@@ -1,0 +1,1263 @@
+{
+  "01  EVERYDAY": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "02  CAMERAS": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "03  MENUS & HUD": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "04  UEVR SETTINGS": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "A / B": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "A hidden head bone has no usable animated pose: the neck supplies an approximation. For actual head-bone tracking choose Keep entire character visible or Hide body; keep full character shadow. Separate accessories without a head bone may remain visible in head-only mode. Exit and re-enter first person in a neutral pose to recalibrate. Offsets use game units. L3 + A recenters headset/simulator displacement.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "A-D restore all controller slots for a fair comparison. Each records until stopped or 1000 changes. Close with Insert, test LB+Y before and after Alt-Tab, then return with Insert. Restore above to undo this batch. UEVR saves the current settings on exit.": [
+    "mods/VR.cpp"
+  ],
+  "A. Physical gamepad baseline": [
+    "mods/VR.cpp"
+  ],
+  "Acro drone (manual)": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Acro throttle control": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Acro: right stick controls roll/pitch rates; left stick X controls yaw. Stick forward pitches down. Centered sticks stop rotation without levelling. Gravity, thrust and momentum keep acting while armed. Full camera roll is part of this mode.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Action": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Activated automatically in this menu: cursor only.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Activated automatically in this menu: cursor only. L3 + R3 opens settings.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Aim direction": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Aiming and right-stick pitch": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Air drag (per second)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "All detected menus": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "All shortcut contexts": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "All slots preserves normal input. Select one slot to exclude the others from WuWa's XInput state calls. Check the raw controller states below while pressing a button to identify your pad. Slot numbers can change after reconnecting; this does not hide Windows devices or filter other input APIs. Vibration commands stay available, including motor stop requests.": [
+    "mods/VR.cpp"
+  ],
+  "All stick overrides (includes legacy pitch-only)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Allow VR motion-controller input": [
+    "mods/VR.cpp"
+  ],
+  "Also cover the ESC profile ID row": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Alternating / AFR": [
+    "mods/VR.cpp"
+  ],
+  "Always (manual mask)": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Animated position + stick pitch": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Animation off: stable height relative to the character root. On: follow the head, or reconstruct it from a visible parent bone when the head is hidden. This follows leaning and sprinting but can add bobbing. Missing rig support falls back to the stable anchor; see the status below.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Arm at low throttle / disarm": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Automatic for current mode": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Automatic mouse starts off so the game's menu buttons, tabs and triggers work normally. Legacy automatic mouse does not adjust the HUD. Page 04 of the sheet is a reference: open UEVR with L3 + R3 before using those controls.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Automatically use mouse in game menus (legacy)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "B. Windows focus forwarding": [
+    "mods/VR.cpp"
+  ],
+  "Below recentered headset origin": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Below standing origin (meters)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Bring sheet in front": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Buttons": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "C. Gamepad passthrough": [
+    "mods/VR.cpp"
+  ],
+  "CAMERA TOOLS": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "CAMERA TOOLS / ACRO DRONE": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "CAMERA TOOLS / HOVER DRONE": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "CAMERA TOOLS / PLANE FPV": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Camera / HUD layouts: LuaLoader > Script UI > WuWa VR comfort controls.": [
+    "mods/VR.cpp"
+  ],
+  "Camera and gameplay controls": [
+    "mods/VR.cpp"
+  ],
+  "Camera collision radius (game units)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Camera customization": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Camera forward/side / height": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Camera shortcuts": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Camera view": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Center sticks": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Change sidebar page": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Choose RT shortcut page": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Click / go back": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Click left stick + left bumper, then release all controls.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Close UEVR before using these shortcuts. L3/R3 mean clicking the sticks; View is the two-squares button and Menu is the three-lines button.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Close UEVR settings to see the sheet in the headset or simulator. It is absent from the game's flat spectator view. At-feet placement uses your recentered headset origin, not the character's feet.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Close UEVR, press L3 + LB once, then release the controller. Left stick moves the cursor; A clicks, B goes back, X + stick scrolls. LT/RT moves the HUD nearer/farther; LB/RB lowers/raises it. L3 + LB again returns to normal controls. Adjustment pauses freecam flight and starts off each launch.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Comfort: stable height, level horizon": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Compare controller fixes in this run": [
+    "mods/VR.cpp"
+  ],
+  "Cruise faster / slower": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Current renderer: %s": [
+    "mods/VR.cpp"
+  ],
+  "Custom / saved behavior": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Custom: Extreme Compatibility": [
+    "mods/VR.cpp"
+  ],
+  "D-pad / A / B": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "D. Focus forwarding + passthrough": [
+    "mods/VR.cpp"
+  ],
+  "Decouple game camera pitch": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Default: keeps the body visible and head bones hidden, with a full shadow copy. Original non-casting/hidden equipment stays excluded. Copies are removed on exit, menus, rig changes or script reset. Unsupported rigs report a fallback below.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Double L3": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Double L3  Windows screenshot": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Double R3": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Double R3  Freecam on / off": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Draws the missing eye of the world-label stage with its own camera and depth rectangle. Requires the matching candidate DLL and native stereo without Native Stereo Fix. Unsupported layouts keep the original rendering. NPC/bubble acceptance is pending; this does not repair reflections or character materials.": [
+    "mods/VR.cpp"
+  ],
+  "Drone response (higher = less drift)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "ESC / overlay menus (detected)": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Edit the UTF-8 JSON files in your game profile's wuwa-languages folder. Missing entries fall back to English. Reload applies changes without restarting the game.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Edit translations": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Enable Polar Xbox controls": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Enable Xbox mouse shortcuts": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "End the temporary focus/motion test below before starting a comparison.": [
+    "mods/VR.cpp"
+  ],
+  "Enter HUD adjustment": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Enter first person": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Enter freecam (move viewpoint with sticks)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Everyday Xbox shortcuts": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Everyday shortcuts": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Exact animation": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Exact animation (stick does not steer view)": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Exit freecam": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Exit mouse mode now": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Extract additional game menus (experimental)": [
+    "mods/VR.cpp"
+  ],
+  "Extract game HUD into the VR panel": [
+    "mods/VR.cpp"
+  ],
+  "FPV camera upward tilt (degrees)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Fill whole frame (stretch)": [
+    "mods/vr/OverlayComponent.hpp"
+  ],
+  "First / fixed: height": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "First person": [
+    "mods/VR.cpp",
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "First person character visibility": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "First person forward offset": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "First person height offset": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "First person motion": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "First person on / off": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "First person right offset": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "First person: animation on/off": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Fit to portal frame": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Fixed camera distance (game units)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Fixed camera height above pawn (game units)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Fixed third person": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Fixed: farther / closer": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Focus game on controller reconnect": [
+    "mods/VR.cpp"
+  ],
+  "Follow animated head / neck position (Custom)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Follow view (player HUD)": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Follow view keeps the HUD with your head. Distance still sets its stereo depth; choose a comfortable size and distance in the headset.": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "For exact edge alignment set WindowMode > Horizontal Curvature to 0. This HUD panel is flat; it does not bend with a curved aperture.": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "For troubleshooting and comparisons. Leave these alone for everyday play; opening this section changes nothing.": [
+    "mods/VR.cpp"
+  ],
+  "Forward Windows focus events (test)": [
+    "mods/VR.cpp"
+  ],
+  "Forward of standing origin (meters)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Frame coverage (1 = full size)": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Freecam": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Freecam collision (experimental)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Freecam movement speed": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Freecam movement style": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Freecam on / off": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Freecam turning speed": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Freecam: LB descends; double RT = turbo": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Freecam: LT rises, RT boosts speed": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Freecam: boost / turbo": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Freecam: left stick moves, right looks": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Freecam: move / look": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Freecam: rise / descend": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Front placement is two meters ahead of the recentered headset origin. Width still adjusts its size.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Full animation is paused: headset/controller aim or Decoupled Pitch conflicts with animated head turning. Game-view rotation is being used; head position still follows the character.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Full animation rotation (experimental)": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Full animation: stick override": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Full frame at 1 fills both axes of the portal rectangle. It stretches the HUD if its proportions differ from the frame. Preserve proportions leaves space on one axis. Safe fit also leaves a margin for rounded/feathered edges. Your separate HUD layout is retained.": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "GAME UI HIDDEN - MENUS ARE HIDDEN TOO": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "GAME UI HIDDEN: L3 + B restores the HUD and game menus.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "GAME UI IS HIDDEN": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "GAME UI IS HIDDEN - menus are hidden too": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Game / fixed camera": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Game camera": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Game-view override shows the game's camera direction while either stick is used, then returns to animation 0.4 seconds after release. Full animation and headset view can still disagree with movement or target selection; aim alignment remains under investigation. These options never rotate or move the character for you.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "HUD / MOUSE MODE ON": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "HUD / MOUSE MODE: OFF": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "HUD / MOUSE MODE: ON": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "HUD / MOUSE ON (menu cursor): L3 + R3 > WuWa Controls > Exit mouse mode now restores game controls.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "HUD / MOUSE ON: gameplay input paused. L3 + LB exits; release all controls. UEVR settings still open with L3 + R3.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "HUD / mouse adjustment ON (L3 + LB toggles)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "HUD / mouse mode is ON: gameplay buttons are redirected": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "HUD POSITION": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "HUD distance (meters)": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "HUD down / up": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "HUD height (meters)": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "HUD nearer / farther": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "HUD placement and visibility": [
+    "mods/VR.cpp"
+  ],
+  "HUD right / left (meters)": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "HUD up / down (meters)": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "HUD: enter adjustment first": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Headset aim selects Head and sends that direction to the game; the stick still turns. Right-stick pitch selects Game, disables control-rotation override and both pitch locks. Neither changes LB + Y or the selected utility.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Height: first / fixed": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Hidden UI stays quiet during normal gameplay. A recovery notice appears only when the game cursor or a known menu-rendering path indicates a menu. L3 + B restores UI. An unknown menu may not be detected; UEVR settings always retain the Show game UI button.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Hide body in first person": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Hide body; keep original shadows": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Hide head bones keeps the visible body, but also removes the head from its shadow. Hide body; keep full character shadow requests hidden shadows only from the game's original visible shadow casters; it does not enable unused wings or effect rigs. Shadow support depends on the character/material.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Hide head bones; full shadow copy": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Hide head bones; keep body": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Hides the captured HUD and menus together. UEVR settings stay available; individual HUD elements cannot yet be moved separately.": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Hold LB": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Hold RB: full speed if Polar walk is on": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Hold brake / boost": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Horizon level removes the game's camera pitch from the VR view. Turn it off for right-stick up/down look, and disable UEVR's Decoupled Pitch below. Head aiming is an alternative; grapple selection still needs game testing.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Horizontal move / look": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Hover drone (inertia)": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Hover drone: left stick moves horizontally, right stick looks, LT rises, LB descends, RT boosts. Release the stick to settle into a hover.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "INSERT  =  OPEN UEVR": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "INSERT > WuWa Controls > Show game UI now": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Ignore motion input while OpenXR is unfocused (test)": [
+    "mods/VR.cpp"
+  ],
+  "In front of recentered headset origin": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Input candidates start off. Their effect on WuWa's intermittent combinations is not confirmed.": [
+    "mods/VR.cpp"
+  ],
+  "Input still pauses when WuWa loses focus. Real game menus temporarily restore the game camera and character visibility.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Invalid profile value: ": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Invert acro pitch stick": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "KNOW YOUR BUTTONS": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Keep camera and head hiding during Alt-Tab / UEVR settings": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Keep entire character visible": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Keep first person horizon level (Custom)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + A": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + A     Recenter view / portal": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + A also resets headset position (seated)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + B": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + B     Show / hide game UI": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + B  =  SHOW UI": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + D-pad Down": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + D-pad Down toggles full animation follow and your previous first-person motion. Custom keeps your saved settings. The other choices sample the head after animation. Animated position preserves normal stick aiming. Full animation follows character turns and bone rotation; it can be intense.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + D-pad Down: animation follow on / off (first person)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + D-pad Up = automatic page": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + LB": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + LB    Return to normal game controls": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + LB    Toggle HUD / mouse adjustment": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + LB  =  RETURN TO GAME CONTROLS": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + LB exits manual adjustment. Release all controls afterwards.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + LB, release": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + LB, then release": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + Menu": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + Menu  Show / hide this sheet": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + R3": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + R3    UEVR menu": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + RB": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + RB    Game / fixed camera": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + View": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + View  First person on / off": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + View toggles first person. These settings apply when first person is active.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + Y / X": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 + Y/X   Fixed / first-person height": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 / R3 = click the left / right stick": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 = click left stick": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3 means click and hold the left stick, then press B.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3/R3 = stick clicks. L3 + LB toggles HUD/mouse adjustment. Utility: LB + R3 = V; hold 0.8 s for Tab wheel.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "L3/R3 mean clicking the sticks. Controls need the supplied WuWa camera script; physical gamepad passthrough bypasses scripts. Both sticks still open UEVR.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "LB + LT / RT": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "LB + LT/RT Fixed camera farther / closer": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "LB + R3 utility shortcut remains available outside adjustment": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "LB + R3: V once; hold 0.8 s for Tab wheel": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "LB + RB": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "LB / RB": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "LB/RB      HUD down / up": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "LT / LB": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "LT / RT": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "LT/RT      HUD nearer / farther": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Language / WuWa": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Larger menu following view": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Launch settings include any custom settings saved before starting this game. Supplied profile controls are the build's original choices, not UEVR factory defaults.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Launch settings restored. Release all controls before continuing.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Leave first person": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Leave freecam": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Left / right stick": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Left stick": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Left stick (RT off)": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Left stick Cursor    A Click    B Back": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Left stick X": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Left stick Y (Mode 2)": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Legacy pitch-only override is active; choose either option above to replace it.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Level drone and stop": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Live input tests. Change one option, close this menu, then repeat the same action.": [
+    "mods/VR.cpp"
+  ],
+  "Local controller and camera data only, about 30 samples/sec. The clean-video recorder starts this automatically. It never presses buttons. Video/sidecar alignment uses timestamps, not a claim of GPU-frame synchronization.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Lower eye level by 5": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Maximum thrust / weight": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Menu": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Menus and HUD": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Mode 2: centered left stick means 50%% throttle. An Xbox stick springs back to center; hold it down for zero throttle.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Mode OFF": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Move cursor": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Move map": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Native Stereo": [
+    "mods/VR.cpp"
+  ],
+  "Native Stereo Fix frame timing (experimental)": [
+    "mods/VR.cpp"
+  ],
+  "Native Stereo with Native Stereo Fix": [
+    "mods/VR.cpp"
+  ],
+  "Navigate / activate / back": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Normal game/menu controls": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "On uses our LGUI capture. Off shows the game's original HUD in the eye images. This does not hide the UEVR settings panel.": [
+    "mods/VR.cpp"
+  ],
+  "Open / close UEVR settings": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Optional experiments and diagnostics": [
+    "mods/VR.cpp"
+  ],
+  "Or: UEVR > WuWa Controls > Show game UI now": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Pause and disarm": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Physical gamepad passthrough (test)": [
+    "mods/VR.cpp"
+  ],
+  "Pitch + bank / yaw": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Pitch / roll rate (degrees / second)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Place sheet at feet": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Plane FPV": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Plane cruise speed (game units / second)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Plane: right stick pitches/banks, left stick X steers yaw. RT increases cruise speed, LT decreases it. Hold LB to brake, RB to boost. Double R3 exits. Cruise pauses when focus or controller samples are lost; release controls then move a stick to rearm after Alt-Tab.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Polar fly": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Polar fly: left stick moves along view, right stick looks. LT rises, LB descends; RT boosts, double RT gives turbo.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Polar shortcuts are disabled or bypassed.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Polar walk speed unless RB is held": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Portal HUD sizing": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Portal is off: using your separate HUD layout until it is enabled.": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Preserve proportions at frame edges": [
+    "mods/vr/OverlayComponent.hpp"
+  ],
+  "Preserves both deactivation and keyboard focus events, including while this overlay is open. It applies to future events: after enabling, Alt-Tab away and back once. It does not bring the game to the foreground automatically.": [
+    "mods/VR.cpp"
+  ],
+  "Privacy box placement": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Profile ID bottom": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Profile ID left": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Profile ID right": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Profile ID top": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "QUICK ACTIONS": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "R3 = click right stick": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "REFERENCE: OPEN UEVR TO USE THESE": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "RT + D-pad L / R": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "RT + left / right stick": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "RT / LT": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "RT / RB": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "RT / double RT": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "RT / left Y": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "RT page 1: B / Y / X": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "RT page 2 / 3": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Raise eye level by 5": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Readable HUD following view": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Recenter headset / portal": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Recenter view / portal": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Record camera and Xbox diagnostics": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Recording": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Refresh position before drawing (Custom)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Release RT (Xbox) or pull left stick fully down (Mode 2), then tap RB to arm. Tap RB again or hold LB to pause/disarm. LB + RB levels the drone and stops it. Double R3 exits. Focus loss, menus and shortcut chords pause/disarm it; arm again to resume.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Release all controls after entering/leaving": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Reload language files": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Rendering comparisons (live)": [
+    "mods/VR.cpp"
+  ],
+  "Requires Native Stereo Fix off. New Esc candidate matches the ViewFamilyTexture observed on September 24. Other menus keep the existing route. Compare off/on in the same menu; blur/backdrop and live acceptance are still pending.": [
+    "mods/VR.cpp"
+  ],
+  "Reset headset position and direction now": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Reset offsets / view / origin": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Restore all controller slots": [
+    "mods/VR.cpp"
+  ],
+  "Restore controls from this launch": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Restore input settings from before comparisons": [
+    "mods/VR.cpp"
+  ],
+  "Restore profile settings": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Restore renderer from before this comparison": [
+    "mods/VR.cpp"
+  ],
+  "Restore supplied profile controls": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Restore this build's supplied controls, first-person/freecam settings, camera scale, aiming and HUD layout. Rendering and runtime selection are preserved. Temporary HUD/mouse mode is always turned off. You can undo the reset below.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Returns Windows XInput unchanged, bypassing VR and Lua gamepad processing. Use Insert and the mouse for this settings panel; gamepad shortcuts and VR controller mapping are unavailable in this mode.": [
+    "mods/VR.cpp"
+  ],
+  "Right stick": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Right stick / left X": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Right trigger (Xbox)": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Right-stick pitch; animated yaw and roll": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Roll / pitch (forward = down)": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Room panel (stays put)": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Safe fit inside rounded edges": [
+    "mods/vr/OverlayComponent.hpp"
+  ],
+  "Scroll": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Scroll focused panel": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Send aim to player control rotation": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Separate eyes: Synchronized Sequential": [
+    "mods/VR.cpp"
+  ],
+  "Separate-eye rendering produced a black scene with HUD in the September 26 playtest. Native stereo is the working baseline. Submission metadata has been repaired, but separate-eye rendering is still an experiment, not a fix for labels/reflections/materials. Return to Native if the scene disappears.": [
+    "mods/VR.cpp"
+  ],
+  "Set show / hide UI key": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Settings from before the reset restored; mouse mode remains off.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Settings: D-pad selects, A activates, left stick scrolls the focused pane. Mouse wheel also scrolls. Release RT first: holding it adjusts the camera instead.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Settings: Exit mouse mode now": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Sheet is blocked by FrameworkConfig > Always Show Cursor. Turn that off to display it.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Sheet open: L3 + D-pad Left/Right = pages": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Sheet open: L3 + D-pad Left/Right = pages   |   L3 + D-pad Up = automatic   |   Release RT before UEVR scrolling.": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Sheet position": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Sheet width (meters)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Shortcut sheet page": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Shortcut sheet placement": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Shortcuts and the sheet start enabled on a fresh profile. Your saved choices are respected. The sheet is below your recentered headset origin; L3 + Menu hides it.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Show / hide game HUD and menus": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Show / hide game UI": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Show / hide shortcut sheet": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Show / hide this sheet": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Show UI to see this menu": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Show extracted game UI": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Show game UI now": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Show hover-drone / plane camera roll": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Show shortcut sheet": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Simulator Home resets only the simulated headset and preview. Use this reset afterwards to align UEVR's origin. It preserves world scale and camera offsets.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Smooth transition between animation and game view": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Smoothing blends stick handovers and reported movement-state changes, such as takeoff/landing. It starts enabled on the supplied profile. Head position stays current; ordinary aiming and animation are immediate after the handover. Off restores the instant switch.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Start motion sidecar (5 minutes max)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Starts off. Only affects Native Stereo Fix with OpenXR; requires a headset timing comparison before treating it as a fix.": [
+    "mods/VR.cpp"
+  ],
+  "Stereo rendering compatibility": [
+    "mods/VR.cpp"
+  ],
+  "Stick expo (softens center)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Stop motion sidecar": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Stop rotation; no auto-level": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Stopped": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Streamer privacy: cover player IDs": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Supplied profile restored. Release all controls before continuing.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Sweeps the camera against surfaces that block the game's Visibility trace. Slides along contact surfaces. Unsupported queries hold movement and report a reason below. Physical headset leaning is not constrained. Starts off; world geometry still needs live verification.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Tap RB": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "The saved renderer used Native Stereo Fix. Disable additional-menu extraction before restoring that combination, or keep native stereo without the fix.": [
+    "mods/VR.cpp"
+  ],
+  "The sheet stays at your recentered origin, including in HUD/mouse mode. UEVR settings and the hidden-UI recovery warning take priority. Only its L3 + D-pad page shortcuts consume input while visible.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "The top-left box normally follows the ESC/overlay menu render path, including gamepad menus. Other popups using that same path may also show it. The bottom-right UID box stays on. Check your recording; unknown menu layouts are not guaranteed to be covered. Always is a manual fallback.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "These are UEVR's existing global aim settings, shared with VR > Input. They are not limited to first person.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "These buttons use UEVR's existing live rendering options. The image may pause while render targets rebuild. They leave camera, HUD placement and controller settings alone. Opening this section changes nothing; UEVR saves whichever renderer you leave selected.": [
+    "mods/VR.cpp"
+  ],
+  "These modes move the viewpoint; the character stays put. Acro is a camera flight model, without motor, propeller or battery simulation.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "These options are optional comparisons. Opening this section does not enable them or change your camera.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "This is a flat rectangular HUD: corners can extend over rounded/feathered edges. Use Safe fit to keep every corner inside, or use a rectangular portal for exact alignment.": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "This older profile has no supplied-defaults file. Reset this build in the launcher while the game is closed, or use this launch's settings below.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Throttle: choose in UEVR": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Tilt toward feet (degrees)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Toggle HUD / mouse adjustment": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Toggle HUD / mouse mode": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Toggle this mode on / off": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Trace mesh triangles when supported": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Transition duration (seconds)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Try headset aim": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Turn this off to isolate your physical gamepad. Head tracking stays enabled.": [
+    "mods/VR.cpp"
+  ],
+  "UEVR > WuWa Controls > Exit mouse mode now": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "UEVR settings": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "UEVR settings reference": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "UI placement": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "UI visibility (L3 + B), recenter, UEVR settings and sheet toggle are shown on every page. With the sheet open, hold L3 and tap D-pad left/right to browse all four pages; L3 + D-pad up returns to automatic. These page shortcuts leave the game D-pad unchanged while the sheet is hidden.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "UID bottom": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "UID left": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "UID right": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "UID top": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Unavailable while Native Stereo Fix is on. These rendering options cannot be combined.": [
+    "mods/VR.cpp"
+  ],
+  "Undo last controls reset": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Use game aim for full animation": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Use game view while either stick moves": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Use native stereo": [
+    "mods/VR.cpp"
+  ],
+  "Use right-stick pitch": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Use separate-eye renderer": [
+    "mods/VR.cpp"
+  ],
+  "View": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "View: two squares   Menu: three lines": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "WHILE ADJUSTMENT IS ON": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "WUWA VR": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Waiting for a valid portal anchor.": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Warn when a menu opens with game UI hidden": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "When to show the profile ID box": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "While playing in first person, hold L3 + Y to raise eye level or L3 + X to lower it. This lets you see the result with this menu closed.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Window alignment down / up": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Window alignment left / right": [
+    "mods/vr/OverlayComponent.cpp"
+  ],
+  "Windows screenshot": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "World-space labels in both eyes (candidate)": [
+    "mods/VR.cpp"
+  ],
+  "WuWa Controls > Show game UI now": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "WuWa controls and shortcut pages only. Base UEVR, game text and some technical help remain English. Translations are community-editable drafts.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "X + left stick": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "X + stick  Scroll    D-pad Move map": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "X/Y/B: load / save slots 0/1/2": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "XBOX CONTROLLER  /  POLAR SHORTCUTS": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "XInput controller slot (test)": [
+    "mods/VR.cpp"
+  ],
+  "Xbox shortcuts": [
+    "mods/VR.cpp"
+  ],
+  "Yaw": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Yaw rate (degrees / second)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ]
+}

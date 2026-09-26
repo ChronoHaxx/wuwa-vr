@@ -1,0 +1,1089 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2332260..2acc1d0 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -46,6 +46,10 @@ add_library(openxr_simulator SHARED
+ 
+ include(CTest)
+ if(BUILD_TESTING)
++    add_executable(space_math_tests tests/space_math_tests.cpp)
++    target_include_directories(space_math_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
++    add_test(NAME space_math COMMAND space_math_tests)
++
+     add_executable(projection_timing_tests tests/projection_timing_tests.cpp)
+     target_include_directories(projection_timing_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+     add_test(NAME projection_timing COMMAND projection_timing_tests)
+diff --git a/probe/xr_probe.cpp b/probe/xr_probe.cpp
+index 9b9805c..0bc9aae 100644
+--- a/probe/xr_probe.cpp
++++ b/probe/xr_probe.cpp
+@@ -43,6 +43,7 @@ static XrInstance g_instance = XR_NULL_HANDLE;
+ static XrPath P(const char* s) { XrPath p = XR_NULL_PATH; xrStringToPath(g_instance, s, &p); return p; }
+ 
+ int main() {
++    setvbuf(stdout, nullptr, _IONBF, 0);  // keep the failing step if a supervised run times out
+     step("xrEnumerateInstanceExtensionProperties");
+     uint32_t extCount = 0;
+     XRC(xrEnumerateInstanceExtensionProperties(nullptr, 0, &extCount, nullptr), "enumerate extension count");
+@@ -67,7 +68,7 @@ int main() {
+     XrInstanceCreateInfo ici = { XR_TYPE_INSTANCE_CREATE_INFO };
+     ici.enabledExtensionCount = (uint32_t)enabled.size();
+     ici.enabledExtensionNames = enabled.data();
+-    ici.applicationInfo = { "BetterVR", 1, "Cemu", 1, XR_API_VERSION_1_0 };
++    ici.applicationInfo = { "BetterVR", 1, "Cemu", 1, XR_MAKE_VERSION(1, 0, 0) };
+     XRC(xrCreateInstance(&ici, &g_instance), "xrCreateInstance");
+ 
+     PFN_xrGetD3D12GraphicsRequirementsKHR pfnReq = nullptr;
+@@ -182,6 +183,14 @@ int main() {
+     rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+     XRC(xrCreateReferenceSpace(session, &rsci, &headSpace), "xrCreateReferenceSpace(VIEW)");
+ 
++    const bool spaceContract = EnvOn("PROBE_SPACE_CONTRACT");
++    XrSpace offsetSpace = XR_NULL_HANDLE;
++    if (spaceContract) {
++        rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
++        rsci.poseInReferenceSpace = {{0, 0.7071067812f, 0, 0.7071067812f}, {0.75f, -0.5f, 0.25f}};
++        XRC(xrCreateReferenceSpace(session, &rsci, &offsetSpace), "xrCreateReferenceSpace(rotated + translated STAGE)");
++    }
++
+     step("actions (BetterVR's shape: subaction paths, pose/bool/float/vec2/vibration)");
+     std::array<XrPath, 2> handPaths = { P("/user/hand/left"), P("/user/hand/right") };
+     if (handPaths[0] == XR_NULL_PATH || handPaths[1] == XR_NULL_PATH) { printf("  [FAIL] xrStringToPath returned XR_NULL_PATH\n"); g_fail++; }
+@@ -384,6 +393,8 @@ int main() {
+     int sleepMs = 0;
+     if (const char* env = getenv("XR_PROBE_SLEEP_MS")) sleepMs = atoi(env);
+     const bool projectionOnly = EnvOn("XR_PROBE_PROJECTION_ONLY");
++    const bool omitQuads = EnvOn("XR_PROBE_NO_QUADS");
++    const bool onlyQuads = EnvOn("XR_PROBE_QUAD_ONLY");
+ 
+     char stepLabel[128];
+     snprintf(stepLabel, sizeof(stepLabel), "frame loop x %d (waitFrame/beginFrame/locateViews/acquire/release/endFrame + syncActions)", totalFrames);
+@@ -449,6 +460,35 @@ int main() {
+         std::array<XrView, 2> views = { XrView{ XR_TYPE_VIEW }, XrView{ XR_TYPE_VIEW } };
+         r = xrLocateViews(session, &vli, &vs, n, &n, views.data());
+         if (XR_FAILED(r)) { fail("xrLocateViews", r); break; }
++        if (f == 0 && spaceContract) {
++            auto verify = [&](bool value, const char* label) {
++                if (value) ok(label); else fail(label, XR_ERROR_VALIDATION_FAILURE);
++            };
++            auto closeEnough = [](float a, float b) { return std::isfinite(a) && std::abs(a-b) < 0.0001f; };
++            XrViewLocateInfo localInfo = vli;
++            localInfo.space = headSpace;
++            std::array<XrView, 2> eyes{XrView{XR_TYPE_VIEW}, XrView{XR_TYPE_VIEW}};
++            uint32_t count{};
++            XRC(xrLocateViews(session, &localInfo, &vs, 2, &count, eyes.data()), "xrLocateViews(VIEW offsets)");
++            for (const auto& eye : eyes) {
++                verify(closeEnough(eye.pose.position.y, 0) && closeEnough(eye.pose.position.z, 0), "VIEW eye has no duplicated head translation");
++                verify(closeEnough(eye.pose.orientation.x, 0) && closeEnough(eye.pose.orientation.y, 0) && closeEnough(eye.pose.orientation.z, 0) && closeEnough(eye.pose.orientation.w, 1), "VIEW eye has no duplicated head rotation");
++            }
++            verify(eyes[0].pose.position.x < 0 && eyes[1].pose.position.x > 0, "VIEW eye offsets retain stereo separation");
++            verify(closeEnough(views[0].pose.position.y, headLoc.pose.position.y), "STAGE eye retains actual head height");
++            XrSpaceLocation same{XR_TYPE_SPACE_LOCATION}, shifted{XR_TYPE_SPACE_LOCATION};
++            XRC(xrLocateSpace(headSpace, headSpace, fs.predictedDisplayTime, &same), "xrLocateSpace(VIEW relative to itself)");
++            verify(closeEnough(same.pose.position.x, 0) && closeEnough(same.pose.position.y, 0) && closeEnough(same.pose.position.z, 0), "space located relative to itself is identity");
++            XRC(xrLocateSpace(headSpace, offsetSpace, fs.predictedDisplayTime, &shifted), "xrLocateSpace(VIEW in offset STAGE)");
++            verify(closeEnough(shifted.pose.position.x, 0.25f-headLoc.pose.position.z) &&
++                closeEnough(shifted.pose.position.y, headLoc.pose.position.y+0.5f) &&
++                closeEnough(shifted.pose.position.z, headLoc.pose.position.x-0.75f), "base translation and 90-degree rotation both respected");
++            verify(xrLocateViews(session, &localInfo, &vs, 1, &count, eyes.data()) == XR_ERROR_SIZE_INSUFFICIENT, "undersized view array refused");
++            localInfo.space = (XrSpace)(uintptr_t)0xabcdef;
++            verify(xrLocateViews(session, &localInfo, &vs, 2, &count, eyes.data()) == XR_ERROR_HANDLE_INVALID, "unknown locate space refused");
++            if (g_fail) break;
++            ok("OpenXR space contract verified against loaded runtime");
++        }
+         if (f == 0) {
+             printf("       viewStateFlags=0x%llX  n=%u\n", (unsigned long long)vs.viewStateFlags, n);
+             printf("       L pos=(%.3f,%.3f,%.3f) fov=(%.3f,%.3f,%.3f,%.3f)\n", views[0].pose.position.x, views[0].pose.position.y, views[0].pose.position.z,
+@@ -560,7 +600,7 @@ int main() {
+         // Alternate in blocks rather than splitting the run in half, so a long run does not
+         // make an observer wait out thousands of quad-only frames to see the mixed case.
+         const int phaseLen = (totalFrames > 200) ? 100 : (totalFrames / 2);
+-        const bool quadOnly = !projectionOnly && ((phaseLen <= 0) || ((f / phaseLen) % 2) == 0);
++        const bool quadOnly = onlyQuads || (!projectionOnly && ((phaseLen <= 0) || ((f / phaseLen) % 2) == 0));
+         if (quadOnly) quadOnlyFrames++;
+ 
+         bool cycled = cycle(quadChain, false);
+@@ -635,10 +675,12 @@ int main() {
+         const XrCompositionLayerBaseHeader* layers[5];
+         uint32_t layerCount = 0;
+         if (!quadOnly) layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&proj);
+-        layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&quad);
+-        layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&angled);
+-        layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&rightOnly);
+-        layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&overlap);
++        if (!omitQuads) {
++            layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&quad);
++            layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&angled);
++            layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&rightOnly);
++            layers[layerCount++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&overlap);
++        }
+ 
+         XrFrameEndInfo fei = { XR_TYPE_FRAME_END_INFO };
+         fei.displayTime = fs.predictedDisplayTime;
+@@ -699,7 +741,7 @@ int main() {
+     XRC_SOFT(xrRequestExitSession(session), "xrRequestExitSession");
+     XRC_SOFT(xrEndSession(session), "xrEndSession right after xrRequestExitSession");
+     for (Chain* c : { &colorL, &colorR, &depthL, &depthR, &quadChain }) if (c->handle) xrDestroySwapchain(c->handle);
+-    for (XrSpace s : { handSpaces[0], handSpaces[1], headSpace, stageSpace }) if (s) xrDestroySpace(s);
++    for (XrSpace s : { handSpaces[0], handSpaces[1], headSpace, stageSpace, offsetSpace }) if (s) xrDestroySpace(s);
+     XRC_SOFT(xrDestroySession(session), "xrDestroySession");
+     XRC_SOFT(xrDestroyInstance(g_instance), "xrDestroyInstance");
+ 
+diff --git a/src/mcp_integration.h b/src/mcp_integration.h
+index b978aca..3b7a95b 100644
+--- a/src/mcp_integration.h
++++ b/src/mcp_integration.h
+@@ -139,9 +139,49 @@ inline std::string g_screenshotEye = "both";
+ inline std::string g_screenshotLayer = "projection";  // "projection", "quad", or "all"
+ inline std::atomic_uint64_t g_runtimeFrameCount{};
+ inline uint64_t g_screenshotRequestFrame = 0;
++inline bool g_screenshotInFlight = false;
++inline std::string g_screenshotClientId;
++
++// A request belongs to the frame that records it, not the older frame the
++// asynchronous preview happens to paint when the request arrives.
++struct ScreenshotRequest {
++    bool active = false;
++    std::string layer, eye, clientId;
++    uint64_t frame = 0;
++};
++
++inline std::string JsonEscape(const std::string& value) {
++    std::string out;
++    for (unsigned char c : value) {
++        if (c == '"' || c == '\\') { out += '\\'; out += (char)c; }
++        else if (c < 32) {
++            char escaped[7]; snprintf(escaped, sizeof(escaped), "\\u%04x", c);
++            out += escaped;
++        } else out += (char)c;
++    }
++    return out;
++}
++
++inline ScreenshotRequest CurrentScreenshotRequest() {
++    return {g_screenshotRequested, g_screenshotLayer, g_screenshotEye,
++            g_screenshotClientId, g_screenshotRequestFrame};
++}
++
++inline void RequestPreviewScreenshot(const char* eye) {
++    if (g_screenshotRequested || g_screenshotInFlight) return;
++    g_screenshotLayer = "all";
++    g_screenshotEye = eye;
++    g_screenshotClientId.clear();
++    g_screenshotRequestFrame = g_runtimeFrameCount.load(std::memory_order_acquire);
++    g_screenshotRequested = true;
++}
+ 
+ inline void WriteScreenshotStatus(const char* layer, uint32_t width, uint32_t height,
+-                                  uint64_t capturedFrame = 0) {
++                                  uint64_t capturedFrame = 0,
++                                  const ScreenshotRequest* request = nullptr,
++                                  const char* error = nullptr,
++                                  bool isolatedPreview = false) {
++    const auto current = request ? *request : CurrentScreenshotRequest();
+     std::string path = GetSimulatorDataPath() + "\\screenshot_status.json";
+     std::string temporary = path + ".tmp";
+     FILE* file = nullptr;
+@@ -151,13 +191,19 @@ inline void WriteScreenshotStatus(const char* layer, uint32_t width, uint32_t he
+     fprintf(file, "{\n");
+     fprintf(file, "  \"timestamp\": \"%04d-%02d-%02dT%02d:%02d:%02d.%03d\",\n",
+             st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+-    fprintf(file, "  \"requestFrame\": %llu,\n", (unsigned long long)g_screenshotRequestFrame);
++    fprintf(file, "  \"ok\": %s,\n", error ? "false" : "true");
++    fprintf(file, "  \"runtimePid\": %lu,\n", GetCurrentProcessId());
++    fprintf(file, "  \"client_id\": \"%s\",\n", JsonEscape(current.clientId).c_str());
++    if (error) fprintf(file, "  \"error\": \"%s\",\n", JsonEscape(error).c_str());
++    if (request) fprintf(file, "  \"captureKind\": \"%s\",\n",
++                         isolatedPreview ? "layer-isolated-preview" : "composited-preview");
++    fprintf(file, "  \"requestFrame\": %llu,\n", (unsigned long long)current.frame);
+     fprintf(file, "  \"capturedFrame\": %llu,\n",
+             (unsigned long long)(capturedFrame != 0
+                 ? capturedFrame
+                 : g_runtimeFrameCount.load(std::memory_order_acquire)));
+-    fprintf(file, "  \"layer\": \"%s\",\n", layer ? layer : "unknown");
+-    fprintf(file, "  \"eye\": \"%s\",\n", g_screenshotEye.c_str());
++    fprintf(file, "  \"layer\": \"%s\",\n", JsonEscape(layer ? layer : "unknown").c_str());
++    fprintf(file, "  \"eye\": \"%s\",\n", JsonEscape(current.eye).c_str());
+     fprintf(file, "  \"width\": %u,\n", width);
+     fprintf(file, "  \"height\": %u\n", height);
+     fprintf(file, "}\n");
+@@ -173,6 +219,9 @@ inline bool g_quadLayerCaptured = false;
+ 
+ // Check if MCP has requested a screenshot
+ inline void CheckScreenshotRequest() {
++    // Leave a subsequent command on disk until the GPU has completed this one.
++    // In particular, never overwrite the identity of an in-flight readback.
++    if (g_screenshotRequested || g_screenshotInFlight) return;
+     std::string reqPath = GetSimulatorDataPath() + "\\screenshot_request.json";
+     FILE* f = nullptr;
+     if (fopen_s(&f, reqPath.c_str(), "r") == 0 && f) {
+@@ -186,6 +235,7 @@ inline void CheckScreenshotRequest() {
+         g_screenshotRequestFrame = g_runtimeFrameCount.load(std::memory_order_acquire);
+         g_screenshotEye = o.string("eye", "both");
+         g_screenshotLayer = o.string("layer", "projection");
++        g_screenshotClientId = o.string("client_id", "");
+ 
+         DeleteFileA(reqPath.c_str());
+         McpLogf("Screenshot request detected: layer=%s, eye=%s", g_screenshotLayer.c_str(), g_screenshotEye.c_str());
+diff --git a/src/runtime.cpp b/src/runtime.cpp
+index 0f26abf..7a14bdc 100644
+--- a/src/runtime.cpp
++++ b/src/runtime.cpp
+@@ -115,6 +115,7 @@ static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_glCheckFramebufferStatus = nullptr;
+ #include <loader_interfaces.h>
+ #include "mcp_integration.h"
+ #include "projection_timing.h"
++#include "space_math.h"
+ #include "ui_enhancements.h"
+ 
+ using Microsoft::WRL::ComPtr;
+@@ -146,6 +147,14 @@ static const bool g_logVerbose = []() {
+     return n > 0 && n < sizeof(v) && v[0] != '0';
+ }();
+ 
++// Test-only, per-process opt-in: keep the preview window for sizing/rendering,
++// but never show or focus it. Does not change runtime registration or settings.
++static const bool g_previewHeadless = []() {
++    char v[16]{};
++    const DWORD n = GetEnvironmentVariableA("SIMXR_HEADLESS", v, (DWORD)sizeof(v));
++    return n > 0 && n < sizeof(v) && v[0] != '0';
++}();
++
+ static void EnsureLogFile() {
+     if (g_LogFile) return;
+     char base[MAX_PATH]{};
+@@ -377,6 +386,11 @@ static constexpr UINT kPreviewMaxHeight = 1080;
+ struct PreviewFrame12 {
+     ComPtr<ID3D12CommandAllocator> alloc;
+     ComPtr<ID3D12Resource> readback;   // composited frame, kPreviewRTFormat rows at previewReadbackPitch
++    mcp::ScreenshotRequest screenshot;
++    // Allocated only for an explicit isolated-layer screenshot, and released
++    // after its fence completes. Ordinary preview frames do no extra drawing.
++    ComPtr<ID3D12Resource> captureRT, captureReadback;
++    ComPtr<ID3D12DescriptorHeap> captureRtvHeap;
+     UINT rtWidth{0}, rtHeight{0};      // size the composite in `readback` was rendered at
+     UINT64 fenceValue{0};              // last value signalled for this slot; 0 = never submitted
+     bool pending{false};               // submitted, not yet painted into the back buffer
+@@ -692,8 +706,10 @@ static ControllerState g_rightController = {
+     {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f  // Velocity tracking
+ };
+ 
+-// Map XrSpace handles to controller type (0=none, 1=left grip, 2=left aim, 3=right grip, 4=right aim)
++// Map action spaces to a hand (0=unbound, 1=left, 2=right).
+ static std::unordered_map<XrSpace, int> g_controllerSpaces;
++static std::unordered_map<XrSpace, XrPosef> g_actionSpaceOffsets;
++static uintptr_t g_nextSpace = 100;
+ 
+ // Composition layers carry a pose plus the space it is in, and VIEW (head-locked)
+ // against STAGE (world) changes where the layer belongs entirely.
+@@ -777,30 +793,9 @@ XrQuaternionf QuatFromYawPitchRoll(float yaw, float pitch, float roll) {
+     return q;
+ }
+ 
+-static inline XrQuaternionf MultiplyQuaternions(const XrQuaternionf& a, const XrQuaternionf& b) {
+-    return XrQuaternionf{
+-        a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
+-        a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
+-        a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
+-        a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z
+-    };
+-}
+-
+-// Rotate a vector by a quaternion (q * v * q^-1)
+-static inline XrVector3f RotateVectorByQuaternion(const XrQuaternionf& q, const XrVector3f& v) {
+-    const XrQuaternionf qv{ v.x, v.y, v.z, 0.0f };
+-    const XrQuaternionf qinv{ -q.x, -q.y, -q.z, q.w };
+-    const XrQuaternionf r = MultiplyQuaternions(MultiplyQuaternions(q, qv), qinv);
+-    return XrVector3f{ r.x, r.y, r.z };
+-}
+-
+-static inline XrPosef ComposePose(const XrPosef& parent, const XrPosef& child) {
+-    const XrVector3f r = RotateVectorByQuaternion(parent.orientation, child.position);
+-    XrPosef out;
+-    out.orientation = MultiplyQuaternions(parent.orientation, child.orientation);
+-    out.position = { parent.position.x + r.x, parent.position.y + r.y, parent.position.z + r.z };
+-    return out;
+-}
++using simspace::MultiplyQuaternions;
++using simspace::RotateVectorByQuaternion;
++using simspace::ComposePose;
+ 
+ static void GetEffectiveHeadAngles(float& yaw, float& pitch, float& roll) {
+     yaw = g_headYaw; pitch = g_headPitch; roll = g_headRoll;
+@@ -830,6 +825,30 @@ static XrFovf GetViewFov(uint32_t eye) {
+     return GetUiFov(eye);
+ }
+ 
++// Resolve every space into the same simulator tracking coordinates before taking
++// a relative transform. In particular VIEW requests must not receive head height
++// and rotation a second time as if they were eye offsets.
++static bool SpaceWorldPose(XrSpace space, float yaw, float pitch, float roll, XrPosef& pose, bool& tracked) {
++    tracked = true;
++    const XrPosef head{QuatFromYawPitchRoll(yaw, pitch, roll), g_headPos};
++    if (const auto it = g_referenceSpaces.find(space); it != g_referenceSpaces.end()) {
++        pose = simspace::ReferenceWorldPose(it->second.type, it->second.poseInRef, head);
++        return true;
++    }
++    if (const auto it = g_controllerSpaces.find(space); it != g_controllerSpaces.end()) {
++        pose = simspace::IdentityPose();
++        if (it->second == 0) { tracked = false; return true; }
++        const auto& ctrl = it->second == 1 ? g_leftController : g_rightController;
++        tracked = ctrl.isTracking;
++        GetControllerPose(ctrl, &pose);
++        if (const auto offset = g_actionSpaceOffsets.find(space); offset != g_actionSpaceOffsets.end()) {
++            pose = ComposePose(pose, offset->second);
++        }
++        return true;
++    }
++    return false;
++}
++
+ // --- Composition layer blending -------------------------------------------------------------------
+ // OpenXR 1.0, XrCompositionLayerFlagBits: the layer's alpha channel is only live when
+ // BLEND_TEXTURE_SOURCE_ALPHA is set, and is premultiplied into the colour channels unless
+@@ -1401,6 +1420,14 @@ static void WaitForPreviewIdle(rt::Session& s) {
+     WaitForPreviewFence(s);
+     // Nothing is in flight any more, so no slot is waiting to be picked up either.
+     for (UINT i = 0; i < rt::kPreviewFrames; ++i) {
++        auto& f = s.previewFrames[i];
++        if (f.screenshot.active) {
++            mcp::WriteScreenshotStatus(f.screenshot.layer.c_str(), 0, 0, f.frame,
++                                      &f.screenshot, "preview_reset_before_capture");
++            f.screenshot = {};
++            mcp::g_screenshotRequested = mcp::g_screenshotInFlight = false;
++        }
++        f.captureRT.Reset(); f.captureReadback.Reset(); f.captureRtvHeap.Reset();
+         s.previewFrames[i].pending = false;
+         s.previewFrames[i].recording = false;
+     }
+@@ -1754,7 +1781,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
+             rt::RefreshPreviewGeometry(hWnd);
+             if (ui::HandleMenuCommand(hWnd, wParam,
+                 []() { rt::ResizeWindowForContent(rt::g_session.hwnd); },
+-                []() { mcp::g_screenshotRequested = true; },
++                []() { mcp::RequestPreviewScreenshot(ui::g_uiState.viewMode == ui::ViewMode::BothEyes ? "both" :
++                    ui::g_uiState.viewMode == ui::ViewMode::LeftEyeOnly ? "left" : "right"); },
+                 []() {
+                     rt::g_headPos = {0, 1.7f, 0}; rt::g_headYaw = 0; rt::g_headPitch = 0; rt::g_headRoll = 0;
+                     ui::SetFitToWindow();
+@@ -1771,7 +1799,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
+                 rt::RefreshPreviewGeometry(hWnd);
+                 if (ui::HandleKeyboardShortcut(hWnd, wParam,
+                     []() { rt::ResizeWindowForContent(rt::g_session.hwnd); },
+-                    []() { mcp::g_screenshotRequested = true; },
++                    []() { mcp::RequestPreviewScreenshot(ui::g_uiState.viewMode == ui::ViewMode::BothEyes ? "both" :
++                        ui::g_uiState.viewMode == ui::ViewMode::LeftEyeOnly ? "left" : "right"); },
+                     []() {
+                         rt::g_headPos = {0, 1.7f, 0}; rt::g_headYaw = 0; rt::g_headPitch = 0; rt::g_headRoll = 0;
+                         ui::SetFitToWindow();
+@@ -1803,13 +1832,13 @@ static void ensurePreview(Session& s) {
+     if (s.hwnd) return;
+     WNDCLASSW wc{}; wc.lpfnWndProc = WndProc; wc.hInstance = GetModuleHandleW(nullptr); wc.lpszClassName = L"OpenXR Simulator";
+     RegisterClassW(&wc);
+-    s.hwnd = CreateWindowExW(0, wc.lpszClassName, L"OpenXR Simulator", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
++    s.hwnd = CreateWindowExW(0, wc.lpszClassName, L"OpenXR Simulator", WS_OVERLAPPEDWINDOW | (g_previewHeadless ? 0 : WS_VISIBLE),
+                              CW_USEDEFAULT, CW_USEDEFAULT, (int)s.previewWidth, (int)s.previewHeight, nullptr, nullptr, wc.hInstance, nullptr);
+     Logf("[SimXR] ensurePreview: hwnd=%p size=%ux%u usesD3D12=%d", s.hwnd, s.previewWidth, s.previewHeight, s.usesD3D12);
+ 
+     // Make sure window is shown and updated
+     if (s.hwnd) {
+-        ShowWindow(s.hwnd, SW_SHOW);
++        if (!g_previewHeadless) ShowWindow(s.hwnd, SW_SHOW);
+         UpdateWindow(s.hwnd);
+ 
+         // Check if window has focus
+@@ -2845,7 +2874,8 @@ static const char* kSupportedExtensions[] = {
+     XR_KHR_VULKAN_ENABLE_EXTENSION_NAME,
+     XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME,
+     XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
+-    XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME,  // UEVR uses this for UI layers
++    // Cylinder composition is not implemented below; do not advertise it.
++    // UEVR will then choose its supported quad fallback instead of an invisible UI.
+     "XR_KHR_win32_convert_performance_counter_time"    // Unity often requires this
+ };
+ 
+@@ -4088,23 +4118,9 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
+     static long long periodNs = (long long)(periodSec * 1e9);
+     static double nextTick = [](){ LARGE_INTEGER t; QueryPerformanceCounter(&t); return (double)t.QuadPart; }();
+     
+-    // Handle WASD keyboard input for movement (relative to head orientation).
+-    //
+-    // Accept input when the foreground window is our preview window OR ANY window owned by the host
+-    // process (the OpenXR app — e.g. the game). The simulator runtime lives in-process with the host,
+-    // so checking the foreground window's PID against our own lets head WASD/look work whether the user
+-    // has focused the small "O" preview or the host's own (often fullscreen) window — yet never steals
+-    // keystrokes when the user has alt-tabbed to an unrelated app (terminal/browser), since those have a
+-    // different PID.
+-    //
+-    // WHY THIS MATTERS (6DOF translation bug): previously this required `foreground == preview &&
+-    // isFocused`. As soon as the game's window took the foreground (which it does on launch / when
+-    // fullscreen), the preview went inactive (isFocused=false) and WASD silently stopped feeding
+-    // g_headPos — so interactive head translation looked completely dead, even though the underlying
+-    // pose pipeline was fine (scripted head_pose_command.json poses are focus-independent, which is
+-    // exactly why those worked while WASD didn't). Gating on "any window of our process is foreground"
+-    // fixes that. Note: FH5 also binds W/S/A/D to throttle/brake/steer, so while the game window is
+-    // focused these keys additionally drive the car — park the car when isolating head-only translation.
++    // Simulator keys belong to the preview by default. Reading keys while the
++    // game's own window is foreground moves both the avatar and simulated HMD;
++    // retain that behavior only as an explicit Tools option.
+     const HWND foregroundWindow = GetForegroundWindow();
+     bool previewWindowFocused = false;
+     if (foregroundWindow != nullptr) {
+@@ -4113,7 +4129,8 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
+         } else {
+             DWORD fgPid = 0;
+             GetWindowThreadProcessId(foregroundWindow, &fgPid);
+-            previewWindowFocused = (fgPid != 0 && fgPid == GetCurrentProcessId());
++            previewWindowFocused = ui::g_uiState.inputFromGameWindow &&
++                (fgPid != 0 && fgPid == GetCurrentProcessId());
+         }
+     }
+     if (previewWindowFocused) {
+@@ -4334,6 +4351,19 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
+             rt::g_leftController.prevPitch = totalLeftPitch;
+         }
+ 
++    } else {
++        for (auto* ctrl : {&rt::g_leftController, &rt::g_rightController}) {
++            ctrl->triggerPressed = ctrl->gripPressed = ctrl->menuPressed = false;
++            ctrl->primaryPressed = ctrl->secondaryPressed = ctrl->thumbstickPressed = false;
++            ctrl->triggerValue = ctrl->gripValue = 0.0f;
++            ctrl->thumbstick = {0,0};
++            ctrl->linearVelocity = ctrl->angularVelocity = {0,0,0};
++            XrPosef pose{};
++            rt::GetControllerPose(*ctrl, &pose);
++            ctrl->prevPosWorld = pose.position;
++            ctrl->prevYaw = rt::g_headYaw + ctrl->yawOffset;
++            ctrl->prevPitch = rt::g_headPitch + ctrl->pitchOffset;
++        }
+     }
+ 
+     // MCP commands work regardless of window focus (file-based IPC).
+@@ -4537,7 +4567,7 @@ static void ensurePreviewWindow(rt::Session& s, UINT initialClientW, UINT initia
+             SetWindowLongPtrW(s.hwnd, GWLP_WNDPROC, (LONG_PTR)rt::WndProc);
+             Log("[SimXR] Updated window WndProc to new DLL address");
+             ui::ApplyDarkTheme(s.hwnd);
+-            ShowWindow(s.hwnd, SW_SHOW);
++            if (!g_previewHeadless) ShowWindow(s.hwnd, SW_SHOW);
+             UpdateWindow(s.hwnd);
+             // Seed clientWidth/Height from the actual current client area
+             RECT cr{};
+@@ -4562,10 +4592,12 @@ static void ensurePreviewWindow(rt::Session& s, UINT initialClientW, UINT initia
+         Log("[SimXR] Failed to create preview window!");
+         return;
+     }
+-    ShowWindow(s.hwnd, SW_SHOW);
+-    UpdateWindow(s.hwnd);
+-    SetForegroundWindow(s.hwnd);
+-    SetWindowPos(s.hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
++    if (!g_previewHeadless) {
++        ShowWindow(s.hwnd, SW_SHOW);
++        UpdateWindow(s.hwnd);
++        SetForegroundWindow(s.hwnd);
++        SetWindowPos(s.hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
++    }
+     Logf("[SimXR] Created new preview window: hwnd=%p clientSize=%ux%u",
+          s.hwnd, initialClientW, initialClientH);
+ 
+@@ -5404,20 +5436,93 @@ static void blitViewToHalf(rt::Session& s, rt::Swapchain& chain, uint32_t srcInd
+     }
+ }
+ 
+-// The D3D12 preview never goes through a swapchain, so the composited frame only exists in
+-// the readback buffer paintPreviewComposite has mapped. Called from there, with the pixels
+-// of the frame that was just shown, so a shot can never be of a frame the window never had.
+-static void saveD3D12Screenshot(const uint8_t* pixels, UINT width, UINT height, UINT pitch,
+-                                uint64_t capturedFrame) {
+-    if (!mcp::g_screenshotRequested) return;
++// Isolated images use the same eye layout, projection, clipping and blend shaders
++// as the preview, over black. They are not raw swapchain textures. A separate RT
++// prevents a "quad" or "projection" request from silently saving the composite.
++static bool beginD3D12Screenshot(rt::Session& s, rt::PreviewFrame12& f) {
++    if (!mcp::g_screenshotRequested || mcp::g_screenshotInFlight) return true;
++    f.screenshot = mcp::CurrentScreenshotRequest();
++    const auto fail = [&](const char* error) {
++        mcp::WriteScreenshotStatus(f.screenshot.layer.c_str(), 0, 0, 0, &f.screenshot, error);
++        f.screenshot = {};
++        f.captureRT.Reset(); f.captureReadback.Reset(); f.captureRtvHeap.Reset();
++        mcp::g_screenshotRequested = mcp::g_screenshotInFlight = false;
++        return false;
++    };
++    const std::string& layer = f.screenshot.layer;
++    if (layer != "projection" && layer != "quad" && layer != "all")
++        return fail("unsupported_layer");
++    const char* previewEye = ui::g_uiState.viewMode == ui::ViewMode::BothEyes ? "both" :
++        ui::g_uiState.viewMode == ui::ViewMode::LeftEyeOnly ? "left" : "right";
++    if (f.screenshot.eye != previewEye || ui::g_uiState.displayLayout == ui::DisplayLayout::Anaglyph)
++        return fail("requested_eye_does_not_match_preview_layout");
++    if (layer == "all") { mcp::g_screenshotInFlight = true; return true; }
++
++    const auto desc = s.previewRT12->GetDesc();
++    D3D12_HEAP_PROPERTIES heap{}; heap.Type = D3D12_HEAP_TYPE_DEFAULT;
++    D3D12_CLEAR_VALUE clear{}; clear.Format = rt::kPreviewRTFormat; clear.Color[3] = 1.0f;
++    if (FAILED(s.d3d12Device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
++        D3D12_RESOURCE_STATE_RENDER_TARGET, &clear, IID_PPV_ARGS(f.captureRT.GetAddressOf()))))
++        return fail("capture_render_target_allocation_failed");
++    D3D12_DESCRIPTOR_HEAP_DESC hd{};
++    hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV; hd.NumDescriptors = 2;
++    if (FAILED(s.d3d12Device->CreateDescriptorHeap(&hd, IID_PPV_ARGS(f.captureRtvHeap.GetAddressOf()))))
++        return fail("capture_descriptor_allocation_failed");
++    D3D12_RENDER_TARGET_VIEW_DESC view{}; view.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
++    auto rtv = f.captureRtvHeap->GetCPUDescriptorHandleForHeapStart();
++    view.Format = rt::kPreviewRTFormat;
++    s.d3d12Device->CreateRenderTargetView(f.captureRT.Get(), &view, rtv);
++    rtv.ptr += s.previewRtvStride;
++    view.Format = rt::kPreviewRTFormatSrgb;
++    s.d3d12Device->CreateRenderTargetView(f.captureRT.Get(), &view, rtv);
++
++    auto buffer = f.readback->GetDesc();
++    heap.Type = D3D12_HEAP_TYPE_READBACK;
++    if (FAILED(s.d3d12Device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &buffer,
++        D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(f.captureReadback.GetAddressOf()))))
++        return fail("capture_readback_allocation_failed");
++    rtv = f.captureRtvHeap->GetCPUDescriptorHandleForHeapStart();
++    s.previewCmdList->ClearRenderTargetView(rtv, clear.Color, 0, nullptr);
++    mcp::g_screenshotInFlight = true;
++    return true;
++}
+ 
+-    const std::string path = mcp::GetSimulatorDataPath() + "\\screenshot.bmp";
+-    if (mcp::SavePixelsToBMP(pixels, width, height, path.c_str(), (int)pitch, true)) {
+-        mcp::WriteScreenshotStatus(mcp::g_screenshotLayer.c_str(), width, height, capturedFrame);
+-        std::wstring wp(path.begin(), path.end());
+-        ui::NotifyScreenshotSaved(wp);
++static void drawD3D12ScreenshotLayer(rt::Session& s, rt::PreviewFrame12& f, bool quad,
++                                   UINT vertices, D3D12_CPU_DESCRIPTOR_HANDLE restoreRtv) {
++    if (!f.screenshot.active || !f.captureRT ||
++        f.screenshot.layer != (quad ? "quad" : "projection")) return;
++    auto rtv = f.captureRtvHeap->GetCPUDescriptorHandleForHeapStart();
++    if (quad) rtv.ptr += s.previewRtvStride;
++    s.previewCmdList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
++    s.previewCmdList->DrawInstanced(vertices, 1, 0, 0);
++    s.previewCmdList->OMSetRenderTargets(1, &restoreRtv, FALSE, nullptr);
++}
++
++// Called for every completed capture slot, even if a newer slot supersedes it
++// in the preview. No CPU fence wait and no borrowing a previous frame's pixels.
++static void saveD3D12Screenshot(rt::Session& s, rt::PreviewFrame12& f) {
++    if (!f.screenshot.active) return;
++    const bool isolated = f.screenshot.layer != "all";
++    auto* readback = isolated ? f.captureReadback.Get() : f.readback.Get();
++    const std::string path = mcp::GetSimulatorDataPath() +
++        (f.screenshot.layer == "quad" ? "\\screenshot_quad.bmp" : "\\screenshot.bmp");
++    const char* error = nullptr;
++    void* pixels = nullptr;
++    D3D12_RANGE range{0, (SIZE_T)s.previewReadbackPitch * f.rtHeight};
++    if (!readback || FAILED(readback->Map(0, &range, &pixels)) || !pixels) {
++        error = "capture_readback_map_failed";
++    } else {
++        if (!mcp::SavePixelsToBMP((const uint8_t*)pixels, f.rtWidth, f.rtHeight, path.c_str(),
++                                 (int)s.previewReadbackPitch, true)) error = "capture_file_write_failed";
++        D3D12_RANGE noWrites{0, 0};
++        readback->Unmap(0, &noWrites);
+     }
+-    mcp::g_screenshotRequested = false;
++    mcp::WriteScreenshotStatus(f.screenshot.layer.c_str(), f.rtWidth, f.rtHeight,
++                              f.frame, &f.screenshot, error, isolated);
++    if (!error) { const std::wstring wp(path.begin(), path.end()); ui::NotifyScreenshotSaved(wp); }
++    f.screenshot = {};
++    f.captureRT.Reset(); f.captureReadback.Reset(); f.captureRtvHeap.Reset();
++    mcp::g_screenshotRequested = mcp::g_screenshotInFlight = false;
+ }
+ 
+ // Whether the mirror updates this frame, latched once per xrEndFrame from the Mirror Rate
+@@ -5477,6 +5582,8 @@ static bool beginPreviewRT(rt::Session& s, rt::PreviewFrame12& f) {
+     const float clearBlack[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+     s.previewCmdList->ClearRenderTargetView(rtv, clearBlack, 0, nullptr);
+ 
++    beginD3D12Screenshot(s, f);  // capture failure must never abort the normal preview
++
+     f.recording = true;
+     return true;
+ }
+@@ -5523,6 +5630,15 @@ static void closePreviewSlot(rt::Session& s, uint32_t frameCount, bool hasProjec
+     src.SubresourceIndex = 0;
+     s.previewCmdList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+ 
++    if (f.captureRT && f.captureReadback) {
++        D3D12_RESOURCE_BARRIER captureBarrier = barrier;
++        captureBarrier.Transition.pResource = f.captureRT.Get();
++        s.previewCmdList->ResourceBarrier(1, &captureBarrier);
++        auto captureDst = dst; captureDst.pResource = f.captureReadback.Get();
++        auto captureSrc = src; captureSrc.pResource = f.captureRT.Get();
++        s.previewCmdList->CopyTextureRegion(&captureDst, 0, 0, 0, &captureSrc, nullptr);
++    }
++
+     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
+     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
+     s.previewCmdList->ResourceBarrier(1, &barrier);
+@@ -5570,8 +5686,8 @@ static void closePreviewSlot(rt::Session& s, uint32_t frameCount, bool hasProjec
+ // window - no intermediate back buffer, and none of the per-frame memcpy that copying into
+ // one costs (~15MB a frame at a 2560x1440 window, on the app's render thread).
+ //
+-// The screenshot and burst paths read the same mapping, which is also what makes them
+-// structurally unable to capture a frame the window never showed.
++// Bursts read this same mapping. Explicit screenshots are served at slot
++// completion separately, including a requested slot superseded by a newer preview.
+ static void paintPreviewComposite(rt::Session& s, rt::PreviewFrame12& f) {
+     if (!f.readback || !s.hwnd || f.rtWidth == 0 || f.rtHeight == 0) return;
+     if (s.previewReadbackPitch == 0) return;
+@@ -5608,9 +5724,6 @@ static void paintPreviewComposite(rt::Session& s, rt::PreviewFrame12& f) {
+         ReleaseDC(s.hwnd, windowDC);
+     }
+ 
+-    saveD3D12Screenshot((const uint8_t*)mapped, f.rtWidth, f.rtHeight,
+-                        s.previewReadbackPitch, f.frame);
+-
+     // The burst records the frame that was just shown, described by the metadata that
+     // frame was recorded with rather than by whatever the head is doing now.
+     if (mcp::g_burstActive && f.hasProjection) {
+@@ -5744,12 +5857,12 @@ static void blitD3D12ToPreview(rt::Session& s,
+             srvDesc.Texture2D.MipLevels = 1;
+         }
+ 
+-        const UINT slot = s.previewSrvSlot;
++        const UINT descriptorSlot = s.previewSrvSlot;
+         s.previewSrvSlot = (s.previewSrvSlot + 1) % rt::kPreviewSrvSlots;
+         D3D12_CPU_DESCRIPTOR_HANDLE cpu = s.previewSrvHeap->GetCPUDescriptorHandleForHeapStart();
+         D3D12_GPU_DESCRIPTOR_HANDLE gpu = s.previewSrvHeap->GetGPUDescriptorHandleForHeapStart();
+-        cpu.ptr += (SIZE_T)slot * s.previewSrvStride;
+-        gpu.ptr += (UINT64)slot * s.previewSrvStride;
++        cpu.ptr += (SIZE_T)descriptorSlot * s.previewSrvStride;
++        gpu.ptr += (UINT64)descriptorSlot * s.previewSrvStride;
+         s.d3d12Device->CreateShaderResourceView(srcTex, &srvDesc, cpu);
+ 
+         transition(srcTex, chain.imageStates12[idx], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+@@ -5777,6 +5890,7 @@ static void blitD3D12ToPreview(rt::Session& s,
+         s.previewCmdList->RSSetViewports(1, &vp);
+         s.previewCmdList->RSSetScissorRects(1, &scissor);
+         s.previewCmdList->DrawInstanced(3, 1, 0, 0);
++        drawD3D12ScreenshotLayer(s, *slot, false, 3, rtvHandle);
+ 
+         // Back to the state the app released it in, so its own barriers still line up.
+         transition(srcTex, chain.imageStates12[idx], chain.releaseState12);
+@@ -6713,6 +6827,7 @@ static void renderQuadLayer(rt::Session& s, const XrCompositionLayerQuad* quad)
+             s.previewCmdList->RSSetViewports(1, &vp);
+             s.previewCmdList->RSSetScissorRects(1, &scissor);
+             s.previewCmdList->DrawInstanced(6, 1, 0, 0);
++            drawD3D12ScreenshotLayer(s, *slot, true, 6, rtvSrgb);
+             slot->quadComposed = true;
+         }
+ 
+@@ -7134,6 +7249,7 @@ static void consumeCompletedPreviewFrame(rt::Session& s) {
+ 
+     for (UINT i = 0; i < rt::kPreviewFrames; ++i) {
+         rt::PreviewFrame12& f = s.previewFrames[i];
++        if (f.pending && f.fenceValue <= done) saveD3D12Screenshot(s, f);
+         if (f.pending && f.fenceValue <= done && (int)i != newest) f.pending = false;
+     }
+ 
+@@ -7141,7 +7257,7 @@ static void consumeCompletedPreviewFrame(rt::Session& s) {
+     f.pending = false;
+ 
+     // Every layer of the frame - eyes and quads alike - was composited into the render
+-    // target on the GPU, so this shows one finished image, and captures it if asked.
++    // target on the GPU, so this shows one finished image.
+     paintPreviewComposite(s, f);
+ }
+ 
+@@ -7467,41 +7583,36 @@ static XrResult XRAPI_PTR xrEndFrame_runtime(XrSession, const XrFrameEndInfo* in
+ }
+ 
+ static XrResult XRAPI_PTR xrLocateViews_runtime(XrSession, const XrViewLocateInfo* li, XrViewState* vs, uint32_t cap, uint32_t* outCount, XrView* views) {
+-    if (outCount) *outCount = 2;
+-    if (vs) { 
+-        vs->type = XR_TYPE_VIEW_STATE; 
+-        // Set both VALID and TRACKED bits so Unity knows this is a real tracked HMD
+-        vs->viewStateFlags = XR_VIEW_STATE_ORIENTATION_VALID_BIT | 
+-                            XR_VIEW_STATE_POSITION_VALID_BIT | 
+-                            XR_VIEW_STATE_ORIENTATION_TRACKED_BIT | 
+-                            XR_VIEW_STATE_POSITION_TRACKED_BIT; 
+-    }
+-    if (cap < 2 || !views) return XR_SUCCESS;
+-
+-    // Composition-layer placement reads these same two helpers, which is what keeps
+-    // an overlay pinned to the geometry the app renders around it.
+-    float effYaw, effPitch, effRoll;
+-    rt::GetEffectiveHeadAngles(effYaw, effPitch, effRoll);
++    if (!li || !vs || !outCount) return XR_ERROR_VALIDATION_FAILURE;
++    if (li->viewConfigurationType != XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO)
++        return XR_ERROR_VIEW_CONFIGURATION_TYPE_UNSUPPORTED;
++    *outCount = 2;
++    if (cap != 0 && cap < 2) return XR_ERROR_SIZE_INSUFFICIENT;
++    if (cap != 0 && !views) return XR_ERROR_VALIDATION_FAILURE;
+ 
++    float yaw, pitch, roll;
++    rt::GetEffectiveHeadAngles(yaw, pitch, roll);
++    XrPosef base{};
++    bool tracked{};
++    if (!rt::SpaceWorldPose(li->space, yaw, pitch, roll, base, tracked)) return XR_ERROR_HANDLE_INVALID;
++    vs->viewStateFlags = tracked ? XR_VIEW_STATE_ORIENTATION_VALID_BIT |
++        XR_VIEW_STATE_POSITION_VALID_BIT | XR_VIEW_STATE_ORIENTATION_TRACKED_BIT |
++        XR_VIEW_STATE_POSITION_TRACKED_BIT : 0;
++    if (cap == 0) return XR_SUCCESS;
+     for (uint32_t i = 0; i < 2; ++i) {
+-        views[i].type = XR_TYPE_VIEW;
+-        views[i].pose = rt::ViewPoseFromAngles(i, effYaw, effPitch, effRoll);
++        views[i].pose = simspace::RelativePose(rt::ViewPoseFromAngles(i, yaw, pitch, roll), base);
+         views[i].fov = rt::GetViewFov(i);
+     }
+-    static int locateCount = 0;
+-    if (++locateCount % 90 == 1) {  // Log every 90 frames (~1 second)
+-        Logf("[SimXR] xrLocateViews: pos=(%.2f,%.2f,%.2f) yaw=%.2f pitch=%.2f", 
+-             rt::g_headPos.x, rt::g_headPos.y, rt::g_headPos.z, 
+-             rt::g_headYaw, rt::g_headPitch);
+-    }
+     return XR_SUCCESS;
+ }
+ 
+ // Add missing space/action functions for compatibility
+ static XrResult XRAPI_PTR xrCreateReferenceSpace_runtime(XrSession, const XrReferenceSpaceCreateInfo* info, XrSpace* space) {
+     if (!info || !space) return XR_ERROR_VALIDATION_FAILURE;
+-    static uintptr_t nextSpace = 100;
+-    *space = (XrSpace)(nextSpace++);
++    if (info->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_VIEW &&
++        info->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_LOCAL &&
++        info->referenceSpaceType != XR_REFERENCE_SPACE_TYPE_STAGE) return XR_ERROR_REFERENCE_SPACE_UNSUPPORTED;
++    *space = (XrSpace)(rt::g_nextSpace++);
+     rt::g_referenceSpaces[*space] = rt::RefSpace{ info->referenceSpaceType, info->poseInReferenceSpace };
+     Logf("[SimXR] xrCreateReferenceSpace: type=%d space=%p", info->referenceSpaceType, *space);
+     return XR_SUCCESS;
+@@ -7509,71 +7620,49 @@ static XrResult XRAPI_PTR xrCreateReferenceSpace_runtime(XrSession, const XrRefe
+ 
+ static XrResult XRAPI_PTR xrDestroySpace_runtime(XrSpace space) {
+     rt::g_referenceSpaces.erase(space);
++    rt::g_controllerSpaces.erase(space);
++    rt::g_actionSpaceOffsets.erase(space);
+     Logf("[SimXR] xrDestroySpace: space=%p", space);
+     return XR_SUCCESS;
+ }
+ 
+ static XrResult XRAPI_PTR xrLocateSpace_runtime(XrSpace space, XrSpace baseSpace, XrTime time, XrSpaceLocation* location) {
+     if (!location) return XR_ERROR_VALIDATION_FAILURE;
+-    location->type = XR_TYPE_SPACE_LOCATION;
+-
+-    // Check if this is a controller space
+-    auto it = rt::g_controllerSpaces.find(space);
+-    if (it != rt::g_controllerSpaces.end()) {
+-        int ctrlType = it->second;
+-        const rt::ControllerState& ctrl = (ctrlType == 1) ? rt::g_leftController : rt::g_rightController;
+-
+-        if (ctrl.isTracking) {
+-            location->locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT |
+-                                      XR_SPACE_LOCATION_ORIENTATION_VALID_BIT |
+-                                      XR_SPACE_LOCATION_POSITION_TRACKED_BIT |
+-                                      XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
+-            rt::GetControllerPose(ctrl, &location->pose);
+-
+-            // Handle velocity if chained (XrSpaceVelocity)
+-            XrSpaceVelocity* velocity = (XrSpaceVelocity*)location->next;
+-            if (velocity && velocity->type == XR_TYPE_SPACE_VELOCITY) {
+-                velocity->velocityFlags = XR_SPACE_VELOCITY_LINEAR_VALID_BIT | XR_SPACE_VELOCITY_ANGULAR_VALID_BIT;
+-                // Return the calculated velocities from the controller state
+-                velocity->linearVelocity = ctrl.linearVelocity;
+-                velocity->angularVelocity = ctrl.angularVelocity;
+-            }
+-
+-            static int logCount = 0;
+-            if (++logCount % 500 == 1) {
+-                float speed = sqrtf(ctrl.linearVelocity.x * ctrl.linearVelocity.x +
+-                                   ctrl.linearVelocity.y * ctrl.linearVelocity.y +
+-                                   ctrl.linearVelocity.z * ctrl.linearVelocity.z);
+-                Logf("[SimXR] xrLocateSpace: controller %d at (%.2f, %.2f, %.2f) vel=(%.2f, %.2f, %.2f) speed=%.2f m/s",
+-                     ctrlType, location->pose.position.x, location->pose.position.y, location->pose.position.z,
+-                     ctrl.linearVelocity.x, ctrl.linearVelocity.y, ctrl.linearVelocity.z, speed);
+-            }
+-        } else {
+-            location->locationFlags = 0;
+-            location->pose.orientation = {0, 0, 0, 1};
+-            location->pose.position = {0, 0, 0};
+-        }
+-    } else {
+-        // Reference spaces (VIEW / LOCAL / STAGE). Report fully-tracked: a real
+-        // runtime sets the *_TRACKED_BIT whenever tracking is live, and UEVR's
+-        // "first valid poses" gate requires those bits before it will submit.
+-        location->locationFlags = XR_SPACE_LOCATION_POSITION_VALID_BIT |
+-                                  XR_SPACE_LOCATION_ORIENTATION_VALID_BIT |
+-                                  XR_SPACE_LOCATION_POSITION_TRACKED_BIT |
+-                                  XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
+-
+-        auto typeIt = rt::g_referenceSpaces.find(space);
+-        XrReferenceSpaceType spaceType = typeIt != rt::g_referenceSpaces.end()
+-            ? typeIt->second.type : XR_REFERENCE_SPACE_TYPE_LOCAL;
+-        if (spaceType == XR_REFERENCE_SPACE_TYPE_VIEW) {
+-            // VIEW space located against LOCAL/STAGE == the current head pose, so
+-            // HMD orientation/position actually track (yaw/pitch/roll from MCP).
+-            location->pose.orientation = rt::QuatFromYawPitchRoll(rt::g_headYaw, rt::g_headPitch, rt::g_headRoll);
+-            location->pose.position = rt::g_headPos;
+-        } else {
+-            // LOCAL / STAGE are fixed reference frames -> identity.
+-            location->pose.orientation = {0, 0, 0, 1};
+-            location->pose.position = {0, 0, 0};
++    float yaw, pitch, roll;
++    rt::GetEffectiveHeadAngles(yaw, pitch, roll);
++    XrPosef world{}, base{};
++    bool tracked{}, baseTracked{};
++    if (!rt::SpaceWorldPose(space, yaw, pitch, roll, world, tracked) ||
++        !rt::SpaceWorldPose(baseSpace, yaw, pitch, roll, base, baseTracked)) return XR_ERROR_HANDLE_INVALID;
++    location->locationFlags = tracked && baseTracked ? XR_SPACE_LOCATION_POSITION_VALID_BIT |
++        XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_POSITION_TRACKED_BIT |
++        XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT : 0;
++    location->pose = simspace::RelativePose(world, base);
++
++    auto* velocity = static_cast<XrSpaceVelocity*>(location->next);
++    if (velocity && velocity->type == XR_TYPE_SPACE_VELOCITY) {
++        velocity->velocityFlags = 0;
++        velocity->linearVelocity = velocity->angularVelocity = {0,0,0};
++        const auto controller = rt::g_controllerSpaces.find(space);
++        const auto reference = rt::g_referenceSpaces.find(baseSpace);
++        // Existing controller velocities are tracking-space velocities. Do not
++        // claim them valid relative to another moving space (VIEW/action).
++        if (tracked && baseTracked && controller != rt::g_controllerSpaces.end() &&
++            controller->second != 0 && reference != rt::g_referenceSpaces.end() &&
++            reference->second.type != XR_REFERENCE_SPACE_TYPE_VIEW) {
++            const auto& ctrl = controller->second == 1 ? rt::g_leftController : rt::g_rightController;
++            XrPosef controllerPose{};
++            rt::GetControllerPose(ctrl, &controllerPose);
++            const XrVector3f offset{world.position.x-controllerPose.position.x,
++                world.position.y-controllerPose.position.y, world.position.z-controllerPose.position.z};
++            const auto& w = ctrl.angularVelocity;
++            const XrVector3f linear{ctrl.linearVelocity.x + w.y*offset.z - w.z*offset.y,
++                ctrl.linearVelocity.y + w.z*offset.x - w.x*offset.z,
++                ctrl.linearVelocity.z + w.x*offset.y - w.y*offset.x};
++            const auto inverse = simspace::InversePose(base).orientation;
++            velocity->linearVelocity = simspace::RotateVectorByQuaternion(inverse, linear);
++            velocity->angularVelocity = simspace::RotateVectorByQuaternion(inverse, w);
++            velocity->velocityFlags = XR_SPACE_VELOCITY_LINEAR_VALID_BIT | XR_SPACE_VELOCITY_ANGULAR_VALID_BIT;
+         }
+     }
+     return XR_SUCCESS;
+@@ -7591,8 +7680,7 @@ static XrResult XRAPI_PTR xrEnumerateReferenceSpaces_runtime(XrSession, uint32_t
+ 
+ static XrResult XRAPI_PTR xrCreateActionSpace_runtime(XrSession, const XrActionSpaceCreateInfo* info, XrSpace* space) {
+     if (!info || !space) return XR_ERROR_VALIDATION_FAILURE;
+-    static uintptr_t nextSpace = 200;
+-    *space = (XrSpace)(nextSpace++);
++    *space = (XrSpace)(rt::g_nextSpace++);
+ 
+     // Detect controller subaction paths and register the space
+     int controllerType = 0;  // 0=none, 1=left, 2=right
+@@ -7618,9 +7706,8 @@ static XrResult XRAPI_PTR xrCreateActionSpace_runtime(XrSession, const XrActionS
+         Log("[SimXR] xrCreateActionSpace: subactionPath is XR_NULL_PATH");
+     }
+ 
+-    if (controllerType > 0) {
+-        rt::g_controllerSpaces[*space] = controllerType;
+-    }
++    rt::g_controllerSpaces[*space] = controllerType;
++    rt::g_actionSpaceOffsets[*space] = info->poseInActionSpace;
+ 
+     Log("[SimXR] xrCreateActionSpace");
+     return XR_SUCCESS;
+diff --git a/src/ui_enhancements.h b/src/ui_enhancements.h
+index dba94af..60a4a81 100644
+--- a/src/ui_enhancements.h
++++ b/src/ui_enhancements.h
+@@ -61,6 +61,7 @@ enum MenuCommand {
+     ID_TOOLS_SCREENSHOT = 1401,
+     ID_TOOLS_RESET_VIEW = 1402,
+     ID_TOOLS_TOGGLE_STATS = 1403,
++    ID_TOOLS_INPUT_FROM_GAME = 1404,
+ 
+     // Help
+     ID_HELP_CONTROLS = 1501,
+@@ -123,6 +124,7 @@ struct UIState {
+     DisplayLayout displayLayout = DisplayLayout::SideBySide;
+     HeadsetProfile headsetProfile = HeadsetProfile::Quest3;
+     bool showStats = false;
++    bool inputFromGameWindow = false; // Keep game WASD separate unless explicitly requested.
+ 
+     // Recommended per-eye render size reported to the application. This is deliberately
+     // independent of headset geometry: FOV/IPD can emulate Quest 3 while a lower render
+@@ -570,6 +572,7 @@ inline std::string SerializeSettings() {
+         "  \"window_height\": %d,\n"
+         "  \"full_render\": %s,\n"
+         "  \"show_stats\": %s,\n"
++        "  \"input_from_game_window\": %s,\n"
+         "  \"move_speed\": %.2f,\n"
+         "  \"move_boost\": %.2f,\n"
+         "  \"preview_fps\": %d\n"
+@@ -588,6 +591,7 @@ inline std::string SerializeSettings() {
+         g_uiState.windowHeight,
+         g_uiState.showFullRender ? "true" : "false",
+         g_uiState.showStats ? "true" : "false",
++        g_uiState.inputFromGameWindow ? "true" : "false",
+         g_uiState.moveSpeed,
+         g_uiState.moveBoost,
+         g_uiState.previewFps);
+@@ -651,6 +655,7 @@ inline void ApplySettingsJson(const char* text) {
+     g_uiState.windowHeight = (std::max)(0, o.number("window_height", g_uiState.windowHeight));
+     g_uiState.showFullRender = o.boolean("full_render", g_uiState.showFullRender);
+     g_uiState.showStats = o.boolean("show_stats", g_uiState.showStats);
++    g_uiState.inputFromGameWindow = o.boolean("input_from_game_window", false);
+ 
+     SetMoveSpeed(o.number("move_speed", g_uiState.moveSpeed));
+     g_uiState.moveBoost = (std::max)(1.0f, (std::min)(50.0f,
+@@ -939,6 +944,7 @@ inline HMENU CreateAppMenu() {
+                 L"Render &Resolution (per eye, restart app)");
+     AppendMenuW(toolsMenu, MF_SEPARATOR, 0, nullptr);
+ 
++    AppendMenuW(toolsMenu, MF_STRING, ID_TOOLS_INPUT_FROM_GAME, L"Also read keys while game is focused");
+     HMENU moveMenu = CreatePopupMenu();
+     AppendMenuW(moveMenu, MF_STRING, ID_MOVE_SLOWER, L"Slo&wer\t,");
+     AppendMenuW(moveMenu, MF_STRING, ID_MOVE_FASTER, L"&Faster\t.");
+@@ -1040,6 +1046,8 @@ inline void UpdateMenuState(HMENU menu) {
+     CheckMenuItem(menu, ID_VIEW_FULL_RENDER,
+         g_uiState.showFullRender ? MF_CHECKED : MF_UNCHECKED);
+ 
++    CheckMenuItem(menu, ID_TOOLS_INPUT_FROM_GAME, g_uiState.inputFromGameWindow ? MF_CHECKED : MF_UNCHECKED);
++
+     // Movement speed checks. Nothing is checked once , or . has walked the
+     // speed off a preset, which is the honest answer.
+     for (int i = 0; i < kMoveSpeedPresetCount; ++i) {
+@@ -1062,7 +1070,8 @@ inline void ShowControlsDialog(HWND parent) {
+         L"Mouse Look:\n"
+         L"  Click and drag to look around\n"
+         L"  ESC to release mouse capture\n\n"
+-        L"Movement (WASD):\n"
++        L"Movement (simulator focused by default):\n"
++        L"  Tools - Also read keys while game is focused (optional)\n"
+         L"  W/S - Forward/Backward\n"
+         L"  A/D - Strafe Left/Right\n"
+         L"  Q/E - Up/Down\n"
+@@ -1414,6 +1423,11 @@ inline bool HandleMenuCommand(HWND hwnd, WPARAM wParam,
+             ScaleMoveSpeed(1.0f / 1.25f);
+             break;
+ 
++        case ID_TOOLS_INPUT_FROM_GAME:
++            g_uiState.inputFromGameWindow = !g_uiState.inputFromGameWindow;
++            settingsChanged = true;
++            break;
++
+         case ID_MOVE_FASTER:
+             ScaleMoveSpeed(1.25f);
+             break;
+diff --git a/tests/ui_resolution_tests.cpp b/tests/ui_resolution_tests.cpp
+index 5b5b976..15db72f 100644
+--- a/tests/ui_resolution_tests.cpp
++++ b/tests/ui_resolution_tests.cpp
+@@ -78,6 +78,16 @@ int main() {
+     Check(width == 1280 && height == 1400 && ui::g_uiState.fitToWindow,
+           "older settings migrate to the performance resolution and full-window fill");
+ 
++    ui::g_uiState = ui::UIState{};
++    ui::ApplySettingsJson("{}");
++    Check(!ui::g_uiState.inputFromGameWindow, "old settings do not make game WASD move the simulated head");
++    ui::ApplySettingsJson("{\"input_from_game_window\": true}");
++    Check(ui::g_uiState.inputFromGameWindow, "shared keyboard input is explicitly selectable");
++    const auto saved = ui::SerializeSettings();
++    ui::g_uiState = ui::UIState{};
++    ui::ApplySettingsJson(saved.c_str());
++    Check(ui::g_uiState.inputFromGameWindow, "keyboard input preference round trips");
++
+     if (failures != 0) return 1;
+     std::puts("ui_resolution_tests: PASS");
+     return 0;
+diff --git a/src/space_math.h b/src/space_math.h
+new file mode 100644
+--- /dev/null
++++ b/src/space_math.h
+@@ -0,0 +1,40 @@
++#pragma once
++
++#include <openxr/openxr.h>
++
++// All poses below are rigid transforms with unit OpenXR quaternions.
++namespace simspace {
++inline XrPosef IdentityPose() { return {{0, 0, 0, 1}, {0, 0, 0}}; }
++
++inline XrQuaternionf MultiplyQuaternions(const XrQuaternionf& a, const XrQuaternionf& b) {
++    return {a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
++            a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
++            a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
++            a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z};
++}
++
++inline XrVector3f RotateVectorByQuaternion(const XrQuaternionf& q, const XrVector3f& v) {
++    const auto r = MultiplyQuaternions(MultiplyQuaternions(q, {v.x, v.y, v.z, 0}), {-q.x, -q.y, -q.z, q.w});
++    return {r.x, r.y, r.z};
++}
++
++inline XrPosef ComposePose(const XrPosef& parent, const XrPosef& child) {
++    const auto r = RotateVectorByQuaternion(parent.orientation, child.position);
++    return {MultiplyQuaternions(parent.orientation, child.orientation),
++            {parent.position.x + r.x, parent.position.y + r.y, parent.position.z + r.z}};
++}
++
++inline XrPosef InversePose(const XrPosef& pose) {
++    const XrQuaternionf inverse{-pose.orientation.x, -pose.orientation.y, -pose.orientation.z, pose.orientation.w};
++    return {inverse, RotateVectorByQuaternion(inverse, {-pose.position.x, -pose.position.y, -pose.position.z})};
++}
++
++inline XrPosef RelativePose(const XrPosef& worldPose, const XrPosef& baseWorldPose) {
++    return ComposePose(InversePose(baseWorldPose), worldPose);
++}
++
++inline XrPosef ReferenceWorldPose(XrReferenceSpaceType type, const XrPosef& offset, const XrPosef& head) {
++    // In this simulator LOCAL and STAGE share a fixed origin. VIEW follows the head.
++    return type == XR_REFERENCE_SPACE_TYPE_VIEW ? ComposePose(head, offset) : offset;
++}
++} // namespace simspace
+diff --git a/tests/space_math_tests.cpp b/tests/space_math_tests.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/space_math_tests.cpp
+@@ -0,0 +1,54 @@
++#include "space_math.h"
++#include <cmath>
++#include <cstdio>
++#include <cstdlib>
++#include <initializer_list>
++
++namespace {
++void Near(float a, float b) {
++    if (!std::isfinite(a) || std::abs(a - b) > 0.00002f) {
++        std::fprintf(stderr, "pose mismatch: %.8f != %.8f\n", a, b);
++        std::exit(1);
++    }
++}
++void SamePose(const XrPosef& a, const XrPosef& b) {
++    Near(a.position.x, b.position.x); Near(a.position.y, b.position.y); Near(a.position.z, b.position.z);
++    // Compare rotated axes, because q and -q express the same orientation.
++    for (auto axis : {XrVector3f{1,0,0}, XrVector3f{0,1,0}, XrVector3f{0,0,1}}) {
++        const auto x = simspace::RotateVectorByQuaternion(a.orientation, axis);
++        const auto y = simspace::RotateVectorByQuaternion(b.orientation, axis);
++        Near(x.x, y.x); Near(x.y, y.y); Near(x.z, y.z);
++    }
++}
++}
++int main() {
++    using namespace simspace;
++    const auto identity = IdentityPose();
++    const float q = std::sqrt(0.5f);
++    // Independent expected positions: 90-degree yaw turns eye X displacement toward -Z.
++    const XrPosef head{{0,q,0,q}, {3,1.7f,-4}};
++    const XrPosef left{{0,0,0,1}, {-0.032f,0,0}};
++    const auto worldEye = ComposePose(head, left);
++    Near(worldEye.position.x, 3); Near(worldEye.position.y, 1.7f); Near(worldEye.position.z, -3.968f);
++    SamePose(RelativePose(worldEye, ReferenceWorldPose(XR_REFERENCE_SPACE_TYPE_VIEW, identity, head)), left);
++    SamePose(RelativePose(worldEye, ReferenceWorldPose(XR_REFERENCE_SPACE_TYPE_STAGE, identity, head)), worldEye);
++
++    const XrPosef offset{{q,0,0,q}, {0,0.4f,-0.2f}};
++    const auto viewOffset = ReferenceWorldPose(XR_REFERENCE_SPACE_TYPE_VIEW, offset, head);
++    SamePose(ComposePose(viewOffset, RelativePose(worldEye, viewOffset)), worldEye);
++    const auto stageOffset = ReferenceWorldPose(XR_REFERENCE_SPACE_TYPE_STAGE, offset, head);
++    SamePose(stageOffset, offset);
++    SamePose(ComposePose(stageOffset, RelativePose(head, stageOffset)), head);
++    SamePose(RelativePose(viewOffset, viewOffset), identity);
++    SamePose(ComposePose(InversePose(head), head), identity);
++
++    // Walking/tilting the head must never leak into eye offsets requested in VIEW.
++    for (float a : {-1.2f, 0.0f, 0.7f}) {
++        const XrPosef movingHead{{std::sin(a/2),0,0,std::cos(a/2)}, {a*2,1.7f+a,a-5}};
++        for (float x : {-0.032f,0.032f}) {
++            const XrPosef eye{{0,0,0,1}, {x,0,0}};
++            SamePose(RelativePose(ComposePose(movingHead, eye), movingHead), eye);
++        }
++    }
++    std::puts("OpenXR reference-space pose tests passed");
++}

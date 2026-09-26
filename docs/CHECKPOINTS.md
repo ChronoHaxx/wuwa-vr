@@ -118,3 +118,17 @@ Tag `wuwa/beta-guide-2026-09-26-203618` records updated setup, controls and reco
 This is a documentation checkpoint: the 20:11 native runtime, supplied
 profiles and comparison helpers are unchanged. The same grouped headset
 acceptance remains pending; it is not a new rendering variant.
+
+## Stereo, menus and languages — 26 September 22:42:55 BST
+
+Tag `wuwa/stereo-menus-2026-09-26-224255` preserves `stereo-menus-20260926-r3`, backend
+`624eeda38b0e26a66692e68124059cb6eb30daffba4ac27f4b9a99db09316090`. NPC label geometry guards now accept the
+measured swapped eyes and padded depth allocation. Hidden-UI warnings
+require a detected menu; the upper-left privacy box defaults to the
+ESC/overlay route. Polar fly is the supplied/recovery freecam default.
+Ten editable language catalogs and embedded fonts cover mod UI/shortcuts
+with partial draft translations. Native build, source reconstruction,
+four C++ checks and 180 software-rendered layouts passed. The earlier
+live simulator batch still shows doubled reflections; the typed planar
+comparison now needs this new backend. New behavior is not installed or
+game/headset-accepted. No previous checkpoint was overwritten.

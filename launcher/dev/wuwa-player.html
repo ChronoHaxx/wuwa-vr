@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17191c">
+<title>WuWa VR Launcher</title>
+<link rel="icon" href="/guide/media/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/guide/style.css">
+<script src="/guide/config.js" defer></script>
+<script src="/guide/app.js" defer></script>
+<style>
+.status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-block:20px}
+.status-item{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:12px 16px}
+.status-item span{display:block;font-size:14px;color:var(--muted)}
+.status-item strong{display:block;overflow-wrap:anywhere}
+.ok::before{content:"\2713  ";color:#8fd694}.warn::before{content:"!  ";color:#e7c26b;font-weight:700}
+fieldset{border:1px solid var(--line);border-radius:4px;padding:6px 18px 12px;margin:0 0 18px}
+legend{font-weight:650;padding-inline:6px}
+.choice{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:start;padding:12px 0;border-bottom:1px solid var(--line)}
+.choice:last-child{border-bottom:0}.choice input{width:22px;height:22px;min-height:0;margin-top:3px}
+.choice label{font-weight:600}.choice p{grid-column:2;margin:0;color:var(--muted);font-size:15px}
+.badge{display:inline-block;font-size:13px;font-weight:600;border:1px solid var(--line);border-radius:3px;padding:0 6px;margin-inline-start:6px;vertical-align:1px}
+.badge.tested{border-color:#8fd694;color:#bfe9c2}.badge.candidate{border-color:#e7c26b;color:#f1dba4}
+.path-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}.path-row input{flex:1;min-width:220px}
+.progress{border-inline-start:3px solid var(--accent);background:var(--surface);padding:14px 18px;margin-block:18px;white-space:pre-line}
+.progress.error{border-color:#ef8f8f}.check-row{display:flex;gap:12px;align-items:flex-start;margin-block:16px}
+.check-row input{width:22px;height:22px;min-height:0;margin-top:3px;flex:none}
+.stopped main>*:not(#stopped){display:none}
+.button.primary{background:#1f3a55;border-color:var(--accent);font-weight:650}.button.primary:hover{background:#28496b}
+button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:760px){.status-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="header wrap"><span class="wordmark">WuWa VR Launcher</span>
+<nav aria-label="Guide"><a href="/guide/guide.html" target="_blank" rel="noopener">Player guide</a><a href="/guide/guide.html#controls" target="_blank" rel="noopener">Controls</a><a href="/guide/guide.html#recovery" target="_blank" rel="noopener">Problems</a><a href="/guide/risk.html" target="_blank" rel="noopener">Account risk</a></nav></header>
+<main class="wrap" id="main">
+<noscript><p class="notice risk">This launcher page needs JavaScript to apply builds. The <a href="/guide/guide.html">player guide</a> works without it.</p></noscript>
+<p id="stopped" class="notice" hidden tabindex="-1">The launcher has stopped. You can close this tab. Open <strong>WuWa VR Launcher.exe</strong> again when you need it.</p>
+<h1>Play Wuthering Waves in VR</h1>
+<p class="intro">Unofficial fan project built on praydog's UEVR. This page runs only on your PC. It changes your UEVR profile and starts the injector; it never changes game files.</p>
+<p id="packageNote" class="small"></p>
+<p id="pathWarning" class="notice risk" hidden>This folder's path contains non-English characters. That has not been tested with the injector. If the game starts without VR, move the whole WuWa VR folder to a simple path such as <code>C:\Games\WuWa VR</code>.</p>
+
+<section aria-labelledby="now-heading">
+<h2 id="now-heading">Right now</h2>
+<div class="status-grid">
+<div class="status-item"><span>Game</span><strong id="gameState">Checking…</strong></div>
+<div class="status-item"><span>Headset runtime (OpenXR)</span><strong id="xrState">Checking…</strong></div>
+<div class="status-item"><span>Build in your UEVR profile</span><strong id="buildState">Checking…</strong></div>
+</div>
+<p id="xrHelp" class="small" hidden></p>
+<div class="actions"><button type="button" id="useHeadset">Use headset</button><button type="button" id="useSimulator">Use simulator</button></div>
+<p class="small">Switch with the game and injector closed. This changes OpenXR for all PC apps and asks for Windows permission. It applies on the next launch. Use headset restores the runtime saved before enabling the simulator.</p>
+</section>
+
+<section aria-labelledby="risk-heading">
+<h2 id="risk-heading">1. Account risk</h2>
+<div class="notice risk"><p><strong>Use at your own risk.</strong> This injects unofficial code into the game. Anti-cheat may detect it; account restrictions or a permanent ban are possible, including for cosmetic use. It is not approved by Kuro Games and nobody can guarantee account safety. <a href="/guide/risk.html" target="_blank" rel="noopener">Read the full notice</a>.</p></div>
+<div class="check-row"><input type="checkbox" id="risk"><label for="risk">I have read the account-risk notice and accept the risk.</label></div>
+</section>
+
+<section aria-labelledby="build-heading">
+<h2 id="build-heading">2. Choose a build</h2>
+<fieldset id="builds"><legend>Build</legend></fieldset>
+<p id="chosenBuild" class="notice" aria-live="polite"></p>
+</section>
+
+<section aria-labelledby="game-heading">
+<h2 id="game-heading">3. How do you start the game?</h2>
+<p>The standalone official launcher is the previously working route. The 26 Sep 23:02 package reached gameplay through the standalone launcher on the owner’s PC. SteamVR / Steam Link headset support is separate from the Steam version of the game.</p>
+<fieldset id="gameChoices"><legend>Game start</legend></fieldset>
+<details id="customPath"><summary>Use a different launcher.exe location</summary>
+<label for="launcherPath">Full path to the official launcher.exe</label>
+<div class="path-row"><input id="launcherPath" type="text" spellcheck="false" autocomplete="off" placeholder="C:\Program Files\Wuthering Waves\launcher.exe"><button type="button" id="savePath">Use this path</button></div>
+</details>
+</section>
+
+<section aria-labelledby="go-heading">
+<h2 id="go-heading">4. Start</h2>
+<p>Put on or connect your headset and start its software first (for example SteamVR). Then:</p>
+<div class="actions"><button type="button" class="button primary" id="launch">Apply &amp; launch</button><button type="button" id="check">Check readiness</button><button type="button" id="apply">Apply without launching</button><button type="button" id="cancel" hidden>Stop waiting</button></div>
+<p class="small">Windows will ask for permission, because the game runs as administrator and the injector must match it. Choose <strong>Yes</strong>, then press <strong>Play</strong> in your chosen game launcher. Steam/Epic injection is unverified. In the game, <kbd>L3</kbd> + <kbd>R3</kbd> (or <kbd>Insert</kbd>) opens UEVR settings.</p>
+<div id="progress" class="progress" role="status" aria-live="polite">Loading…</div>
+</section>
+
+<section aria-labelledby="record-heading">
+<h2 id="record-heading">Record gameplay</h2>
+<p>SteamVR: clean side-by-side video for clips or debugging. The replay can export a single-eye or stereo still. No desktop or audio capture.</p>
+<p><label>Purpose <select id="recordPurpose"><option value="debug">Playtest with camera and Xbox data</option><option value="content">Content creation: clean video only</option></select></label></p>
+<p><label>Target frame rate <select id="recordFps"><option value="30">30 fps</option><option value="45">45 fps</option><option value="60">60 fps</option></select></label> <label>Resolution per eye <select id="recordSize"><option value="720">720 px - lighter</option><option value="1024" selected>1024 px - balanced</option><option value="1280">1280 px - larger</option></select></label></p>
+<p class="small">Choose content creation for older builds without camera/controller recording.</p>
+<p class="small">30 fps is a useful starting point for 30-45 fps gameplay. Higher targets need more headroom. The recorder reports its measured capture rate; choosing 60 cannot create game frames that were never rendered. Video has no diagnostic labels burned in, in either mode.</p>
+<div class="actions"><button id="recordStart" type="button">Start recording</button><button id="recordStop" type="button" disabled>Stop recording</button><button id="openRecordings" type="button">Open recordings</button></div>
+<p class="small">Stops after five minutes, game exit or a scene change. Keep footage private until you have reviewed it for player names/UIDs. Recording does not play the game or change camera settings.</p>
+</section>
+<section aria-labelledby="help-heading">
+<h2 id="help-heading">Recovery and removal</h2>
+<details><summary>Undo, reset or remove</summary>
+<p><strong>Reset this build</strong> replaces the chosen build's settings with the ones it was supplied with. Your current settings are backed up first.</p>
+<p><strong>Restore my settings from before WuWa VR</strong> puts your UEVR profile and injector choice back to how they were before this launcher first changed them. The mod's settings are kept in a backup, so you can apply the build again later.</p>
+<p>To remove WuWa VR completely: select <strong>Use headset</strong> if the simulator is active, restore your settings, choose <strong>Stop launcher</strong>, then delete the WuWa VR folder. Backups and logs remain in the data folder until you delete it too.</p>
+<div class="actions"><button type="button" id="reset">Reset this build</button><button type="button" id="restore">Restore my settings from before WuWa VR</button></div>
+</details>
+<details><summary>Check files and get help</summary>
+<div class="actions"><button type="button" id="verify">Check package files</button><button type="button" id="copyDiag">Copy diagnostics</button><button type="button" id="openData">Open data folder</button><button type="button" id="openPackage">Open package folder</button></div>
+<p class="small">Diagnostics replace your Windows user name with a placeholder. Read them before sharing; never share account IDs or passwords.</p>
+<p id="dataFolder" class="small"></p>
+</details>
+<details><summary>Compare stereo rendering (experimental)</summary>
+<p>For the prepared stereo-labels candidate running through SteamVR. Open a scene showing the doubled reflections or one-eye material, close the UEVR overlay, then start below and return to WuWa. The batch waits for game focus; keep the view still until it finishes.</p>
+<p>Five reflection/material settings are tested separately, with before/changed/restored images. Each original value is restored before the next test. This helps diagnose a defect; it does not apply a permanent fix or change the VR runtime.</p>
+<div class="actions"><button id="compareGraphics" type="button">Compare current scene</button><button id="openComparisons" type="button">Open comparisons</button></div>
+<p class="small">Captures include the HUD and may include your UID. Exact frame pairing between eyes is unavailable. Results remain local; review them before sharing.</p>
+</details>
+<div class="actions"><button type="button" id="stop">Stop launcher</button></div>
+</section>
+</main>
+<footer class="footer wrap"><nav aria-label="Community"><a id="feedbackLink" href="/guide/feedback.html" target="_blank" rel="noopener">Report a problem / request a feature</a><a href="/guide/developers.html" target="_blank" rel="noopener">Code &amp; contribute</a><a data-project-link="code" hidden target="_blank" rel="noopener noreferrer">GitHub</a><a href="/guide/support.html" target="_blank" rel="noopener">Optional support</a></nav><p>Free, unofficial fan project. Not affiliated with Kuro Games. Donations are optional and never required. <a href="/guide/credits.html" target="_blank" rel="noopener">Credits</a> · <a href="/guide/license.html" target="_blank" rel="noopener">License scope</a></p></footer>
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const $ = id => document.getElementById(id);
+let current = null, chosenBuild = "", flash = null;
+
+function setProgress(text, isError) {
+  const box = $("progress");
+  if (box.textContent === text && box.classList.contains("error") === !!isError) return;
+  box.textContent = text;
+  box.classList.toggle("error", !!isError);
+  box.setAttribute("role", isError ? "alert" : "status");
+}
+function notify(text, isError, seconds) {
+  flash = {text, isError, until: Date.now() + (seconds || 8) * 1000};
+  setProgress(text, isError);
+}
+async function post(path, body) {
+  const response = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json", "X-WuWa-Token": TOKEN}, body: JSON.stringify(body || {})});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || ("Request failed (" + response.status + ")"));
+  return data;
+}
+async function act(path, body, pending) {
+  try {
+    if (pending) notify(pending, false, 3);
+    const data = await post(path, body);
+    if (data.message) notify(data.message, false, 10);
+    await refresh();
+  } catch (error) { notify(error.message, true, 15); }
+}
+function badge(role) {
+  const span = document.createElement("span");
+  span.className = "badge " + (role === "baseline" ? "tested" : "candidate");
+  span.textContent = role === "baseline" ? "Owner-tested" : "Untested candidate";
+  return span;
+}
+function renderBuilds(s) {
+  const box = $("builds");
+  const key = JSON.stringify(s.builds.map(b => b.id));
+  if (box.dataset.key !== key) {
+    box.querySelectorAll(".choice").forEach(n => n.remove());
+    for (const build of s.builds) {
+      const row = document.createElement("div"); row.className = "choice";
+      const input = document.createElement("input"); input.type = "radio"; input.name = "build"; input.id = "build-" + build.id; input.value = build.id;
+      input.addEventListener("change", () => { chosenBuild = build.id; $("chosenBuild").textContent = "Next Apply & launch: " + build.name + "."; });
+      const label = document.createElement("label"); label.htmlFor = input.id; label.textContent = build.name; label.append(badge(build.role));
+      const summary = document.createElement("p"); summary.textContent = build.summary || build.description || "";
+      row.append(input, label, summary);
+      if (build.known) { const known = document.createElement("p"); known.textContent = "Known issues: " + build.known; row.append(known); }
+      box.append(row);
+    }
+    box.dataset.key = key;
+  }
+  if (!chosenBuild) chosenBuild = s.selected || s.package.defaultBuild || (s.builds[0] && s.builds[0].id) || "";
+  const checked = $("build-" + chosenBuild); if (checked) checked.checked = true;
+}
+function renderGame(s) {
+  const box = $("gameChoices"), game = s.game;
+  const options = [];
+  for (const found of game.detected.filter(d => d.kind === "official")) options.push({value: "launcher:" + found.path, text: "Open the official launcher for me", detail: found.path});
+  if (game.mode === "launcher" && game.launcher && !options.some(o => o.value === "launcher:" + game.launcher)) options.unshift({value: "launcher:" + game.launcher, text: "Open the official launcher for me", detail: game.launcher});
+  const stores = game.detected.filter(d => d.kind !== "official").map(d => d.label).join(" ");
+  options.push({value: "manual", text: "I start the game myself (experimental for Steam/Epic)", detail: (stores ? stores + " " : "") + "Steam injection previously failed and has not been retested; Epic is untested. Detecting an installation does not verify injection."});
+  const key = JSON.stringify(options);
+  if (box.dataset.key !== key) {
+    box.querySelectorAll(".choice").forEach(n => n.remove());
+    options.forEach((option, index) => {
+      const row = document.createElement("div"); row.className = "choice";
+      const input = document.createElement("input"); input.type = "radio"; input.name = "game"; input.id = "game-" + index; input.value = option.value;
+      input.addEventListener("change", () => {
+        if (option.value === "manual") act("/api/settings", {gameStart: "manual"}, "Saving…");
+        else act("/api/settings", {gameStart: "launcher", gameLauncher: option.value.slice(9)}, "Saving…");
+      });
+      const label = document.createElement("label"); label.htmlFor = input.id; label.textContent = option.text;
+      const detail = document.createElement("p"); detail.textContent = option.detail;
+      row.append(input, label, detail); box.append(row);
+    });
+    box.dataset.key = key;
+  }
+  const value = game.mode === "manual" ? "manual" : "launcher:" + game.launcher;
+  box.querySelectorAll("input").forEach(input => { input.checked = input.value === value; });
+}
+function render(s) {
+  current = s;
+  const created = s.package.createdAt ? new Date(s.package.createdAt) : null;
+  const when = created && !isNaN(created) ? ", created " + created.toLocaleString(undefined, {dateStyle: "medium", timeStyle: "short"}) : "";
+  $("packageNote").textContent = (s.package.private ? "Private test package" : "Package") + " " + s.package.id + when + ". Not a public release.";
+  $("pathWarning").hidden = !s.package.nonAsciiPath;
+  const game = $("gameState");
+  game.textContent = s.gameRunning ? "Running" : s.injectorRunning ? "Injector waiting for the game" : "Closed";
+  game.className = s.gameRunning || s.injectorRunning ? "warn" : "ok";
+  const xr = $("xrState");
+  xr.textContent = s.openxr.available ? s.openxr.name : "Not found";
+  xr.className = s.openxr.available ? "ok" : "warn";
+  $("xrHelp").hidden = s.openxr.available; $("xrHelp").textContent = s.openxr.message || "";
+  const selected = s.builds.find(b => b.id === s.selected);
+  const reportBuild = selected ? selected.name + (s.selectionMatches ? " (applied)" : " (selected; not applied)") : "No applied build";
+  $("feedbackLink").href = "/guide/feedback.html?build=" + encodeURIComponent(reportBuild + " / OpenXR: " + (s.openxr.name || "unknown"));
+  const buildState = $("buildState");
+  buildState.textContent = selected ? selected.name + (s.selectionMatches ? "" : " (needs Apply)") : (s.restoredOriginalAt ? "None (your original settings)" : "None yet");
+  buildState.className = selected && s.selectionMatches ? "ok" : "warn";
+  $("risk").checked = s.riskAcknowledged;
+  renderBuilds(s); renderGame(s);
+  $("chosenBuild").textContent = "Next Apply & launch: " + (s.builds.find(b => b.id === chosenBuild)?.name || "choose a build") + ".";
+  $("dataFolder").textContent = "Data folder: " + s.dataFolder;
+  $("restore").disabled = !s.originalBackup;
+  const job = s.job, busy = job.running || s.gameRunning || s.injectorRunning;
+  $("recordStart").disabled = job.running || !s.gameRunning || s.openxr.isSimulator || !s.recording?.available;
+  $("recordStop").disabled = !s.recording?.running;
+  $("compareGraphics").disabled = job.running || !s.gameRunning || s.openxr.isSimulator || !s.comparisons?.available;
+  $("useHeadset").disabled = busy || !s.openxr.canHeadset || !s.openxr.isSimulator;
+  $("useSimulator").disabled = busy || !s.openxr.canSimulator || s.openxr.isSimulator;
+  for (const id of ["launch", "apply", "reset", "restore"]) $(id).disabled = busy || (id === "restore" && !s.originalBackup);
+  $("check").disabled = job.running; $("verify").disabled = job.running; $("stop").disabled = job.running;
+  const waiting = s.launch && ["preflight", "waiting-for-play", "game-starting", "injected", "settling"].includes(s.launch.phase) && !s.gameRunning;
+  $("cancel").hidden = !waiting;
+  let text, isError = false;
+  if (job.running) text = job.message + "…";
+  else if (flash && Date.now() < flash.until) { text = flash.text; isError = flash.isError; }
+  else if (job.kind) {
+    text = job.output || job.message; isError = job.error;
+    if (job.kind === "launch" && !job.error && s.launch && s.launch.message) { text += "\n\nStartup: " + s.launch.message; isError = s.launch.phase === "failed"; }
+  }
+  else if (s.game.problem) { text = s.game.problem; isError = true; }
+  else text = s.riskAcknowledged ? "Ready. Choose Apply & launch when your headset software is running." : "Tick the account-risk box, choose a build, then Apply & launch.";
+  setProgress(text, isError);
+}
+async function refresh() {
+  try {
+    const response = await fetch("/api/status", {cache: "no-store"});
+    if (!response.ok) throw new Error("status " + response.status);
+    render(await response.json());
+  } catch (error) {
+    if (!document.body.classList.contains("stopped")) setProgress("The launcher is not responding. If you closed it, open WuWa VR Launcher.exe again.", true);
+  }
+}
+$("risk").addEventListener("change", event => act("/api/settings", {riskAcknowledged: event.target.checked}));
+for (const [id, mode] of [["useHeadset", "headset"], ["useSimulator", "simulator"]]) {
+  $(id).addEventListener("click", () => act("/api/runtime", {mode, expectedActive: current.openxr.manifest}, "Selecting " + mode + "; accept Windows' prompt…"));
+}
+$("savePath").addEventListener("click", () => act("/api/settings", {gameStart: "launcher", gameLauncher: $("launcherPath").value}, "Checking that path…"));
+$("launch").addEventListener("click", () => {
+  if (!$("risk").checked) { notify("Tick the account-risk box first.", true, 10); $("risk").focus(); return; }
+  act("/api/launch", {id: chosenBuild}, "Starting…");
+});
+$("apply").addEventListener("click", () => act("/api/apply", {id: chosenBuild}, "Applying…"));
+$("check").addEventListener("click", () => act("/api/check", {id: chosenBuild}, "Checking…"));
+$("cancel").addEventListener("click", () => act("/api/cancel", {}, "Stopping the wait…"));
+$("reset").addEventListener("click", () => { if (confirm("Replace this build's current settings with its supplied settings? A backup is made first.")) act("/api/apply", {id: chosenBuild, reset: true}, "Resetting…"); });
+$("restore").addEventListener("click", () => { if (confirm("Restore your UEVR settings from before WuWa VR? The mod's settings are backed up first.")) act("/api/restore", {}, "Restoring…"); });
+$("verify").addEventListener("click", () => act("/api/verify", {}, "Checking package files…"));
+$("openData").addEventListener("click", () => act("/api/open", {folder: "data"}));
+$("recordStart").addEventListener("click", () => act("/api/record-start", {videoOnly: $("recordPurpose").value === "content", fps: Number($("recordFps").value), eyeWidth: Number($("recordSize").value)}, "Starting recording…"));
+$("recordStop").addEventListener("click", () => act("/api/record-stop", {}, "Finishing recording…"));
+$("openRecordings").addEventListener("click", () => act("/api/open", {folder: "recordings"}));
+$("compareGraphics").addEventListener("click", () => act("/api/compare-graphics", {}, "Waiting for WuWa focus…"));
+$("openComparisons").addEventListener("click", () => act("/api/open", {folder: "comparisons"}));
+$("openPackage").addEventListener("click", () => act("/api/open", {folder: "package"}));
+$("copyDiag").addEventListener("click", async () => {
+  try {
+    const text = await (await fetch("/api/diagnostics", {cache: "no-store"})).text();
+    await navigator.clipboard.writeText(text);
+    notify("Diagnostics copied. Review them before sharing.", false, 10);
+  } catch (error) { notify("Could not copy automatically. Open " + location.origin + "/api/diagnostics and copy the text.", true); }
+});
+$("stop").addEventListener("click", async () => {
+  try {
+    await post("/api/stop", {});
+    clearInterval(timer);
+    document.body.classList.add("stopped"); $("stopped").hidden = false; $("stopped").focus();
+  } catch (error) { notify(error.message, true, 15); }
+});
+const timer = setInterval(refresh, 2000);
+refresh();
+</script>
+</body>
+</html>

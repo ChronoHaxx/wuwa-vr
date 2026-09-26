@@ -1,6 +1,6 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Local checkpoints and next-session comparisons; not public release acceptance."><meta name="theme-color" content="#17191c"><title>Local test notes — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Local test notes</h1><p>For the prepared development installation. These notes do not establish public release or headset acceptance.</p><div class="guide-content"><section id="next-test"><h2>Next session</h2><p>The saved development candidate is <strong>Stereo and camera candidate · 26 Sep 20:11 BST</strong>
-(<code>stereo-camera-20260926</code>). Backend SHA-256:
-<code>3c8acd6bfb3312044ef1ef717a263f2ffe7d3bcb6cc32c16f5fb69769082f762</code>.
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Local checkpoints and next-session comparisons; not public release acceptance."><meta name="theme-color" content="#17191c"><title>Local test notes — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Local test notes</h1><p>For the prepared development installation. These notes do not establish public release or headset acceptance.</p><div class="guide-content"><section id="next-test"><h2>Next session</h2><p>The saved development candidate is <strong>Stereo, menus and languages · 26 Sep 22:42 BST</strong>
+(<code>stereo-menus-20260926-r3</code>). Backend SHA-256:
+<code>624eeda38b0e26a66692e68124059cb6eb30daffba4ac27f4b9a99db09316090</code>.
 It is not selected automatically. <strong>Controls and recovery · 26 Sep 15:39 BST</strong>
 and earlier checkpoints remain available.</p>
 <p><strong>Rendering work remains open.</strong> This build includes an unverified missing-eye
@@ -8,12 +8,14 @@ NPC-label candidate. Doubled head-following preview reflections, one-eye
 materials and full-animation game-aim alignment remain unresolved.
 This checklist is saved for a combined session; it is not a
 request to interrupt gameplay or repeatedly demonstrate unchanged defects.</p>
-<p>Use the prepared private launcher, select <strong>20:11</strong>, and verify <strong>Next Apply &amp;
+<p>Use the local launcher, select <strong>22:42</strong>, and verify <strong>Next Apply &amp;
 launch</strong> before launching through the official standalone game launcher. Steam
 injection previously failed and has not been retested; Epic is untested. Native
 DLL changes need a normal game restart. Keep <strong>native rendering</strong> and <strong>Native
 Stereo Fix off</strong>; separate-eye rendering previously gave a black scene.</p>
-<p>Quest Pro through Steam Link/SteamVR, Xbox pad connected to PC. No countdown or
+<p>Quest Pro through Virtual Desktop or SteamVR, Xbox pad connected to PC. Current
+automated video needs SteamVR; the patched simulator supports still-image batches.
+VDXR video capture is not implemented. No countdown or
 intermediate replies are needed. Report pass/fail/not tried together, including
 the affected character/mode. Game time continues in every camera mode.</p>
 <ol>
@@ -37,16 +39,20 @@ shadows appear, and leaving first person restores the character. Check normal
 menus/dialogue, the WuWa scrollbar and Alt-Tab/LB+Y without the UEVR overlay.</li>
 <li><input disabled="" type="checkbox"> <strong>Shortcut sheet and HUD/mouse mode.</strong> Show the sheet with L3+Menu, leave
 page selection automatic, then use L3+LB and release. The sheet should stay
-put, show page 03 and explain how to exit. Hide game UI with L3+B: the sheet
-should remain with a red restore hint. Hide the sheet to see the standalone
-warnings. Restore UI and exit mouse mode using the same shortcuts. Automatic
+put, show page 03 and explain how to exit. Hide game UI with L3+B: normal play
+should show no hidden-UI warning. Open ESC/map to see the restore hint. Hide
+the sheet to check the standalone menu warning. Restore UI and exit mouse mode using the same shortcuts. Automatic
 mouse-in-menus stays off by default and is a separate legacy option.</li>
 <li><input disabled="" type="checkbox"> <strong>Streamer privacy and reset.</strong> Enable <strong>Streamer privacy: cover player
 IDs</strong>. Inspect a short gameplay, ESC-menu and character/menu recording: both
 eye views should cover each ID completely. Adjust rectangle edges if needed.
-The optional ESC-row mask also remains visible outside menus. Restore supplied
+The upper-left ESC-row mask should disappear in normal play; other overlays
+sharing that render route can also display it. The manual Always option is
+available for an undetected layout. Restore supplied
 controls, then undo a harmless HUD-size change; privacy must stay enabled.
-Names, chat and diagnostic files are outside the masks&#39; scope.</li>
+Names, chat and diagnostic files are outside the masks&#39; scope. Supplied freecam
+style is now Polar fly. If desired, select another Language / WuWa and check
+the shortcut pages; technical help still has English fallbacks.</li>
 <li><input disabled="" type="checkbox"> <strong>One recording and portal check.</strong> Use the launcher&#39;s Playtest purpose,
 30 fps / 1024 pixels per eye, to record movement and any visible NPC bubbles,
 translucent character effects and preview reflections encountered naturally.
@@ -65,7 +71,10 @@ reflection/material settings are compared and restored automatically; no manual
 CVar toggling or simulator switch is needed. <strong>Open comparisons → index.html</strong>
 shows the before/changed/restored captures. These are composited SteamVR mirrors,
 not isolated scene layers or guaranteed simultaneous eye frames. Results remain
-private and may contain a UID. This is diagnosis, not a verified reflection fix.</p>
+private and may contain a UID. This is diagnosis, not a verified reflection fix.
+The planar setting gates updates and may leave a cached reflection visible;
+an unchanged still image cannot rule out that path. No texture clearing or
+scene recreation is performed by this batch.</p>
 </section><section id="checkpoints"><h2>Checkpoint identities</h2><p>All times are <strong>BST (UTC+01:00), 24 September 2026</strong>. The dashboard preserves
 runtime hashes and saved profiles; these are distinct from headset acceptance.</p>
 <div class="table-scroll"><table>
@@ -259,4 +268,16 @@ full-animation headset targeting remain open. Earlier builds are preserved.</p>
 This is a documentation checkpoint: the 20:11 native runtime, supplied
 profiles and comparison helpers are unchanged. The same grouped headset
 acceptance remains pending; it is not a new rendering variant.</p>
+<h3>Stereo, menus and languages — 26 September 22:42:55 BST</h3>
+<p>Tag <code>wuwa/stereo-menus-2026-09-26-224255</code> preserves <code>stereo-menus-20260926-r3</code>, backend
+<code>624eeda38b0e26a66692e68124059cb6eb30daffba4ac27f4b9a99db09316090</code>. NPC label geometry guards now accept the
+measured swapped eyes and padded depth allocation. Hidden-UI warnings
+require a detected menu; the upper-left privacy box defaults to the
+ESC/overlay route. Polar fly is the supplied/recovery freecam default.
+Ten editable language catalogs and embedded fonts cover mod UI/shortcuts
+with partial draft translations. Native build, source reconstruction,
+four C++ checks and 180 software-rendered layouts passed. The earlier
+live simulator batch still shows doubled reflections; the typed planar
+comparison now needs this new backend. New behavior is not installed or
+game/headset-accepted. No previous checkpoint was overwritten.</p>
 </section></div></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>

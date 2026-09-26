@@ -1,77 +1,34 @@
 # WuWa VR
 
-[Website and visual guide](https://chronohaxx.github.io/wuwa-vr/) ·
-[Releases](https://github.com/ChronoHaxx/wuwa-vr/releases) ·
-[Report a bug or request a feature](https://chronohaxx.github.io/wuwa-vr/feedback.html) ·
-[Optional Ko-fi support](https://ko-fi.com/chronohax)
+Free, unofficial Wuthering Waves VR mod, built on praydog's UEVR and community work.
 
-An unofficial Wuthering Waves VR project built on praydog's UEVR and the
-community's WuWa work. Current development includes Xbox controls, adjustable
-HUD, first-person cameras and an optional 6DOF window. NPC labels, some
-translucent materials, character-preview reflections and full-animation aiming
-still have open issues. See the [known issues](docs/TROUBLESHOOTING.md).
+**[Download the complete beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213)** · [Watch / guide](https://chronohaxx.github.io/wuwa-vr/)
+· [Report an issue](https://github.com/ChronoHaxx/wuwa-vr/issues)
 
-**Mod downloads are not published yet.** The saved launcher packages contain
-upstream components whose redistribution permission is being clarified. This
-repository currently publishes the website, guides and issue tracker. It does
-not claim that the native mod is MIT-licensed or ready for a general release.
+Extract **WuWa-VR-Launcher.zip**, then open **WuWa VR Launcher.exe**.
+Keep its companion folders together. No Python installation is needed.
+[Setup](docs/START-HERE.md) · [Xbox shortcuts](docs/CONTROLS.md) · [Recovery](docs/TROUBLESHOOTING.md)
 
-**Code & contribute:** open `site/developers.html` for the source map and current
-rendering issues. Fork this repository for website/guide contributions, or use
-the issue templates for bugs, features and language requests. This export is
-not the full native-mod source; a separate pinned source-review bundle is
-prepared for upstream collaboration.
+Stereo view, first person, Xbox controls, adjustable HUD, freecam and an optional
+6DOF window. This beta still has doubled preview reflections, some one-eye
+materials/NPC bubbles and full-animation aiming issues.
 
-Static project showcase, player guide, community credits and optional creator
-support page. Open `site/index.html` locally or serve the `site` directory.
-No package install or build step is needed to view it.
+**Use at your own risk.** Unofficial injection can trigger anti-cheat or account
+bans. Not affiliated with Kuro Games. [Risk notice](docs/RISK.md).
+Steam/Epic game injection and fresh-PC compatibility are unverified.
 
-This export intentionally has no game binaries, backend DLLs, private logs,
-personal profiles, extracted game assets or development Git history. It is a
-website preview, not a mod download. Original website and guide work has a
-[scoped MIT license](LICENSE.md). Game captures and upstream components retain
-their owners' rights. Please keep access free, credit authors and share
-improvements; these are community requests, not additional MIT restrictions.
+## Source
 
-**Use the mod at your own risk: anti-cheat detection, account restrictions or
-a permanent ban are possible.** It is unofficial and not approved by Kuro
-Games. See the [risk notice](docs/RISK.md). Cosmetic use is not a safety guarantee.
+- [Native changes, Lua and translations](mod/): browsable files plus pinned patches.
+- [Reconstruct the native source](mod/BUILD.md).
+- [Launcher and recording helpers](launcher/dev/).
+- `site/` and `docs/`: website and visual guide. Edit the sources, then `npm install`
+  and `npm run build`. Pages deploys from `site/` via the manual GitHub workflow.
 
-## Deployment
+Small fixes, forks and feedback welcome under the applicable component terms.
+Credit the [original authors](CREDITS.md). The combined mod is **not blanket MIT**;
+our independent website/guide work is MIT and upstream notices remain in effect.
+Please keep access free; this is a community request, not an added MIT condition.
 
-Review the page copy and game captures. Only set the payment link in
-`site/config.js` to a support account supplied and approved by the owner.
-Donations do not buy promised updates, compatibility or permanent support.
-Set `repositoryUrl` to the confirmed GitHub repository to enable source, fork,
-existing-issue links and reviewable issue drafts. Configure both destinations
-locally with `python dev/configure-sharing.py --repository <GitHub-URL>` and,
-optionally, `--support-url <owner-payment-page>`. `--check` reports the current
-state without editing. Nothing is posted automatically.
-The site collects no payment details and has no analytics, external fonts or
-third-party embeds. A configured support link opens the external provider.
-
-This public repository contains the reviewed website export. Do not upload the
-original development workspace or its history here. GitHub Pages uses GitHub
-Actions; after reviewing and pushing a site update, manually run **Publish
-reviewed showcase**. Ordinary pushes do not deploy it. The workflow uploads
-only `site/`.
-
-GitHub's [custom Pages workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
-describes the environment and Pages permissions. The relative asset links work
-under a project subpath as well as a domain root. No custom domain is configured.
-
-`manifest.json` and `SHA256SUMS.txt` describe this export. Local generation and
-browser checks do not establish live deployment, financial-account ownership or
-in-game/headset acceptance.
-
-## Editing
-
-The generated pages work without build tools. To edit the Markdown or translations,
-install a current Node.js LTS, run `npm install`, then `npm run build`. For optional
-browser checks, run `npx playwright install chromium` and `npm run check`. These
-are developer dependencies only; visitors need no Node or Python installation.
-`release/site-media.json` holds public video descriptors. Private media provenance
-and local capture paths are excluded, and are not required to regenerate the site.
-Language sources are under `site/languages/`; Arabic uses right-to-left layout.
-Initial translations need community review and do not translate the game or
-the native UEVR interface.
+[Optional Ko-fi support](https://ko-fi.com/chronohax). No obligation, paid access,
+promised updates or lifetime support.

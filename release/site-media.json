@@ -1,4 +1,35 @@
 {
   "schema": 1,
-  "media": []
+  "media": [
+    {
+      "kind": "gameplay-video",
+      "ownerApproved": true,
+      "file": "site/media/feature-portal.mp4",
+      "poster": "site/media/feature-portal.jpg",
+      "caption": "The optional 6DOF window during combat. Both eye views; actual headset footage.",
+      "build": "26 Sep development footage",
+      "recorded": "26 September 2026",
+      "headset": "Quest Pro / SteamVR mirror"
+    },
+    {
+      "kind": "gameplay-video",
+      "ownerApproved": true,
+      "file": "site/media/feature-first-person.mp4",
+      "poster": "site/media/feature-first-person.jpg",
+      "caption": "First-person body animation, viewed from one eye. Xbox-controlled; these hands are character animation.",
+      "build": "26 Sep development footage",
+      "recorded": "26 September 2026",
+      "headset": "Quest Pro / SteamVR mirror"
+    },
+    {
+      "kind": "gameplay-video",
+      "ownerApproved": true,
+      "file": "site/media/feature-city.mp4",
+      "poster": "site/media/feature-city.jpg",
+      "caption": "First-person combat in the city. One eye from the headset mirror.",
+      "build": "26 Sep development footage",
+      "recorded": "26 September 2026",
+      "headset": "Quest Pro / SteamVR mirror"
+    }
+  ]
 }

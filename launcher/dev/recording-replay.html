@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WuWa recording</title><style>
+:root{color-scheme:dark;font:16px system-ui;background:#16181a;color:#eee}body{max-width:1200px;margin:28px auto;padding:0 20px}video{width:100%;background:#000}button,a{font:inherit;color:inherit;margin-right:12px;padding:8px}button{cursor:pointer}pre{white-space:pre-wrap;font:14px ui-monospace}#panel{display:grid;grid-template-columns:340px 1fr;gap:20px}svg{width:100%;max-width:340px}.muted{color:#aeb7bf}circle,rect{stroke:#8494a1;fill:#232c34}text{fill:#dfe8ee;font:15px system-ui}.on{fill:#3d9277}#stamp{min-height:1.5em}@media(max-width:650px){#panel{display:block}}
+</style><h1>WuWa recording</h1><p>Clean stereo video. Controller and camera annotations are shown separately; they are not burned into the footage. No audio was recorded.</p>
+<video id="video" controls preload="metadata" src="clean-sbs.mp4"></video><p><button id="diagnostics">Hide diagnostics</button><label>Still: <select id="eye"><option value="left">Left eye</option><option value="right">Right eye</option><option value="both">Stereo pair</option></select></label> <button id="still">Save clean still</button><a href="clean-sbs.mp4" download>Save stereo video</a></p><p id="stamp" class="muted"></p>
+<details id="local-help"><summary>Local video or still export blocked?</summary><p>Select this recording's clean-sbs.mp4 to let your browser read it locally. It stays on your PC.</p><input id="local-video" type="file" accept="video/mp4"></details>
+<section id="panel"><svg viewBox="0 0 340 230" role="img" aria-label="Xbox controller input">
+<rect id="lb" x="15" y="10" width="90" height="30" rx="7"/><text x="49" y="31">LB</text><rect id="rb" x="235" y="10" width="90" height="30" rx="7"/><text x="269" y="31">RB</text>
+<circle cx="67" cy="89" r="39"/><circle id="ls" cx="67" cy="89" r="12" class="on"/><text x="34" y="146">Left stick</text>
+<circle cx="231" cy="174" r="34"/><circle id="rs" cx="231" cy="174" r="11" class="on"/><text x="196" y="227">Right stick</text>
+<circle id="y" cx="273" cy="70" r="18"/><text x="269" y="75">Y</text><circle id="a" cx="273" cy="127" r="18"/><text x="268" y="132">A</text><circle id="x" cx="244" cy="99" r="18"/><text x="239" y="104">X</text><circle id="b" cx="302" cy="99" r="18"/><text x="297" y="104">B</text>
+<text id="triggers" x="14" y="193">LT —   RT —</text></svg><pre id="details">Waiting for video…</pre></section>
+<p class="muted">Timing is an estimate: nearest camera sample within 125 ms of mirror readback. Unmatched/stale input is shown as unavailable. This replay helps diagnose behavior; it does not certify headset comfort.</p>
+<script id="data" type="application/json">__TIMELINE_JSON__</script><script>
+const rows=JSON.parse(document.getElementById('data').textContent),v=document.getElementById('video'),panel=document.getElementById('panel'),stamp=document.getElementById('stamp');
+const byId=id=>document.getElementById(id);let show=true;
+byId('diagnostics').onclick=()=>{show=!show;panel.hidden=!show;panel.style.display=show?'':'none';byId('diagnostics').textContent=show?'Hide diagnostics':'Show diagnostics'};
+function draw(){let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>1;if(rows[mid].time<=v.currentTime)lo=mid+1;else hi=mid}const row=rows[Math.max(0,lo-1)],sample=row?.sample;
+let inputs=sample?.inputs||[];inputs=inputs.filter(p=>p.raw_result===0&&p.age_ms<=250&&(sample.camera?.slot==null||p.slot===sample.camera.slot)).sort((a,b)=>a.age_ms-b.age_ms);const p=inputs[0]?.raw;
+for(const [id,mask]of Object.entries({a:4096,b:8192,x:16384,y:32768,lb:256,rb:512}))byId(id).classList.toggle('on',!!p&&(p.buttons&mask)!==0);
+byId('ls').setAttribute('cx',67+(p?.lx||0)/32768*25);byId('ls').setAttribute('cy',89-(p?.ly||0)/32768*25);byId('rs').setAttribute('cx',231+(p?.rx||0)/32768*22);byId('rs').setAttribute('cy',174-(p?.ry||0)/32768*22);
+byId('triggers').textContent=p?`LT ${Math.round(p.lt/255*100)}%   RT ${Math.round(p.rt/255*100)}%`:'Controller unavailable';
+const buttons=Object.entries({Up:1,Down:2,Left:4,Right:8,Menu:16,View:32,L3:64,R3:128,LB:256,RB:512,A:4096,B:8192,X:16384,Y:32768}).filter(([_,mask])=>p&&(p.buttons&mask)).map(([name])=>name).join(' + ');
+byId('details').textContent=sample?JSON.stringify({buttons:p?(buttons||'none'):'unavailable',slot:inputs[0]?.slot,input_age_ms:inputs[0]?.age_ms,delivered:inputs[0]?.delivered,...sample.camera},null,2):'No fresh camera/input sample for this frame.';
+stamp.textContent=row?`Video ${v.currentTime.toFixed(2)} s · sample offset ${row.sample_delta_ms??'unavailable'} ms · readback ${row.capture_span_ms} ms`: 'No frame timing sidecar';}
+v.addEventListener('timeupdate',draw);v.addEventListener('seeked',draw);v.addEventListener('loadeddata',draw);
+if(v.requestVideoFrameCallback){const next=()=>{draw();v.requestVideoFrameCallback(next)};v.requestVideoFrameCallback(next)}
+let localUrl;byId('local-video').onchange=e=>{const file=e.target.files[0];if(!file)return;if(localUrl)URL.revokeObjectURL(localUrl);localUrl=URL.createObjectURL(file);v.src=localUrl};
+byId('still').onclick=()=>{try{if(!v.videoWidth)return;const eye=byId('eye').value,c=document.createElement('canvas');c.width=eye==='both'?v.videoWidth:v.videoWidth/2;c.height=v.videoHeight;c.getContext('2d').drawImage(v,eye==='right'?v.videoWidth/2:0,0,c.width,c.height,0,0,c.width,c.height);c.toBlob(blob=>{if(!blob)return;const a=document.createElement('a');a.download=`wuwa-${eye}-${v.currentTime.toFixed(2)}s.png`;a.href=URL.createObjectURL(blob);a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)},'image/png')}catch(e){stamp.textContent='Select clean-sbs.mp4 below to allow local still export.';byId('local-help').open=true}};
+draw();</script></html>

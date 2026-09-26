@@ -1,4 +1,5 @@
 @charset "UTF-8";
+video:focus,video:focus-within{outline:3px solid #c0e2ff;outline-offset:4px}
 /* Original site styling: MIT, scoped by LICENSE.md. */
 :root{color-scheme:dark;--bg:#17191c;--surface:#21252b;--ink:#eef0f3;--muted:#bdc4cd;--line:#464d57;--accent:#9bcfff}
 figure video{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:3px;background:#000}.visual-steps{list-style:none;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 28px;margin-block:24px}.visual-steps li,.visual-steps figure{margin:0}.visual-steps figcaption{color:var(--ink);font-size:15px}
@@ -7,3 +8,5 @@ figure video{display:block;width:100%;height:auto;border:1px solid var(--line);b
 @media(max-width:380px){.language-grid{grid-template-columns:1fr}.locale-guide table{font-size:14px}.locale-guide bdi{white-space:normal}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media print{body{background:white;color:black;font-size:11pt}.header,.footer,.toc,.control-filter,.print-button,.skip,.page-links,.language-picker,.report-form,.report-preview{display:none!important}.wrap{width:100%;max-width:none}main{padding:0}.guide-grid{display:block}.guide-content{max-width:none}.guide-content section{break-inside:auto}h2,h3{break-after:avoid}figure,tr{break-inside:avoid}p,li,td,th,figcaption,pre{color:#222!important}.notice{background:#eee}.table-scroll{overflow:visible}a{color:black}img{max-height:180mm;object-fit:contain}}
+
+.feature-clips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}.feature-clips figure{margin:0 0 12px}.feature-clips figure:first-child{grid-column:1/-1}.feature-clips video{max-height:600px;object-fit:contain}.feature-clips figcaption{line-height:1.55}@media(max-width:700px){.feature-clips{grid-template-columns:1fr}}

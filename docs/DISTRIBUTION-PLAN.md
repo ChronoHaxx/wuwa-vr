@@ -1,6 +1,6 @@
 # Easier Windows packaging
 
-**Status, 25 September 2026:** a private **portable launcher package** exists as
+**Status, 27 September 2026:** the beta uses a **portable launcher package**, distributed as
 a local prototype: a ZIP containing a folder with `WuWa VR Launcher.exe`. Players
 extract it and double-click the EXE; no Python installation, terminal or GitHub
 account is needed. It is not public, and its real UAC/game launch has not yet
@@ -66,15 +66,14 @@ versions, manifest and notices.
 
 Still open:
 
-- A person must run **Apply & launch** through the real Windows prompt and
-  game, including cancelling the prompt once.
+- The owner reached gameplay through **Apply & launch** on 26 September.
+  Cancellation and fresh-PC behavior still need acceptance.
 - Test on another Windows account/PC without Python or the development tools.
 - Injection from a folder whose path has non-English characters is untested;
   the launcher warns about it.
-- Include only files whose distribution is permitted. The UEVR backend's
-  notice is "All rights reserved", so a public combined package needs the
-  owners' permission first. An EXE does not change UEVR/community licensing.
+- Preserve each component's copyright and license notices. Our MIT grant
+  does not relicense UEVR or community work.
 - Show the [account-risk notice](RISK.md) before any future public download.
 
 An MSI/MSIX installer can follow if it improves updates or trust. There is
-currently no public binary or independently tested fresh-PC installation.
+a public beta, but no independently tested fresh-PC installation.

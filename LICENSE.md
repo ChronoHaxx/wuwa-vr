@@ -37,8 +37,8 @@ Preserve the copyright and license notice when sharing covered work.
 
 See [CREDITS.md](CREDITS.md) for component notices and provenance. The pinned
 UEVR backend's root notice is All rights reserved; its SDK's separate MIT
-notice does not cover the backend. Public mod redistribution remains pending
-clarification. This does not restrict rights already granted by other owners.
+notice does not cover the backend. Publishing a beta does not relicense those components or imply their authors
+endorse this project. This does not restrict rights already granted by other owners.
 
 ## Our community request
 

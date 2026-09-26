@@ -2,79 +2,45 @@
 Help with rendering, camera behavior, controller comfort, documentation and
 translations is welcome. A donation is never required to contribute.</p>
 <h3>Find the right starting point</h3>
-<p>Use the GitHub links on this page to browse the project, search issues or fork
-the published repository. The public showcase export contains its website,
-guides and community templates. It does not contain a complete buildable UEVR
-fork or a downloadable mod. Native changes are preserved in a separate review
-bundle while their distribution scope is clarified. Do not mistake the
-showcase source for the full mod source.</p>
-<p>For the published website: edit the Markdown under <code>docs/</code> or translations
-under <code>site/languages/</code>, then run <code>npm install</code> and <code>npm run build</code>. The checked-in HTML
-also works directly. Follow <a href="developers.html#contributing">CONTRIBUTING.md</a> and preserve
-the <a href="license.html">component license boundaries</a>.</p>
-<h3>Mod source map</h3>
+<p>The <a href="https://github.com/ChronoHaxx/wuwa-vr">public repository</a> contains the
+website, matching native source changes, Lua, language catalogs and launcher.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
-<th>Area</th>
-<th>Main source in the development checkout</th>
-<th>What it controls</th>
+<th>Folder</th>
+<th>Contents</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>UEVR integration</td>
-<td><code>src/mods/vr/FFakeStereoRenderingHook.cpp</code>, <code>OverlayComponent.cpp</code>, <code>src/utility/WuWaLgui*.hpp</code></td>
-<td>Game UI extraction, stereo hooks and HUD placement</td>
+<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/uevr">mod/uevr</a></td>
+<td>Modified native files: stereo/UI hooks, camera settings and portal</td>
 </tr>
 <tr>
-<td>In-VR settings</td>
-<td><code>src/mods/vr/WuWaControlsComponent.cpp</code></td>
-<td>Xbox shortcuts, first-person settings, warnings and recovery</td>
+<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/lua">mod/lua</a></td>
+<td>Camera, controller, head hiding and shadow scripts</td>
 </tr>
 <tr>
-<td>Camera and controller behavior</td>
-<td><code>dev/02_WuWaVR_PolarControls.lua</code></td>
-<td>Head binding, animation follow, visibility/shadows and freecam</td>
+<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/source-changes">mod/source-changes</a></td>
+<td>Full patches against the pinned upstreams</td>
 </tr>
 <tr>
-<td>Portal window</td>
-<td><code>src/mods/WindowMode.cpp</code></td>
-<td>Optional 6DOF window, adapted from Elliott Tate&#39;s work</td>
+<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/localization">mod/localization</a></td>
+<td>Editable controls and shortcut translations</td>
 </tr>
 <tr>
-<td>Windows launcher</td>
-<td><code>dev/wuwa_player.py</code>, <code>dev/wuwa-player.html</code>, <code>dev/portable/</code></td>
-<td>Local launcher UI, packaging and startup</td>
-</tr>
-<tr>
-<td>Recording</td>
-<td><code>dev/steamvr-capture/record.cpp</code>, <code>dev/record-wuwa.py</code></td>
-<td>SteamVR mirror capture, GPU resizing and separate motion sidecars</td>
-</tr>
-<tr>
-<td>Stereo comparisons</td>
-<td><code>dev/wuwa-test.py</code>, <code>dev/steamvr-capture/main.cpp</code></td>
-<td>Bounded graphics leases with restored values and simulator or public SteamVR mirror PNGs; exact SteamVR source-frame pairing is unavailable</td>
+<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/launcher/dev">launcher/dev</a></td>
+<td>Portable launcher, capture and SteamVR recording source</td>
 </tr>
 </tbody></table></div>
-<p>The <code>src/</code> paths above are relative to the UEVR checkout, not this website
-export. They are a map for collaborating on the mod, not links to missing files.</p>
-<h3>Reproducible review checkpoint</h3>
-<p>The latest prepared native candidate is <strong>Stereo and camera candidate · 26 Sep
-20:11 BST</strong>, source tag <code>wuwa/stereo-camera-2026-09-26-201113</code>. The review bundle&#39;s
-manifest records the exact source commit. It retains the guarded missing-eye
-label pass and reversible material comparisons. Full-animation game-view
-handovers now use current rotation and matching offsets after the blend, and
-incompatible global aim settings retain game-view rotation with a visible warning.
-Build and component checks passed; the candidate has not been observed in game.
-Labels, doubled reflections, one-eye materials and full-animation target alignment
-are not claimed fixed. The owner accepted full-shadow head hiding on 15:39.</p>
-<p>The native patch is against UEVR
-<code>4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d</code>. Its review bundle includes the pinned
-UE SDK submodule revision, native/SDK patches, the matching Lua sources,
-component notices and hashes. It excludes game files, logs, binaries,
-recordings and personal profiles. The complete native patch already contains
-the portal adaptation; applying a separate portal patch again is incorrect.</p>
+<h3>Reconstruct the release</h3>
+<p>Read <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md">mod/BUILD.md</a>.
+The export matches <strong>26 Sep 22:42 BST</strong> in the owner-played <strong>23:02</strong> package.
+It is a browsable overlay plus patches, not a complete standalone UEVR fork.
+All 62 native paths and two SDK paths were forward-applied and compared with
+the saved build sources. That is not a fresh-PC or complete headset check.</p>
+<p>The original local checkpoint IDs are preserved for provenance; they are not
+commits reachable in the public repository. Public release tags identify the
+actual exported files. Keep component notices and credit the original authors.</p>
 <h3>Rendering work that is still open</h3>
 <ul>
 <li>Some NPC names and overhead speech bubbles appear in only one eye.</li>

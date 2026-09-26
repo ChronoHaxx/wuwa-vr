@@ -1,102 +1,56 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Visual Xbox controls, setup, comfort and recovery for WuWa VR."><meta name="theme-color" content="#17191c"><title>Player guide — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Player guide</h1><p>Setup for the private launcher package, illustrated controls and ways to recover when a setting feels wrong. <a href="languages.html">Getting started in 10 languages</a>.</p><button class="print-button" id="print-guide" type="button" hidden>Print / save this guide</button><div class="guide-grid"><nav class="toc" aria-label="Guide chapters"><a href="#start">Setup</a><a href="#visual-controls">Controller images</a><a href="#controls">All Xbox shortcuts</a><a href="#comfort">HUD and camera comfort</a><a href="#recovery">Problems and recovery</a><a href="#packaging">Portable launcher</a></nav><div class="guide-content"><section id="start"><h2>Setup</h2><p><strong>Account risk:</strong> this unofficial injector may be detected or blocked by
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Visual Xbox controls, setup, comfort and recovery for WuWa VR."><meta name="theme-color" content="#17191c"><title>Player guide — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Player guide</h1><p>Setup for the portable beta, illustrated controls and ways to recover when a setting feels wrong. <a href="languages.html">Getting started in 10 languages</a>.</p><button class="print-button" id="print-guide" type="button" hidden>Print / save this guide</button><div class="guide-grid"><nav class="toc" aria-label="Guide chapters"><a href="#start">Setup</a><a href="#visual-controls">Controller images</a><a href="#controls">All Xbox shortcuts</a><a href="#comfort">HUD and camera comfort</a><a href="#recovery">Problems and recovery</a><a href="#packaging">Portable launcher</a></nav><div class="guide-content"><section id="start"><h2>Setup</h2><p><strong>Account risk:</strong> this unofficial injector may be detected or blocked by
 anti-cheat, and account restrictions or a ban are possible. Use at your own
 risk; there is no publisher approval or account-safety guarantee.
 <a href="risk.html">Read the risk notice</a> before launching.</p>
-<p>This guide describes the <strong>WuWa VR Launcher private test package</strong>: a ZIP
-containing a folder and <code>WuWa VR Launcher.exe</code>. There
-is no public download yet. You need your own Wuthering Waves installation, a PC
-VR headset whose software provides OpenXR (tested: Quest Pro through Steam Link
-and SteamVR) and an Xbox/XInput controller connected to the PC.</p>
+<p><a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213">Download the complete beta ZIP</a>, extract it, and open
+<strong>WuWa VR Launcher.exe</strong>. Keep the <code>app</code> and <code>python</code> folders beside it.
+You need your own game, a Windows PC VR headset/runtime, and an Xbox/XInput
+controller connected to the PC. No separate Python installation is needed.</p>
 <h3>Which build?</h3>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Build</th>
-<th>Status</th>
-<th>Choose it when</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Camera + acro checkpoint · 24 Sep 22:37 BST</td>
-<td>Owner-tested in a headset; the launcher&#39;s default</td>
-<td>You want the version that has actually been played</td>
-</tr>
-<tr>
-<td>Stereo and camera candidate · 26 Sep 20:11 BST</td>
-<td>Compiled and component-tested; <strong>game/headset test pending</strong></td>
-<td>You are doing the current combined playtest, including camera handovers and the NPC-label candidate</td>
-</tr>
-<tr>
-<td>Earlier 26 Sep candidates</td>
-<td>Preserved comparison builds; not a complete headset pass</td>
-<td>You need to compare a reported regression with a specific saved revision</td>
-</tr>
-</tbody></table></div>
-<p>Each build keeps its own saved settings. You can switch while the game is
-closed. See <a href="guide.html#controls">controls</a> for the differences between them.
-Package manifests identify the exact contents; not every historical build is
-included in every ZIP. The full checkpoint list remains available in the guide.
-Reflections, one-eye materials and full-animation headset targeting remain open
-in the current candidate. Use the <a href="testing.html#next-test">combined checklist</a> once.</p>
+<p>The current download contains <strong>Stereo, menus and languages · 26 Sep 22:42 BST</strong>,
+from the owner-played 23:02 package. Its native files and supplied profile are
+unchanged. Older builds stay in separate releases to keep downloads smaller.
+Your saved settings are retained; use <strong>Reset this build</strong> for supplied defaults.</p>
 <h3>Install and launch</h3>
-<p><strong>Game version:</strong> the standalone official launcher is the previously working
-route. The new portable launcher package has <strong>not yet completed a real game
-launch or headset test</strong>. Detecting an installation does not verify injection.</p>
+<ol>
+<li>Extract the whole ZIP to a simple path such as <code>C:/Games/WuWa VR</code>.</li>
+<li>Start your headset software, then open <strong>WuWa VR Launcher.exe</strong>.</li>
+<li>Read the risk notice, choose how you start the game, and click <strong>Apply &amp; launch</strong>.</li>
+<li>Accept Windows&#39; prompt, then press <strong>Play</strong> in the game launcher.</li>
+<li>In game, <strong>L3 + R3</strong> (or Insert) opens UEVR settings. Custom options are under
+<strong>VR → WuWa Controls</strong>. Close settings before using gameplay shortcuts.</li>
+</ol><ol class="visual-steps"><li><figure><a href="media/launcher-step-1-risk.png" aria-label="Open launcher step 1 at full size"><img src="media/launcher-step-1-risk.png" width="588" height="242" loading="lazy" alt="Launcher step 1, Account risk: the risk notice and a ticked box, I have read the account-risk notice and accept the risk."></a><figcaption>Open <strong>WuWa VR Launcher.exe</strong> from the extracted folder. Read the account-risk notice and tick the box.</figcaption></figure></li><li><figure><a href="media/launcher-step-2-build.png" aria-label="Open launcher step 2 at full size"><img src="media/launcher-step-2-build.png" width="588" height="508" loading="lazy" alt="Earlier launcher example, Choose a build: Camera + acro checkpoint, 24 Sep 22:37 BST, above the Camera binding candidate, 25 Sep 22:49 BST. The current download contains one newer build with its own known-issues note."></a><figcaption>The current download contains the 26 Sep build. This earlier screenshot illustrates the build selector.</figcaption></figure></li><li><figure><a href="media/launcher-step-3-game.png" aria-label="Open launcher step 3 at full size"><img src="media/launcher-step-3-game.png" width="588" height="444" loading="lazy" alt="Launcher step 3, How do you start the game: the official launcher is selected; manual Steam/Epic startup is marked experimental, with injection limitations explained."></a><figcaption>Use the standalone official launcher for the previously working route. Steam/Epic startup is experimental: Steam injection previously failed and has not been retested; Epic is untested. The 23:02 package reached gameplay via the standalone launcher on the owner’s PC.</figcaption></figure></li><li><figure><a href="media/launcher-step-4-start.png" aria-label="Open launcher step 4 at full size"><img src="media/launcher-step-4-start.png" width="588" height="325" loading="lazy" alt="Launcher step 4, Start: Apply and launch, Check readiness and Apply without launching buttons, a note about the Windows permission prompt and a Ready message."></a><figcaption>Start your headset software, then <strong>Apply &amp; launch</strong>. Accept the Windows permission prompt and press Play.</figcaption></figure></li></ol><p class="small">Actual renders of the launcher page from the private test package, 25 September 2026, in a sample state. It runs only on your PC; your paths and status will differ.</p>
+<p>The EXE is unsigned; Windows may warn. Download from this project&#39;s GitHub
+Releases and check the published hash if unsure. Do not disable antivirus or
+anti-cheat. Injection needs elevation to match the game.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
 <th>Game installation</th>
-<th>Injection evidence</th>
+<th>Evidence</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>Standalone official launcher</td>
-<td>Previously worked in the development setup; portable-package launch awaiting testing</td>
+<td>The 23:02 package reached gameplay on the owner&#39;s PC</td>
 </tr>
 <tr>
-<td>Steam version</td>
-<td>Previous injection attempt failed; not retested with the current fixes</td>
+<td>Steam game version</td>
+<td>An earlier injection attempt failed; current fixes not retested</td>
 </tr>
 <tr>
-<td>Epic version</td>
+<td>Epic game version</td>
 <td>Untested</td>
 </tr>
 </tbody></table></div>
-<p>SteamVR and Steam Link are the headset connection in our tested setup. That
-does not establish support for the <strong>Steam store version</strong> of the game.</p>
-<ol>
-<li>Extract the <strong>whole</strong> ZIP to a normal folder, for example
-<code>C:\Games\WuWa VR</code>. It cannot run from inside the ZIP window. A path with
-only English letters is safest; other characters have not been tested with
-the injector.</li>
-<li>Start your headset software. For the combined Quest Pro test, connect through
-Steam Link and use SteamVR as the active OpenXR runtime. Check the runtime
-shown at the top of the launcher page after opening it.</li>
-<li>Double-click <strong>WuWa VR Launcher.exe</strong>. Your browser opens a page served only
-on your PC (<code>http://127.0.0.1:…</code>). Windows may say it protected your PC,
-because the launcher is new and unsigned. Only continue if you received the
-ZIP from the project owner directly. Do not disable SmartScreen, antivirus
-or anti-cheat.</li>
-<li>On the page: read the risk notice and tick the box, choose a build and how
-you start the game (prefer the standalone official launcher; manual
-Steam/Epic startup is experimental), then press
-<strong>Apply &amp; launch</strong>.</li>
-<li>Windows asks for administrator permission, because the game itself runs as
-administrator and the injector has to match it. Choose <strong>Yes</strong>, then press
-<strong>Play</strong> in your chosen game launcher. The page shows progress. It
-cannot press these protected buttons for you.</li>
-<li>In the game, press <strong>L3 + R3</strong> (or Insert) for UEVR settings. Most custom
-features live in <strong>VR → WuWa Controls</strong>. Close settings before using the
-gameplay shortcuts. Release all controller buttons after changing modes.</li>
-</ol><ol class="visual-steps"><li><figure><a href="media/launcher-step-1-risk.png" aria-label="Open launcher step 1 at full size"><img src="media/launcher-step-1-risk.png" width="588" height="242" loading="lazy" alt="Launcher step 1, Account risk: the risk notice and a ticked box, I have read the account-risk notice and accept the risk."></a><figcaption>Open <strong>WuWa VR Launcher.exe</strong> from the extracted folder. Read the account-risk notice and tick the box.</figcaption></figure></li><li><figure><a href="media/launcher-step-2-build.png" aria-label="Open launcher step 2 at full size"><img src="media/launcher-step-2-build.png" width="588" height="508" loading="lazy" alt="Launcher step 2, Choose a build: Camera + acro checkpoint, 24 Sep 22:37 BST, selected and marked Owner-tested, above the Camera binding candidate, 25 Sep 22:49 BST, marked Untested candidate, each with known issues."></a><figcaption>Choose a build. The owner-tested build is selected by default; the newer candidate is marked untested.</figcaption></figure></li><li><figure><a href="media/launcher-step-3-game.png" aria-label="Open launcher step 3 at full size"><img src="media/launcher-step-3-game.png" width="588" height="444" loading="lazy" alt="Launcher step 3, How do you start the game: the official launcher is selected; manual Steam/Epic startup is marked experimental, with injection limitations explained."></a><figcaption>Use the standalone official launcher for the previously working route. Steam/Epic startup is experimental: Steam injection previously failed and has not been retested; Epic is untested. The portable package still needs a real game-launch test.</figcaption></figure></li><li><figure><a href="media/launcher-step-4-start.png" aria-label="Open launcher step 4 at full size"><img src="media/launcher-step-4-start.png" width="588" height="325" loading="lazy" alt="Launcher step 4, Start: Apply and launch, Check readiness and Apply without launching buttons, a note about the Windows permission prompt and a Ready message."></a><figcaption>Start your headset software, then <strong>Apply &amp; launch</strong>. Accept the Windows permission prompt and press Play.</figcaption></figure></li></ol><p class="small">Actual renders of the launcher page from the private test package, 25 September 2026, in a sample state. It runs only on your PC; your paths and status will differ.</p>
-<p>The launcher never changes game files. Before its first change it backs up your
-UEVR profile to <code>%LOCALAPPDATA%\WuWa VR Launcher\snapshots</code>.</p>
-<p><strong>Simulator or headset:</strong> the top of the page has <strong>Use headset</strong> and <strong>Use
-simulator</strong> buttons. Use them with the game and injector closed. They ask for
-Windows permission and change OpenXR globally for other PC apps too, taking
-effect on the next launch. <strong>Use headset</strong> restores the runtime saved before
-the simulator was enabled; that may be Virtual Desktop or another runtime,
-not necessarily SteamVR. Opening the launcher alone does not switch it.</p>
+<p>SteamVR / Steam Link headset support does not establish Steam-store injection.
+The full latest-build headset check and a clean-PC test remain pending.</p>
+<p><strong>Simulator or headset:</strong> use the two buttons at the top of the launcher with
+WuWa and the injector closed. This changes OpenXR globally, asks for Windows
+permission, and applies next launch. <strong>Use headset</strong> restores the previously
+saved runtime. Opening the launcher itself does not change it.</p>
+<p>The launcher changes your UEVR profile, not game files. Backups are in the
+launcher&#39;s data folder under <code>snapshots</code>.</p>
 <h3>First-minute recovery</h3>
 <p>The candidate&#39;s supplied profile starts with game UI, Xbox shortcuts, Xbox
 mouse shortcuts and the shortcut sheet enabled. The 22:37 build keeps the

@@ -1,0 +1,8 @@
+#include <windows.h>
+4815 RCDATA "wuwa-xbox-controller.png"
+4820 RCDATA "wuwa-fonts/latin.ttf"
+4821 RCDATA "wuwa-fonts/sc.ttf"
+4822 RCDATA "wuwa-fonts/jp.ttf"
+4823 RCDATA "wuwa-fonts/kr.ttf"
+4824 RCDATA "wuwa-fonts/arabic.ttf"
+4830 RCDATA "wuwa-languages.json"

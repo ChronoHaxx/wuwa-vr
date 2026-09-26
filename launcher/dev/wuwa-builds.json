@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "builds": [
+    {
+      "id": "stereo-menus-20260926-r3",
+      "name": "Stereo, menus and languages · 26 Sep 22:42 BST",
+      "role": "candidate",
+      "runtime": "runtime/Wuthering Waves UEVR - stereo menus 2026-09-26 r3",
+      "sha256": "624eeda38b0e26a66692e68124059cb6eb30daffba4ac27f4b9a99db09316090",
+      "seed": "builds/stereo-menus-20260926-r3/profile",
+      "savedAt": "2026-09-26T22:42:55+01:00",
+      "summary": "Corrects NPC-label eye ordering and padded-depth validation, scopes hidden-UI warnings and profile privacy masks to menus, adds editable language catalogs, and supplies Polar fly as the default freecam style. Includes a typed planar-reflection comparison.",
+      "known": "Build and component checks passed. New NPC rendering and menu detection need game acceptance. Simulator captures still show doubled character reflections; the planar comparison requires this new backend. One-eye materials remain unresolved. Some technical help remains English; translations are drafts.",
+      "description": "NPC-label candidate accepts measured swapped eye order and padded depth allocations. Hidden-UI warnings only in detected menus; profile-ID mask defaults to ESC/overlay detection. Editable draft languages and Polar fly profile default. Typed planar-reflection comparison prepared. Compiled/component-tested; new in-game acceptance and remaining reflection/material fixes pending."
+    }
+  ]
+}

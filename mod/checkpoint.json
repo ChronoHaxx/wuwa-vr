@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "build": {
+    "id": "stereo-menus-20260926-r3",
+    "name": "Stereo, menus and languages \u00b7 26 Sep 22:42 BST",
+    "sha256": "624eeda38b0e26a66692e68124059cb6eb30daffba4ac27f4b9a99db09316090",
+    "savedAt": "2026-09-26T22:42:55+01:00"
+  },
+  "sourceTag": "wuwa/stereo-menus-2026-09-26-224255",
+  "sourceCommit": "35f058b55c3e5e7a79f6de91edfaa0d8a3b9c058",
+  "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
+  "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18"
+}

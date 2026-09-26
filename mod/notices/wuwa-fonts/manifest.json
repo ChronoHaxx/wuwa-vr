@@ -1,0 +1,45 @@
+{
+  "source_commit": "23e54b51ddffbc7713c583748e3bd86f62b1fa4a",
+  "fonts": {
+    "latin": {
+      "source_url": "https://raw.githubusercontent.com/google/fonts/23e54b51ddffbc7713c583748e3bd86f62b1fa4a/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf",
+      "source_sha256": "bfb7bb691513f12e734dc346c03a03f784912432d7e3fa8e56efcf906fe86b3d",
+      "file": "latin.ttf",
+      "sha256": "7e21f21a9e7e7ec85e8f3dfd1fb69f1df265c411f5722ac4a15d7caf94f6b482",
+      "bytes": 646068,
+      "license": "LICENSES/wuwa-fonts/latin-OFL.txt"
+    },
+    "sc": {
+      "source_url": "https://raw.githubusercontent.com/google/fonts/23e54b51ddffbc7713c583748e3bd86f62b1fa4a/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+      "source_sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
+      "file": "sc.ttf",
+      "sha256": "3d40169558022633c39693f44c9a03a7e09f9170223474337fcf92c28dc40e56",
+      "bytes": 10595824,
+      "license": "LICENSES/wuwa-fonts/sc-OFL.txt"
+    },
+    "jp": {
+      "source_url": "https://raw.githubusercontent.com/google/fonts/23e54b51ddffbc7713c583748e3bd86f62b1fa4a/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf",
+      "source_sha256": "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
+      "file": "jp.ttf",
+      "sha256": "295b84ba22eb625402cb3cc6a885c643b0cfba08533c4b0909d01b98c8b2ec20",
+      "bytes": 5766776,
+      "license": "LICENSES/wuwa-fonts/jp-OFL.txt"
+    },
+    "kr": {
+      "source_url": "https://raw.githubusercontent.com/google/fonts/23e54b51ddffbc7713c583748e3bd86f62b1fa4a/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf",
+      "source_sha256": "194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252",
+      "file": "kr.ttf",
+      "sha256": "e0cd0d21e148c3efb6b3ef0a3af7b069902999bc07d58017a53ee3bdd88e6dfc",
+      "bytes": 6224760,
+      "license": "LICENSES/wuwa-fonts/kr-OFL.txt"
+    },
+    "arabic": {
+      "source_url": "https://raw.githubusercontent.com/google/fonts/23e54b51ddffbc7713c583748e3bd86f62b1fa4a/ofl/notosansarabic/NotoSansArabic%5Bwdth%2Cwght%5D.ttf",
+      "source_sha256": "63111b5b2e074dd48cc67692e0a2726d86ee94c1c37fe8598257b7b4e87e869e",
+      "file": "arabic.ttf",
+      "sha256": "20275a16ba178f9919c1d8d3a1c3f920ce6cd5aa54a93cadab2e0f3d42c8a700",
+      "bytes": 194196,
+      "license": "LICENSES/wuwa-fonts/arabic-OFL.txt"
+    }
+  }
+}

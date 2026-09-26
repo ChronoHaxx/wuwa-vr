@@ -1,8 +1,8 @@
 # Combined acceptance draft
 
-The saved development candidate is **Stereo and camera candidate · 26 Sep 20:11 BST**
-(`stereo-camera-20260926`). Backend SHA-256:
-`3c8acd6bfb3312044ef1ef717a263f2ffe7d3bcb6cc32c16f5fb69769082f762`.
+The saved development candidate is **Stereo, menus and languages · 26 Sep 22:42 BST**
+(`stereo-menus-20260926-r3`). Backend SHA-256:
+`624eeda38b0e26a66692e68124059cb6eb30daffba4ac27f4b9a99db09316090`.
 It is not selected automatically. **Controls and recovery · 26 Sep 15:39 BST**
 and earlier checkpoints remain available.
 
@@ -12,13 +12,15 @@ materials and full-animation game-aim alignment remain unresolved.
 This checklist is saved for a combined session; it is not a
 request to interrupt gameplay or repeatedly demonstrate unchanged defects.
 
-Use the prepared private launcher, select **20:11**, and verify **Next Apply &
+Use the local launcher, select **22:42**, and verify **Next Apply &
 launch** before launching through the official standalone game launcher. Steam
 injection previously failed and has not been retested; Epic is untested. Native
 DLL changes need a normal game restart. Keep **native rendering** and **Native
 Stereo Fix off**; separate-eye rendering previously gave a black scene.
 
-Quest Pro through Steam Link/SteamVR, Xbox pad connected to PC. No countdown or
+Quest Pro through Virtual Desktop or SteamVR, Xbox pad connected to PC. Current
+automated video needs SteamVR; the patched simulator supports still-image batches.
+VDXR video capture is not implemented. No countdown or
 intermediate replies are needed. Report pass/fail/not tried together, including
 the affected character/mode. Game time continues in every camera mode.
 
@@ -42,16 +44,20 @@ the affected character/mode. Game time continues in every camera mode.
    menus/dialogue, the WuWa scrollbar and Alt-Tab/LB+Y without the UEVR overlay.
 3. [ ] **Shortcut sheet and HUD/mouse mode.** Show the sheet with L3+Menu, leave
    page selection automatic, then use L3+LB and release. The sheet should stay
-   put, show page 03 and explain how to exit. Hide game UI with L3+B: the sheet
-   should remain with a red restore hint. Hide the sheet to see the standalone
-   warnings. Restore UI and exit mouse mode using the same shortcuts. Automatic
+   put, show page 03 and explain how to exit. Hide game UI with L3+B: normal play
+   should show no hidden-UI warning. Open ESC/map to see the restore hint. Hide
+   the sheet to check the standalone menu warning. Restore UI and exit mouse mode using the same shortcuts. Automatic
    mouse-in-menus stays off by default and is a separate legacy option.
 4. [ ] **Streamer privacy and reset.** Enable **Streamer privacy: cover player
    IDs**. Inspect a short gameplay, ESC-menu and character/menu recording: both
    eye views should cover each ID completely. Adjust rectangle edges if needed.
-   The optional ESC-row mask also remains visible outside menus. Restore supplied
+   The upper-left ESC-row mask should disappear in normal play; other overlays
+   sharing that render route can also display it. The manual Always option is
+   available for an undetected layout. Restore supplied
    controls, then undo a harmless HUD-size change; privacy must stay enabled.
-   Names, chat and diagnostic files are outside the masks' scope.
+   Names, chat and diagnostic files are outside the masks' scope. Supplied freecam
+   style is now Polar fly. If desired, select another Language / WuWa and check
+   the shortcut pages; technical help still has English fallbacks.
 5. [ ] **One recording and portal check.** Use the launcher's Playtest purpose,
    30 fps / 1024 pixels per eye, to record movement and any visible NPC bubbles,
    translucent character effects and preview reflections encountered naturally.
@@ -71,3 +77,6 @@ CVar toggling or simulator switch is needed. **Open comparisons → index.html**
 shows the before/changed/restored captures. These are composited SteamVR mirrors,
 not isolated scene layers or guaranteed simultaneous eye frames. Results remain
 private and may contain a UID. This is diagnosis, not a verified reflection fix.
+The planar setting gates updates and may leave a cached reflection visible;
+an unchanged still image cannot rule out that path. No texture clearing or
+scene recreation is performed by this batch.

@@ -1,0 +1,635 @@
+#define NOMINMAX
+#include "utility/WuWaLocalizedUI.hpp"
+#include "utility/WuWaMenuSignals.hpp"
+#include "WuWaControlsComponent.hpp"
+#include "../VR.hpp"
+#include "../FrameworkConfig.hpp"
+#include "../WindowMode.hpp"
+#include "utility/WuWaTestControl.hpp"
+#include "utility/WuWaShortcutSheet.hpp"
+#include <nlohmann/json.hpp>
+#include <glm/gtx/transform.hpp>
+#include <algorithm>
+#include <cmath>
+
+namespace vrmod {
+namespace {
+constexpr const char* sheet[][2] = {
+    {"GENERAL", "CAMERA"},
+    {"L3 + R3    UEVR menu", "L3 + RB    Game / fixed camera"},
+    {"L3 + A     Recenter view / portal", "L3 + Y/X   Fixed / first-person height"},
+    {"Double L3  Windows screenshot", "LB + LT/RT Fixed camera farther / closer"},
+    {"Double R3  Freecam on / off", "Freecam: left stick moves, right looks"},
+    {"L3 + B     Show / hide game UI", "Freecam: LT rises, RT boosts speed"},
+    {"L3 + View  First person on / off", "Freecam: LB descends; double RT = turbo"},
+    {"L3 + Menu  Show / hide this sheet", "L3 + D-pad Down: animation follow on / off (first person)"},
+    {"Sheet open: L3 + D-pad Left/Right = pages", "L3 + D-pad Up = automatic page"},
+    {"Hold RB: full speed if Polar walk is on", "LB + R3: V once; hold 0.8 s for Tab wheel"},
+    {"L3 + LB    Toggle HUD / mouse adjustment", "Release all controls after entering/leaving"},
+    {"WHILE ADJUSTMENT IS ON", "HUD POSITION"},
+    {"Left stick Cursor    A Click    B Back", "LT/RT      HUD nearer / farther"},
+    {"X + stick  Scroll    D-pad Move map", "LB/RB      HUD down / up"},
+    {"L3 + LB    Return to normal game controls", "LB + R3 utility shortcut remains available outside adjustment"},
+};
+void key(WORD code, bool down) {
+    INPUT input{}; input.type = INPUT_KEYBOARD; input.ki.wVk = code;
+    input.ki.dwFlags = down ? 0 : KEYEVENTF_KEYUP; SendInput(1, &input, sizeof(input));
+}
+void mouse(DWORD flags, LONG x = 0, LONG y = 0, DWORD data = 0) {
+    INPUT input{}; input.type = INPUT_MOUSE; input.mi.dwFlags = flags;
+    input.mi.dx = x; input.mi.dy = y; input.mi.mouseData = data; SendInput(1, &input, sizeof(input));
+}
+}
+
+WuWaControlsComponent::WuWaControlsComponent() {
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+        *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
+        *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
+        *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
+        *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
+        *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording,
+        *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
+        *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};
+}
+
+void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_defaults) {
+    ModComponent::on_config_load(cfg,set_defaults);
+    if (wuwa_test::is_wuwa())
+        wuwa_l10n::request(m_language->value(), Framework::get_persistent_dir("wuwa-languages"));
+    if (!wuwa_test::is_wuwa() || set_defaults || !m_recovery.launch().empty()) return;
+    auto launch=cfg.get_key_values();
+    for (const IModValue& value : m_options) launch[value.get_config_name()]=value.get();
+    m_recovery.remember_launch(launch);
+    try {
+        utility::Config supplied;
+        if (supplied.load(Framework::get_persistent_dir("wuwa-profile-defaults.txt").string()) &&
+            supplied.get("WuWaProfileDefaultsVersion")==std::optional<std::string>{"1"})
+            m_recovery.supplied(supplied.get_key_values());
+    } catch (const std::exception& e) { spdlog::warn("[WuWaControls] Profile reset unavailable: {}",e.what()); }
+}
+
+wuwa_controls::Settings WuWaControlsComponent::control_settings() const {
+    wuwa_controls::Settings result;
+    for (const auto& [key,unused] : m_recovery.launch())
+        if (const auto value=VR::get()->get_value(key)) result[key]=value->get();
+    for (const auto& [key,unused] : m_recovery.supplied())
+        if (const auto value=VR::get()->get_value(key)) result[key]=value->get();
+    return result;
+}
+
+void WuWaControlsComponent::apply_control_settings(const wuwa_controls::Settings& settings) {
+    // Validate the entire bounded, scoped set before changing any live option.
+    for (const auto& [key,text] : settings) {
+        if (!wuwa_controls::recoverable(key)) continue;
+        const auto value=VR::get()->get_value(key);
+        if (!value) continue;
+        if (!wuwa_controls::valid_value_like(value->get(),text))
+            throw std::runtime_error("Invalid profile value: "+key);
+    }
+    for (const auto& [key,text] : settings)
+        if (wuwa_controls::recoverable(key))
+            if (const auto value=VR::get()->get_value(key)) value->set(text);
+    m_adjust.value()=false;
+    release_input(); m_input_armed=false;
+    std::scoped_lock lock{m_bridge_mutex};
+    m_mouse_state={}; m_recenter_pending=m_screenshot_pending=false;
+}
+
+void WuWaControlsComponent::on_draw_language() {
+    const auto options=wuwa_l10n::languages();
+    const auto selected=wuwa_l10n::language();
+    const auto found=std::find_if(options.begin(),options.end(),[&](const auto& x){return x.id==selected;});
+    const std::string preview=found==options.end() ? "English" : found->name+" ("+found->id+")";
+    // Always-readable label provides a recovery path after an accidental choice.
+    if(ImGui::BeginCombo("Language / WuWa",preview.c_str())) {
+        for(const auto& option:options) {
+            const std::string name=option.name+" ("+option.id+")";
+            if(ImGui::Selectable(name.c_str(),option.id==selected)) {
+                m_language->value()=option.id;
+                wuwa_l10n::request(option.id,Framework::get_persistent_dir("wuwa-languages"));
+            }
+        }
+        ImGui::EndCombo();
+    }
+    wuwa_ui::TextWrapped("WuWa controls and shortcut pages only. Base UEVR, game text and some technical help remain English. Translations are community-editable drafts.");
+    if(wuwa_ui::TreeNode("Edit translations")) {
+        wuwa_ui::TextWrapped("Edit the UTF-8 JSON files in your game profile's wuwa-languages folder. Missing entries fall back to English. Reload applies changes without restarting the game.");
+        if(wuwa_ui::Button("Reload language files"))
+            wuwa_l10n::request(m_language->value(),Framework::get_persistent_dir("wuwa-languages"),true);
+        const auto state=wuwa_l10n::status();
+        if(!state.empty()) wuwa_ui::TextWrapped("%s",state.c_str());
+        ImGui::TreePop();
+    }
+}
+
+void WuWaControlsComponent::on_draw_recovery() {
+    if (m_adjust.value() || mode_warning_active()) {
+        wuwa_ui::TextColored(ImVec4{1.0f,0.77f,0.24f,1.0f},"HUD / mouse mode is ON: gameplay buttons are redirected");
+        if (wuwa_ui::Button("Exit mouse mode now")) {
+            m_adjust.value()=false; m_auto_mouse->value()=false;
+            release_input(); m_input_armed=false;
+        }
+        wuwa_ui::TextWrapped("L3 + LB exits manual adjustment. Release all controls afterwards.");
+    }
+    if (!VR::get()->is_gui_enabled()) {
+        wuwa_ui::TextColored(ImVec4{1.0f,0.25f,0.25f,1.0f},"GAME UI IS HIDDEN - menus are hidden too");
+        if (wuwa_ui::Button("Show game UI now"))
+            if (const auto value=VR::get()->get_value("VR_EnableGUI")) value->set("true");
+    }
+    if (wuwa_ui::TreeNode("Restore profile settings")) {
+        wuwa_ui::TextWrapped("Restore this build's supplied controls, first-person/freecam settings, camera scale, aiming and HUD layout. Rendering and runtime selection are preserved. Temporary HUD/mouse mode is always turned off. You can undo the reset below.");
+        const auto reset=[&](const wuwa_controls::Settings& settings,const char* message) {
+            const auto before=control_settings();
+            try {
+                apply_control_settings(settings); m_recovery.remember_before_reset(before); m_recovery_status=message;
+            } catch (const std::exception& e) { m_recovery_status=e.what(); }
+        };
+        ImGui::BeginDisabled(m_recovery.supplied().empty());
+        if (wuwa_ui::Button("Restore supplied profile controls")) reset(m_recovery.supplied(),"Supplied profile restored. Release all controls before continuing.");
+        ImGui::EndDisabled();
+        if (m_recovery.supplied().empty()) wuwa_ui::TextWrapped("This older profile has no supplied-defaults file. Reset this build in the launcher while the game is closed, or use this launch's settings below.");
+        ImGui::BeginDisabled(m_recovery.launch().empty());
+        if (wuwa_ui::Button("Restore controls from this launch")) reset(m_recovery.launch(),"Launch settings restored. Release all controls before continuing.");
+        ImGui::EndDisabled();
+        ImGui::BeginDisabled(!m_recovery.can_undo());
+        if (wuwa_ui::Button("Undo last controls reset")) {
+            try { apply_control_settings(m_recovery.undo()); m_recovery.finish_undo(); m_recovery_status="Settings from before the reset restored; mouse mode remains off."; }
+            catch (const std::exception& e) { m_recovery_status=e.what(); }
+        }
+        ImGui::EndDisabled();
+        wuwa_ui::TextWrapped("Launch settings include any custom settings saved before starting this game. Supplied profile controls are the build's original choices, not UEVR factory defaults.");
+        if (!m_recovery_status.empty()) wuwa_ui::TextWrapped("%s",m_recovery_status.c_str());
+        ImGui::TreePop();
+    }
+}
+
+bool WuWaControlsComponent::game_focused() {
+    return wuwa_test::is_wuwa() && g_framework->get_window() != nullptr &&
+        GetForegroundWindow() == g_framework->get_window() && !g_framework->is_drawing_ui();
+}
+
+void WuWaControlsComponent::on_draw_shortcuts() {
+    wuwa_ui::draw(*m_enabled,"Enable Polar Xbox controls");
+    wuwa_ui::draw(*m_mouse,"Enable Xbox mouse shortcuts");
+    wuwa_ui::TextWrapped("Close UEVR before using these shortcuts. L3/R3 mean clicking the sticks; View is the two-squares button and Menu is the three-lines button.");
+    if (ImGui::BeginTable("Everyday Xbox shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+        wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
+        wuwa_ui::TableSetupColumn("Action");
+        for (const auto& row : std::array<std::array<const char*,2>,8>{{
+            {{"L3 + R3", "Open / close UEVR settings"}},
+            {{"L3 + B", "Show / hide game HUD and menus"}},
+            {{"L3 + A", "Recenter headset / portal"}},
+            {{"L3 + Menu", "Show / hide shortcut sheet"}},
+            {{"L3 + LB, release", "Toggle HUD / mouse adjustment"}},
+            {{"L3 + View", "First person on / off"}},
+            {{"Double R3", "Freecam on / off"}},
+            {{"L3 + RB", "Game / fixed camera"}},
+        }}) {
+            ImGui::TableNextRow(); ImGui::TableNextColumn(); wuwa_ui::TextUnformatted(row[0]);
+            ImGui::TableNextColumn(); wuwa_ui::TextWrapped("%s", row[1]);
+        }
+        ImGui::EndTable();
+    }
+    wuwa_ui::draw(*m_sheet,"Show shortcut sheet");
+    wuwa_ui::draw(*m_sheet_page,"Shortcut sheet page");
+    wuwa_ui::TextWrapped("UI visibility (L3 + B), recenter, UEVR settings and sheet toggle are shown on every page. With the sheet open, hold L3 and tap D-pad left/right to browse all four pages; L3 + D-pad up returns to automatic. These page shortcuts leave the game D-pad unchanged while the sheet is hidden.");
+    if (wuwa_ui::Button("Bring sheet in front")) { m_sheet->value() = true; m_sheet_position->value() = 1; }
+    ImGui::SameLine();
+    if (wuwa_ui::Button("Place sheet at feet")) { m_sheet->value() = true; m_sheet_position->value() = 0; }
+    wuwa_ui::TextWrapped("Close UEVR settings to see the sheet in the headset or simulator. It is absent from the game's flat spectator view. At-feet placement uses your recentered headset origin, not the character's feet.");
+    if (FrameworkConfig::get()->is_always_show_cursor())
+        wuwa_ui::TextWrapped("Sheet is blocked by FrameworkConfig > Always Show Cursor. Turn that off to display it.");
+    if (wuwa_ui::TreeNode("Shortcut sheet placement")) {
+        wuwa_ui::draw(*m_sheet_position,"Sheet position");
+        wuwa_ui::draw(*m_sheet_width,"Sheet width (meters)");
+        if (m_sheet_position->value() == 0) {
+            wuwa_ui::draw(*m_sheet_drop,"Below standing origin (meters)");
+            wuwa_ui::draw(*m_sheet_forward,"Forward of standing origin (meters)");
+            wuwa_ui::draw(*m_sheet_tilt,"Tilt toward feet (degrees)");
+        } else {
+            wuwa_ui::TextWrapped("Front placement is two meters ahead of the recentered headset origin. Width still adjusts its size.");
+        }
+        wuwa_ui::TextWrapped("The sheet stays at your recentered origin, including in HUD/mouse mode. UEVR settings and the hidden-UI recovery warning take priority. Only its L3 + D-pad page shortcuts consume input while visible.");
+        ImGui::TreePop();
+    }
+    if (wuwa_ui::TreeNode("All shortcut contexts")) {
+        for (const auto& row : sheet) { wuwa_ui::TextUnformatted(row[0]); wuwa_ui::TextUnformatted(row[1]); }
+        ImGui::TreePop();
+    }
+    wuwa_ui::TextWrapped("Shortcuts and the sheet start enabled on a fresh profile. Your saved choices are respected. The sheet is below your recentered headset origin; L3 + Menu hides it.");
+}
+
+void WuWaControlsComponent::on_draw_experiments() {
+        if (wuwa_ui::TreeNode("Record camera and Xbox diagnostics")) {
+            if (wuwa_ui::Button("Start motion sidecar (5 minutes max)")) {
+                try { wuwa_motion::start(Framework::get_persistent_dir(),300); }
+                catch (const std::exception& e) { spdlog::warn("[WuWaMotion] {}",e.what()); }
+            }
+            ImGui::SameLine();
+            if (wuwa_ui::Button("Stop motion sidecar")) wuwa_motion::stop();
+            const auto state=wuwa_motion::status();
+            wuwa_ui::Text("%s: %u samples",state["active"].get<bool>()?"Recording":"Stopped",state["rows"].get<uint32_t>());
+            wuwa_ui::TextWrapped("%s",state["path"].get<std::string>().c_str());
+            wuwa_ui::TextWrapped("Local controller and camera data only, about 30 samples/sec. The clean-video recorder starts this automatically. It never presses buttons. Video/sidecar alignment uses timestamps, not a claim of GPU-frame synchronization.");
+            ImGui::TreePop();
+        }
+        wuwa_ui::draw(*m_free_collision,"Freecam collision (experimental)");
+        if (m_free_collision->value()) {
+            wuwa_ui::draw(*m_collision_radius,"Camera collision radius (game units)");
+            wuwa_ui::draw(*m_collision_complex,"Trace mesh triangles when supported");
+            wuwa_ui::TextWrapped("Sweeps the camera against surfaces that block the game's Visibility trace. Slides along contact surfaces. Unsupported queries hold movement and report a reason below. Physical headset leaning is not constrained. Starts off; world geometry still needs live verification.");
+        }
+    wuwa_ui::draw(*m_auto_mouse,"Automatically use mouse in game menus (legacy)");
+    wuwa_ui::TextWrapped("These options are optional comparisons. Opening this section does not enable them or change your camera.");
+}
+
+void WuWaControlsComponent::on_draw_ui() {
+    wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
+    if (m_privacy->value()) {
+        wuwa_ui::TextWrapped("Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.");
+        if (wuwa_ui::TreeNode("Privacy box placement")) {
+            wuwa_ui::draw(*m_privacy_profile,"Also cover the ESC profile ID row");
+            wuwa_ui::draw(*m_privacy_profile_scope,"When to show the profile ID box");
+            wuwa_ui::TextWrapped("The top-left box normally follows the ESC/overlay menu render path, including gamepad menus. Other popups using that same path may also show it. The bottom-right UID box stays on. Check your recording; unknown menu layouts are not guaranteed to be covered. Always is a manual fallback.");
+            wuwa_ui::draw(*m_uid_left,"UID left"); wuwa_ui::draw(*m_uid_top,"UID top");
+            wuwa_ui::draw(*m_uid_right,"UID right"); wuwa_ui::draw(*m_uid_bottom,"UID bottom");
+            wuwa_ui::draw(*m_id_left,"Profile ID left"); wuwa_ui::draw(*m_id_top,"Profile ID top");
+            wuwa_ui::draw(*m_id_right,"Profile ID right"); wuwa_ui::draw(*m_id_bottom,"Profile ID bottom");
+            ImGui::TreePop();
+        }
+    }
+    wuwa_ui::draw(*m_warn_hidden_ui,"Warn when a menu opens with game UI hidden");
+    wuwa_ui::TextWrapped("Hidden UI stays quiet during normal gameplay. A recovery notice appears only when the game cursor or a known menu-rendering path indicates a menu. L3 + B restores UI. An unknown menu may not be detected; UEVR settings always retain the Show game UI button.");
+    wuwa_ui::TextWrapped("L3/R3 mean clicking the sticks. Controls need the supplied WuWa camera script; physical gamepad passthrough bypasses scripts. Both sticks still open UEVR.");
+    wuwa_ui::TextWrapped("Settings: D-pad selects, A activates, left stick scrolls the focused pane. Mouse wheel also scrolls. Release RT first: holding it adjusts the camera instead.");
+    wuwa_ui::draw(*m_camera,"Camera view");
+    if (wuwa_ui::Button(m_camera->value()==2 ? "Leave freecam" : "Enter freecam (move viewpoint with sticks)"))
+        m_camera->value()=m_camera->value()==2 ? 0 : 2;
+    wuwa_ui::draw(*m_keep_camera,"Keep camera and head hiding during Alt-Tab / UEVR settings");
+    wuwa_ui::TextWrapped("Input still pauses when WuWa loses focus. Real game menus temporarily restore the game camera and character visibility.");
+    wuwa_ui::draw(*m_recenter_position,"L3 + A also resets headset position (seated)");
+    if (wuwa_ui::Button("Reset headset position and direction now")) recenter(true);
+    wuwa_ui::TextWrapped("Simulator Home resets only the simulated headset and preview. Use this reset afterwards to align UEVR's origin. It preserves world scale and camera offsets.");
+    ImGui::BeginDisabled(!m_mouse->value());
+    wuwa_ui::draw(m_adjust,"HUD / mouse adjustment ON (L3 + LB toggles)");
+    ImGui::EndDisabled();
+    wuwa_ui::TextWrapped("Close UEVR, press L3 + LB once, then release the controller. Left stick moves the cursor; A clicks, B goes back, X + stick scrolls. LT/RT moves the HUD nearer/farther; LB/RB lowers/raises it. L3 + LB again returns to normal controls. Adjustment pauses freecam flight and starts off each launch.");
+    wuwa_ui::TextWrapped("Automatic mouse starts off so the game's menu buttons, tabs and triggers work normally. Legacy automatic mouse does not adjust the HUD. Page 04 of the sheet is a reference: open UEVR with L3 + R3 before using those controls.");
+    wuwa_ui::draw(*m_walk,"Polar walk speed unless RB is held");
+    if (wuwa_ui::TreeNode("Camera customization")) {
+        wuwa_ui::draw(*m_fixed_distance,"Fixed camera distance (game units)");
+        wuwa_ui::draw(*m_fixed_height,"Fixed camera height above pawn (game units)");
+        wuwa_ui::draw(*m_free_speed,"Freecam movement speed");
+        wuwa_ui::draw(*m_free_turn,"Freecam turning speed");
+        wuwa_ui::draw(*m_free_style,"Freecam movement style");
+        if (m_free_style->value()==1) {
+            wuwa_ui::draw(*m_drone_response,"Drone response (higher = less drift)");
+            wuwa_ui::TextWrapped("Hover drone: left stick moves horizontally, right stick looks, LT rises, LB descends, RT boosts. Release the stick to settle into a hover.");
+        } else if (m_free_style->value()==2) {
+            wuwa_ui::draw(*m_plane_speed,"Plane cruise speed (game units / second)");
+            wuwa_ui::TextWrapped("Plane: right stick pitches/banks, left stick X steers yaw. RT increases cruise speed, LT decreases it. Hold LB to brake, RB to boost. Double R3 exits. Cruise pauses when focus or controller samples are lost; release controls then move a stick to rearm after Alt-Tab.");
+        } else if (m_free_style->value()==3) {
+            wuwa_ui::TextWrapped("Acro: right stick controls roll/pitch rates; left stick X controls yaw. Stick forward pitches down. Centered sticks stop rotation without levelling. Gravity, thrust and momentum keep acting while armed. Full camera roll is part of this mode.");
+            wuwa_ui::draw(*m_acro_throttle,"Acro throttle control");
+            wuwa_ui::TextWrapped("Release RT (Xbox) or pull left stick fully down (Mode 2), then tap RB to arm. Tap RB again or hold LB to pause/disarm. LB + RB levels the drone and stops it. Double R3 exits. Focus loss, menus and shortcut chords pause/disarm it; arm again to resume.");
+            if (m_acro_throttle->value()==1)
+                wuwa_ui::TextWrapped("Mode 2: centered left stick means 50%% throttle. An Xbox stick springs back to center; hold it down for zero throttle.");
+            wuwa_ui::draw(*m_acro_rate,"Pitch / roll rate (degrees / second)");
+            wuwa_ui::draw(*m_acro_yaw_rate,"Yaw rate (degrees / second)");
+            wuwa_ui::draw(*m_acro_expo,"Stick expo (softens center)");
+            wuwa_ui::draw(*m_acro_thrust,"Maximum thrust / weight");
+            wuwa_ui::draw(*m_acro_drag,"Air drag (per second)");
+            wuwa_ui::draw(*m_acro_tilt,"FPV camera upward tilt (degrees)");
+            wuwa_ui::draw(*m_acro_invert_pitch,"Invert acro pitch stick");
+        } else wuwa_ui::TextWrapped("Polar fly: left stick moves along view, right stick looks. LT rises, LB descends; RT boosts, double RT gives turbo.");
+        if (m_free_style->value()!=3) wuwa_ui::draw(*m_flight_roll,"Show hover-drone / plane camera roll");
+        wuwa_ui::TextWrapped("These modes move the viewpoint; the character stays put. Acro is a camera flight model, without motor, propeller or battery simulation.");
+        ImGui::TreePop();
+    }
+    {
+        std::scoped_lock lock{m_bridge_mutex};
+        wuwa_ui::TextWrapped("%s", m_script_status.c_str());
+    }
+}
+
+void WuWaControlsComponent::on_draw_first_person() {
+        if (wuwa_ui::Button(m_camera->value()==3 ? "Leave first person" : "Enter first person"))
+            m_camera->value()=m_camera->value()==3 ? 0 : 3;
+        wuwa_ui::TextWrapped("L3 + View toggles first person. These settings apply when first person is active.");
+        wuwa_ui::draw(*m_fp_forward,"First person forward offset");
+        wuwa_ui::draw(*m_fp_right,"First person right offset");
+        wuwa_ui::draw(*m_fp_up,"First person height offset");
+        wuwa_ui::TextWrapped("While playing in first person, hold L3 + Y to raise eye level or L3 + X to lower it. This lets you see the result with this menu closed.");
+        if (wuwa_ui::Button("Lower eye level by 5")) m_fp_up->value() = (std::max)(-100.0f, m_fp_up->value() - 5.0f);
+        ImGui::SameLine();
+        if (wuwa_ui::Button("Raise eye level by 5")) m_fp_up->value() = (std::min)(100.0f, m_fp_up->value() + 5.0f);
+        wuwa_ui::draw(*m_fp_motion,"First person motion");
+        if (m_fp_motion->value()==3 && (VR::get()->get_aim_method()!=VR::AimMethod::GAME || VR::get()->is_decoupled_pitch_enabled())) {
+            wuwa_ui::TextWrapped("Full animation is paused: headset/controller aim or Decoupled Pitch conflicts with animated head turning. Game-view rotation is being used; head position still follows the character.");
+            if (wuwa_ui::Button("Use game aim for full animation")) {
+                VR::get()->set_aim_method(VR::AimMethod::GAME);
+                if (const auto value=VR::get()->get_value("VR_AimModifyPlayerControlRotation")) value->set("false");
+                VR::get()->set_decoupled_pitch(false);
+            }
+        }
+        wuwa_ui::TextWrapped("L3 + D-pad Down toggles full animation follow and your previous first-person motion. Custom keeps your saved settings. The other choices sample the head after animation. Animated position preserves normal stick aiming. Full animation follows character turns and bone rotation; it can be intense.");
+        int stick_choice=m_fp_look->value()==2 ? 1 : 0;
+        const char* choices[]{"Exact animation", "Use game view while either stick moves"};
+        if (wuwa_ui::Combo("Full animation: stick override",&stick_choice,choices,2)) m_fp_look->value()=stick_choice==1 ? 2 : 0;
+        if (m_fp_look->value()==1) wuwa_ui::TextWrapped("Legacy pitch-only override is active; choose either option above to replace it.");
+        ImGui::BeginDisabled(m_fp_look->value()!=2);
+        wuwa_ui::draw(*m_fp_smooth,"Smooth transition between animation and game view");
+        if (m_fp_smooth->value()) wuwa_ui::draw(*m_fp_blend_time,"Transition duration (seconds)");
+        ImGui::EndDisabled();
+        wuwa_ui::TextWrapped("Smoothing blends stick handovers and reported movement-state changes, such as takeoff/landing. It starts enabled on the supplied profile. Head position stays current; ordinary aiming and animation are immediate after the handover. Off restores the instant switch.");
+        wuwa_ui::TextWrapped("Game-view override shows the game's camera direction while either stick is used, then returns to animation 0.4 seconds after release. Full animation and headset view can still disagree with movement or target selection; aim alignment remains under investigation. These options never rotate or move the character for you.");
+        ImGui::BeginDisabled(m_fp_motion->value()!=0);
+        wuwa_ui::draw(*m_fp_animation,"Follow animated head / neck position (Custom)");
+        wuwa_ui::draw(*m_fp_horizon,"Keep first person horizon level (Custom)");
+        wuwa_ui::draw(*m_fp_late,"Refresh position before drawing (Custom)");
+        ImGui::EndDisabled();
+        wuwa_ui::TextWrapped("Horizon level removes the game's camera pitch from the VR view. Turn it off for right-stick up/down look, and disable UEVR's Decoupled Pitch below. Head aiming is an alternative; grapple selection still needs game testing.");
+        if (wuwa_ui::TreeNode("Aiming and right-stick pitch")) {
+            wuwa_ui::draw(*m_fp_look,"All stick overrides (includes legacy pitch-only)");
+            wuwa_ui::TextWrapped("These are UEVR's existing global aim settings, shared with VR > Input. They are not limited to first person.");
+            for (const auto& [key,label] : {std::pair{"VR_AimMethod","Aim direction"},
+                    std::pair{"VR_AimModifyPlayerControlRotation","Send aim to player control rotation"},
+                    std::pair{"VR_DecoupledPitch","Decouple game camera pitch"}}) {
+                if (const auto value=VR::get()->get_value(key)) wuwa_ui::draw(*value,label);
+            }
+            if (wuwa_ui::Button("Try headset aim")) {
+                VR::get()->set_aim_method(VR::AimMethod::HEAD);
+                if (const auto value=VR::get()->get_value("VR_AimModifyPlayerControlRotation")) value->set("true");
+                m_fp_horizon->value()=true;
+                m_fp_motion->value()=1;
+            }
+            ImGui::SameLine();
+            if (wuwa_ui::Button("Use right-stick pitch")) {
+                VR::get()->set_aim_method(VR::AimMethod::GAME);
+                if (const auto value=VR::get()->get_value("VR_AimModifyPlayerControlRotation")) value->set("false");
+                VR::get()->set_decoupled_pitch(false);
+                m_fp_horizon->value()=false;
+                m_fp_motion->value()=2;
+            }
+            wuwa_ui::TextWrapped("Headset aim selects Head and sends that direction to the game; the stick still turns. Right-stick pitch selects Game, disables control-rotation override and both pitch locks. Neither changes LB + Y or the selected utility.");
+            ImGui::TreePop();
+        }
+        wuwa_ui::draw(*m_mesh,"First person character visibility");
+        if (m_mesh->value()==4) wuwa_ui::TextWrapped("Default: keeps the body visible and head bones hidden, with a full shadow copy. Original non-casting/hidden equipment stays excluded. Copies are removed on exit, menus, rig changes or script reset. Unsupported rigs report a fallback below.");
+        wuwa_ui::TextWrapped("Animation off: stable height relative to the character root. On: follow the head, or reconstruct it from a visible parent bone when the head is hidden. This follows leaning and sprinting but can add bobbing. Missing rig support falls back to the stable anchor; see the status below.");
+        wuwa_ui::TextWrapped("Hide head bones keeps the visible body, but also removes the head from its shadow. Hide body; keep full character shadow requests hidden shadows only from the game's original visible shadow casters; it does not enable unused wings or effect rigs. Shadow support depends on the character/material.");
+        wuwa_ui::TextWrapped("A hidden head bone has no usable animated pose: the neck supplies an approximation. For actual head-bone tracking choose Keep entire character visible or Hide body; keep full character shadow. Separate accessories without a head bone may remain visible in head-only mode. Exit and re-enter first person in a neutral pose to recalibrate. Offsets use game units. L3 + A recenters headset/simulator displacement.");
+    {
+        std::scoped_lock lock{m_bridge_mutex};
+        wuwa_ui::TextWrapped("%s", m_script_status.c_str());
+    }
+
+}
+
+nlohmann::json WuWaControlsComponent::diagnostic_status() {
+    // Copy the script's report under the bridge lock; never inspect UObject
+    // pointers, change camera state or generate input from this heartbeat.
+    nlohmann::json result;
+    {
+        std::scoped_lock lock{m_bridge_mutex};
+        const auto age = m_received == std::chrono::steady_clock::time_point{} ? int64_t{-1}
+            : std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_received).count();
+        result = {{"script_status", m_script_status}, {"script_age_ms", age},
+            {"script_fresh", age >= 0 && age <= 1000}, {"game_menu", m_game_menu}};
+    }
+    // "Eligible" is deliberately not a claim that the user can see/read it.
+    result["sheet_state"] = !m_sheet->value() ? "off"
+        : g_framework->is_drawing_ui() ? "hidden_by_uevr_menu"
+        : !VR::get()->is_hmd_active() ? "headset_inactive" : "eligible";
+    result["hidden_ui_warning"] = menu_warning_active();
+    result["mouse_mode_warning"] = mode_warning_active();
+    result["profile_defaults_available"] = !m_recovery.supplied().empty();
+    result["streamer_privacy"] = m_privacy->value();
+    return result;
+}
+
+bool WuWaControlsComponent::menu_warning_active() const {
+    if (!wuwa_test::is_wuwa() || !m_warn_hidden_ui->value() || VR::get()->is_gui_enabled()) return false;
+    return wuwa_menu::detected(GetTickCount64(),fresh_menu_cursor());
+}
+
+bool WuWaControlsComponent::fresh_menu_cursor() const {
+    std::scoped_lock lock{m_bridge_mutex};
+    return m_game_menu && m_received!=std::chrono::steady_clock::time_point{} &&
+        std::chrono::steady_clock::now()-m_received<=std::chrono::milliseconds(1000);
+}
+
+bool WuWaControlsComponent::menu_warning_visible() const {
+    return !g_framework->is_drawing_ui() && VR::get()->is_hmd_active() && menu_warning_active();
+}
+
+bool WuWaControlsComponent::mode_warning_active() const {
+    if (!wuwa_test::is_wuwa() || !m_enabled->value() || !m_mouse->value() || VR::get()->physical_gamepad_passthrough()) return false;
+    if (m_adjust.get()=="true") return true;
+    std::scoped_lock lock{m_bridge_mutex};
+    return m_auto_mouse->value() && m_mouse_state.active && !m_mouse_state.utility &&
+        m_received!=std::chrono::steady_clock::time_point{} &&
+        std::chrono::steady_clock::now()-m_received<=std::chrono::milliseconds(1000);
+}
+
+bool WuWaControlsComponent::status_warning_visible() const {
+    // A visible sheet includes both recovery hints. Keep its controls and
+    // placement available even when mouse mode and hidden UI are combined.
+    return !g_framework->is_drawing_ui() && VR::get()->is_hmd_active() &&
+        !floor_visible() && (menu_warning_active() || mode_warning_active());
+}
+
+bool WuWaControlsComponent::floor_visible() const {
+    return wuwa_test::is_wuwa() && m_sheet->value() && !g_framework->is_drawing_ui() && VR::get()->is_hmd_active();
+}
+
+Matrix4x4f WuWaControlsComponent::floor_transform() const {
+    auto basis = Matrix4x4f{glm::inverse(VR::get()->get_rotation_offset())};
+    if (m_sheet_position->value() == 1) {
+        basis[3] = glm::vec4{Vector3f{VR::get()->get_standing_origin()} - Vector3f{basis[2]} * 2.0f, 1.0f};
+        return basis;
+    }
+    const auto center = Vector3f{VR::get()->get_standing_origin()} - Vector3f{basis[2]} * m_sheet_forward->value()
+        - Vector3f{0.0f, m_sheet_drop->value(), 0.0f};
+    auto transform = basis * glm::rotate(glm::radians(-m_sheet_tilt->value()), Vector3f{1.0f, 0.0f, 0.0f});
+    transform[3] = glm::vec4{center, 1.0f};
+    return transform;
+}
+
+void WuWaControlsComponent::draw_passive_overlay() {
+    if (status_warning_visible()) {
+        const bool hidden=menu_warning_active();
+        const bool shortcut=m_enabled->value() && !VR::get()->physical_gamepad_passthrough();
+        if (hidden) wuwa_sheet::draw_hidden_ui_warning(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize,ImGui::GetFont(),shortcut,true);
+        if (mode_warning_active()) wuwa_sheet::draw_mouse_mode_warning(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize,ImGui::GetFont(),m_adjust.value(),hidden);
+        return;
+    }
+    if (!floor_visible()) return;
+    int page=m_sheet_page->value()-1;
+    if (page<0) {
+        std::scoped_lock lock{m_bridge_mutex};
+        page=m_adjust.value() || m_mouse_state.active || m_script_status.starts_with("Game menu:") ? 2 : m_camera->value()!=0 ? 1 : 0;
+    }
+    wuwa_sheet::draw(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize,page,ImGui::GetFont(),m_free_style->value(),m_adjust.value(),mode_warning_active(),menu_warning_active());
+}
+
+std::array<wuwa_privacy::Rect, 2> WuWaControlsComponent::privacy_rectangles(int32_t width,int32_t height) const {
+    if (!wuwa_test::is_wuwa() || !m_privacy->value()) return {};
+    return {wuwa_privacy::pixels(m_uid_left->value(),m_uid_top->value(),m_uid_right->value(),m_uid_bottom->value(),width,height),
+        m_privacy_profile->value() && wuwa_menu::profile_mask(m_privacy_profile_scope->value(),GetTickCount64(),fresh_menu_cursor()) ?
+            wuwa_privacy::pixels(m_id_left->value(),m_id_top->value(),m_id_right->value(),m_id_bottom->value(),width,height) : wuwa_privacy::Rect{}};
+}
+
+void WuWaControlsComponent::record_rendered_view(int32_t index, const Rotator<float>* rotation, const Vector3f* position, bool doubles) {
+    if (!wuwa_motion::active() || !wuwa_test::is_wuwa() || !rotation || !position || index<0 || index>=3) return;
+    RecordedView view; view.index=index; view.clock_ms=GetTickCount64();
+    if (doubles) {
+        const auto r=reinterpret_cast<const Rotator<double>*>(rotation);
+        const auto p=reinterpret_cast<const Vector3d*>(position);
+        view.rotation={r->pitch,r->yaw,r->roll}; view.position={p->x,p->y,p->z};
+    } else {
+        view.rotation={rotation->pitch,rotation->yaw,rotation->roll}; view.position={position->x,position->y,position->z};
+    }
+    for (auto v : view.rotation) if (!std::isfinite(v)) return;
+    for (auto v : view.position) if (!std::isfinite(v)) return;
+    std::scoped_lock lock{m_bridge_mutex};
+    m_recorded_views[index]=view;
+}
+
+void WuWaControlsComponent::receive(std::string_view data) {
+    if (data.size() > 16384 || !wuwa_test::is_wuwa()) return;
+    try {
+        const auto value = nlohmann::json::parse(data);
+        if (!value.is_object()) return;
+        if (value.value("motion_only",false)) {
+            if (wuwa_motion::active() && value.contains("motion") && value["motion"].is_object()) {
+                auto motion=value["motion"];
+                const auto vr=VR::get();
+                motion["world_scale"]=vr->get_world_scale();
+                const auto sample=vr->get_head_and_standing_origin();
+                motion["head_m"]={sample[0].x,sample[0].y,sample[0].z};
+                motion["origin_m"]={sample[1].x,sample[1].y,sample[1].z};
+                const auto head_rotation=glm::quat{vr->get_rotation(vr->get_hmd_index())};
+                const auto offset=vr->get_rotation_offset();
+                motion["head_orientation_xyzw"]={head_rotation.x,head_rotation.y,head_rotation.z,head_rotation.w};
+                motion["rotation_offset_xyzw"]={offset.x,offset.y,offset.z,offset.w};
+                motion["aim_method"]=static_cast<int>(vr->get_aim_method());
+                motion["aim_modifies_control_rotation"]=vr->is_aim_modify_player_control_rotation_enabled();
+                motion["rendered_views"]=nlohmann::json::array();
+                {
+                    std::scoped_lock lock{m_bridge_mutex};
+                    for (const auto& view : m_recorded_views) {
+                        const auto age=GetTickCount64()-view.clock_ms;
+                        if (view.index>=0 && age<=250)
+                            motion["rendered_views"].push_back({{"index",view.index},{"position",view.position},
+                                {"rotation",view.rotation},{"clock_ms",view.clock_ms},{"age_ms",age}});
+                    }
+                }
+                wuwa_motion::append(std::move(motion));
+            }
+            return;
+        }
+        MouseState next{};
+        next.active = value.value("mouse", false);
+        next.utility = value.value("utility", false);
+        next.buttons = value.value("buttons", 0) & 0xffff;
+        next.x = std::clamp(value.value("x", 0), -32768, 32767);
+        next.y = std::clamp(value.value("y", 0), -32768, 32767);
+        auto status = value.value("status", std::string{});
+        if (status.size() > 512) status.resize(512);
+        std::scoped_lock lock{m_bridge_mutex};
+        m_mouse_state = next;
+        m_game_menu = value.value("menu", false);
+        m_recenter_pending |= value.value("recenter", false);
+        m_screenshot_pending |= value.value("screenshot", false);
+        m_received = std::chrono::steady_clock::now();
+        if (!status.empty()) m_script_status = std::move(status);
+    } catch (...) {
+        std::scoped_lock lock{m_bridge_mutex};
+        m_mouse_state = {}; m_recenter_pending = m_screenshot_pending = false;
+        m_game_menu = false;
+    }
+}
+
+void WuWaControlsComponent::release_input() {
+    m_mouse_rearm.reset();
+    if (m_left_down) mouse(MOUSEEVENTF_LEFTUP);
+    constexpr WORD keys[]{'W', 'S', 'A', 'D'};
+    for (int i = 0; i < 4; ++i) { if (m_keys[i]) key(keys[i], false); m_keys[i] = false; }
+    if (m_tab_down) key(VK_TAB, false);
+    m_left_down = m_tab_down = m_utility_held = false;
+    m_previous_buttons = 0;
+    m_mouse_x = m_mouse_y = m_scroll = 0.0f;
+}
+
+void WuWaControlsComponent::on_frame() {
+    if (wuwa_motion::active()) wuwa_test::input_watch_until=GetTickCount64()+1000;
+    const auto now = std::chrono::steady_clock::now();
+    const float delta = std::clamp(std::chrono::duration<float>(now - m_last_frame).count(), 0.0f, 0.05f);
+    m_last_frame = now;
+    MouseState state{};
+    bool fresh{}, recenter{}, screenshot{};
+    {
+        std::scoped_lock lock{m_bridge_mutex};
+        fresh = now - m_received <= std::chrono::milliseconds(250);
+        if (fresh) {
+            state = m_mouse_state; recenter = m_recenter_pending; screenshot = m_screenshot_pending;
+        }
+        m_recenter_pending = m_screenshot_pending = false;
+    }
+    if (!fresh || !m_enabled->value() || !game_focused() || VR::get()->physical_gamepad_passthrough()) {
+        m_input_armed = false;
+        release_input(); return;
+    }
+    if (!m_input_armed) {
+        m_input_armed = !state.buttons && !state.utility && std::abs(state.x)<8000 && std::abs(state.y)<8000;
+        release_input(); return;
+    }
+    if (recenter) this->recenter(m_recenter_position->value());
+    if (screenshot) {
+        key(VK_LWIN,true); key(VK_SNAPSHOT,true); key(VK_SNAPSHOT,false); key(VK_LWIN,false);
+    }
+    if (!m_mouse->value()) { release_input(); return; }
+    if (state.utility) {
+        if (!m_utility_held) { m_utility_begin = now; key('V', true); key('V', false); }
+        if (!m_tab_down && now - m_utility_begin >= std::chrono::milliseconds(800)) { key(VK_TAB, true); m_tab_down = true; }
+    } else if (m_tab_down) { key(VK_TAB, false); m_tab_down = false; }
+    m_utility_held = state.utility;
+    if (!state.active) {
+        m_mouse_rearm.reset();
+        if (m_left_down) { mouse(MOUSEEVENTF_LEFTUP); m_left_down = false; }
+        constexpr WORD keys[]{'W', 'S', 'A', 'D'};
+        for (int i=0; i<4; ++i) { if (m_keys[i]) key(keys[i], false); m_keys[i]=false; }
+        m_previous_buttons = 0; m_mouse_x = m_mouse_y = m_scroll = 0; return;
+    }
+    if (!m_mouse_rearm.accept(static_cast<uint16_t>(state.buttons), state.x, state.y)) return;
+    const auto axis = [](int v) { return std::abs(v) < 8000 ? 0.0f : (float)v / 32768.0f; };
+    if (state.buttons & XINPUT_GAMEPAD_X) {
+        m_scroll += axis(state.y) * delta * 900.0f;
+        const auto amount = (int)m_scroll;
+        if (amount) { mouse(MOUSEEVENTF_WHEEL, 0, 0, (DWORD)amount); m_scroll -= (float)amount; }
+        m_mouse_x = m_mouse_y = 0;
+    } else {
+        m_scroll = 0;
+        m_mouse_x += axis(state.x) * delta * 900.0f; m_mouse_y -= axis(state.y) * delta * 900.0f;
+        const auto x=(int)m_mouse_x, y=(int)m_mouse_y;
+        if (x || y) { mouse(MOUSEEVENTF_MOVE, x, y); m_mouse_x-=(float)x; m_mouse_y-=(float)y; }
+    }
+    const bool click = (state.buttons & XINPUT_GAMEPAD_A) != 0;
+    if (click != m_left_down) { mouse(click ? MOUSEEVENTF_LEFTDOWN : MOUSEEVENTF_LEFTUP); m_left_down=click; }
+    constexpr WORD buttons[]{XINPUT_GAMEPAD_DPAD_UP,XINPUT_GAMEPAD_DPAD_DOWN,XINPUT_GAMEPAD_DPAD_LEFT,XINPUT_GAMEPAD_DPAD_RIGHT};
+    constexpr WORD keys[]{'W','S','A','D'};
+    for (int i=0; i<4; ++i) { const bool held=(state.buttons & buttons[i])!=0; if (held!=m_keys[i]) key(keys[i],held); m_keys[i]=held; }
+    if ((state.buttons & XINPUT_GAMEPAD_B) && !(m_previous_buttons & XINPUT_GAMEPAD_B)) { key(VK_ESCAPE,true); key(VK_ESCAPE,false); }
+    m_previous_buttons=state.buttons;
+}
+void WuWaControlsComponent::recenter(bool reset_position) {
+    const auto& vr=VR::get();
+    if (!vr->is_hmd_active()) return;
+    const auto head=vr->get_position(0);
+    if (!std::isfinite(head.x) || !std::isfinite(head.y) || !std::isfinite(head.z)) return;
+    if (reset_position) vr->set_standing_origin(head);
+    vr->recenter_view(); vr->recenter_horizon(); WindowMode::get()->request_recenter();
+}
+} // namespace vrmod

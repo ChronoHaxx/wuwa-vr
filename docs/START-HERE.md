@@ -5,75 +5,47 @@ anti-cheat, and account restrictions or a ban are possible. Use at your own
 risk; there is no publisher approval or account-safety guarantee.
 [Read the risk notice](RISK.md) before launching.
 
-This guide describes the **WuWa VR Launcher private test package**: a ZIP
-containing a folder and `WuWa VR Launcher.exe`. There
-is no public download yet. You need your own Wuthering Waves installation, a PC
-VR headset whose software provides OpenXR (tested: Quest Pro through Steam Link
-and SteamVR) and an Xbox/XInput controller connected to the PC.
+[Download the complete beta ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213), extract it, and open
+**WuWa VR Launcher.exe**. Keep the `app` and `python` folders beside it.
+You need your own game, a Windows PC VR headset/runtime, and an Xbox/XInput
+controller connected to the PC. No separate Python installation is needed.
 
 ## Which build?
 
-| Build | Status | Choose it when |
-| --- | --- | --- |
-| Camera + acro checkpoint · 24 Sep 22:37 BST | Owner-tested in a headset; the launcher's default | You want the version that has actually been played |
-| Stereo and camera candidate · 26 Sep 20:11 BST | Compiled and component-tested; **game/headset test pending** | You are doing the current combined playtest, including camera handovers and the NPC-label candidate |
-| Earlier 26 Sep candidates | Preserved comparison builds; not a complete headset pass | You need to compare a reported regression with a specific saved revision |
-
-Each build keeps its own saved settings. You can switch while the game is
-closed. See [controls](CONTROLS.md) for the differences between them.
-Package manifests identify the exact contents; not every historical build is
-included in every ZIP. The full checkpoint list remains available in the guide.
-Reflections, one-eye materials and full-animation headset targeting remain open
-in the current candidate. Use the [combined checklist](NEXT-SESSION.md) once.
+The current download contains **Stereo, menus and languages · 26 Sep 22:42 BST**,
+from the owner-played 23:02 package. Its native files and supplied profile are
+unchanged. Older builds stay in separate releases to keep downloads smaller.
+Your saved settings are retained; use **Reset this build** for supplied defaults.
 
 ## Install and launch
 
-**Game version:** the standalone official launcher is the previously working
-route. The new portable launcher package has **not yet completed a real game
-launch or headset test**. Detecting an installation does not verify injection.
+1. Extract the whole ZIP to a simple path such as `C:/Games/WuWa VR`.
+2. Start your headset software, then open **WuWa VR Launcher.exe**.
+3. Read the risk notice, choose how you start the game, and click **Apply & launch**.
+4. Accept Windows' prompt, then press **Play** in the game launcher.
+5. In game, **L3 + R3** (or Insert) opens UEVR settings. Custom options are under
+   **VR → WuWa Controls**. Close settings before using gameplay shortcuts.
 
-| Game installation | Injection evidence |
+The EXE is unsigned; Windows may warn. Download from this project's GitHub
+Releases and check the published hash if unsure. Do not disable antivirus or
+anti-cheat. Injection needs elevation to match the game.
+
+| Game installation | Evidence |
 | --- | --- |
-| Standalone official launcher | Previously worked in the development setup; portable-package launch awaiting testing |
-| Steam version | Previous injection attempt failed; not retested with the current fixes |
-| Epic version | Untested |
+| Standalone official launcher | The 23:02 package reached gameplay on the owner's PC |
+| Steam game version | An earlier injection attempt failed; current fixes not retested |
+| Epic game version | Untested |
 
-SteamVR and Steam Link are the headset connection in our tested setup. That
-does not establish support for the **Steam store version** of the game.
+SteamVR / Steam Link headset support does not establish Steam-store injection.
+The full latest-build headset check and a clean-PC test remain pending.
 
-1. Extract the **whole** ZIP to a normal folder, for example
-   `C:\Games\WuWa VR`. It cannot run from inside the ZIP window. A path with
-   only English letters is safest; other characters have not been tested with
-   the injector.
-2. Start your headset software. For the combined Quest Pro test, connect through
-   Steam Link and use SteamVR as the active OpenXR runtime. Check the runtime
-   shown at the top of the launcher page after opening it.
-3. Double-click **WuWa VR Launcher.exe**. Your browser opens a page served only
-   on your PC (`http://127.0.0.1:…`). Windows may say it protected your PC,
-   because the launcher is new and unsigned. Only continue if you received the
-   ZIP from the project owner directly. Do not disable SmartScreen, antivirus
-   or anti-cheat.
-4. On the page: read the risk notice and tick the box, choose a build and how
-   you start the game (prefer the standalone official launcher; manual
-   Steam/Epic startup is experimental), then press
-   **Apply & launch**.
-5. Windows asks for administrator permission, because the game itself runs as
-   administrator and the injector has to match it. Choose **Yes**, then press
-   **Play** in your chosen game launcher. The page shows progress. It
-   cannot press these protected buttons for you.
-6. In the game, press **L3 + R3** (or Insert) for UEVR settings. Most custom
-   features live in **VR → WuWa Controls**. Close settings before using the
-   gameplay shortcuts. Release all controller buttons after changing modes.
+**Simulator or headset:** use the two buttons at the top of the launcher with
+WuWa and the injector closed. This changes OpenXR globally, asks for Windows
+permission, and applies next launch. **Use headset** restores the previously
+saved runtime. Opening the launcher itself does not change it.
 
-The launcher never changes game files. Before its first change it backs up your
-UEVR profile to `%LOCALAPPDATA%\WuWa VR Launcher\snapshots`.
-
-**Simulator or headset:** the top of the page has **Use headset** and **Use
-simulator** buttons. Use them with the game and injector closed. They ask for
-Windows permission and change OpenXR globally for other PC apps too, taking
-effect on the next launch. **Use headset** restores the runtime saved before
-the simulator was enabled; that may be Virtual Desktop or another runtime,
-not necessarily SteamVR. Opening the launcher alone does not switch it.
+The launcher changes your UEVR profile, not game files. Backups are in the
+launcher's data folder under `snapshots`.
 
 ## First-minute recovery
 

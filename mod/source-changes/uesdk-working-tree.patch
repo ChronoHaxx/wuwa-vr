@@ -1,0 +1,120 @@
+diff --git a/src/sdk/AActor.cpp b/src/sdk/AActor.cpp
+index 9e96ea2..1c2a492 100644
+--- a/src/sdk/AActor.cpp
++++ b/src/sdk/AActor.cpp
+@@ -1,4 +1,5 @@
+ #include <vector>
++#include <spdlog/spdlog.h>
+ #include <utility/String.hpp>
+ 
+ #include "UObjectArray.hpp"
+@@ -241,7 +242,31 @@ UActorComponent* AActor::add_component_by_class(UClass* uclass, bool deferred) {
+ 
+     this->process_event(func, params.data());
+ 
+-    return *(UActorComponent**)(params.data() + ret_offset);
++    auto result = *(UActorComponent**)(params.data() + ret_offset);
++
++    // The fallback below was previously only reachable when AddComponentByClass
++    // could not be FOUND. If the UFunction exists but the call yields nothing,
++    // there was no second chance and the caller just saw a null component.
++    //
++    // Wuthering Waves 2.6.5.0 hits exactly that: the UFunction resolves, the
++    // actor spawns, and process_event returns null every time - 14242 of 14242
++    // attempts on 2026-09-06, which left the native-stereo scene capture unable
++    // to exist and the right eye black. The param blob built above assumes a
++    // stock AddComponentByClass signature and a stock FTransform layout; a
++    // modified engine only has to disagree about either for this to fail
++    // silently. spawn_object + FinishAddComponent does not depend on that
++    // signature at all, so try it before giving up.
++    if (result == nullptr) {
++        static bool warned = false;
++        if (!warned) {
++            warned = true;
++            spdlog::warn("[AActor] AddComponentByClass returned null; falling back to spawn_object path");
++        }
++
++        return add_component_by_class_ex(uclass, deferred);
++    }
++
++    return result;
+ }
+ 
+ UActorComponent* AActor::add_component_by_class_ex(UClass* uclass, bool deferred) {
+diff --git a/src/sdk/FSceneView.cpp b/src/sdk/FSceneView.cpp
+index a1517b2..305628c 100644
+--- a/src/sdk/FSceneView.cpp
++++ b/src/sdk/FSceneView.cpp
+@@ -1,4 +1,5 @@
+ #include <unordered_set>
++#include <algorithm>
+ #include <cstdint>
+ 
+ #include <spdlog/spdlog.h>
+@@ -150,17 +151,48 @@ std::optional<uintptr_t> FSceneView::get_constructor_address() {
+         // For use with a fallback method
+         std::vector<uintptr_t> translucent_functions{};
+ 
++        const auto add_candidate = [&translucent_functions](uintptr_t fn) {
++            if (std::find(translucent_functions.begin(), translucent_functions.end(), fn) == translucent_functions.end()) {
++                translucent_functions.push_back(fn);
++            }
++        };
++
+         for (const auto& translucent_ref : translucent_string_refs) {
+             SPDLOG_INFO("[FSceneView] Found r.TranslucentSortPolicy reference at 0x{:x}", translucent_ref);
+ 
+             const auto translucent_func = utility::find_function_start_with_call(translucent_ref);
+ 
+-            if (!translucent_func) {
+-                SPDLOG_WARN("[FSceneView] Failed to find function start (with call) for reference at 0x{:x}", translucent_ref);
++            if (translucent_func) {
++                add_candidate(*translucent_func);
++                continue;
++            }
++
++            SPDLOG_WARN("[FSceneView] Failed to find function start (with call) for reference at 0x{:x}", translucent_ref);
++
++            // find_function_start_with_call only accepts a function start that some
++            // direct CALL instruction references. A constructor that is inlined at
++            // its call sites, or dispatched indirectly through a register or vtable,
++            // has no such reference, so every candidate start is rejected and this
++            // whole reference gets dropped without ever being searched.
++            //
++            // Observed in Wuthering Waves 2.6.5.0: of two r.TranslucentSortPolicy
++            // references, one resolved fine and the other was discarded here, so the
++            // exhaustive search below only ever ran against one candidate and the
++            // constructor was never found. Fall back to a plain function start so
++            // the dropped reference still gets its turn.
++            if (const auto unwind_func = utility::find_function_start_unwind(translucent_ref)) {
++                SPDLOG_INFO("[FSceneView] Falling back to unwind function start 0x{:x} for reference at 0x{:x}", *unwind_func, translucent_ref);
++                add_candidate(*unwind_func);
+                 continue;
+             }
+ 
+-            translucent_functions.push_back(*translucent_func);
++            if (const auto plain_func = utility::find_function_start(translucent_ref)) {
++                SPDLOG_INFO("[FSceneView] Falling back to scanned function start 0x{:x} for reference at 0x{:x}", *plain_func, translucent_ref);
++                add_candidate(*plain_func);
++                continue;
++            }
++
++            SPDLOG_WARN("[FSceneView] No function start could be resolved for reference at 0x{:x}", translucent_ref);
+         }
+ 
+         // previously we naively checked if the vr.InstancedStereo string ref was
+@@ -190,7 +222,13 @@ std::optional<uintptr_t> FSceneView::get_constructor_address() {
+ 
+             bool is_correct_function = false;
+ 
+-            utility::exhaustive_decode((uint8_t*)translucent_function, 1000, [&](INSTRUX& ix, uintptr_t ip) -> utility::ExhaustionResult {
++            // seen_ips must not carry across candidates. The callback BREAKs on any
++            // already-seen ip, so with more than one candidate in the list an earlier
++            // walk can starve a later one of its search before it starts -- silently,
++            // and in exactly the case the fallback above exists to handle.
++            seen_ips.clear();
++
++            utility::exhaustive_decode((uint8_t*)translucent_function, 3000, [&](INSTRUX& ix, uintptr_t ip) -> utility::ExhaustionResult {
+                 if (seen_ips.contains(ip) || is_correct_function) {
+                     return utility::ExhaustionResult::BREAK;
+                 }

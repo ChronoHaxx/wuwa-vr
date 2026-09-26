@@ -1,0 +1,14 @@
+{
+  "name": "wuwa-vr-community-site",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Development tools for the static WuWa VR guide and community website",
+  "scripts": {
+    "build": "node dev/build-site.cjs",
+    "check": "node dev/check-site.cjs && node dev/check-community.cjs"
+  },
+  "devDependencies": {
+    "marked": "17.0.5",
+    "playwright": "1.62.1"
+  }
+}

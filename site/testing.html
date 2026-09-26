@@ -1,0 +1,262 @@
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Local checkpoints and next-session comparisons; not public release acceptance."><meta name="theme-color" content="#17191c"><title>Local test notes — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Local test notes</h1><p>For the prepared development installation. These notes do not establish public release or headset acceptance.</p><div class="guide-content"><section id="next-test"><h2>Next session</h2><p>The saved development candidate is <strong>Stereo and camera candidate · 26 Sep 20:11 BST</strong>
+(<code>stereo-camera-20260926</code>). Backend SHA-256:
+<code>3c8acd6bfb3312044ef1ef717a263f2ffe7d3bcb6cc32c16f5fb69769082f762</code>.
+It is not selected automatically. <strong>Controls and recovery · 26 Sep 15:39 BST</strong>
+and earlier checkpoints remain available.</p>
+<p><strong>Rendering work remains open.</strong> This build includes an unverified missing-eye
+NPC-label candidate. Doubled head-following preview reflections, one-eye
+materials and full-animation game-aim alignment remain unresolved.
+This checklist is saved for a combined session; it is not a
+request to interrupt gameplay or repeatedly demonstrate unchanged defects.</p>
+<p>Use the prepared private launcher, select <strong>20:11</strong>, and verify <strong>Next Apply &amp;
+launch</strong> before launching through the official standalone game launcher. Steam
+injection previously failed and has not been retested; Epic is untested. Native
+DLL changes need a normal game restart. Keep <strong>native rendering</strong> and <strong>Native
+Stereo Fix off</strong>; separate-eye rendering previously gave a black scene.</p>
+<p>Quest Pro through Steam Link/SteamVR, Xbox pad connected to PC. No countdown or
+intermediate replies are needed. Report pass/fail/not tried together, including
+the affected character/mode. Game time continues in every camera mode.</p>
+<ol>
+<li><input disabled="" type="checkbox"> <strong>Normal play and full-animation transitions.</strong> L3+View enters first
+person. First check Animated position + stick pitch for ordinary walk,
+sprint, grapple and wing flight. Under <strong>WuWa Controls → First person</strong>,
+Full animation retains <strong>Use game view while either stick moves</strong>. Smoothing
+starts enabled at 0.2 seconds in this supplied profile. Walk backward,
+strafe, turn and release both sticks; check the head offset stays coherent
+and the return to animation blends. Compare takeoff/landing. The movement
+component must report a change for those transitions to trigger a blend.
+Head position should remain immediate. Completed game-view handovers now use
+the current camera angle and matching offsets. L3+D-pad Down returns to the
+previous motion preset. Full animation requires Game aim and Decoupled Pitch
+off; conflicting settings now show a warning and retain game-view rotation.
+The warning&#39;s button restores compatible aim settings explicitly. Full-animation
+game-aim disagreement remains open; this guard does not establish a targeting fix.</li>
+<li><input disabled="" type="checkbox"> <strong>Shadows and controller recovery.</strong> Head hiding with a full shadow is
+now the default. Confirm swaps do not require re-toggling it, no unused wing
+shadows appear, and leaving first person restores the character. Check normal
+menus/dialogue, the WuWa scrollbar and Alt-Tab/LB+Y without the UEVR overlay.</li>
+<li><input disabled="" type="checkbox"> <strong>Shortcut sheet and HUD/mouse mode.</strong> Show the sheet with L3+Menu, leave
+page selection automatic, then use L3+LB and release. The sheet should stay
+put, show page 03 and explain how to exit. Hide game UI with L3+B: the sheet
+should remain with a red restore hint. Hide the sheet to see the standalone
+warnings. Restore UI and exit mouse mode using the same shortcuts. Automatic
+mouse-in-menus stays off by default and is a separate legacy option.</li>
+<li><input disabled="" type="checkbox"> <strong>Streamer privacy and reset.</strong> Enable <strong>Streamer privacy: cover player
+IDs</strong>. Inspect a short gameplay, ESC-menu and character/menu recording: both
+eye views should cover each ID completely. Adjust rectangle edges if needed.
+The optional ESC-row mask also remains visible outside menus. Restore supplied
+controls, then undo a harmless HUD-size change; privacy must stay enabled.
+Names, chat and diagnostic files are outside the masks&#39; scope.</li>
+<li><input disabled="" type="checkbox"> <strong>One recording and portal check.</strong> Use the launcher&#39;s Playtest purpose,
+30 fps / 1024 pixels per eye, to record movement and any visible NPC bubbles,
+translucent character effects and preview reflections encountered naturally.
+The NPC candidate adds a guarded primary-eye pass; CPU observations in
+<code>motion.jsonl</code> establish whether it ran, separately from visible labels.
+<code>clean-sbs.mp4</code> and <code>replay.html</code> still show the video and
+controller/camera comparison separately. Portal HUD coverage, freecam and
+simulator/headset controls remain available. Runtime switching requires the
+game/injector to be closed. Nothing is uploaded automatically.</li>
+</ol>
+<p>The next private launcher also provides <strong>Recovery and removal → Compare stereo
+rendering (experimental) → Compare current scene</strong>. During this same grouped
+session, leave an affected character preview visible, close UEVR settings, start
+the comparison and return focus to WuWa. Keep the view still. Five allowlisted
+reflection/material settings are compared and restored automatically; no manual
+CVar toggling or simulator switch is needed. <strong>Open comparisons → index.html</strong>
+shows the before/changed/restored captures. These are composited SteamVR mirrors,
+not isolated scene layers or guaranteed simultaneous eye frames. Results remain
+private and may contain a UID. This is diagnosis, not a verified reflection fix.</p>
+</section><section id="checkpoints"><h2>Checkpoint identities</h2><p>All times are <strong>BST (UTC+01:00), 24 September 2026</strong>. The dashboard preserves
+runtime hashes and saved profiles; these are distinct from headset acceptance.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Saved</th>
+<th>ID</th>
+<th>Backend SHA-256</th>
+<th>Source tag</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>17:09</td>
+<td>playable-20260924</td>
+<td>fa0eba4d0002364cd8fbc736a5251eb553b1882d8de1b2ddf743ab637803d569</td>
+<td>wuwa/playable-2026-09-24</td>
+</tr>
+<tr>
+<td>20:56</td>
+<td>first-person-20260924</td>
+<td>1f477d71191cea15be3d08582d177daf51103218fad4c4677c3b6e087d364999</td>
+<td>wuwa/first-person-2026-09-24</td>
+</tr>
+<tr>
+<td>22:37</td>
+<td>camera-tested-20260924</td>
+<td>84f1579560b03a0eded29f9d6f54a5a913ebb8b272ae6b66094345061887a18e</td>
+<td>wuwa/camera-tested-2026-09-24-2237</td>
+</tr>
+<tr>
+<td>23:00</td>
+<td>hud-input-20260924</td>
+<td>72a08bd3f42fbc26d0cc1b00b942dfefddf312ca90aaf6f5ec54facdf346d5be</td>
+<td>wuwa/hud-input-candidate-2026-09-24-2300</td>
+</tr>
+<tr>
+<td>23:31</td>
+<td>menu-camera-qol-20260924</td>
+<td>39810b377a4fb70781332177c9e3f054b8fc2103dcebc84bdf11545e9e73c1d7</td>
+<td>wuwa/menu-camera-qol-2026-09-24-2331</td>
+</tr>
+</tbody></table></div>
+<p>The first two source-history commits were reconstructed later from preserved
+artifacts; they were not original commits made at those save times. The tags
+preserve source and patches, not a claim of a clean independently reproduced
+build. Older September 20 labels use verified <strong>build</strong> times (17:23 / 18:33)
+because the later reconstructed profiles have different dates.</p>
+<h3>25 September 2026, BST (UTC+01:00)</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Saved</th>
+<th>ID</th>
+<th>Backend SHA-256</th>
+<th>Source tag</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>01:22:07</td>
+<td>accessible-menu-20260925</td>
+<td>33a9e7f5ce4fd302e4ff2f35305ba23c7332903b787d842c6a4164805f6b9a97</td>
+<td>wuwa/accessible-menu-2026-09-25-012207</td>
+</tr>
+<tr>
+<td>22:49:13</td>
+<td>camera-binding-20260925</td>
+<td>09edbe295b55e9a78e2d87e70e8c974d347ccc0e5cb2f8ea9e10a30f8c0ac188</td>
+<td>wuwa/camera-binding-2026-09-25-224913</td>
+</tr>
+</tbody></table></div>
+<p>The accessible-menu candidate reorganizes the custom UEVR settings page and
+supplies visible UI/shortcut defaults. It inherits the 23:31 candidate&#39;s
+rendering and gameplay behavior. Game/headset acceptance is still pending.
+The previous native builds above are unchanged.
+The 22:49 candidate repairs two reproduced camera binding cases: a replaced
+main mesh and calibration before animation when late refresh is selected.
+It also records passive main/captured-view data for the NPC-label investigation.
+This does not establish a live camera, grapple or stereo-label fix. Its late
+option and Native Stereo Fix remain off by default; all earlier tags remain.
+Use the timestamped catalog and manifest rather than a folder called &quot;latest&quot;.</p>
+<h3>26 September 2026, BST (UTC+01:00)</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Saved</th>
+<th>ID</th>
+<th>Backend SHA-256</th>
+<th>Source tag</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>01:17:50</td>
+<td>comfort-runtime-20260926</td>
+<td>db0566a38ba364b7f756360a722460ba0cedf4cd2c8720fff4a7bbcf17830f51</td>
+<td>wuwa/comfort-runtime-2026-09-26-011750</td>
+</tr>
+<tr>
+<td>01:53:38</td>
+<td>combined-playtest-20260926</td>
+<td>e20e02610087d81b19821e734efbb82007de0e1ef166969dc0ef586cbee2d13d</td>
+<td>wuwa/combined-playtest-2026-09-26-015338</td>
+</tr>
+<tr>
+<td>14:09:29</td>
+<td>motion-shadow-20260926</td>
+<td>f7044a277c8aae7354b3b07b0ddcfabbda86259bbc6194622c4ebb7a624e9175</td>
+<td>wuwa/motion-shadow-2026-09-26-140929</td>
+</tr>
+<tr>
+<td>15:39:51</td>
+<td>control-recovery-20260926</td>
+<td>02ac1fbad19af0bb518197952a4b4be1953c5f4da1808d703699d570f444716d</td>
+<td>wuwa/control-recovery-2026-09-26-153951</td>
+</tr>
+<tr>
+<td>17:30:42</td>
+<td>playability-20260926</td>
+<td>f6c73f82acbaabab14a02fa39fa657f105c8204e0d25c6f17f1652466fe3b8ff</td>
+<td>wuwa/playability-2026-09-26-173042</td>
+</tr>
+<tr>
+<td>18:03:24</td>
+<td>playability-20260926-r2</td>
+<td>22066ebd46cd105a17c0bdd66f6c81796d8d6d290134acbefbc804b7794acded</td>
+<td>wuwa/playability-2026-09-26-180324</td>
+</tr>
+<tr>
+<td>19:04:02</td>
+<td>stereo-labels-20260926</td>
+<td>1f034f2b58e7cdbf384f749f79c68ad9f9094e4fc8b1611808715a1f42dc5efe</td>
+<td>wuwa/stereo-labels-2026-09-26-190402</td>
+</tr>
+</tbody></table></div>
+<p>18:03 preserves the 17:30 camera/profile and restores the common HUD/MOUSE
+heading. Its source commit also records the later portable relocation and Ko-fi
+changes. 19:04 adds a guarded missing-eye label candidate and typed material
+comparisons. Both compiled and passed component checks; neither has new headset
+acceptance. Reflections and one-eye materials remain unresolved. Their source
+commits were saved after these runtime timestamps; earlier artifacts are unchanged.</p>
+<p>01:17 restores portable simulator/headset switching, adds a visible WuWa menu
+scrollbar, motion presets with post-animation sampling, and an optional hidden
+body with a full character shadow. 01:53 retains that batch and adds a reversible
+native/separate-eye renderer comparison plus continuing passive stereo samples.
+The owner subsequently reported good default first-person sprint, grapple and
+wing tracking in 01:53, but duplicate equipment shadows, full-follow drift and
+stick issues, portal margins, and a black scene in the separate-eye comparison.
+That is partial acceptance, not a pass for the whole build.</p>
+<p>14:09 preserves the accepted default camera path and adds filtered shadow
+casters, opt-in head-shadow copies, full-follow stick override and L3+D-pad Down,
+full-frame portal sizing and clean SteamVR video with separate camera/controller
+replay. OpenXR depth metadata is reinitialized and bounds checked; the black-scene
+comparison is not yet proven repaired. Native shader/label/reflection repairs
+remain open. The owner subsequently liked full animation with the game-view
+stick override and reported working head shadows after a manual re-toggle per
+character. The recordings establish real SteamVR capture, with only about 11
+new captured frames per second; camera handover and stereo defects remain.
+This is partial acceptance, not a complete pass.</p>
+<p>15:39 adds automatic shadow retries/flag restoration, optional smooth handover,
+the First person section, persistent recovery hints and supplied-profile reset
+with undo. The launcher adds 30/45/60 fps and resolution choices; the recorder
+resizes on the GPU and new debug recordings include head/control/rendered poses.
+Offline checks pass; live performance and this candidate&#39;s grouped headset
+acceptance remain pending. Native labels/reflections/materials and full-follow
+aim alignment are unchanged. Source receipts record actual commit/tag creation.</p>
+<p>The owner subsequently accepted the 15:39 full-shadow head-hiding behavior and
+requested it as the default. Other recordings showed backward offset desync,
+disabled smoothing and shortcut help disappearing in mouse mode.</p>
+<p>17:30 makes that shadow mode the supplied default, aligns full-follow/game-view
+offsets during backward movement, and enables 0.2-second stick and reported
+movement-state handovers. It retains shortcut help during mouse/hidden-UI modes
+and adds optional player-ID masks. Bounded label-stage recording hooks are
+diagnostic only. Native build, camera tests, offscreen D3D11/D3D12 masks and sheet
+renders passed; new game/headset acceptance is pending. NPC labels, doubled
+reflections, one-eye materials and full-animation game aim remain unresolved.</p>
+<h3>Launcher tools — 26 September 19:43:24 BST</h3>
+<p>Tag <code>wuwa/steamvr-comparisons-2026-09-26-194324</code> adds a focus-waited, automatically restored SteamVR graphics
+comparison batch and full-resolution per-eye/SBS PNG capture. This is a
+tools checkpoint; the 19:04 renderer DLL and its supplied profile are unchanged.
+Offline component/launcher checks passed; headset capture and the remaining
+stereo defects are unverified. Public mirrors cannot prove exact source-frame
+pairing. See <code>_docs/steamvr-comparisons-2026-09-26.md</code> for the evidence limits.</p>
+<h3>Stereo and camera — 26 September 20:11:13 BST</h3>
+<p>Tag <code>wuwa/stereo-camera-2026-09-26-201113</code> saves <code>stereo-camera-20260926</code>, backend
+<code>3c8acd6bfb3312044ef1ef717a263f2ffe7d3bcb6cc32c16f5fb69769082f762</code>. It retains the missing-eye NPC-label
+candidate and adds current game-view handover rotation/offset repairs plus
+an incompatible-aim warning and fallback. Component checks and build passed;
+it is not installed or headset-tested. Reflections, one-eye materials and
+full-animation headset targeting remain open. Earlier builds are preserved.</p>
+<h3>Guide and package — 26 September 20:36:18 BST</h3>
+<p>Tag <code>wuwa/beta-guide-2026-09-26-203618</code> records updated setup, controls and recovery instructions.
+This is a documentation checkpoint: the 20:11 native runtime, supplied
+profiles and comparison helpers are unchanged. The same grouped headset
+acceptance remains pending; it is not a new rendering variant.</p>
+</section></div></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>

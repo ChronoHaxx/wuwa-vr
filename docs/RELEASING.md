@@ -1,5 +1,26 @@
 # Release preparation
 
+## Live community site — 26 September 2026
+
+The [GitHub repository](https://github.com/ChronoHaxx/wuwa-vr) and
+[Pages website](https://chronohaxx.github.io/wuwa-vr/) are now published.
+They contain the reviewed website, guides and issue templates. The Ko-fi link
+is connected, and the feedback form prepares a GitHub issue without submitting
+it automatically.
+
+Eighteen saved launcher/recovery packages have timestamped **draft** releases
+with build IDs and hashes. No mod archive has been uploaded or publicly
+released: redistribution permission for the bundled upstream components is
+still unresolved. The latest prepared package remains experimental; published
+documentation does not establish headset acceptance.
+
+Release assets will use a consistent `WuWa-VR-Launcher.zip` name per launcher
+release. A beta download button must point to the actual published prerelease
+asset, after its upload is verified. GitHub's `releases/latest` route is for
+published non-prerelease releases, so it must not be used as a working beta
+download while all releases remain drafts or prereleases. Keep older timestamps
+and hashes available for rollback and bug reports.
+
 ## Sharing update — 26 September
 
 The website and launcher now expose **Code & contribute** and **Feedback**.
@@ -26,11 +47,12 @@ game files, recordings and personal profiles. It is prepared for author review,
 with public redistribution scope still unconfirmed. A source review bundle
 and a complete buildable public mod repository are different artifacts.
 
-For the public showcase, use the allowlisted `public-site` export below. Review
-that exact folder, then create/push a dedicated repository from it when approved.
+For public-site updates, use the allowlisted `public-site` export below. Review
+that exact folder, then update the dedicated `ChronoHaxx/wuwa-vr` repository.
 Its manual Pages workflow deploys only `site/`. Do not push this development
 workspace or its history. Keep the private mod ZIP out of public Releases until
-component permissions and release acceptance are settled.
+component permissions are settled; document the actual acceptance status of
+each experimental build.
 
 The September 25 presentation pass prepares a static website and private
 recovery archives. It does **not** publish the repository, open donations or
@@ -134,19 +156,18 @@ and **SannpoKun** for modification; `mirudo2` is the repository owner. Older
 workspace notes used those names imprecisely. The new credit page distinguishes
 them. Discord posts/attachments and game data are not republished in the site.
 
-## Publishing the showcase later
+## Updating the public website
 
-Choose a public repository name and review the standalone export first. There
-is currently no remote configured for this development repository. Create a
-separate repository from the reviewed export rather than publishing this
-history. In GitHub Pages, select GitHub Actions and manually run the supplied
-workflow when approved. It uploads only `site/` and does not run on push.
+Review the standalone export before updating `ChronoHaxx/wuwa-vr`. The private
+development repository remains separate from that public checkout. Pages is
+configured to use GitHub Actions: commit and push the reviewed public files,
+then manually run **Publish reviewed showcase**. It uploads only `site/` and
+does not run on push. Verify the resulting deployment and live URLs.
 GitHub documents the [Pages workflow and environment permissions](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 
-No hosting account, repository or payment account was created by preparing
-these files. The owner supplied `https://ko-fi.com/chronohax`; it is configured
-locally in the support page, `site/config.js` and GitHub's funding file. Preparing
-these links does not publish them. Keep support optional and separate from
+The owner supplied `https://ko-fi.com/chronohax`; it appears on the published
+support page and in GitHub's funding configuration. No payment account was
+created by these tools. Keep support optional and separate from
 availability/compatibility.
 GitHub Sponsors is one possible route for eligible open-source contributors;
 its [official overview](https://docs.github.com/en/sponsors/getting-started-with-github-sponsors/about-github-sponsors)

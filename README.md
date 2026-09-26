@@ -37,7 +37,7 @@ improvements; these are community requests, not additional MIT restrictions.
 a permanent ban are possible.** It is unofficial and not approved by Kuro
 Games. See the [risk notice](docs/RISK.md). Cosmetic use is not a safety guarantee.
 
-## Before publishing
+## Deployment
 
 Review the page copy and game captures. Only set the payment link in
 `site/config.js` to a support account supplied and approved by the owner.
@@ -50,11 +50,11 @@ state without editing. Nothing is posted automatically.
 The site collects no payment details and has no analytics, external fonts or
 third-party embeds. A configured support link opens the external provider.
 
-Use a dedicated public repository for this export. Do not upload the original
-development workspace or its history. Choose a repository name and review the
-result before publishing. In GitHub Settings → Pages, select GitHub Actions,
-then manually run **Publish reviewed showcase** when ready. Ordinary pushes
-do not deploy this template. The workflow uploads only `site/`.
+This public repository contains the reviewed website export. Do not upload the
+original development workspace or its history here. GitHub Pages uses GitHub
+Actions; after reviewing and pushing a site update, manually run **Publish
+reviewed showcase**. Ordinary pushes do not deploy it. The workflow uploads
+only `site/`.
 
 GitHub's [custom Pages workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
 describes the environment and Pages permissions. The relative asset links work

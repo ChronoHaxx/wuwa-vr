@@ -8,11 +8,21 @@ function Get-SceneCaptureCheck {
     $unresolvedFailure = $false
     $unavailableCount = 0
     $failureCount = 0
+    $captureObserved = $false
+    $nativeFixOffObserved = $false
+    $nativeFixOnObserved = $false
     $compositePattern = 'right-eye composite: capture=(\d+)x(\d+) game=(\d+)x(\d+) expected_eye=(\d+)x(\d+) capture_resource=0x([0-9a-fA-F]+)'
 
     # Log order matters: an early null is normal during loading, but a resource
     # disappearing after an earlier good observation must not be reported PASS.
     foreach ($line in ($LogText -split '\r?\n')) {
+        if ($line -match '\[WuWaFrame\] submit\b[^\r\n]*\bnative_fix=(true|false)(?=\s|$)') {
+            if ($Matches[1] -eq 'true') { $nativeFixOnObserved = $true }
+            else { $nativeFixOffObserved = $true }
+        }
+        if ($line -match 'right-eye composite:|Creating scene capture!|Failed to add scene capture component|Failed to fully setup scene capture texture') {
+            $captureObserved = $true
+        }
         if ($line -match 'Failed to add scene capture component|Failed to fully setup scene capture texture') {
             $failureCount++
             $unresolvedFailure = $true
@@ -41,6 +51,15 @@ function Get-SceneCaptureCheck {
             $result = 'PENDING'
             $detail = 'capture creation requested; no later valid resource observation'
         }
+    }
+
+    # Ordinary native stereo does not use the optional Native Stereo Fix capture.
+    # Require this run's render-path evidence, not a saved config or its absence.
+    # Any enabled frame or capture activity (even an unfamiliar log format)
+    # keeps the existing resource checks.
+    if (-not $captureObserved -and $nativeFixOffObserved -and -not $nativeFixOnObserved) {
+        $result = 'N/A'
+        $detail = 'Native Stereo Fix is off in the observed render frames; its optional scene-capture resource is not required'
     }
 
     [pscustomobject]@{ Check = 'scene capture'; Result = $result; Detail = $detail }

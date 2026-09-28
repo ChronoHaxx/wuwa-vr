@@ -435,7 +435,9 @@ $onPoll = {
         Write-Host ('  {0}  {1}' -f (Get-Date -Format 'HH:mm:ss'), $message)
         $progress.Message = $message
     }
-    Update-LaunchState -Path $StatePath -Values @{ phase = $phase; message = $message }
+    Update-LaunchState -Path $StatePath -Values @{ phase = $phase; message = $message;
+        injectorRunning = [bool]$observation.InjectorRunning; backendLogStarted = [bool]$observation.BackendLogStarted;
+        firstFrameSeen = [bool]$observation.FirstFrameSeen }
 }
 $cancelCheck = {
     ($CancelPath -and (Test-Path -LiteralPath $CancelPath)) -or ($PromptOnLauncherClosed -and (Test-LaunchCancelKey))
@@ -471,6 +473,7 @@ try {
             -ArgumentList 'Client-Win64-Shipping.exe' `
             -PassThru
         $watchedInjector = $injectorProcess
+        Update-LaunchState -Path $StatePath -Values @{ injectorPid = $injectorProcess.Id; injectorStarted = $true }
         Write-Output "Injector started minimised in the taskbar (PID $($injectorProcess.Id)); press Play in the game launcher."
     }
 
@@ -501,7 +504,7 @@ try {
             'LauncherClosed' { ' Run the shortcut again and press Play in the launcher.' }
             'InjectorExited' { ' Run the shortcut again and leave the injector open until the game starts.' }
             'GameExited'     { ' Check the game or launcher for an error, then run the shortcut again.' }
-            'NotInjected'    { ' Close the game normally, then run the shortcut again.' }
+            'NotInjected'    { ' Open Recovery > Copy diagnostics in the launcher. Include the injector log when reporting this failure. Close the game normally before retrying.' }
             default          { '' }
         }
         $phase = 'failed'

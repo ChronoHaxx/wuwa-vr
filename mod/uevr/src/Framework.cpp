@@ -20,6 +20,13 @@
 #include "utility/Input.hpp"
 #include "utility/WuWaModuleCapture.hpp"
 #include "utility/WuWaLguiProbe.hpp"
+#include "utility/WuWaPlanarProbe.hpp"
+#include "utility/WuWaLodProbe.hpp"
+#include "utility/WuWaTranslucencyStereo.hpp"
+#include "utility/WuWaKuroReflection.hpp"
+#include "utility/WuWaLodProbe.hpp"
+#include "utility/WuWaReflectionCapture.hpp"
+#include "utility/WuWaWaterObservation.hpp"
 #include "utility/WuWaLguiRoute.hpp"
 #include "utility/WuWaLguiRedirect.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
@@ -406,6 +413,12 @@ void wuwa_lgui_probe::ProbeDeleter::operator()(Probe* probe) const noexcept {
 }
 
 Framework::~Framework() {
+    wuwa_reflection_capture::shutdown(wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
+    wuwa_lod_probe::shutdown(wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
+    wuwa_kuro_reflection::shutdown(wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
+    wuwa_translucency::shutdown(wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
+    wuwa_water_observation::shutdown(wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
+    wuwa_planar_probe::shutdown(wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
     if (!wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed)) {
         wuwa_lgui_redirect::stop();
         wuwa_lgui_route::stop();

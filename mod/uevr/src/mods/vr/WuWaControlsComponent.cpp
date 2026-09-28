@@ -7,6 +7,7 @@
 #include "../WindowMode.hpp"
 #include "utility/WuWaTestControl.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
+#include "utility/WuWaStereoBasePose.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
@@ -39,6 +40,87 @@ void mouse(DWORD flags, LONG x = 0, LONG y = 0, DWORD data = 0) {
     INPUT input{}; input.type = INPUT_MOUSE; input.mi.dwFlags = flags;
     input.mi.dx = x; input.mi.dy = y; input.mi.mouseData = data; SendInput(1, &input, sizeof(input));
 }
+nlohmann::json pose_frames_json(const wuwa_pose_pair::Frames& frames) {
+    return {{"runtime_frame",frames.runtime_frame},{"g_frame_count",frames.game_frame},{"thread",frames.thread}};
+}
+nlohmann::json recorded_pose_json(const wuwa_pose_pair::Pose& pose) {
+    const bool valid=wuwa_pose_pair::finite(pose);
+    return {{"valid",valid},{"position",valid?nlohmann::json(pose.position):nlohmann::json(nullptr)},
+        {"rotation",valid?nlohmann::json(pose.rotation):nlohmann::json(nullptr)}};
+}
+template<class T> nlohmann::json pose_field_json(const wuwa_pose_pair::Field<T>& field) {
+    return field.valid?nlohmann::json(field.value):nlohmann::json(nullptr);
+}
+nlohmann::json constructor_pose_json(const wuwa_pose_pair::Constructor& c) {
+    const auto& a=c.input;const auto& b=c.output;
+    nlohmann::json input{{"address",a.address},{"origin_0x0",pose_field_json(a.origin)},
+        {"rotation_0x10",pose_field_json(a.rotation)},{"projection_0x50",pose_field_json(a.projection)},
+        {"alternate_projection_0xb0",pose_field_json(a.alternate_projection)},
+        {"alternate_flag_0xf0",pose_field_json(a.alternate_flag)},
+        {"family_0xf8",pose_field_json(a.family)},{"state_0x100",pose_field_json(a.state)},
+        {"pass_0x150",pose_field_json(a.pass)}};
+    auto first=nlohmann::json::array(),second=nlohmann::json::array();
+    for(size_t i=0;i<wuwa_pose_pair::matrix_offsets.size();++i) {
+        first.push_back(pose_field_json(b.object_320[i]));second.push_back(pose_field_json(b.object_7e0[i]));
+    }
+    nlohmann::json output{{"view",b.address},{"family_0x0",pose_field_json(b.family)},
+        {"state_0x8",pose_field_json(b.state)},{"pass_0xc90",pose_field_json(b.pass)},
+        {"matrix_offsets",wuwa_pose_pair::matrix_offsets},
+        {"matrix_object_0x320",std::move(first)},{"matrix_object_0x7e0",std::move(second)}};
+    return {{"constructor_ordinal",c.ordinal},{"preceding_offset_call_ordinal",c.preceding_call_ordinal},
+        {"offset_call_association_proven",false},{"destination",c.destination},
+        {"begin_ms",c.begin_ms},{"end_ms",c.end_ms},{"input_frames",pose_frames_json(c.input_frames)},
+        {"output_frames",pose_frames_json(c.output_frames)},{"layout_verified",c.layout_verified},
+        {"finished",c.finished},{"result_matches_destination",c.result_matches_destination},{"valid",c.valid},
+        {"input",std::move(input)},{"after_native_before_early_correction",std::move(output)}};
+}
+nlohmann::json pose_pair_json(const wuwa_pose_pair::Pair& pair, uint64_t now, bool emit_constructors) {
+    nlohmann::json result{{"version",1},{"available",pair.available},{"valid",pair.valid},
+        {"association","latest retained completed viewport draw; explicit CPU scope identity, not the current motion sample or GPU frame"},
+        {"valid_scope","two completed stereo-offset calls in one CPU viewport draw; constructor completeness is separate"}};
+    if (!pair.available) return result;
+    result["recording_session"]=pair.scope.recording_session;
+    result["viewport_draw_sequence"]=pair.scope.draw_sequence;
+    result["parent_viewport_draw_sequence"]=pair.scope.parent_draw_sequence;
+    result["draw_frames"]=pose_frames_json(pair.scope.frames);
+    result["begin_ms"]=pair.scope.begin_ms;result["end_ms"]=pair.end_ms;
+    result["age_ms"]=now>=pair.end_ms?nlohmann::json(now-pair.end_ms):nlohmann::json(nullptr);
+    result["fresh"]=now>=pair.end_ms && now-pair.end_ms<=250;
+    result["closed"]=pair.closed;result["recording_continued"]=pair.recording_continued;
+    result["call_count"]=pair.call_count;result["stored_calls"]=pair.stored_calls;
+    result["capacity"]=wuwa_pose_pair::call_capacity;result["eye_calls"]=pair.eye_calls;
+    result["overflow"]=pair.overflow;result["missing_eye"]=pair.missing_eye;
+    result["duplicate_eye"]=pair.duplicate_eye;result["invalid_eye"]=pair.invalid_eye;
+    result["frame_mismatch"]=pair.frame_mismatch;result["invalid_pose"]=pair.invalid_pose;
+    result["incomplete_call"]=pair.incomplete_call;
+    result["call_ordinal_scope"]="non-full stereo-offset calls in this viewport draw";
+    auto calls=nlohmann::json::array();
+    for (size_t i=0;i<pair.stored_calls;++i) {
+        const auto& c=pair.calls[i];
+        calls.push_back({{"call_ordinal",c.ordinal},{"raw_index",c.raw_index},{"logical_eye",c.logical_eye},
+            {"begin_ms",c.begin_ms},{"end_ms",c.end_ms},{"input_frames",pose_frames_json(c.input_frames)},
+            {"after_pre_frames",pose_frames_json(c.after_pre_frames)},{"output_frames",pose_frames_json(c.output_frames)},
+            {"input_game_pose",recorded_pose_json(c.input_game)},
+            {"stereo_base",{{"observed",c.stereo_base_observed},{"callsite_rva",c.callsite_rva},
+                {"action",wuwa_stereo_base_pose::action_name(static_cast<wuwa_stereo_base_pose::Action>(c.stereo_base_action))},
+                {"reason",wuwa_stereo_base_pose::reason_name(static_cast<wuwa_stereo_base_pose::Reason>(c.stereo_base_reason))},
+                {"source_call_ordinal",c.stereo_base_source_ordinal}}},
+            {"after_pre_callbacks_pose",recorded_pose_json(c.after_pre_callbacks)},
+            {"output_pose",recorded_pose_json(c.output)},
+            {"has_after_pre",c.has_after_pre},{"finished",c.finished}});
+    }
+    result["calls"]=std::move(calls);
+    auto constructors=nlohmann::json::array();
+    if (emit_constructors) for(size_t i=0;i<pair.stored_constructors;++i)
+        constructors.push_back(constructor_pose_json(pair.constructors[i]));
+    result["constructor_count"]=pair.constructor_count;result["constructor_capacity"]=wuwa_pose_pair::constructor_capacity;
+    result["stored_constructors"]=pair.stored_constructors;
+    result["constructors_sampled"]=emit_constructors;
+    result["constructor_sample_interval_ms"]=200;
+    if (!emit_constructors) result["constructor_omission_reason"]="bounded serialization cadence";
+    result["constructor_overflow"]=pair.constructor_overflow;result["constructors"]=std::move(constructors);
+    return result;
+}
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
@@ -48,7 +130,8 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording,
+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu,
+        *m_video_fps, *m_video_width, *m_video_telemetry,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};
 }
@@ -244,7 +327,43 @@ void WuWaControlsComponent::on_draw_experiments() {
     wuwa_ui::TextWrapped("These options are optional comparisons. Opening this section does not enable them or change your camera.");
 }
 
-void WuWaControlsComponent::on_draw_ui() {
+void WuWaControlsComponent::on_draw_recording() {
+    const auto profile=Framework::get_persistent_dir();
+    m_video.poll(profile);
+    const auto state=m_video.state();
+    if (!m_video.connected())
+        wuwa_ui::TextWrapped("Keep WuWa VR Launcher running to record from here. Its browser tab can be closed.");
+    else if (!m_video.available())
+        wuwa_ui::TextWrapped("The recorder is missing from this launcher package.");
+    else if (state=="starting") wuwa_ui::TextWrapped("Starting the recorder. Close the UEVR menu for a clear view.");
+    else if (state=="recording") wuwa_ui::TextWrapped("Recording video. Close the UEVR menu for a clear view.");
+    else if (state=="finishing") wuwa_ui::TextWrapped("Finishing the video. Please wait.");
+    else if (state=="saved") wuwa_ui::TextWrapped("Recording saved. Use Open recordings in the launcher.");
+    else if (state=="busy") wuwa_ui::TextWrapped("Wait for the launcher operation to finish.");
+    else if (state=="error") wuwa_ui::TextWrapped("Recording failed. See the message below.");
+    const bool busy=state=="starting" || state=="recording" || state=="finishing" || state=="busy";
+    ImGui::BeginDisabled(busy || m_video.pending());
+    wuwa_ui::draw(*m_video_fps,"Target recording rate");
+    wuwa_ui::draw(*m_video_width,"Maximum pixels per eye");
+    wuwa_ui::draw(*m_video_telemetry,"Include camera and controller data");
+    ImGui::EndDisabled();
+    ImGui::BeginDisabled(!m_video.available() || busy || m_video.pending());
+    if (wuwa_ui::Button("Start video recording")) {
+        constexpr int rates[]{30,45,60},widths[]{720,1024,1280};
+        m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
+                      widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value());
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!m_video.available() || (state!="starting" && state!="recording") || m_video.pending());
+    if (wuwa_ui::Button("Stop video recording")) m_video.submit(profile,false);
+    ImGui::EndDisabled();
+    if (m_video.pending()) wuwa_ui::TextWrapped("Waiting for the launcher...");
+    const auto message=m_video.message();
+    if (!message.empty()) wuwa_ui::TextWrapped("%s",message.c_str());
+    wuwa_ui::TextWrapped("SteamVR and the updated OpenXR Simulator are supported. VDXR capture is not available yet. Video has no audio and stops after five minutes. Actual frame rate depends on the game.");
+    wuwa_ui::TextWrapped("Simulator: keep its preview open, choose Both eyes / side-by-side, and turn Full render off. Recording uses the preview size.");
+    ImGui::Separator();
     wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
     if (m_privacy->value()) {
         wuwa_ui::TextWrapped("Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.");
@@ -259,6 +378,9 @@ void WuWaControlsComponent::on_draw_ui() {
             ImGui::TreePop();
         }
     }
+}
+
+void WuWaControlsComponent::on_draw_ui() {
     wuwa_ui::draw(*m_warn_hidden_ui,"Warn when a menu opens with game UI hidden");
     wuwa_ui::TextWrapped("Hidden UI stays quiet during normal gameplay. A recovery notice appears only when the game cursor or a known menu-rendering path indicates a menu. L3 + B restores UI. An unknown menu may not be detected; UEVR settings always retain the Show game UI button.");
     wuwa_ui::TextWrapped("L3/R3 mean clicking the sticks. Controls need the supplied WuWa camera script; physical gamepad passthrough bypasses scripts. Both sticks still open UEVR.");
@@ -361,8 +483,6 @@ void WuWaControlsComponent::on_draw_first_person() {
             if (wuwa_ui::Button("Try headset aim")) {
                 VR::get()->set_aim_method(VR::AimMethod::HEAD);
                 if (const auto value=VR::get()->get_value("VR_AimModifyPlayerControlRotation")) value->set("true");
-                m_fp_horizon->value()=true;
-                m_fp_motion->value()=1;
             }
             ImGui::SameLine();
             if (wuwa_ui::Button("Use right-stick pitch")) {
@@ -396,8 +516,18 @@ nlohmann::json WuWaControlsComponent::diagnostic_status() {
         const auto age = m_received == std::chrono::steady_clock::time_point{} ? int64_t{-1}
             : std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_received).count();
         result = {{"script_status", m_script_status}, {"script_age_ms", age},
-            {"script_fresh", age >= 0 && age <= 1000}, {"game_menu", m_game_menu}};
+            {"script_fresh", age >= 0 && age <= 1000}, {"game_menu", m_game_menu},
+            {"hud_mouse",m_adjust.value() || m_mouse_state.active}};
     }
+    // Developer input leases consume only this bounded native/script status;
+    // the XInput callback never locks this component or follows camera objects.
+    const auto game_window=g_framework->get_window();
+    result["strict_game_foreground"]=game_window && GetForegroundWindow()==game_window;
+    result["native_menu"]=wuwa_menu::detected(GetTickCount64(),false);
+    result["uevr_menu"]=g_framework->is_drawing_ui();
+    result["motion_active"]=VR::get()->is_using_controllers();
+    result["passthrough"]=VR::get()->physical_gamepad_passthrough();
+    result["slot_filter"]=VR::get()->gamepad_slot_filter();
     // "Eligible" is deliberately not a claim that the user can see/read it.
     result["sheet_state"] = !m_sheet->value() ? "off"
         : g_framework->is_drawing_ui() ? "hidden_by_uevr_menu"
@@ -481,6 +611,55 @@ std::array<wuwa_privacy::Rect, 2> WuWaControlsComponent::privacy_rectangles(int3
             wuwa_privacy::pixels(m_id_left->value(),m_id_top->value(),m_id_right->value(),m_id_bottom->value(),width,height) : wuwa_privacy::Rect{}};
 }
 
+uint64_t WuWaControlsComponent::pose_recording_session(std::string* recording_id) noexcept {
+    if (!wuwa_motion::active() || !wuwa_test::is_wuwa()) return 0;
+    try {
+        std::unique_lock motion_lock{wuwa_motion::mutex,std::defer_lock};
+        std::unique_lock bridge_lock{m_bridge_mutex,std::defer_lock};
+        if (std::try_lock(motion_lock,bridge_lock)!=-1) {++m_pose_capture_lock_misses;return 0;}
+        if (!wuwa_motion::active()) return 0;
+        if (m_pose_recording_id!=wuwa_motion::id) {
+            m_pose_recording_id=wuwa_motion::id;
+            if (++m_pose_recording_session==0) ++m_pose_recording_session;
+            m_recorded_pose_pair={};
+            m_next_pose_constructor_emit_ms=0;
+        }
+        if (recording_id) *recording_id=m_pose_recording_id;
+        return m_pose_recording_session;
+    } catch (...) { return 0; }
+}
+
+wuwa_pose_pair::Pose WuWaControlsComponent::sample_recorded_pose(
+    const Rotator<float>* rotation, const Vector3f* position, bool doubles) noexcept {
+    wuwa_pose_pair::Pose pose{};
+    if (!rotation || !position) return pose;
+    // Observation must not turn an unavailable pointer into a recording crash.
+    __try {
+        if (doubles) {
+            const auto* r=reinterpret_cast<const Rotator<double>*>(rotation);
+            const auto* p=reinterpret_cast<const Vector3d*>(position);
+            pose.rotation={r->pitch,r->yaw,r->roll};pose.position={p->x,p->y,p->z};
+        } else {
+            pose.rotation={rotation->pitch,rotation->yaw,rotation->roll};
+            pose.position={position->x,position->y,position->z};
+        }
+        pose.valid=true;
+    } __except(EXCEPTION_EXECUTE_HANDLER) { pose.valid=false; }
+    if (!wuwa_pose_pair::finite(pose)) pose.valid=false;
+    return pose;
+}
+
+void WuWaControlsComponent::record_pose_pair(const wuwa_pose_pair::Pair& pair) noexcept {
+    if (!pair.available || !wuwa_motion::active() || !wuwa_test::is_wuwa()) return;
+    try {
+        std::unique_lock motion_lock{wuwa_motion::mutex,std::defer_lock};
+        std::unique_lock bridge_lock{m_bridge_mutex,std::defer_lock};
+        if (std::try_lock(motion_lock,bridge_lock)!=-1) {++m_pose_capture_lock_misses;return;}
+        if (wuwa_motion::active() && m_pose_recording_id==wuwa_motion::id &&
+            pair.scope.recording_session==m_pose_recording_session) m_recorded_pose_pair=pair;
+    } catch (...) {}
+}
+
 void WuWaControlsComponent::record_rendered_view(int32_t index, const Rotator<float>* rotation, const Vector3f* position, bool doubles) {
     if (!wuwa_motion::active() || !wuwa_test::is_wuwa() || !rotation || !position || index<0 || index>=3) return;
     RecordedView view; view.index=index; view.clock_ms=GetTickCount64();
@@ -504,6 +683,12 @@ void WuWaControlsComponent::receive(std::string_view data) {
         if (!value.is_object()) return;
         if (value.value("motion_only",false)) {
             if (wuwa_motion::active() && value.contains("motion") && value["motion"].is_object()) {
+                std::string recording_id;
+                const auto pose_session=pose_recording_session(&recording_id);
+                if (!pose_session || recording_id.empty()) return;
+                wuwa_pose_pair::Pair pose_pair{};
+                bool emit_constructors=false;
+                const auto motion_now=GetTickCount64();
                 auto motion=value["motion"];
                 const auto vr=VR::get();
                 motion["world_scale"]=vr->get_world_scale();
@@ -525,8 +710,23 @@ void WuWaControlsComponent::receive(std::string_view data) {
                             motion["rendered_views"].push_back({{"index",view.index},{"position",view.position},
                                 {"rotation",view.rotation},{"clock_ms",view.clock_ms},{"age_ms",age}});
                     }
+                    if (pose_session && m_recorded_pose_pair.scope.recording_session==pose_session) {
+                        pose_pair=m_recorded_pose_pair;
+                        if (pose_pair.available && motion_now>=m_next_pose_constructor_emit_ms) {
+                            emit_constructors=true;
+                        }
+                    }
                 }
-                wuwa_motion::append(std::move(motion));
+                motion["pose_pair"]=pose_pair_json(pose_pair,motion_now,emit_constructors);
+                motion["pose_capture_lock_misses_total"]=m_pose_capture_lock_misses.load();
+                const bool written=wuwa_motion::append(std::move(motion),recording_id);
+                if (written && emit_constructors) {
+                    // Commit the cadence only for an accepted motion row: the
+                    // recorder's 33 ms gate may reject this Lua callback.
+                    std::scoped_lock lock{m_bridge_mutex};
+                    if (m_pose_recording_id==recording_id && m_pose_recording_session==pose_session)
+                        m_next_pose_constructor_emit_ms=std::max(m_next_pose_constructor_emit_ms,motion_now+200);
+                }
             }
             return;
         }

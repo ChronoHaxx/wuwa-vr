@@ -1,13 +1,11 @@
 {
-  "schema": 1,
-  "build": {
-    "id": "stereo-menus-20260926-r3",
-    "name": "Stereo, menus and languages \u00b7 26 Sep 22:42 BST",
-    "sha256": "624eeda38b0e26a66692e68124059cb6eb30daffba4ac27f4b9a99db09316090",
-    "savedAt": "2026-09-26T22:42:55+01:00"
-  },
-  "sourceTag": "wuwa/stereo-menus-2026-09-26-224255",
-  "sourceCommit": "35f058b55c3e5e7a79f6de91edfaa0d8a3b9c058",
+  "schema": 2,
+  "build": "camera-trial-controls-20260928-r2",
+  "sourceCommit": "02497e870f5f3b2524eed76df5bef16319c98752",
+  "publicReleaseTag": "experimental-2026-09-28-1628",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
-  "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18"
+  "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
+  "backendSha256": "34455e5e2875300faa2741184e7ac38f971c14ce0654e2195843d8ec0c437c87",
+  "frozenPatchSha256": "e858ab099b45aa964e99ddcdd185455007609c39457876b7c90fb27829416af4",
+  "liveAcceptance": "pending; tooling update, not a foliage fix"
 }

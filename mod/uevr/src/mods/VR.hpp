@@ -354,18 +354,16 @@ public:
         return wuwa_test::is_wuwa() && m_wuwa_world_labels->value();
     }
 
-    // Both options alter the destination of WuWa's screen UI. Reject the
-    // incompatible pair at the UI/API boundary, and keep the render getter
-    // fail-closed even if another plugin writes a ModValue directly.
-    bool allows_wuwa_render_option_change(std::string_view key, std::string_view value) const {
-        if (!wuwa_test::is_wuwa() || (value != "true" && value != "1")) return true;
-        if (key == "VR_NativeStereoFix") return !m_wuwa_lgui_menu_redirect->value();
-        if (key == "VR_WuWaLguiMenuRedirect") return !m_native_stereo_fix->value();
-        return true;
-    }
-
     bool is_wuwa_native_frame_timing_enabled() const {
         return wuwa_test::is_wuwa() && m_wuwa_native_frame_timing->value();
+    }
+
+    bool is_wuwa_early_stereo_views_enabled() const {
+        return wuwa_test::is_wuwa() && m_wuwa_early_stereo_views->value();
+    }
+
+    bool is_wuwa_stereo_base_pose_enabled() const {
+        return wuwa_test::is_wuwa() && m_wuwa_stereo_base_pose->value();
     }
 
     int get_hmd_index() const {
@@ -599,8 +597,7 @@ public:
     }
 
     bool is_native_stereo_fix_enabled() const {
-        return m_native_stereo_fix->value() && !is_using_afr()
-            && (!wuwa_test::is_wuwa() || !m_wuwa_lgui_menu_redirect->value());
+        return m_native_stereo_fix->value() && !is_using_afr();
     }
 
     bool is_native_stereo_fix_same_pass_enabled() const {
@@ -1171,7 +1168,13 @@ public:
             *m_wuwa_lgui_redirect,
             *m_wuwa_lgui_menu_redirect,
             *m_wuwa_world_labels,
+            *m_wuwa_planar_eye_parameters,
+            *m_wuwa_stereo_translucency,
+            *m_wuwa_kuro_water_stereo,
+            *m_wuwa_hide_kuro_reflections,
             *m_wuwa_native_frame_timing,
+            *m_wuwa_early_stereo_views,
+            *m_wuwa_stereo_base_pose,
             *m_lerp_camera_pitch,
             *m_lerp_camera_yaw,
             *m_lerp_camera_roll,
@@ -1197,7 +1200,13 @@ private:
     const ModToggle::Ptr m_wuwa_lgui_redirect{ ModToggle::create(generate_name("WuWaLguiRedirect"), true) };
     const ModToggle::Ptr m_wuwa_lgui_menu_redirect{ ModToggle::create(generate_name("WuWaLguiMenuRedirect"), false) };
     const ModToggle::Ptr m_wuwa_world_labels{ ModToggle::create(generate_name("WuWaWorldLabelsStereo"), false) };
+    const ModToggle::Ptr m_wuwa_planar_eye_parameters{ ModToggle::create(generate_name("WuWaPlanarEyeParameters"), false) };
+    const ModToggle::Ptr m_wuwa_stereo_translucency{ ModToggle::create(generate_name("WuWaStereoTranslucency"), false) };
+    const ModToggle::Ptr m_wuwa_kuro_water_stereo{ ModToggle::create(generate_name("WuWaKuroWaterStereo"), false) };
+    const ModToggle::Ptr m_wuwa_hide_kuro_reflections{ ModToggle::create(generate_name("WuWaHideKuroReflections"), false) };
     const ModToggle::Ptr m_wuwa_native_frame_timing{ ModToggle::create(generate_name("WuWaNativeFrameTiming"), false) };
+    const ModToggle::Ptr m_wuwa_early_stereo_views{ ModToggle::create(generate_name("WuWaEarlyStereoViews"), false) };
+    const ModToggle::Ptr m_wuwa_stereo_base_pose{ ModToggle::create(generate_name("WuWaStereoBasePose"), true) };
     bool m_controller_test_mode{false};
     
     const ModToggle::Ptr m_show_fps{ ModToggle::create(generate_name("ShowFPSOverlay"), false) };

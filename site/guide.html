@@ -1,4 +1,4 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Visual Xbox controls, setup, comfort and recovery for WuWa VR."><meta name="theme-color" content="#17191c"><title>Player guide — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Player guide</h1><p>Setup for the portable beta, illustrated controls and ways to recover when a setting feels wrong. <a href="languages.html">Getting started in 10 languages</a>.</p><button class="print-button" id="print-guide" type="button" hidden>Print / save this guide</button><div class="guide-grid"><nav class="toc" aria-label="Guide chapters"><a href="#start">Setup</a><a href="#visual-controls">Controller images</a><a href="#controls">All Xbox shortcuts</a><a href="#comfort">HUD and camera comfort</a><a href="#recovery">Problems and recovery</a><a href="#packaging">Portable launcher</a></nav><div class="guide-content"><section id="start"><h2>Setup</h2><p><strong>Account risk:</strong> this unofficial injector may be detected or blocked by
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Visual Xbox controls, setup, comfort and recovery for WuWa VR."><meta name="theme-color" content="#17191c"><title>Player guide — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><aside class="notice"><strong>28 Sep update:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/experimental-2026-09-28-1628">Experimental 16:28 package</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Select the 16:27 camera + trigger candidate in the launcher. Foliage and ultimate fixes are not confirmed. The older beta below remains available.</aside><h1>Player guide</h1><p>Setup for the portable beta, illustrated controls and ways to recover when a setting feels wrong. <a href="languages.html">Getting started in 10 languages</a>.</p><button class="print-button" id="print-guide" type="button" hidden>Print / save this guide</button><div class="guide-grid"><nav class="toc" aria-label="Guide chapters"><a href="#start">Setup</a><a href="#visual-controls">Controller images</a><a href="#controls">All Xbox shortcuts</a><a href="#comfort">HUD and camera comfort</a><a href="#recovery">Problems and recovery</a><a href="#packaging">Portable launcher</a></nav><div class="guide-content"><section id="start"><h2>Setup</h2><p><strong>Account risk:</strong> this unofficial injector may be detected or blocked by
 anti-cheat, and account restrictions or a ban are possible. Use at your own
 risk; there is no publisher approval or account-safety guarantee.
 <a href="risk.html">Read the risk notice</a> before launching.</p>
@@ -7,10 +7,13 @@ risk; there is no publisher approval or account-safety guarantee.
 You need your own game, a Windows PC VR headset/runtime, and an Xbox/XInput
 controller connected to the PC. No separate Python installation is needed.</p>
 <h3>Which build?</h3>
-<p>The current download contains <strong>Stereo, menus and languages · 26 Sep 22:42 BST</strong>,
+<p>The linked public beta contains <strong>Stereo, menus and languages · 26 Sep 22:42 BST</strong>,
 from the owner-played 23:02 package. Its native files and supplied profile are
 unchanged. Older builds stay in separate releases to keep downloads smaller.
 Your saved settings are retained; use <strong>Reset this build</strong> for supplied defaults.</p>
+<p>If you received a newer test ZIP, open its <strong>BUILD GUIDE.html</strong> instead for the
+included builds and their supplied settings. This public-beta setup does not
+override a candidate&#39;s guide.</p>
 <h3>Install and launch</h3>
 <ol>
 <li>Extract the whole ZIP to a simple path such as <code>C:/Games/WuWa VR</code>.</li>
@@ -62,8 +65,10 @@ the UI is hidden. The candidate also has <strong>Show game UI now</strong> in Wu
 <li>Enable <strong>Xbox mouse shortcuts</strong> in WuWa Controls before using mouse/HUD
 adjustment. Leave <strong>Physical gamepad passthrough</strong> off to use the mod&#39;s
 shortcuts; passthrough deliberately bypasses them.</li>
-<li>Leave <strong>Native Stereo Fix → Enabled</strong> off. Keep <strong>Native Stereo</strong> as the
-rendering method; those are different settings.</li>
+<li>The linked <strong>26 Sep public beta</strong> supplies <strong>Native Stereo Fix → Enabled</strong>
+off. Newer candidates enable it with a timing correction; use their package
+guide rather than turning it off. <strong>Native Stereo</strong> is a separate rendering
+method setting.</li>
 <li>Start in the ordinary game camera, with the portal and freecam off. Press
 <strong>L3 + A</strong> while sitting comfortably to recenter. Increase HUD size separately
 from world scale.</li>
@@ -110,12 +115,11 @@ an installer.</p>
 <p>If something fails, use <a href="guide.html#recovery">troubleshooting</a>. For the next
 candidate, <a href="testing.html#next-test">one short sequence</a> covers the important changes
 without repeated timed tests.</p>
-</section><section id="visual-controls"><h2>Controller guide</h2><p>Actual renders of the supplied in-VR shortcut sheet, not game screenshots. The new HUD toggle is a candidate awaiting headset checks. Open an image at full size or use the searchable text below.</p><figure><h3>Everyday shortcuts</h3><a href="media/shortcuts-everyday.png" aria-label="Open everyday shortcuts at full size"><img src="media/shortcuts-everyday.png" width="1600" height="900" loading="lazy" alt="Everyday shortcuts. L3 + R3 opens settings; L3 + B shows or hides the game UI; L3 + A recenters; L3 + Menu toggles this sheet."></a><figcaption>L3 + R3 opens settings; L3 + B shows or hides the game UI; L3 + A recenters; L3 + Menu toggles this sheet.</figcaption></figure><figure><h3>Camera controls</h3><a href="media/shortcuts-camera.png" aria-label="Open camera controls at full size"><img src="media/shortcuts-camera.png" width="1600" height="900" loading="lazy" alt="Camera controls. The camera sheet changes with the active movement mode. This image shows Polar fly; the text reference below includes drone, plane and acro."></a><figcaption>The camera sheet changes with the active movement mode. This image shows Polar fly; the text reference below includes drone, plane and acro.</figcaption></figure><figure><h3>HUD and mouse adjustment</h3><a href="media/shortcuts-hud.png" aria-label="Open hud and mouse adjustment at full size"><img src="media/shortcuts-hud.png" width="1600" height="900" loading="lazy" alt="HUD and mouse adjustment. Candidate builds: enable Xbox mouse shortcuts, close UEVR, press L3 + LB once and release. This image shows adjustment ON; press L3 + LB again for normal game controls. The 22:37 build uses the menu cursor or LB + R3 instead."></a><figcaption>Candidate builds: enable Xbox mouse shortcuts, close UEVR, press L3 + LB once and release. This image shows adjustment ON; press L3 + LB again for normal game controls. The 22:37 build uses the menu cursor or LB + R3 instead.</figcaption></figure><figure><h3>Using UEVR settings</h3><a href="media/shortcuts-uevr.png" aria-label="Open using uevr settings at full size"><img src="media/shortcuts-uevr.png" width="1600" height="900" loading="lazy" alt="Using UEVR settings. Open UEVR with L3 + R3 first. Release RT, then use the D-pad and A; the left stick scrolls the focused pane."></a><figcaption>Open UEVR with L3 + R3 first. Release RT, then use the D-pad and A; the left stick scrolls the focused pane.</figcaption></figure></section><section id="controls"><h2>All Xbox shortcuts</h2><div class="control-filter" hidden><label for="control-search">FIND A SHORTCUT</label><input id="control-search" type="search" placeholder="HUD, camera, acro, L3…" autocomplete="off"><button id="clear-search" class="reset-button" type="button">Clear</button></div><p id="control-count" role="status" aria-live="polite"></p><p>This reference describes <strong>Stereo and camera candidate · 26 Sep 20:11 BST</strong>.
-Earlier candidates contain different subsets of these features. The owner-tested
-<strong>22:37 Camera + acro checkpoint</strong> differs in a few places, listed at the end
-of this page. These
-bindings were checked against the Lua and native shortcut sheet, not assumed
-from the original profile. Physical gamepad passthrough bypasses mod shortcuts.</p>
+</section><section id="visual-controls"><h2>Controller guide</h2><p>Actual renders of the supplied in-VR shortcut sheet, not game screenshots. The new HUD toggle is a candidate awaiting headset checks. Open an image at full size or use the searchable text below.</p><figure><h3>Everyday shortcuts</h3><a href="media/shortcuts-everyday.png" aria-label="Open everyday shortcuts at full size"><img src="media/shortcuts-everyday.png" width="1600" height="900" loading="lazy" alt="Everyday shortcuts. L3 + R3 opens settings; L3 + B shows or hides the game UI; L3 + A recenters; L3 + Menu toggles this sheet."></a><figcaption>L3 + R3 opens settings; L3 + B shows or hides the game UI; L3 + A recenters; L3 + Menu toggles this sheet.</figcaption></figure><figure><h3>Camera controls</h3><a href="media/shortcuts-camera.png" aria-label="Open camera controls at full size"><img src="media/shortcuts-camera.png" width="1600" height="900" loading="lazy" alt="Camera controls. The camera sheet changes with the active movement mode. This image shows Polar fly; the text reference below includes drone, plane and acro."></a><figcaption>The camera sheet changes with the active movement mode. This image shows Polar fly; the text reference below includes drone, plane and acro.</figcaption></figure><figure><h3>HUD and mouse adjustment</h3><a href="media/shortcuts-hud.png" aria-label="Open hud and mouse adjustment at full size"><img src="media/shortcuts-hud.png" width="1600" height="900" loading="lazy" alt="HUD and mouse adjustment. Candidate builds: enable Xbox mouse shortcuts, close UEVR, press L3 + LB once and release. This image shows adjustment ON; press L3 + LB again for normal game controls. The 22:37 build uses the menu cursor or LB + R3 instead."></a><figcaption>Candidate builds: enable Xbox mouse shortcuts, close UEVR, press L3 + LB once and release. This image shows adjustment ON; press L3 + LB again for normal game controls. The 22:37 build uses the menu cursor or LB + R3 instead.</figcaption></figure><figure><h3>Using UEVR settings</h3><a href="media/shortcuts-uevr.png" aria-label="Open using uevr settings at full size"><img src="media/shortcuts-uevr.png" width="1600" height="900" loading="lazy" alt="Using UEVR settings. Open UEVR with L3 + R3 first. Release RT, then use the D-pad and A; the left stick scrolls the focused pane."></a><figcaption>Open UEVR with L3 + R3 first. Release RT, then use the D-pad and A; the left stick scrolls the focused pane.</figcaption></figure></section><section id="controls"><h2>All Xbox shortcuts</h2><div class="control-filter" hidden><label for="control-search">FIND A SHORTCUT</label><input id="control-search" type="search" placeholder="HUD, camera, acro, L3…" autocomplete="off"><button id="clear-search" class="reset-button" type="button">Clear</button></div><p id="control-count" role="status" aria-live="polite"></p><p>This reference describes the current control set. See
+<a href="testing.html#next-test">the included builds and grouped checklist</a> for build-specific
+defaults and acceptance status. Bindings were checked against the Lua and native
+shortcut sheet; this does not establish headset acceptance. Earlier checkpoints
+can differ. Physical gamepad passthrough bypasses mod shortcuts.</p>
 <p><strong>L3 / R3:</strong> click the left / right stick. <strong>View:</strong> two squares. <strong>Menu:</strong> three
 lines. Use gameplay shortcuts with UEVR settings closed. Release controls when
 entering/leaving modes and after returning from Alt-Tab.</p>
@@ -235,19 +239,18 @@ not need to hold a bumper. The mode starts off at each launch.</p>
 placement remains; freecam motion pauses. <strong>Game time continues.</strong> With the mode
 off, menus keep their normal gamepad controls by default. The legacy automatic
 mouse-in-menus option is separate and starts off.</p>
-<p>The 26 September candidates show an amber <strong>HUD / MOUSE MODE
-ON</strong> notice even when the shortcut sheet is hidden. The <strong>17:30 Camera, HUD and
-privacy</strong> candidate keeps the sheet visible during mouse mode, with the recovery
-hint inside it. Its automatic page chooses page 03. Use <strong>L3 + LB</strong> to exit,
+<p>An amber <strong>HUD / MOUSE MODE ON</strong> notice appears when the shortcut sheet is hidden.
+An enabled sheet stays visible during mouse mode and includes the recovery hint;
+its automatic page chooses page 03. Use <strong>L3 + LB</strong> to exit,
 or <strong>WuWa Controls → Exit mouse mode now</strong>. That button also disables legacy
 automatic mouse-in-menus. Release all controls before resuming play.</p>
 <p>The heading stays <strong>HUD / MOUSE MODE</strong>. When the optional legacy setting
 activates the cursor for a detected menu, a smaller note says <strong>Activated
 automatically in this menu: cursor only</strong>. HUD distance/height controls are
 available after entering manual adjustment with L3 + LB.</p>
-<p>With game UI hidden, a red recovery hint reminds you that game menus are hidden
-too. Detected menus get a larger warning; some WuWa menus do not expose the
-cursor flag, so the smaller hint remains available. <strong>L3 + B</strong> restores the UI.</p>
+<p>With game UI hidden, a red recovery hint appears only when a game menu is
+detected. Ordinary gameplay stays clear. Detection is not guaranteed for every
+menu, so <strong>L3 + B</strong> restores the UI even if no warning appears.</p>
 <h3>First person and fixed camera</h3>
 <div class="table-scroll"><table>
 <thead>
@@ -422,27 +425,27 @@ the features available in that build.</p>
 <td>Later in-game control recovery</td>
 </tr>
 </tbody></table></div>
-<p>Choose the candidate if you want these newer controls; it has not yet been
-tested in a headset.</p>
+<p>Check the package guide for the selected build&#39;s status; these differences
+describe the older 22:37 checkpoint, not every baseline or candidate.</p>
 </section><section id="comfort"><h2>HUD and camera comfort</h2><p>Most settings apply live. A native DLL change needs a restart; adjusting a HUD
 or camera option normally does not.</p>
 <h3>When an effect differs between eyes</h3>
-<p>Open <strong>WuWa Controls &gt; Stereo rendering compatibility</strong>. <strong>Use separate-eye
-renderer</strong> selects UEVR&#39;s Synchronized Sequential / Skip Draw path. <strong>Use native
-stereo</strong> returns to the ordinary native path. The restore button restores the
-renderer settings from before the comparison. Camera, HUD placement and Xbox
-controls stay as you set them. Opening the section changes nothing.</p>
-<p>The owner&#39;s September 26 comparison produced a <strong>black scene with the HUD still
-visible</strong>. Keep native stereo selected for normal play. The 14:09 and later candidates
-repairs stale OpenXR depth metadata and rejects depth rectangles outside their
-swapchain, but this has not established a fix for the black scene or the native
-NPC labels, doubled reflections and one-eye character effects.
-See <a href="https://docs.uevr.io/#quick-overview-of-rendering-methods">UEVR&#39;s rendering guide</a>.
-Both comparison choices keep Native Stereo Fix off. UEVR saves the renderer you
-leave selected. The image may pause while its targets rebuild.</p>
-<p>Keep the current native mode if the alternative looks worse. No GPU frame
-capture or replacement shader is bundled, and neither a menu toggle nor a
-successful compile establishes that the one-eye effects are fixed.</p>
+<p>Start with the selected build&#39;s supplied settings. The <strong>28 Sep shared-frame
+candidate</strong> enables Native Stereo Fix, Use Same Stereo Pass and the native
+timing correction with <code>r.OneFrameThreadLag=0</code>. Earlier profiles differed.
+<strong>BUILD GUIDE.html</strong> in the ZIP lists the actual supplied values; saved personal
+settings take priority. The candidate&#39;s remaining visual fixes need a playtest.</p>
+<p><strong>WuWa Controls &gt; Stereo rendering compatibility</strong> is an optional comparison,
+not required setup. <strong>Use separate-eye renderer</strong> selects Synchronized
+Sequential / Skip Draw. <strong>Use native stereo</strong> selects the ordinary native path.
+<strong>Both comparison buttons turn Native Stereo Fix off.</strong> To recover the settings
+you had before the comparison, use its <strong>Restore</strong> button; selecting native
+alone does not restore NSF. Camera, HUD and Xbox settings are unchanged.</p>
+<p>The owner&#39;s separate-eye comparison produced a <strong>black scene with the HUD still
+visible</strong>, so it is not the recommended route. Opening the section changes
+nothing; making a selection can pause the image while targets rebuild, and UEVR
+saves the settings left selected. See
+<a href="https://docs.uevr.io/#quick-overview-of-rendering-methods">UEVR&#39;s rendering guide</a>.</p>
 <h3>Three HUD arrangements</h3>
 <div class="table-scroll"><table>
 <thead>
@@ -469,10 +472,10 @@ not a promise of zero eye strain. A closer panel is not automatically easier to
 read: increase its physical size as well, and keep important text away from
 the extreme edges. The headset is the final check; a flat spectator capture
 cannot establish comfortable stereo fusion.</p>
-<p>Use <strong>L3 + B</strong> to hide/show the game UI. It also hides menus. The control-recovery
-candidate keeps a small red recovery hint visible while UI is hidden; detected
-menus get a larger warning. Some game menus do not expose the cursor signal.
-Use L3+B or <strong>Show game UI now</strong> in WuWa Controls to restore it.</p>
+<p>Use <strong>L3 + B</strong> to hide/show the game UI. It also hides menus. Recent builds show
+the red recovery warning only when a menu is detected, not during ordinary
+gameplay. Detection cannot cover every menu. Use L3+B or <strong>Show game UI now</strong>
+in WuWa Controls to restore it even if no warning appears.</p>
 <h3>Recenter is not world scale</h3>
 <p><strong>L3 + A</strong> recenters the view. Position reset can be enabled separately. World
 scale changes the relation between physical head movement and game units, so it
@@ -574,8 +577,9 @@ your <strong>recentered tracking origin</strong>, not your avatar. A desktop spe
 may omit compositor layers. UEVR settings can temporarily take priority over
 the sheet, so close them to inspect placement. The 17:30 candidate keeps the
 sheet visible during manual or automatic mouse mode, including with game UI
-hidden. The sheet contains amber mouse and red hidden-UI hints; if you hide the
-sheet, standalone recovery notices remain.</p>
+hidden. The amber hint indicates active HUD/mouse mode. The red hidden-UI warning
+requires a detected menu. When the sheet is hidden, those same conditions can
+show standalone notices; hiding ordinary gameplay UI does not itself show one.</p>
 <h3>The window</h3>
 <p>Open <strong>WindowMode → 6DOF Window</strong>, enable it, then use <strong>Recenter Window In Front
 Of Me</strong>. Width, height, distance, edge feather, corners and curvature are live.
@@ -588,27 +592,34 @@ It is a stereo window into the running scene, not a paused reconstruction.
 Passthrough/chroma-key support depends on the streaming/runtime setup and has
 not been established for every Quest connection method here.</p>
 <h3>Record a problem or a showcase clip</h3>
-<p>The <strong>17:30 Camera, HUD and privacy</strong> candidate adds <strong>WuWa Controls → Streamer
-privacy: cover player IDs</strong>. This optional switch draws opaque black rectangles
-over the usual bottom-right UID and the ESC profile-ID row in the extracted UI,
-before the VR/portal and mod spectator copies. It starts off. The ESC rectangle
-stays on outside menus too, since cursor detection alone misses controller menus;
-you can disable that rectangle separately and adjust both rectangles&#39; edges.
-Control-profile resets preserve this privacy setting.</p>
+<p>Open <strong>WuWa Controls → Recording and privacy</strong>. <strong>Streamer privacy: cover player
+IDs</strong> draws black rectangles over the usual bottom-right UID and the ESC profile
+ID in the extracted UI, including its VR/portal and mod spectator copies. It
+starts off. The top-left box normally follows detected ESC/overlay menus;
+other popups using that render path may also show it. <strong>Privacy box placement</strong>
+lets you adjust the edges or choose <strong>Always</strong> as a manual fallback. The
+bottom-right box stays on while privacy is enabled. Control-profile resets
+preserve this setting.</p>
 <p>Inspect a short gameplay and ESC-menu recording before sharing it. The masks
 have GPU pixel checks, but their live placement still needs verification and
 other layouts may put an ID elsewhere. They do not redact names, chat, log files,
 the launcher or pre-injection screens, and cannot edit recordings already saved.
 Both playtest and content-creation recordings use the same masked VR image when
 the switch is enabled.</p>
-<p>On the new portable launcher, open <strong>Record gameplay</strong> and press <strong>Start
-recording</strong> while WuWa is already running through SteamVR. Return focus to WuWa,
-then play normally. Stop from the launcher when finished, or it stops after five
-minutes. This captures SteamVR&#39;s two eye views, not the desktop; there is no
-audio. Recording can reduce performance. The first real clips captured about
-11 new images per second despite a 30 fps file target. The new GPU resize path
-passed synthetic color/encoding checks but needs a live performance comparison.
-Choose 30/45/60 fps and 720/1024/1280 pixels per eye; start with 30 / 1024.</p>
+<p>Keep <strong>WuWa VR Launcher</strong> running. Start/stop from <strong>Recording and privacy</strong>
+in UEVR, or <strong>Record gameplay</strong> in the launcher. The launcher tab can be closed;
+the local app must stay running. Close UEVR and return focus to WuWa while
+recording. Video stops after five minutes, game exit or a scene change.</p>
+<p>SteamVR and the updated OpenXR Simulator are supported capture routes. <strong>VDXR
+video capture is not implemented.</strong> For the simulator, keep its preview open
+with <strong>Both eyes</strong>, side-by-side and <strong>Full render off</strong>. An older registered
+simulator must be replaced using <strong>Use this package&#39;s simulator</strong> with the game
+and injector closed; updating the backend alone does not replace it. That
+button changes the global OpenXR runtime. Capture uses the preview&#39;s resolution.</p>
+<p>There is no desktop or audio capture. Recording can reduce performance. Choose
+30/45/60 fps and 720/1024/1280 pixels per eye; start with 30 / 1024. A 60 fps target
+cannot create game frames that were not rendered. The report records measured
+capture throughput; recording performance on this candidate still needs checking.</p>
 <p><strong>Open recordings</strong> opens the saved folder. <code>clean-sbs.mp4</code> is the unannotated
 stereo video. <code>replay.html</code> shows controller presses and camera state separately;
 it can save clean left-eye, right-eye or stereo PNG stills. If the browser blocks
@@ -626,10 +637,12 @@ only</strong> also supports older backends without motion recording.</p>
 <p>For showcase footage, hide the shortcut sheet and close UEVR first; the recorder
 does not remove game HUD, menus or account identifiers. Keep the original clip
 and diagnostic sidecars for debugging, and review any footage before publishing.
-Simulator video capture and automatic upload are not included.</p>
-</section><section id="recovery"><h2>Problems and recovery</h2><p>Status: September 26, 2026. Keep the selected build name, timestamp and backend
-hash with a report. A result against one checkpoint does not automatically
-apply to another.</p>
+Nothing uploads automatically.</p>
+</section><section id="recovery"><h2>Problems and recovery</h2><p>Updated September 28, 2026. Keep the selected build name, timestamp and backend
+hash with a report. The public 26 Sep beta and newer local candidates have
+different defaults. Use <strong>BUILD GUIDE.html</strong> in your ZIP for its supplied values;
+saved personal settings take priority. A result against one checkpoint does not
+automatically apply to another.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -679,23 +692,31 @@ apply to another.</p>
 </tr>
 <tr>
 <td>SteamVR periodically stutters</td>
-<td>Keep Native Stereo Fix off; the user reproduced stutter with that checkbox on. This does not establish every possible streaming/GPU cause.</td>
+<td>Older NSF-on sessions stuttered. New candidates supply Native Stereo Fix on with the timing correction and <code>r.OneFrameThreadLag=0</code>; do not follow the old generic NSF-off advice. Check this build&#39;s supplied settings before changing them. Stable headset timing remains to be verified.</td>
 </tr>
 <tr>
 <td>An older build crashes with menu extraction + Native Stereo Fix</td>
-<td>Do not repeat that combination. Use the preserved current menu route with Native Stereo Fix off.</td>
+<td>Keep its crash record and use a preserved checkpoint. The 28 Sep candidate includes timing repairs and optional additional-menu extraction; a successful build does not prove the old crash was fixed. Do not repeatedly reproduce a crash.</td>
 </tr>
 <tr>
 <td>NPC name or speech bubble visible in one eye</td>
-<td>The 19:04 and 20:11 candidates add a guarded per-eye label pass. It has not been verified in game. Unknown target layouts are left unchanged; this is still an open rendering issue.</td>
+<td>A guarded per-eye label pass is included. The owner reported the label issue fixed in a later 26 Sep build, but coverage across all labels and the current candidate still needs checking. Unknown layouts are left unchanged.</td>
 </tr>
 <tr>
-<td>Two reflections per eye in character/Echo previews</td>
-<td>Open rendering issue in the scene layer. Planar and SSR CVars were already zero in a measured session; turning them off again is not a demonstrated solution.</td>
+<td>Character/Echo reflection is doubled, offset or flickering</td>
+<td>The 27 Sep projection fix partially improved alignment but still flickered. The 28 Sep candidate adds separate per-eye histories and a shared scene frame; visual acceptance is pending. Keep <strong>Hide Kuro material reflections</strong> off to judge it. Hiding reflections is a workaround.</td>
 </tr>
 <tr>
 <td>Iuno hair/head, Mornye leg transparency or Lynae effects absent in one eye</td>
-<td>Open stereo-material defects. The reported head-following preview reflections are tracked separately; a shared shader cause has not been established.</td>
+<td>The owner found Native Stereo Fix repaired these materials. Current candidates preserve NSF and add timing repairs. Do not assume the rendering-comparison button restores NSF: both choices disable it; use that comparison&#39;s Restore button.</td>
+</tr>
+<tr>
+<td>One eye has static foliage, different prop detail, visibility or lighting</td>
+<td>The 28 Sep candidate corrects the actual scene-frame counter shared between eye submissions, rather than changing only trees. Whether that repairs every visible mismatch is unverified. Report the scene and affected eye; repeated global LOD/CVar trials did not resolve the earlier canopy defect.</td>
+</tr>
+<tr>
+<td>Eyes briefly disagree at the end of an ultimate</td>
+<td>Open temporal stereo issue. The shared-frame candidate is intended to address one confirmed timing defect, but ultimate-to-gameplay transitions still need observation. Do not attribute the symptom to GPU speed alone.</td>
 </tr>
 <tr>
 <td>Full head shadow only works after toggling per character</td>
@@ -737,6 +758,14 @@ apply to another.</p>
 <td>Simulator Home does not restore first person</td>
 <td>Home resets the simulated headset pose; UEVR still has a separate origin. Recenter UEVR with L3+A too.</td>
 </tr>
+<tr>
+<td>Recording asks for SteamVR while using the simulator</td>
+<td>Use the package&#39;s updated simulator and <strong>Capture source → OpenXR Simulator</strong>. Keep the preview open, Both eyes / side-by-side, with Full render off. If the launcher reports an older simulator, close game/injector and use <strong>Use this package&#39;s simulator</strong>; updating the backend does not replace the registered runtime.</td>
+</tr>
+<tr>
+<td>Recording from UEVR is unavailable</td>
+<td>Leave the matching WuWa VR Launcher app running; its tab can be closed. SteamVR and the updated simulator are supported. VDXR video capture is not implemented.</td>
+</tr>
 </tbody></table></div>
 <h3>What is not implemented or established</h3>
 <ul>
@@ -746,12 +775,11 @@ apply to another.</p>
 <li>No claim of publisher approval, account safety or anti-cheat compatibility.</li>
 <li>No claim that simulator screenshots establish headset comfort or stable Steam Link performance.</li>
 </ul>
-<p>For the remaining reflection/material defects, <strong>Recovery and removal → Compare
-stereo rendering (experimental) → Compare current scene</strong> can collect the five
-reversible comparisons in one SteamVR session. Leave the affected scene still,
-close UEVR settings, start the comparison and return focus to the game. It restores
-each setting before continuing and saves a local gallery. It is a diagnostic tool,
-not an established fix; the images may contain account IDs. No upload occurs.</p>
+<p>The older automated rendering-comparison tool remains available, but it is not
+required for the shared-frame candidate&#39;s playtest. The previous global quality
+comparisons did not resolve the reported static-left-canopy issue. Use the
+<a href="testing.html#next-test">grouped playtest</a> with this build&#39;s defaults instead of
+repeating those trials. Review recordings for account IDs before sharing.</p>
 <h3>Useful bug report</h3>
 <p>Record the checkpoint and hash, runtime/headset, controller connection, camera
 mode, relevant option states and shortest repeatable steps. For stereo problems,
@@ -759,4 +787,4 @@ describe each eye separately. Include whether returning to normal camera or
 restoring UI changes the result. Remove account IDs, personal paths and private
 Discord information before posting logs or screenshots. Do not share game
 binaries, memory captures or extracted assets.</p>
-</section><section id="packaging"><h2>Portable launcher</h2><p>The private test package is a ZIP with a folder and <strong>WuWa VR Launcher.exe</strong>. It needs no Python, terminal or GitHub account: it carries its own copy of Python and opens a page served only on your PC. Settings, backups and logs are kept in <code>%LOCALAPPDATA%\WuWa VR Launcher</code>.</p><p>It is not a public release. The UEVR backend's upstream notice is "All rights reserved", so public downloads wait for permission. Game injection still needs Windows permission because the game runs as administrator. The launcher leaves game files alone. Use headset / Use simulator changes the global OpenXR runtime only when you click it, with the game and injector closed; Windows asks for permission. Use headset restores the previously saved runtime. Do not disable Windows security or anti-cheat. <a href="credits.html#distribution">Distribution status</a>.</p></section></div></div></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>
+</section><section id="packaging"><h2>Portable launcher</h2><p>Extract the ZIP, then open <strong>WuWa VR Launcher.exe</strong>. It carries its own Python and opens a page served only on your PC. Settings, backups and logs are kept in <code>%LOCALAPPDATA%\WuWa VR Launcher</code>.</p><p>The linked public beta and newer local test packages have separate release records. Use the guide included in your ZIP. Game injection needs Windows permission to match the game; the launcher leaves game files alone. Use headset / Use simulator changes the global OpenXR runtime only when you click it, with the game and injector closed. Use headset restores the previously saved runtime. <a href="credits.html#distribution">Release and distribution notes</a>.</p></section></div></div></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>

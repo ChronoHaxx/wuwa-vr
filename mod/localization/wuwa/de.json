@@ -209,6 +209,15 @@
     "X/Y/B: load / save slots 0/1/2": "X/Y/B: Plätze 0/1/2 laden / speichern",
     "XBOX CONTROLLER  /  POLAR SHORTCUTS": "XBOX-CONTROLLER / POLAR-BEFEHLE",
     "Xbox shortcuts": "Xbox-Kurzbefehle",
-    "Yaw": "Gieren"
+    "Yaw": "Gieren",
+    "Recording and privacy": "Aufnahme und Datenschutz",
+    "Target recording rate": "Gewünschte Aufnahmebildrate",
+    "Maximum pixels per eye": "Maximale Breite pro Auge in Pixeln",
+    "Include camera and controller data": "Kamera- und Controllerdaten aufzeichnen",
+    "Start video recording": "Videoaufnahme starten",
+    "Stop video recording": "Videoaufnahme stoppen",
+    "Waiting for the launcher...": "Warten auf den Launcher…",
+    "Finishing the video. Please wait.": "Video wird fertiggestellt. Bitte warten.",
+    "Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.": "Verschiebt unterstützte Menüs in das VR-Panel, auch mit aktiviertem Native Stereo Fix. Anfangs deaktiviert. Bei fehlerhafter Darstellung ausschalten. Ladebildschirme und Unschärfe müssen noch getestet werden."
   }
 }

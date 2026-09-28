@@ -1,4 +1,4 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Source map, known rendering problems and ways to contribute to WuWa VR."><meta name="theme-color" content="#17191c"><title>Code and contributions — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Code and contributions</h1><nav class="page-links" aria-label="GitHub collaboration"><a data-project-link="code" hidden rel="noopener noreferrer">Browse GitHub</a><a data-project-link="fork" hidden rel="noopener noreferrer">Fork the repository</a><a data-project-link="issues" hidden rel="noopener noreferrer">Search issues</a><a href="feedback.html">Prepare a report</a></nav><p class="notice" data-repository-pending>The public repository has not been connected yet. The source map below explains the current review bundle; feedback drafts can still be copied.</p><div class="guide-content"><p>WuWa VR is an experimental integration built on UEVR and community WuWa work.
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Source map, known rendering problems and ways to contribute to WuWa VR."><meta name="theme-color" content="#17191c"><title>Code and contributions — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><aside class="notice"><strong>28 Sep update:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/experimental-2026-09-28-1628">Experimental 16:28 package</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Select the 16:27 camera + trigger candidate in the launcher. Foliage and ultimate fixes are not confirmed. The older beta below remains available.</aside><h1>Code and contributions</h1><nav class="page-links" aria-label="GitHub collaboration"><a data-project-link="code" hidden rel="noopener noreferrer">Browse GitHub</a><a data-project-link="fork" hidden rel="noopener noreferrer">Fork the repository</a><a data-project-link="issues" hidden rel="noopener noreferrer">Search issues</a><a href="feedback.html">Prepare a report</a></nav><p class="notice" data-repository-pending>The public repository has not been connected yet. The source map below explains the current review bundle; feedback drafts can still be copied.</p><div class="guide-content"><p>WuWa VR is an experimental integration built on UEVR and community WuWa work.
 Help with rendering, camera behavior, controller comfort, documentation and
 translations is welcome. A donation is never required to contribute.</p>
 <h3>Find the right starting point</h3>
@@ -32,34 +32,7 @@ website, matching native source changes, Lua, language catalogs and launcher.</p
 <td>Portable launcher, capture and SteamVR recording source</td>
 </tr>
 </tbody></table></div>
-<h3>Reconstruct the release</h3>
-<p>Read <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md">mod/BUILD.md</a>.
-The export matches <strong>26 Sep 22:42 BST</strong> in the owner-played <strong>23:02</strong> package.
-It is a browsable overlay plus patches, not a complete standalone UEVR fork.
-All 62 native paths and two SDK paths were forward-applied and compared with
-the saved build sources. That is not a fresh-PC or complete headset check.</p>
-<p>The original local checkpoint IDs are preserved for provenance; they are not
-commits reachable in the public repository. Public release tags identify the
-actual exported files. Keep component notices and credit the original authors.</p>
-<h3>Rendering work that is still open</h3>
-<ul>
-<li>Some NPC names and overhead speech bubbles appear in only one eye.</li>
-<li>Character/Resonator previews show two reflections in each eye, and those
-reflections follow the head. Databank previews can show the same problem.</li>
-<li>Iuno hair/head, Mornye translucent legs and Lynae effects have been reported
-missing in the left eye. Chisa&#39;s ribbon can leave a silhouette in the right.</li>
-<li>Full-animation first person can disagree with game aiming/target selection.</li>
-<li>Separate-eye rendering previously produced a black scene with the HUD visible.</li>
-</ul>
-<p>These observations do not establish one shared cause. The recorded reflection
-defect is inside the scene eyes. Existing LGUI eligibility counts do not prove
-a missing draw or justify bypassing all view gates. Useful next evidence is
-the first failing draw/dispatch and its actual per-eye projection, viewport
-and resources. No shader fix for these issues is claimed.</p>
-<p>Keep Native Stereo Fix off in the current starting profile: it previously
-caused SteamVR stutter, and combinations with experimental menu extraction
-have crashed. Preserve an accepted checkpoint before changing rendering hooks.</p>
-<h3>A useful report or pull request</h3>
+<h3>Reconstruct the release</h3><p>The public source overlay now matches the <strong>28 Sep 16:28 experimental candidate</strong>. <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md">Build instructions and pinned upstreams</a>. The older beta's matching source remains at its release tag.</p><p>95 changed native paths and two SDK paths were reconstructed from pinned upstream files plus the frozen patches. This is not a new full rebuild or live acceptance. The new candidate adds trigger input and dormant inventory tooling; its carried-forward camera change still needs an ultimate test.</p><h3>Remaining work</h3><p>Foliage/prop animation and visibility, some lighting, and ultimate transitions remain open. Main Resonators reflection improved; lower/weapon submenu offsets and freezing are deferred. NSF repaired reported character materials in user testing, with timing corrections in newer profiles.</p><p><a href="understanding.html">Read the evidence, unsuccessful experiments, code map and next steps</a>. Follow the settings supplied with your chosen package; older beta instructions are not the new candidate's defaults.</p><h3>A useful report or pull request</h3>
 <p>State what happened, what you expected, and the shortest reproduction. Include
 the build name/time, headset/runtime, controller connection, camera mode,
 character/menu, and whether a setting or Alt-Tab changes it. A single-eye or

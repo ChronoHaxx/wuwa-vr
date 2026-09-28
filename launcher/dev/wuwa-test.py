@@ -13,6 +13,7 @@ import html
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
 import subprocess
@@ -24,15 +25,72 @@ PROFILE = Path(os.environ.get("APPDATA", "")) / "UnrealVRMod/Client-Win64-Shippi
 SIMULATOR = Path(os.environ.get("LOCALAPPDATA", "")) / "OpenXR-Simulator"
 TOOLS = Path(__file__).resolve().parent.parent / "dev-tools"
 REFLECTION_SOURCES = (
-    ("planar", "Planar reflections", "r.Kuro.EnablePlanarReflection"),
+    ("planar", "Planar reflection updates", "r.Kuro.EnablePlanarReflection"),
     ("screen-space", "Screen-space reflections", "r.SSR.Quality"),
     ("environment", "Reflection environment", "r.ReflectionEnvironment"),
 )
+GRAPHICS_INTERPRETATION = {
+    "r.MeshDrawCommands.UseCachedCommands": (
+        "Temporarily generates mesh draw commands each frame instead of using cached commands. "
+        "Rendering cost may increase; geometry and wind are not intentionally hidden. "
+        "An improvement implicates a cached-command path but does not by itself identify a stale "
+        "view buffer. A zero baseline means no comparison. Saved or frozen settings stay unchanged."
+    ),
+    "r.Kuro.EnablePlanarReflection": (
+        "The inspected game path gates planar reflection updates. A cached reflection may remain visible "
+        "when this is zero; an unchanged still image cannot rule out planar reflections. "
+        "This comparison does not clear reflection textures or establish which path draws the defect."
+    ),
+    "vr.RoundRobinOcclusion": (
+        "Tests alternating-eye occlusion scheduling. Already zero means no change was made. "
+        "An improvement would implicate scheduling; it would not prove the stereo cameras are correct."
+    ),
+    "r.AllowOcclusionQueries": (
+        "Temporarily disables hardware occlusion queries. It may increase rendering cost. "
+        "This does not disable every custom visibility path or repair per-eye visibility."
+    ),
+    "foliage.ForceLOD": (
+        "Temporarily fixes foliage at the requested LOD to separate LOD selection from missing geometry. "
+        "This changes visible detail and may increase rendering cost; it is not a final rendering fix."
+    ),
+    "foliage.DisableCull": (
+        "Temporarily disables the standard foliage frustum culling path. Custom imposters and "
+        "distance culling may still apply. Rendering cost may increase; no persistent setting is saved."
+    ),
+    "r.EyeAdaptationQuality": (
+        "Temporarily disables automatic exposure to isolate an exposure mismatch from shadows. "
+        "Scene brightness may change; fixed exposure is not the final lighting fix."
+    ),
+    "r.ImposterVer2.ForceMode": (
+        "Compares this game's impostor system: 2 requests source meshes, 1 requests impostors. "
+        "Confirm that the target object actually changes before interpreting the result. "
+        "No change can mean an unexercised or cached path, not proof that impostors are innocent. "
+        "Each comparison restores the original mode; this is not a shipped quality override."
+    ),
+}
 TRANSLUCENCY_SOURCES = (
     ("full-resolution", "Full-resolution translucent effects", "r.KuroDownsampleTranslucencyFullRes", 1),
     ("without-blur", "Translucency without the separate blur", "r.Kuro.SeparateTranslucencyBlur", 0),
 )
 STEREO_SOURCES = tuple((folder, title, name, 0) for folder, title, name in REFLECTION_SOURCES) + TRANSLUCENCY_SOURCES
+VISIBILITY_SOURCES = (
+    ("round-robin", "Alternating-eye occlusion off", "vr.RoundRobinOcclusion", 0),
+    ("occlusion", "Hardware occlusion queries off", "r.AllowOcclusionQueries", 0),
+    ("fixed-foliage-lod", "Foliage LOD 1", "foliage.ForceLOD", 1),
+    ("foliage-frustum", "Foliage frustum culling off", "foliage.DisableCull", 1),
+    ("exposure", "Automatic exposure off", "r.EyeAdaptationQuality", 0),
+)
+IMPOSTOR_SOURCES = (
+    ("source-meshes", "Request source meshes", "r.ImposterVer2.ForceMode", 2),
+    ("impostors", "Request impostors", "r.ImposterVer2.ForceMode", 1),
+)
+STEREO_CANDIDATES = (
+    ("baseline", "All three candidates off", (False,False,False)),
+    ("planar", "Per-eye reflection parameters", (True,False,False)),
+    ("translucency", "Full-resolution stereo translucency", (False,True,False)),
+    ("combined", "Both corrections", (True,True,False)),
+    ("kuro-fallback", "Hide custom reflections (workaround)", (False,False,True)),
+)
 
 
 def foreground_pid() -> int:
@@ -199,6 +257,10 @@ class LiveTest:
             raise RuntimeError("Game restarted during test")
         return state
 
+    def assert_focus(self) -> None:
+        if getattr(self, "require_foreground", False) and foreground_pid() != self.pid:
+            raise RuntimeError("WuWa lost foreground focus; comparison stopped")
+
     @contextlib.contextmanager
     def exclusive(self):
         import msvcrt
@@ -212,12 +274,14 @@ class LiveTest:
                 handle.seek(0)
                 msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
-    def request(self, op: str, timeout: float = 15, **fields) -> dict:
+    def request(self, op: str, timeout: float = 15, *, request_id: str | None = None, **fields) -> dict:
+        if request_id is not None and (not isinstance(request_id, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", request_id)):
+            raise ValueError("Invalid backend request identity")
         self.assert_live()
         request_path = self.profile / "wuwa-test.request.json"
         if request_path.exists():
             raise RuntimeError("Another backend test request is pending")
-        request = dict(version=1, pid=self.pid, id=uuid.uuid4().hex, op=op,
+        request = dict(version=1, pid=self.pid, id=request_id or uuid.uuid4().hex, op=op,
                        expires_unix_ms=int((time.time() + timeout + 3) * 1000), **fields)
         write_json(request_path, request)
         deadline = time.monotonic() + timeout
@@ -250,6 +314,7 @@ class LiveTest:
         deadline = started + seconds + 6
         while time.monotonic() < deadline:
             state = self.assert_live()
+            self.assert_focus()
             runtime = None if steamvr else fresh_json(self.simulator / "runtime_status.json")
             if lease:
                 if state.get("unix_ms", 0) < lease["unix_ms"]:
@@ -259,8 +324,14 @@ class LiveTest:
                     shadow = state.get("shadow", {})
                     expected_enabled = lease.get("shadow", {}).get("enabled", True)
                     if (shadow.get("enabled") != expected_enabled or not shadow.get("ready")
-                            or shadow.get("faulted") or not shadow.get("test_active", True)):
+                            or shadow.get("faulted") or not shadow.get("test_active", True)
+                            or shadow.get("full_view_enabled", False) != lease.get("shadow", {}).get("full_view_enabled", False)):
                         raise RuntimeError("Shadow pass test is no longer active and healthy")
+                elif lease.get("op") == "stereo_candidates":
+                    candidate=state.get("stereo_candidate_test",{})
+                    if (not candidate.get("active") or candidate.get("id")!=lease["id"] or
+                            candidate.get("values")!=lease["stereo_candidate_test"]["values"]):
+                        raise RuntimeError("Stereo candidate comparison expired or changed")
                 elif (not state.get("active") or state.get("id") != lease["id"]
                       or state.get("actual") != lease["actual"] or state.get("render") != lease["actual"]):
                     raise RuntimeError("Graphics test no longer has the requested value")
@@ -312,6 +383,7 @@ class LiveTest:
 
     def capture(self, output: Path, layer: str = "all") -> dict:
         self.capture_layer(layer)
+        self.assert_focus()
         if getattr(self, "capture_source", "simulator") == "steamvr":
             return self.capture_steamvr(output)
         from PIL import Image
@@ -334,6 +406,7 @@ class LiveTest:
         try:
             while time.monotonic() < deadline:
                 self.assert_live()
+                self.assert_focus()
                 try:
                     status = read_json(status_path)
                     if status.get("client_id") == token and status.get("ok") is False:
@@ -382,8 +455,11 @@ class LiveTest:
         output.mkdir(parents=True, exist_ok=False)
         report = {"pid": self.pid, "name": name, "test_value": value, "status": "incomplete",
                   "capture_source": getattr(self, "capture_source", "simulator"), "layer": layer}
+        if name in GRAPHICS_INTERPRETATION:
+            report["interpretation"] = GRAPHICS_INTERPRETATION[name]
         begin = None
         try:
+            self.assert_focus()
             baseline = self.request("query", name=name)
             report["baseline"] = baseline
             self.wait_frames()
@@ -392,9 +468,10 @@ class LiveTest:
                 report["status"] = "already_at_test_value"
                 return report
             try:
+                self.assert_focus()
                 begin = self.request("begin", name=name, value=value, expected=baseline["actual"], seconds=45)
                 report["begin"] = begin
-                self.wait_frames(2, begin)
+                self.wait_frames(4 if name == "r.ImposterVer2.ForceMode" else 2, begin)
                 self.capture(output / "changed", layer)
                 state = self.assert_live()
                 if state.get("id") != begin["id"] or state.get("actual") != value or state.get("render") != value:
@@ -432,7 +509,7 @@ class LiveTest:
                            for _, title, name in REFLECTION_SOURCES]}
 
     def reflections(self, output: Path) -> dict:
-        """Capture each source off, restoring it before testing the next one."""
+        """Compare three controls at zero, restoring each before the next test."""
         return self.graphics_batch(output, tuple((folder, title, name, 0)
                                    for folder, title, name in REFLECTION_SOURCES), "reflection", "reflections.json")
 
@@ -442,6 +519,214 @@ class LiveTest:
 
     def stereo(self, output: Path) -> dict:
         return self.graphics_batch(output, STEREO_SOURCES, "stereo", "stereo.json")
+
+    def visibility(self, output: Path) -> dict:
+        """Separate visibility paths with per-control restoration, without input."""
+        previous = getattr(self, "require_foreground", False)
+        self.require_foreground = True
+        try:
+            self.assert_focus()
+            return self.graphics_batch(output, VISIBILITY_SOURCES, "visibility", "visibility.json")
+        finally:
+            # Restore requests deliberately do not require foreground focus.
+            self.require_foreground = previous
+
+    def impostors(self, output: Path) -> dict:
+        previous = getattr(self, "require_foreground", False)
+        self.require_foreground = True
+        try:
+            self.assert_focus()
+            return self.graphics_batch(output, IMPOSTOR_SOURCES, "impostor", "impostors.json")
+        finally:
+            self.require_foreground = previous
+
+    def lod_inputs(self, output: Path, seconds: int = 8, view_uniforms: bool = False,
+                   mesh_bindings: bool = False) -> dict:
+        """Capture an expiring read-only trace and images; no rendering change."""
+        if not 1 <= seconds <= 30:
+            raise ValueError("LOD input recording must be 1..30 seconds")
+        state = self.assert_live()
+        if "lod_probe" not in state:
+            raise RuntimeError("This backend does not include the LOD input probe")
+        if state["lod_probe"].get("active"):
+            raise RuntimeError("A LOD input recording is already active")
+        if view_uniforms and state["lod_probe"].get("view_uniforms_supported") is not True:
+            raise RuntimeError("This backend does not support View uniform tracing")
+        if mesh_bindings and state["lod_probe"].get("mesh_bindings_supported") is not True:
+            raise RuntimeError("This backend does not support mesh binding tracing")
+        revision = state["lod_probe"].get("mesh_binding_hook_revision")
+        if mesh_bindings and (type(revision) is not int or revision != 2):
+            raise RuntimeError("Mesh tracing is blocked on this backend: its observer can overwrite a native branch target. Use a backend with hook revision 2; ordinary gameplay and recording do not install this observer.")
+        output.mkdir(parents=True, exist_ok=False)
+        report = dict(pid=self.pid, status="incomplete", read_only=True, seconds=seconds,
+                      view_uniforms_requested=view_uniforms,
+                      mesh_bindings_requested=mesh_bindings,
+                      interpretation="Instanced binding inputs only. Matching CPU family frames is not GPU frame proof; visual review is required.")
+        started = None
+        extra_traces = []
+        if view_uniforms:
+            extra_traces.append(("view_uniforms", "View uniform", "view-ub"))
+        if mesh_bindings:
+            extra_traces.append(("mesh_bindings", "Mesh binding", "mesh-bindings"))
+        extra_sources = {}
+        stopped_cleanly = False
+
+        def extra_trace_path(trace: dict, key: str, label: str, prefix: str) -> Path:
+            sample = trace.get(key)
+            if not isinstance(sample, dict) or sample.get("requested") is not True:
+                raise RuntimeError(f"Backend did not acknowledge the requested {label} trace")
+            raw_path = sample.get("path")
+            if not isinstance(raw_path, str) or not raw_path:
+                raise RuntimeError(f"{label} recording path is missing")
+            source = Path(raw_path).resolve()
+            if (source.parent != (self.profile / "diagnostics").resolve()
+                    or source.suffix != ".jsonl" or not source.name.startswith(f"{prefix}-{self.pid}-")):
+                raise RuntimeError(f"{label} recording path or identity is invalid")
+            return source
+
+        previous = getattr(self, "require_foreground", False)
+        self.require_foreground = True
+        try:
+            self.assert_focus()
+            self.capture(output / "baseline", self.capture_layer())
+            started = self.request("lod_probe", seconds=seconds, **{key: True for key, _, _ in extra_traces})
+            report["begin"] = started
+            for key, label, prefix in extra_traces:
+                extra_sources[key] = extra_trace_path(started["lod_probe"], key, label, prefix)
+            self.wait_frames(seconds)
+            report["end"] = self.request("lod_probe", seconds=0)
+            trace = report["end"]["lod_probe"]
+            stopped_cleanly = trace.get("active") is False
+            if not stopped_cleanly or trace.get("error"):
+                raise RuntimeError("LOD recording did not stop cleanly: " + str(trace.get("error", "still active")))
+            source = Path(trace["path"]).resolve()
+            if (source.parent != (self.profile / "diagnostics").resolve()
+                    or source.suffix != ".jsonl" or not source.name.startswith(f"lod-{self.pid}-")
+                    or str(source) != str(Path(started["lod_probe"]["path"]).resolve())
+                    or source.stat().st_size > 32 * 1024 * 1024):
+                raise RuntimeError("LOD recording path, identity or size is invalid")
+            shutil.copyfile(source, output / "lod.jsonl")
+            report["trace_sha256"] = hashlib.sha256((output / "lod.jsonl").read_bytes()).hexdigest()
+            for key, label, prefix in extra_traces:
+                source = extra_trace_path(trace, key, label, prefix)
+                if source != extra_sources[key]:
+                    raise RuntimeError(f"{label} recording path changed after start")
+                sample = trace[key]
+                if sample.get("error") or type(sample.get("truncated")) is not bool:
+                    raise RuntimeError(f"{label} recording failed or omitted its truncation status")
+                limit = 64 * 1024 * 1024
+                if not source.is_file() or source.stat().st_size > limit:
+                    raise RuntimeError(f"{label} recording file or size is invalid")
+                # The backend has stopped; retain an explicit bound even if a
+                # local writer changes the file after the stat check.
+                with source.open("rb") as file:
+                    data = file.read(limit + 1)
+                if len(data) > limit:
+                    raise RuntimeError(f"{label} recording exceeds the 64 MiB limit")
+                (output / f"{prefix}.jsonl").write_bytes(data)
+                report[f"{key}_trace_sha256"] = hashlib.sha256(data).hexdigest()
+                report[f"{key}_trace_truncated"] = sample["truncated"]
+            self.capture(output / "after", self.capture_layer())
+            report["status"] = "captured_inputs_visual_review_pending" if trace.get("written", 0) else "no_covered_draws"
+            return report
+        except BaseException as error:
+            report["error"] = str(error)
+            raise
+        finally:
+            if started is not None and not stopped_cleanly:
+                try:
+                    report["cleanup"] = self.request("lod_probe", seconds=0)
+                except BaseException as error:
+                    report["cleanup_error"] = str(error)  # Backend expires within 30 seconds.
+            self.require_foreground = previous
+            write_json(output / "lod-inputs.json", report)
+
+    @staticmethod
+    def candidate_state(state: dict, values: tuple) -> None:
+        planar,translucency,hide=values
+        for key,expected in (("planar_eye_correction",planar),("stereo_translucency",translucency)):
+            sample=state.get(key,{})
+            if sample.get("faulted") or sample.get("enabled") is not expected:
+                raise RuntimeError(f"{key} did not enter the requested healthy state: {sample.get('error') or 'enabled state mismatch'}")
+        kuro=state.get("kuro_reflection",{})
+        if kuro.get("faulted") or kuro.get("mode")!=(2 if hide else 1 if planar else 0):
+            raise RuntimeError("Kuro reflection comparison did not enter the requested healthy state: " +
+                               (kuro.get("error") or "mode mismatch"))
+
+    def stereo_candidates(self, output: Path) -> dict:
+        """Five bounded comparisons; restore configured switches even on capture failure."""
+        initial=self.assert_live()
+        if not all(key in initial for key in ("stereo_candidate_test","planar_eye_correction","stereo_translucency","kuro_reflection")):
+            raise RuntimeError("This backend lacks the stereo candidate batch; install the staged build first")
+        if initial.get("active") or initial["stereo_candidate_test"].get("active") or initial.get("shadow",{}).get("test_active"):
+            raise RuntimeError("Another graphics comparison is already active")
+        options=initial.get("live_options",{})
+        if (options.get("VR_RenderingMethod")!="0" or options.get("VR_NativeStereoFix")!="false" or
+                options.get("VR_ExtremeCompatibilityMode")!="false"):
+            raise RuntimeError("Stereo candidates require native stereo with Native Stereo Fix and Extreme Compatibility off")
+        option_keys=("VR_WuWaPlanarEyeParameters","VR_WuWaStereoTranslucency","VR_WuWaHideKuroReflections")
+        if any(options.get(key) not in ("true","false") for key in option_keys):
+            raise RuntimeError("Missing configured stereo candidate values")
+        configured=tuple(options[key]=="true" for key in option_keys)
+        output.mkdir(parents=True,exist_ok=False)
+        layer=self.capture_layer()
+        report={"pid":self.pid,"status":"incomplete","capture_source":getattr(self,"capture_source","simulator"),
+                "layer":layer,"initial":initial,"stages":[],"input_sent":False,
+                "interpretation":"Captured images and hook counters need visual review; counters do not prove the defect is repaired."}
+        try:
+            for folder,title,values in STEREO_CANDIDATES:
+                stage={"folder":folder,"title":title,"values":values}; report["stages"].append(stage)
+                begin=None
+                try:
+                    begin=self.request("stereo_candidates",seconds=45,values=list(values))
+                    stage["begin"]=begin
+                    self.wait_frames(2,begin)
+                    before=self.assert_live()
+                    stage["before"]=before
+                    self.candidate_state(before,values)
+                    self.capture(output/folder,layer)
+                    self.wait_frames(2,begin)
+                    after=self.assert_live()
+                    stage["after"]=after
+                    self.candidate_state(after,values)
+                    active=after.get("stereo_candidate_test",{})
+                    if not active.get("active") or active.get("id")!=begin["id"]:
+                        raise RuntimeError("Stereo candidate comparison ended during capture")
+                    stage["unexercised"]=[]
+                    for index,key,counter in ((0,"planar_eye_correction","applied"),
+                                               (1,"stereo_translucency","forced_full_resolution"),
+                                               (2,"kuro_reflection","suppressed")):
+                        if values[index] and after[key].get(counter,0)<=before[key].get(counter,0):
+                            stage["unexercised"].append(key)
+                finally:
+                    if begin is not None:
+                        stage["restore"]=self.request("stereo_candidates",seconds=0,lease_id=begin["id"])
+                        if stage["restore"]["stereo_candidate_test"].get("active"):
+                            raise RuntimeError("Stereo candidate comparison restoration not confirmed")
+                    else: stage["restore_note"]="No begin response; a consumed request expires within 45 seconds. Restoration is unconfirmed."
+                self.wait_frames()
+                restored=self.assert_live(); self.candidate_state(restored,configured)
+                if restored.get("stereo_candidate_test",{}).get("active"):
+                    raise RuntimeError("Stereo candidate comparison unexpectedly remains active")
+            self.capture(output/"restored",layer)
+            report["restored"]=self.assert_live()
+            if any(report["restored"].get("live_options",{}).get(key)!=options[key] for key in option_keys):
+                raise RuntimeError("Configured stereo choices changed during comparison")
+            report["status"]="captured_and_restored_visual_review_pending"
+            return report
+        except BaseException as error:
+            report["error"]=str(error); raise
+        finally:
+            write_json(output/"stereo-candidates.json",report)
+            rows=[]
+            for stage in report["stages"]:
+                folder=stage["folder"]
+                if (output/folder/"image.png").exists():
+                    rows.append(f'<h2>{html.escape(stage["title"])}</h2><img src="{folder}/image.png" alt="Both eyes">')
+            (output/"index.html").write_text('<!doctype html><meta charset="utf-8"><title>Stereo comparison</title>'
+                '<style>body{background:#171717;color:#eee;font:16px system-ui;margin:24px}img{max-width:100%}</style>'
+                '<h1>Stereo comparison</h1><p>Visual review pending. A still cannot establish temporal stability. '
+                'See stereo-candidates.json for correction counters and restoration evidence.</p>'+''.join(rows),encoding="utf-8")
 
     def graphics_batch(self, output: Path, sources: tuple, kind: str, receipt: str) -> dict:
         layer = self.capture_layer()
@@ -484,6 +769,8 @@ class LiveTest:
                     continue
                 detail = read_json(detail_path)
                 parts.append('<section><h2>' + html.escape(title) + '</h2><p>' + html.escape(detail["status"]) + '</p>')
+                if detail.get("interpretation"):
+                    parts.append('<p>' + html.escape(detail["interpretation"]) + '</p>')
                 for stage, label in (("baseline", "Before"), ("changed", f"Changed to {value}"), ("restored", "Restored")):
                     relative = f"{folder}/{stage}/image.png"
                     if (output / relative).is_file():
@@ -491,28 +778,43 @@ class LiveTest:
                 parts.append('</section>')
             (output / "index.html").write_text('\n'.join(parts), encoding="utf-8")
 
-    def shadows(self, output: Path) -> dict:
+    def full_views(self, output: Path) -> dict:
+        previous = getattr(self, "require_foreground", False)
+        self.require_foreground = True
+        try:
+            return self.shadows(output, full_view=True)
+        finally:
+            self.require_foreground = previous
+
+    def shadows(self, output: Path, full_view: bool = False) -> dict:
         """Compare the opposite pass state, then return to the original setting."""
         output.mkdir(parents=True, exist_ok=False)
-        report = {"pid": self.pid, "test": "second_eye_primary_pass", "status": "incomplete"}
+        report = {"pid": self.pid, "test": "full_view_pass" if full_view else "second_eye_primary_pass", "status": "incomplete"}
         begin = None
         try:
             baseline = self.request("shadow_query")["shadow"]
             report["baseline"] = baseline
+            if full_view and not baseline.get("full_view_supported"):
+                raise RuntimeError("Backend does not support the full-view comparison")
             configurable = "configured_enabled" in baseline
             if (not baseline.get("ready") or baseline.get("faulted") or baseline.get("test_active")
                     or (baseline.get("enabled") and not configurable)):
                 raise RuntimeError("Shadow view pair is not verified and idle")
-            changed_enabled = not baseline["enabled"]
+            changed_enabled = False if full_view else not baseline["enabled"]
             report["changed_enabled"] = changed_enabled
             self.wait_frames()
             self.capture(output / "baseline", "all")
             try:
                 fields = {"enabled": changed_enabled} if configurable else {}
+                if full_view:
+                    fields["full_view"] = True
+                self.assert_focus()
                 begin = self.request("shadow_pass", seconds=45, **fields)
                 report["begin"] = begin
                 if begin["shadow"]["enabled"] != changed_enabled:
                     raise RuntimeError("Backend did not select the requested shadow state")
+                if full_view and not begin["shadow"].get("full_view_enabled"):
+                    raise RuntimeError("Backend did not enable the full-view comparison")
                 self.wait_frames(2, begin)
                 self.capture(output / "changed", "all")
                 active = self.request("shadow_query")["shadow"]
@@ -524,6 +826,10 @@ class LiveTest:
                         not active.get("test_active", True) or not counter_ok
                         or active["restored"] != active["applied"]):
                     raise RuntimeError("Shadow override did not apply and restore cleanly")
+                if full_view and (not active.get("full_view_enabled") or
+                        active["full_applied"] <= begin["shadow"]["full_applied"] or
+                        active["full_applied"] != active["full_restored"]):
+                    raise RuntimeError("Full-view comparison did not apply and restore cleanly")
             finally:
                 if begin is not None:
                     report["disable"] = self.request("shadow_pass", seconds=0)
@@ -531,6 +837,8 @@ class LiveTest:
             report["restored"] = restored
             if (restored.get("enabled") != baseline["enabled"] or restored.get("faulted")
                     or restored.get("test_active") or restored["applied"] != restored["restored"]
+                    or restored.get("full_view_enabled", False)
+                    or restored.get("full_applied", 0) != restored.get("full_restored", 0)
                     or restored.get("configured_enabled") != baseline.get("configured_enabled")):
                 raise RuntimeError("Shadow override restoration was not confirmed")
             self.wait_frames()
@@ -556,7 +864,7 @@ def main() -> int:
     graphics.add_argument("--value", type=int, default=0)
     graphics.add_argument("--output", type=Path, required=True)
     graphics.add_argument("--layer", choices=("all", "projection"), help="Default: projection for simulator, all for SteamVR")
-    reflections = commands.add_parser("reflections", help="Capture three reflection sources off one at a time, restoring each")
+    reflections = commands.add_parser("reflections", help="Compare three reflection controls at zero one at a time, restoring each")
     reflections.add_argument("--output", type=Path, required=True)
     reflections.add_argument("--pid", type=int, help="Refuse a different game process")
     translucency = commands.add_parser("translucency", help="Capture full-resolution and blur material comparisons with restoration")
@@ -565,12 +873,30 @@ def main() -> int:
     stereo = commands.add_parser("stereo", help="Compare reflection and translucency paths in one restored batch")
     stereo.add_argument("--output", type=Path, required=True)
     stereo.add_argument("--pid", type=int, help="Refuse a different game process")
+    visibility = commands.add_parser("visibility", help="Compare occlusion and foliage paths, restoring each; keep WuWa focused")
+    visibility.add_argument("--output", type=Path, required=True)
+    visibility.add_argument("--pid", type=int, required=True, help="Refuse a different game process")
+    candidates=commands.add_parser("stereo-candidates",help="Capture and restore the three targeted stereo candidates in one batch")
+    candidates.add_argument("--output",type=Path,required=True)
+    candidates.add_argument("--pid",type=int,required=True)
     values = commands.add_parser("reflection-values", help="Read the three reflection values without changing them")
     values.add_argument("--pid", type=int, help="Refuse a different game process")
     values.add_argument("--output", type=Path, help="Optional JSON receipt path")
     shadows = commands.add_parser("shadows")
     shadows.add_argument("--output", type=Path, required=True)
-    for command in (capture, graphics, reflections, translucency, stereo, shadows):
+    full_views = commands.add_parser("full-views", help="Temporarily render both eyes as full views, then restore; keep WuWa focused")
+    full_views.add_argument("--output", type=Path, required=True)
+    full_views.add_argument("--pid", type=int, required=True)
+    impostors = commands.add_parser("impostors", help="Compare source meshes and impostors with automatic restoration")
+    impostors.add_argument("--output", type=Path, required=True)
+    impostors.add_argument("--pid", type=int, required=True)
+    lod = commands.add_parser("lod-inputs", help="Read-only LOD input trace and stationary scene captures")
+    lod.add_argument("--view-uniforms", action="store_true", help="Also record bounded View uniform ownership on a supporting backend")
+    lod.add_argument("--mesh-bindings", action="store_true", help="Also record bounded mesh bindings before vertex-factory dispatch; this is not GPU draw proof")
+    lod.add_argument("--output", type=Path, required=True)
+    lod.add_argument("--pid", type=int, required=True)
+    lod.add_argument("--seconds", type=int, choices=range(1, 31), metavar="1..30", default=8)
+    for command in (capture, graphics, reflections, translucency, stereo, visibility, candidates, shadows, full_views, impostors, lod):
         command.add_argument("--capture-source", choices=("simulator", "steamvr"), default="simulator",
                              help="Select an already running runtime; never switches or starts one")
     shadow_pass = commands.add_parser("shadow-pass")
@@ -581,6 +907,8 @@ def main() -> int:
     record = commands.add_parser("record-motion", help="Record bounded local controller/camera sidecar; never generates input")
     record.add_argument("--seconds", type=int, choices=range(0, 301), metavar="0..300", default=120)
     record.add_argument("--recording-id", default="")
+    planar = commands.add_parser("planar-probe", help="Observe reflection eye parameters without changing rendering")
+    planar.add_argument("--seconds", type=int, choices=range(0, 121), metavar="0..120", default=60)
     motion = commands.add_parser("motion-input")
     motion.add_argument("--mute-seconds", type=int, default=90)
     focus = commands.add_parser("input-focus", help="Temporary Windows/XR focus candidate; does not edit config")
@@ -593,7 +921,7 @@ def main() -> int:
         parser.error("SteamVR mirrors cannot isolate projection/quad layers; use --layer all")
     client = LiveTest()
     client.capture_source = getattr(args, "capture_source", "simulator")
-    if args.command in ("reflections", "reflection-values", "translucency", "stereo") and args.pid is not None and client.pid != args.pid:
+    if args.command in ("reflections", "reflection-values", "translucency", "stereo", "visibility", "stereo-candidates", "full-views", "impostors", "lod-inputs") and args.pid is not None and client.pid != args.pid:
         raise RuntimeError("Game process changed before graphics comparison")
     with client.exclusive():
         if args.command == "status":
@@ -608,6 +936,15 @@ def main() -> int:
             result = client.translucency(args.output)
         elif args.command == "stereo":
             result = client.stereo(args.output)
+        elif args.command == "visibility":
+            result = client.visibility(args.output)
+        elif args.command == "impostors":
+            result = client.impostors(args.output)
+        elif args.command == "lod-inputs":
+            result = client.lod_inputs(args.output, args.seconds, view_uniforms=args.view_uniforms,
+                                       mesh_bindings=args.mesh_bindings)
+        elif args.command == "stereo-candidates":
+            result = client.stereo_candidates(args.output)
         elif args.command == "reflection-values":
             result = client.reflection_values()
             if args.output is not None:
@@ -615,12 +952,16 @@ def main() -> int:
                 write_json(args.output, result)
         elif args.command == "shadows":
             result = client.shadows(args.output)
+        elif args.command == "full-views":
+            result = client.full_views(args.output)
         elif args.command == "shadow-pass":
             result = client.request("shadow_pass", seconds=args.seconds)
         elif args.command == "trace":
             result = client.request("trace", seconds=0 if args.until_stopped else args.seconds, until_stopped=args.until_stopped)
         elif args.command == "record-motion":
             result = client.request("record_motion", seconds=args.seconds, recording_id=args.recording_id)
+        elif args.command == "planar-probe":
+            result = client.request("planar_probe", seconds=args.seconds)
         elif args.command == "motion-input":
             result = client.request("motion_input", mute_seconds=args.mute_seconds)
         elif args.command == "input-focus":

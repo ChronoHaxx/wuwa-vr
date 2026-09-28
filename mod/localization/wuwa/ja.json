@@ -209,6 +209,15 @@
     "X/Y/B: load / save slots 0/1/2": "X/Y/B：枠 0/1/2 の読込／保存",
     "XBOX CONTROLLER  /  POLAR SHORTCUTS": "Xbox コントローラー／Polar 操作",
     "Xbox shortcuts": "Xbox ショートカット",
-    "Yaw": "ヨー"
+    "Yaw": "ヨー",
+    "Recording and privacy": "録画とプライバシー",
+    "Target recording rate": "目標録画フレームレート",
+    "Maximum pixels per eye": "片目あたりの最大幅（ピクセル）",
+    "Include camera and controller data": "カメラとコントローラーのデータを含める",
+    "Start video recording": "動画の録画を開始",
+    "Stop video recording": "動画の録画を停止",
+    "Waiting for the launcher...": "ランチャーを待っています…",
+    "Finishing the video. Please wait.": "動画を保存しています。お待ちください。",
+    "Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.": "対応メニューを VR パネルに表示します。Native Stereo Fix と併用できます。初期状態はオフです。メニューの表示がおかしい場合は無効にしてください。ロード画面とぼかしは引き続き検証が必要です。"
   }
 }

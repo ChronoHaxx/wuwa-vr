@@ -209,6 +209,15 @@
     "X/Y/B: load / save slots 0/1/2": "X/Y/B: تحميل / حفظ الخانات 0/1/2",
     "XBOX CONTROLLER  /  POLAR SHORTCUTS": "يد Xbox / اختصارات Polar",
     "Xbox shortcuts": "اختصارات Xbox",
-    "Yaw": "الالتفاف الأفقي"
+    "Yaw": "الالتفاف الأفقي",
+    "Recording and privacy": "التسجيل والخصوصية",
+    "Target recording rate": "معدل الإطارات المستهدف للتسجيل",
+    "Maximum pixels per eye": "أقصى عرض لكل عين بالبكسل",
+    "Include camera and controller data": "تضمين بيانات الكاميرا ووحدة التحكم",
+    "Start video recording": "بدء تسجيل الفيديو",
+    "Stop video recording": "إيقاف تسجيل الفيديو",
+    "Waiting for the launcher...": "في انتظار برنامج التشغيل...",
+    "Finishing the video. Please wait.": "جارٍ حفظ الفيديو. يُرجى الانتظار.",
+    "Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.": "ينقل القوائم المدعومة إلى لوحة الواقع الافتراضي، حتى مع تشغيل Native Stereo Fix. يكون معطلاً افتراضياً. عطّله إذا ظهرت قائمة بشكل غير صحيح. لا تزال شاشات التحميل وتأثيرات التمويه بحاجة إلى اختبار."
   }
 }

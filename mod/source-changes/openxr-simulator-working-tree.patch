@@ -1,11 +1,16 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 2332260..2acc1d0 100644
+index 2332260..133f47d 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -46,6 +46,10 @@ add_library(openxr_simulator SHARED
+@@ -46,6 +46,15 @@ add_library(openxr_simulator SHARED
  
  include(CTest)
  if(BUILD_TESTING)
++    add_executable(video_stream_tests tests/video_stream_tests.cpp)
++    add_test(NAME video_stream COMMAND video_stream_tests)
++    add_executable(video_command_tests tests/video_command_tests.cpp)
++    add_test(NAME video_command COMMAND video_command_tests ${CMAKE_CURRENT_BINARY_DIR})
++
 +    add_executable(space_math_tests tests/space_math_tests.cpp)
 +    target_include_directories(space_math_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 +    add_test(NAME space_math COMMAND space_math_tests)
@@ -130,7 +135,7 @@ index 9b9805c..0bc9aae 100644
      XRC_SOFT(xrDestroyInstance(g_instance), "xrDestroyInstance");
  
 diff --git a/src/mcp_integration.h b/src/mcp_integration.h
-index b978aca..3b7a95b 100644
+index b978aca..ea6ac4a 100644
 --- a/src/mcp_integration.h
 +++ b/src/mcp_integration.h
 @@ -139,9 +139,49 @@ inline std::string g_screenshotEye = "both";
@@ -225,11 +230,28 @@ index b978aca..3b7a95b 100644
  
          DeleteFileA(reqPath.c_str());
          McpLogf("Screenshot request detected: layer=%s, eye=%s", g_screenshotLayer.c_str(), g_screenshotEye.c_str());
+@@ -478,6 +528,8 @@ inline void WriteFrameStatus(uint32_t frameCount, uint32_t width, uint32_t heigh
+     fprintf(file, "  \"timestamp\": \"%04d-%02d-%02dT%02d:%02d:%02d\",\n",
+             st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+     fprintf(file, "  \"frame_count\": %u,\n", frameCount);
++    fprintf(file, "  \"runtime_pid\": %lu,\n", GetCurrentProcessId());
++    fprintf(file, "  \"video_stream_version\": 1,\n");
+     fprintf(file, "  \"preview_width\": %u,\n", width);
+     fprintf(file, "  \"preview_height\": %u,\n", height);
+     fprintf(file, "  \"format\": \"%s\",\n", format ? format : "unknown");
 diff --git a/src/runtime.cpp b/src/runtime.cpp
-index 0f26abf..7a14bdc 100644
+index 0f26abf..efbbee3 100644
 --- a/src/runtime.cpp
 +++ b/src/runtime.cpp
-@@ -115,6 +115,7 @@ static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_glCheckFramebufferStatus = nullptr;
+@@ -24,6 +24,7 @@
+ #include <vulkan/vulkan.h>
+ 
+ #include "flicker_detector.h"
++#include "video_command.h"
+ 
+ // OpenGL headers - minimal definitions for what we need
+ #include <GL/gl.h>
+@@ -115,6 +116,7 @@ static PFNGLCHECKFRAMEBUFFERSTATUSPROC g_glCheckFramebufferStatus = nullptr;
  #include <loader_interfaces.h>
  #include "mcp_integration.h"
  #include "projection_timing.h"
@@ -237,7 +259,7 @@ index 0f26abf..7a14bdc 100644
  #include "ui_enhancements.h"
  
  using Microsoft::WRL::ComPtr;
-@@ -146,6 +147,14 @@ static const bool g_logVerbose = []() {
+@@ -146,6 +148,14 @@ static const bool g_logVerbose = []() {
      return n > 0 && n < sizeof(v) && v[0] != '0';
  }();
  
@@ -252,7 +274,7 @@ index 0f26abf..7a14bdc 100644
  static void EnsureLogFile() {
      if (g_LogFile) return;
      char base[MAX_PATH]{};
-@@ -377,6 +386,11 @@ static constexpr UINT kPreviewMaxHeight = 1080;
+@@ -377,6 +387,11 @@ static constexpr UINT kPreviewMaxHeight = 1080;
  struct PreviewFrame12 {
      ComPtr<ID3D12CommandAllocator> alloc;
      ComPtr<ID3D12Resource> readback;   // composited frame, kPreviewRTFormat rows at previewReadbackPitch
@@ -264,7 +286,15 @@ index 0f26abf..7a14bdc 100644
      UINT rtWidth{0}, rtHeight{0};      // size the composite in `readback` was rendered at
      UINT64 fenceValue{0};              // last value signalled for this slot; 0 = never submitted
      bool pending{false};               // submitted, not yet painted into the back buffer
-@@ -692,8 +706,10 @@ static ControllerState g_rightController = {
+@@ -388,6 +403,7 @@ struct PreviewFrame12 {
+     // the question a burst exists to answer.
+     uint32_t frame{0};
+     bool hasProjection{false};
++    bool videoSbs{false};
+     uint32_t quadLayers{0};
+     bool quadComposed{false};
+     int32_t quadRects[2][4]{};
+@@ -692,8 +708,10 @@ static ControllerState g_rightController = {
      {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, 0.0f, 0.0f  // Velocity tracking
  };
  
@@ -276,7 +306,7 @@ index 0f26abf..7a14bdc 100644
  
  // Composition layers carry a pose plus the space it is in, and VIEW (head-locked)
  // against STAGE (world) changes where the layer belongs entirely.
-@@ -777,30 +793,9 @@ XrQuaternionf QuatFromYawPitchRoll(float yaw, float pitch, float roll) {
+@@ -777,30 +795,9 @@ XrQuaternionf QuatFromYawPitchRoll(float yaw, float pitch, float roll) {
      return q;
  }
  
@@ -310,7 +340,7 @@ index 0f26abf..7a14bdc 100644
  
  static void GetEffectiveHeadAngles(float& yaw, float& pitch, float& roll) {
      yaw = g_headYaw; pitch = g_headPitch; roll = g_headRoll;
-@@ -830,6 +825,30 @@ static XrFovf GetViewFov(uint32_t eye) {
+@@ -830,6 +827,30 @@ static XrFovf GetViewFov(uint32_t eye) {
      return GetUiFov(eye);
  }
  
@@ -341,7 +371,7 @@ index 0f26abf..7a14bdc 100644
  // --- Composition layer blending -------------------------------------------------------------------
  // OpenXR 1.0, XrCompositionLayerFlagBits: the layer's alpha channel is only live when
  // BLEND_TEXTURE_SOURCE_ALPHA is set, and is premultiplied into the colour channels unless
-@@ -1401,6 +1420,14 @@ static void WaitForPreviewIdle(rt::Session& s) {
+@@ -1401,6 +1422,14 @@ static void WaitForPreviewIdle(rt::Session& s) {
      WaitForPreviewFence(s);
      // Nothing is in flight any more, so no slot is waiting to be picked up either.
      for (UINT i = 0; i < rt::kPreviewFrames; ++i) {
@@ -356,7 +386,7 @@ index 0f26abf..7a14bdc 100644
          s.previewFrames[i].pending = false;
          s.previewFrames[i].recording = false;
      }
-@@ -1754,7 +1781,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
+@@ -1754,7 +1783,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
              rt::RefreshPreviewGeometry(hWnd);
              if (ui::HandleMenuCommand(hWnd, wParam,
                  []() { rt::ResizeWindowForContent(rt::g_session.hwnd); },
@@ -366,7 +396,7 @@ index 0f26abf..7a14bdc 100644
                  []() {
                      rt::g_headPos = {0, 1.7f, 0}; rt::g_headYaw = 0; rt::g_headPitch = 0; rt::g_headRoll = 0;
                      ui::SetFitToWindow();
-@@ -1771,7 +1799,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
+@@ -1771,7 +1801,8 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
                  rt::RefreshPreviewGeometry(hWnd);
                  if (ui::HandleKeyboardShortcut(hWnd, wParam,
                      []() { rt::ResizeWindowForContent(rt::g_session.hwnd); },
@@ -376,7 +406,7 @@ index 0f26abf..7a14bdc 100644
                      []() {
                          rt::g_headPos = {0, 1.7f, 0}; rt::g_headYaw = 0; rt::g_headPitch = 0; rt::g_headRoll = 0;
                          ui::SetFitToWindow();
-@@ -1803,13 +1832,13 @@ static void ensurePreview(Session& s) {
+@@ -1803,13 +1834,13 @@ static void ensurePreview(Session& s) {
      if (s.hwnd) return;
      WNDCLASSW wc{}; wc.lpfnWndProc = WndProc; wc.hInstance = GetModuleHandleW(nullptr); wc.lpszClassName = L"OpenXR Simulator";
      RegisterClassW(&wc);
@@ -392,7 +422,7 @@ index 0f26abf..7a14bdc 100644
          UpdateWindow(s.hwnd);
  
          // Check if window has focus
-@@ -2845,7 +2874,8 @@ static const char* kSupportedExtensions[] = {
+@@ -2845,7 +2876,8 @@ static const char* kSupportedExtensions[] = {
      XR_KHR_VULKAN_ENABLE_EXTENSION_NAME,
      XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME,
      XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
@@ -402,7 +432,15 @@ index 0f26abf..7a14bdc 100644
      "XR_KHR_win32_convert_performance_counter_time"    // Unity often requires this
  };
  
-@@ -4088,23 +4118,9 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
+@@ -3176,6 +3208,7 @@ static XrResult XRAPI_PTR xrDestroySession_runtime(XrSession s) {
+         return XR_ERROR_HANDLE_INVALID;
+     }
+     
++    sim_video::producer.close();
+     // Transfer window and swapchain to global persistent storage
+     // Unity likes to create/destroy sessions rapidly for compatibility checks
+     {
+@@ -4088,23 +4121,9 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
      static long long periodNs = (long long)(periodSec * 1e9);
      static double nextTick = [](){ LARGE_INTEGER t; QueryPerformanceCounter(&t); return (double)t.QuadPart; }();
      
@@ -429,7 +467,7 @@ index 0f26abf..7a14bdc 100644
      const HWND foregroundWindow = GetForegroundWindow();
      bool previewWindowFocused = false;
      if (foregroundWindow != nullptr) {
-@@ -4113,7 +4129,8 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
+@@ -4113,7 +4132,8 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
          } else {
              DWORD fgPid = 0;
              GetWindowThreadProcessId(foregroundWindow, &fgPid);
@@ -439,7 +477,7 @@ index 0f26abf..7a14bdc 100644
          }
      }
      if (previewWindowFocused) {
-@@ -4334,6 +4351,19 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
+@@ -4334,6 +4354,19 @@ static XrResult XRAPI_PTR xrWaitFrame_runtime(XrSession, const XrFrameWaitInfo*,
              rt::g_leftController.prevPitch = totalLeftPitch;
          }
  
@@ -459,7 +497,7 @@ index 0f26abf..7a14bdc 100644
      }
  
      // MCP commands work regardless of window focus (file-based IPC).
-@@ -4537,7 +4567,7 @@ static void ensurePreviewWindow(rt::Session& s, UINT initialClientW, UINT initia
+@@ -4537,7 +4570,7 @@ static void ensurePreviewWindow(rt::Session& s, UINT initialClientW, UINT initia
              SetWindowLongPtrW(s.hwnd, GWLP_WNDPROC, (LONG_PTR)rt::WndProc);
              Log("[SimXR] Updated window WndProc to new DLL address");
              ui::ApplyDarkTheme(s.hwnd);
@@ -468,7 +506,7 @@ index 0f26abf..7a14bdc 100644
              UpdateWindow(s.hwnd);
              // Seed clientWidth/Height from the actual current client area
              RECT cr{};
-@@ -4562,10 +4592,12 @@ static void ensurePreviewWindow(rt::Session& s, UINT initialClientW, UINT initia
+@@ -4562,10 +4595,12 @@ static void ensurePreviewWindow(rt::Session& s, UINT initialClientW, UINT initia
          Log("[SimXR] Failed to create preview window!");
          return;
      }
@@ -485,7 +523,7 @@ index 0f26abf..7a14bdc 100644
      Logf("[SimXR] Created new preview window: hwnd=%p clientSize=%ux%u",
           s.hwnd, initialClientW, initialClientH);
  
-@@ -5404,20 +5436,93 @@ static void blitViewToHalf(rt::Session& s, rt::Swapchain& chain, uint32_t srcInd
+@@ -5404,20 +5439,93 @@ static void blitViewToHalf(rt::Session& s, rt::Swapchain& chain, uint32_t srcInd
      }
  }
  
@@ -591,7 +629,7 @@ index 0f26abf..7a14bdc 100644
  }
  
  // Whether the mirror updates this frame, latched once per xrEndFrame from the Mirror Rate
-@@ -5477,6 +5582,8 @@ static bool beginPreviewRT(rt::Session& s, rt::PreviewFrame12& f) {
+@@ -5477,6 +5585,8 @@ static bool beginPreviewRT(rt::Session& s, rt::PreviewFrame12& f) {
      const float clearBlack[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
      s.previewCmdList->ClearRenderTargetView(rtv, clearBlack, 0, nullptr);
  
@@ -600,7 +638,16 @@ index 0f26abf..7a14bdc 100644
      f.recording = true;
      return true;
  }
-@@ -5523,6 +5630,15 @@ static void closePreviewSlot(rt::Session& s, uint32_t frameCount, bool hasProjec
+@@ -5493,6 +5603,8 @@ static void closePreviewSlot(rt::Session& s, uint32_t frameCount, bool hasProjec
+     // Label the slot now, while the pose that produced it is still the live one.
+     f.frame = frameCount;
+     f.hasProjection = hasProjection;
++    f.videoSbs = ui::g_uiState.viewMode == ui::ViewMode::BothEyes &&
++        ui::g_uiState.displayLayout == ui::DisplayLayout::SideBySide && !ui::g_uiState.showFullRender;
+     f.headYaw = rt::g_headYaw; f.headPitch = rt::g_headPitch; f.headRoll = rt::g_headRoll;
+     f.headX = rt::g_headPos.x; f.headY = rt::g_headPos.y; f.headZ = rt::g_headPos.z;
+     f.proj = mcp::g_lastProjEntry;
+@@ -5523,6 +5635,15 @@ static void closePreviewSlot(rt::Session& s, uint32_t frameCount, bool hasProjec
      src.SubresourceIndex = 0;
      s.previewCmdList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
  
@@ -616,7 +663,7 @@ index 0f26abf..7a14bdc 100644
      barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
      barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COMMON;
      s.previewCmdList->ResourceBarrier(1, &barrier);
-@@ -5570,8 +5686,8 @@ static void closePreviewSlot(rt::Session& s, uint32_t frameCount, bool hasProjec
+@@ -5570,8 +5691,8 @@ static void closePreviewSlot(rt::Session& s, uint32_t frameCount, bool hasProjec
  // window - no intermediate back buffer, and none of the per-frame memcpy that copying into
  // one costs (~15MB a frame at a 2560x1440 window, on the app's render thread).
  //
@@ -627,7 +674,7 @@ index 0f26abf..7a14bdc 100644
  static void paintPreviewComposite(rt::Session& s, rt::PreviewFrame12& f) {
      if (!f.readback || !s.hwnd || f.rtWidth == 0 || f.rtHeight == 0) return;
      if (s.previewReadbackPitch == 0) return;
-@@ -5608,9 +5724,6 @@ static void paintPreviewComposite(rt::Session& s, rt::PreviewFrame12& f) {
+@@ -5608,9 +5729,6 @@ static void paintPreviewComposite(rt::Session& s, rt::PreviewFrame12& f) {
          ReleaseDC(s.hwnd, windowDC);
      }
  
@@ -637,7 +684,21 @@ index 0f26abf..7a14bdc 100644
      // The burst records the frame that was just shown, described by the metadata that
      // frame was recorded with rather than by whatever the head is doing now.
      if (mcp::g_burstActive && f.hasProjection) {
-@@ -5744,12 +5857,12 @@ static void blitD3D12ToPreview(rt::Session& s,
+@@ -5620,6 +5738,13 @@ static void paintPreviewComposite(rt::Session& s, rt::PreviewFrame12& f) {
+                           f.headYaw, f.headPitch, f.headRoll, f.headX, f.headY, f.headZ);
+     }
+ 
++    if (f.hasProjection) {
++        const float pose[]{f.headYaw, f.headPitch, f.headRoll, f.headX, f.headY, f.headZ};
++        const auto unixMs = std::chrono::duration_cast<std::chrono::milliseconds>(
++            std::chrono::system_clock::now().time_since_epoch()).count();
++        sim_video::producer.publish(static_cast<const uint8_t*>(mapped), f.rtWidth, f.rtHeight,
++            s.previewReadbackPitch, f.frame, unixMs, GetTickCount64(), pose, f.videoSbs);
++    }
+     // The detector samples the aligned readback rows in place; no repack. Before it
+     // took a row pitch, matching the 256-byte alignment on a window whose width was
+     // not a 64-pixel multiple cost a full-frame memcpy here on every painted frame.
+@@ -5744,12 +5869,12 @@ static void blitD3D12ToPreview(rt::Session& s,
              srvDesc.Texture2D.MipLevels = 1;
          }
  
@@ -653,7 +714,7 @@ index 0f26abf..7a14bdc 100644
          s.d3d12Device->CreateShaderResourceView(srcTex, &srvDesc, cpu);
  
          transition(srcTex, chain.imageStates12[idx], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-@@ -5777,6 +5890,7 @@ static void blitD3D12ToPreview(rt::Session& s,
+@@ -5777,6 +5902,7 @@ static void blitD3D12ToPreview(rt::Session& s,
          s.previewCmdList->RSSetViewports(1, &vp);
          s.previewCmdList->RSSetScissorRects(1, &scissor);
          s.previewCmdList->DrawInstanced(3, 1, 0, 0);
@@ -661,7 +722,7 @@ index 0f26abf..7a14bdc 100644
  
          // Back to the state the app released it in, so its own barriers still line up.
          transition(srcTex, chain.imageStates12[idx], chain.releaseState12);
-@@ -6713,6 +6827,7 @@ static void renderQuadLayer(rt::Session& s, const XrCompositionLayerQuad* quad)
+@@ -6713,6 +6839,7 @@ static void renderQuadLayer(rt::Session& s, const XrCompositionLayerQuad* quad)
              s.previewCmdList->RSSetViewports(1, &vp);
              s.previewCmdList->RSSetScissorRects(1, &scissor);
              s.previewCmdList->DrawInstanced(6, 1, 0, 0);
@@ -669,7 +730,7 @@ index 0f26abf..7a14bdc 100644
              slot->quadComposed = true;
          }
  
-@@ -7134,6 +7249,7 @@ static void consumeCompletedPreviewFrame(rt::Session& s) {
+@@ -7134,6 +7261,7 @@ static void consumeCompletedPreviewFrame(rt::Session& s) {
  
      for (UINT i = 0; i < rt::kPreviewFrames; ++i) {
          rt::PreviewFrame12& f = s.previewFrames[i];
@@ -677,7 +738,7 @@ index 0f26abf..7a14bdc 100644
          if (f.pending && f.fenceValue <= done && (int)i != newest) f.pending = false;
      }
  
-@@ -7141,7 +7257,7 @@ static void consumeCompletedPreviewFrame(rt::Session& s) {
+@@ -7141,7 +7269,7 @@ static void consumeCompletedPreviewFrame(rt::Session& s) {
      f.pending = false;
  
      // Every layer of the frame - eyes and quads alike - was composited into the render
@@ -686,7 +747,25 @@ index 0f26abf..7a14bdc 100644
      paintPreviewComposite(s, f);
  }
  
-@@ -7467,41 +7583,36 @@ static XrResult XRAPI_PTR xrEndFrame_runtime(XrSession, const XrFrameEndInfo* in
+@@ -7191,6 +7319,7 @@ static XrResult XRAPI_PTR xrEndFrame_runtime(XrSession, const XrFrameEndInfo* in
+     // Drain the requests that decide whether this frame has to reach the mirror, before
+     // deciding it. Every backend's screenshot path then just tests g_screenshotRequested.
+     if (mcp::g_commandsDue) mcp::CheckScreenshotRequest();
++    if (mcp::g_commandsDue) sim_video::check_command(rt::g_session.usesD3D12);
+ 
+     // Frame-burst capture: the optional pose step lands at this frame boundary,
+     // so the frame submitted right now (rendered with the OLD pose) is the
+@@ -7222,7 +7351,8 @@ static XrResult XRAPI_PTR xrEndFrame_runtime(XrSession, const XrFrameEndInfo* in
+     // hangs off it (see g_previewDueThisFrame). A pending screenshot or a running burst
+     // overrides the cap - both asked for a particular frame, not for the next one the rate
+     // happens to allow, and with the mirror off there would be no next one.
+-    g_previewDueThisFrame = ui::PreviewFrameDue() || mcp::g_screenshotRequested || mcp::g_burstActive;
++    const bool videoDue = sim_video::producer.due(GetTickCount64());
++    g_previewDueThisFrame = ui::PreviewFrameDue() || mcp::g_screenshotRequested || mcp::g_burstActive || videoDue;
+ 
+     // Order the app's Vulkan queue against the compositor's D3D12 queue. Skipped when the
+     // mirror is not due this frame: nothing reads the app's images then.
+@@ -7467,41 +7597,36 @@ static XrResult XRAPI_PTR xrEndFrame_runtime(XrSession, const XrFrameEndInfo* in
  }
  
  static XrResult XRAPI_PTR xrLocateViews_runtime(XrSession, const XrViewLocateInfo* li, XrViewState* vs, uint32_t cap, uint32_t* outCount, XrView* views) {
@@ -748,7 +827,7 @@ index 0f26abf..7a14bdc 100644
      rt::g_referenceSpaces[*space] = rt::RefSpace{ info->referenceSpaceType, info->poseInReferenceSpace };
      Logf("[SimXR] xrCreateReferenceSpace: type=%d space=%p", info->referenceSpaceType, *space);
      return XR_SUCCESS;
-@@ -7509,71 +7620,49 @@ static XrResult XRAPI_PTR xrCreateReferenceSpace_runtime(XrSession, const XrRefe
+@@ -7509,71 +7634,49 @@ static XrResult XRAPI_PTR xrCreateReferenceSpace_runtime(XrSession, const XrRefe
  
  static XrResult XRAPI_PTR xrDestroySpace_runtime(XrSpace space) {
      rt::g_referenceSpaces.erase(space);
@@ -857,7 +936,7 @@ index 0f26abf..7a14bdc 100644
          }
      }
      return XR_SUCCESS;
-@@ -7591,8 +7680,7 @@ static XrResult XRAPI_PTR xrEnumerateReferenceSpaces_runtime(XrSession, uint32_t
+@@ -7591,8 +7694,7 @@ static XrResult XRAPI_PTR xrEnumerateReferenceSpaces_runtime(XrSession, uint32_t
  
  static XrResult XRAPI_PTR xrCreateActionSpace_runtime(XrSession, const XrActionSpaceCreateInfo* info, XrSpace* space) {
      if (!info || !space) return XR_ERROR_VALIDATION_FAILURE;
@@ -867,7 +946,7 @@ index 0f26abf..7a14bdc 100644
  
      // Detect controller subaction paths and register the space
      int controllerType = 0;  // 0=none, 1=left, 2=right
-@@ -7618,9 +7706,8 @@ static XrResult XRAPI_PTR xrCreateActionSpace_runtime(XrSession, const XrActionS
+@@ -7618,9 +7720,8 @@ static XrResult XRAPI_PTR xrCreateActionSpace_runtime(XrSession, const XrActionS
          Log("[SimXR] xrCreateActionSpace: subactionPath is XR_NULL_PATH");
      }
  
@@ -1086,4 +1165,343 @@ new file mode 100644
 +        }
 +    }
 +    std::puts("OpenXR reference-space pose tests passed");
++}
+diff --git a/src/video_stream.h b/src/video_stream.h
+new file mode 100644
+--- /dev/null
++++ b/src/video_stream.h
+@@ -0,0 +1,148 @@
++#pragma once
++// Opt-in transport for the already composited preview. No encoder or waits in
++// the runtime: two bounded slots, a live consumer lease, and drop-on-backpressure.
++#ifndef NOMINMAX
++#define NOMINMAX
++#endif
++#include <windows.h>
++#include <algorithm>
++#include <cstdint>
++#include <cstring>
++#include <string>
++#include <vector>
++
++namespace sim_video {
++constexpr uint32_t magic = 0x57535631, version = 1;
++constexpr size_t max_pixels_bytes = 32 * 1024 * 1024;
++constexpr uint64_t heartbeat_timeout = 3000;
++enum Status : LONG { waiting, connected, stopped, invalid_frame, unsupported_layout, expired };
++struct alignas(64) Slot {
++    volatile LONG state; // 0 free, 1 writing, 2 ready, 3 reading
++    uint32_t width, height;
++    uint64_t frame, unix_ms, tick_ms;
++    float pose[6]; // yaw, pitch, roll (degrees), x, y, z (metres)
++    uint8_t pixels[max_pixels_bytes];
++};
++struct alignas(64) Shared {
++    uint32_t signature, protocol, runtime_pid, consumer_pid, fps;
++    uint64_t consumer_created, created_tick;
++    volatile LONG status, stop;
++    volatile LONG64 heartbeat;
++    Slot slots[2];
++};
++struct Frame {
++    uint32_t width{}, height{};
++    uint64_t frame{}, unix_ms{}, tick_ms{};
++    float pose[6]{};
++    std::vector<uint8_t> pixels;
++};
++inline LONG read_long(volatile LONG& n) { return InterlockedCompareExchange(&n, 0, 0); }
++inline uint64_t read_tick(volatile LONG64& n) { return static_cast<uint64_t>(InterlockedCompareExchange64(&n, 0, 0)); }
++inline uint64_t process_created(HANDLE process) {
++    FILETIME c{}, e{}, k{}, u{};
++    return GetProcessTimes(process, &c, &e, &k, &u) ? (uint64_t(c.dwHighDateTime) << 32) | c.dwLowDateTime : 0;
++}
++inline bool valid_token(const std::string& token) {
++    return token.size() == 32 && std::all_of(token.begin(), token.end(),
++        [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
++}
++inline std::wstring mapping_name(uint32_t pid, const std::string& token) {
++    if (!pid || !valid_token(token)) return {};
++    return L"Local\\WuWaSimVideo-" + std::to_wstring(pid) + L"-" + std::wstring(token.begin(), token.end());
++}
++inline bool dimensions(uint32_t width, uint32_t height, size_t stride) {
++    return width >= 2 && height >= 2 && width <= 8192 && height <= 8192 &&
++        stride >= size_t(width) * 4 && stride <= 8192 * 4 &&
++        size_t(width) * height * 4 <= max_pixels_bytes;
++}
++inline bool take_latest(Shared& shared, uint64_t after, Frame& out) {
++    // Claim before reading any metadata. Producers may replace a ready frame.
++    bool found = false;
++    for (auto& slot : shared.slots) {
++        if (InterlockedCompareExchange(&slot.state, 3, 2) != 2) continue;
++        try {
++            if (slot.frame > after && (!found || slot.frame > out.frame) &&
++                    dimensions(slot.width, slot.height, size_t(slot.width) * 4)) {
++                out.width = slot.width; out.height = slot.height;
++                out.frame = slot.frame; out.unix_ms = slot.unix_ms; out.tick_ms = slot.tick_ms;
++                std::copy(slot.pose, slot.pose + 6, out.pose);
++                out.pixels.assign(slot.pixels, slot.pixels + size_t(slot.width) * slot.height * 4);
++                found = true;
++            }
++        } catch (...) { InterlockedExchange(&slot.state, 0); throw; }
++        InterlockedExchange(&slot.state, 0);
++    }
++    return found;
++}
++class Producer {
++    HANDLE mapping_{}, consumer_{};
++    Shared* shared_{};
++    uint64_t deadline_{}, next_frame_{}, start_tick_{};
++    uint32_t fps_{};
++public:
++    Producer() = default;
++    Producer(const Producer&) = delete;
++    Producer& operator=(const Producer&) = delete;
++    ~Producer() { close(); }
++    void close(Status why = stopped) {
++        if (shared_) { InterlockedExchange(&shared_->status, why); UnmapViewOfFile(shared_); shared_ = nullptr; }
++        if (mapping_) { CloseHandle(mapping_); mapping_ = nullptr; }
++        if (consumer_) { CloseHandle(consumer_); consumer_ = nullptr; }
++    }
++    bool connect(uint32_t runtime_pid, uint32_t consumer_pid, const std::string& token,
++                 uint32_t fps, uint32_t seconds, uint64_t now) {
++        if (shared_ || runtime_pid != GetCurrentProcessId() || !consumer_pid || !valid_token(token) ||
++                (fps != 30 && fps != 45 && fps != 60) || seconds < 1 || seconds > 300) return false;
++        mapping_ = OpenFileMappingW(FILE_MAP_ALL_ACCESS, FALSE, mapping_name(runtime_pid, token).c_str());
++        if (!mapping_) return false;
++        shared_ = static_cast<Shared*>(MapViewOfFile(mapping_, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(Shared)));
++        if (!shared_) { close(); return false; }
++        if (shared_->signature != magic || shared_->protocol != version ||
++                shared_->runtime_pid != runtime_pid || shared_->consumer_pid != consumer_pid ||
++                shared_->fps != fps || shared_->created_tick > now || now - shared_->created_tick > 10000 ||
++                read_long(shared_->status) != waiting) {
++            UnmapViewOfFile(shared_); shared_ = nullptr; close(); return false;
++        }
++        consumer_ = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, consumer_pid);
++        if (!consumer_ || !shared_->consumer_created || process_created(consumer_) != shared_->consumer_created ||
++                WaitForSingleObject(consumer_, 0) != WAIT_TIMEOUT) { close(expired); return false; }
++        deadline_ = now + uint64_t(seconds) * 1000 + 5000; next_frame_ = start_tick_ = now; fps_ = fps;
++        InterlockedExchange(&shared_->status, connected);
++        return true;
++    }
++    bool due(uint64_t now) {
++        if (!shared_) return false;
++        if (read_long(shared_->stop)) { close(); return false; }
++        const auto beat = read_tick(shared_->heartbeat);
++        if (now > deadline_ || beat > now || now - beat > heartbeat_timeout ||
++                WaitForSingleObject(consumer_, 0) != WAIT_TIMEOUT) { close(expired); return false; }
++        return now >= next_frame_;
++    }
++    bool publish(const uint8_t* pixels, uint32_t width, uint32_t height, size_t stride,
++                 uint64_t frame, uint64_t unix_ms, uint64_t now, const float* pose, bool stereo) {
++        if (!due(now)) return false;
++        if (!stereo) { close(unsupported_layout); return false; }
++        if (!pixels || !pose || !frame || !dimensions(width, height, stride)) { close(invalid_frame); return false; }
++        for (size_t n = 0; n < 2; ++n) {
++            auto& slot = shared_->slots[(frame + n) % 2];
++            if (InterlockedCompareExchange(&slot.state, 1, 0) != 0 &&
++                    InterlockedCompareExchange(&slot.state, 1, 2) != 2) continue;
++            slot.width = width; slot.height = height; slot.frame = frame;
++            slot.unix_ms = unix_ms; slot.tick_ms = now; std::copy(pose, pose + 6, slot.pose);
++            for (uint32_t row = 0; row < height; ++row)
++                std::memcpy(slot.pixels + size_t(row) * width * 4, pixels + size_t(row) * stride, size_t(width) * 4);
++            InterlockedExchange(&slot.state, 2);
++            // Keep the original time phase, skipping missed slots. Starting a
++            // fresh rounded interval after every source frame drifts: 34 ms at
++            // a 90 Hz source waits four frames and delivers only 22.5 fps.
++            // No catch-up burst or duplicate frame is emitted after a stall.
++            // Timestamps are integer milliseconds, so phase boundaries round
++            // down too. Choose the first such boundary strictly after now.
++            const auto next_slot = ((now - start_tick_ + 1) * fps_ - 1) / 1000 + 1;
++            next_frame_ = start_tick_ + next_slot * 1000 / fps_;
++            return true;
++        }
++        return false;
++    }
++};
++}
+diff --git a/src/video_command.h b/src/video_command.h
+new file mode 100644
+--- /dev/null
++++ b/src/video_command.h
+@@ -0,0 +1,40 @@
++#pragma once
++#include "video_stream.h"
++#include "json.h"
++#include <cmath>
++#include <filesystem>
++#include <fstream>
++
++namespace sim_video {
++inline Producer producer;
++inline void check_command(bool supported) {
++    wchar_t local[32768]{};
++    const DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", local, 32768);
++    if (!n || n >= 32768) return;
++    const auto path = std::filesystem::path(local) / L"OpenXR-Simulator" /
++        (L"video_command-" + std::to_wstring(GetCurrentProcessId()) + L".json");
++    std::error_code ec;
++    if (!std::filesystem::exists(path, ec)) return;
++    const auto size = std::filesystem::file_size(path, ec);
++    if (ec || size > 2048) return;
++    std::ifstream input(path, std::ios::binary);
++    std::string text((std::istreambuf_iterator<char>(input)), {});
++    input.close();
++    if (text.size() != size) return;
++    const json::Object obj(text.c_str());
++    const auto integer = [&](const char* name, uint64_t maximum) -> uint64_t {
++        const double value = obj.number(name, -1.0);
++        return std::isfinite(value) && value >= 0 && value <= double(maximum) && std::floor(value) == value
++            ? uint64_t(value) : 0;
++    };
++    const auto pid = integer("runtime_pid", UINT32_MAX), now = GetTickCount64();
++    if (pid != GetCurrentProcessId()) return;
++    std::filesystem::remove(path, ec);
++    const auto expires = integer("expires_tick_ms", (uint64_t(1) << 53) - 1);
++    if (integer("version", 1) != 1 || expires < now || expires - now > 20000) return;
++    if (producer.connect(uint32_t(pid), uint32_t(integer("consumer_pid", UINT32_MAX)),
++            obj.string("token"), uint32_t(integer("fps", 60)),
++            uint32_t(integer("seconds", 300)), now) && !supported)
++        producer.close(unsupported_layout);
++}
++}
+diff --git a/tests/video_stream_tests.cpp b/tests/video_stream_tests.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/video_stream_tests.cpp
+@@ -0,0 +1,77 @@
++#include "video_stream.h"
++#include <iostream>
++#include <stdexcept>
++static void check(bool ok, const char* expression, int line) {
++    if (!ok) throw std::runtime_error(std::string("Line ") + std::to_string(line) + ": " + expression);
++}
++#define require(ok) check((ok), #ok, __LINE__)
++int main() {
++    try {
++    using namespace sim_video;
++    const auto pid = GetCurrentProcessId(); const auto now = GetTickCount64();
++    const std::string token = "0123456789abcdef0123456789abcdef";
++    require(!valid_token("../bad")); require(mapping_name(0, token).empty());
++    require(!dimensions(8192, 8192, 32768)); require(!dimensions(4, 4, 15));
++    HANDLE mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(Shared), mapping_name(pid, token).c_str());
++    require(mapping && GetLastError() != ERROR_ALREADY_EXISTS);
++    auto* s = static_cast<Shared*>(MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(Shared)));
++    require(s != nullptr);
++    s->signature = magic; s->protocol = version; s->runtime_pid = pid; s->consumer_pid = pid;
++    s->consumer_created = process_created(GetCurrentProcess()); s->created_tick = now; s->fps = 30;
++    InterlockedExchange64(&s->heartbeat, now);
++    Producer p;
++    require(!p.connect(pid + 1, pid, token, 30, 2, now));
++    require(!p.connect(pid, pid, token, 25, 2, now));
++    require(p.connect(pid, pid, token, 30, 2, now));
++    require(!p.connect(pid, pid, token, 30, 2, now));
++    uint8_t pixels[96]{};
++    for (int row = 0; row < 4; ++row) for (int col = 0; col < 16; ++col) pixels[row * 24 + col] = uint8_t(row * 16 + col);
++    const float pose[6]{1, 2, 3, 4, 5, 6}; Frame f;
++    require(p.publish(pixels, 4, 4, 24, 10, 1234, now, pose, true));
++    require(!p.publish(pixels, 4, 4, 24, 11, 1235, now + 1, pose, true));
++    require(take_latest(*s, 0, f) && f.frame == 10 && f.unix_ms == 1234 && f.pose[5] == 6);
++    require(f.pixels.size() == 64 && f.pixels[63] == 63);
++    require(!take_latest(*s, 10, f));
++    for (auto& slot : s->slots) InterlockedExchange(&slot.state, 3);
++    require(!p.publish(pixels, 4, 4, 24, 12, 1236, now + 40, pose, true));
++    for (auto& slot : s->slots) InterlockedExchange(&slot.state, 0);
++    require(p.publish(pixels, 4, 4, 24, 13, 1237, now + 80, pose, true));
++    require(!p.due(now + heartbeat_timeout + 1) && read_long(s->status) == expired);
++    InterlockedExchange(&s->status, waiting);
++    require(p.connect(pid, pid, token, 30, 2, now));
++    require(!p.publish(pixels, 4, 4, 24, 14, 1238, now, pose, false));
++    require(read_long(s->status) == unsupported_layout);
++    // Ten seconds at actual headset/source cadences. Synthetic clocks avoid
++    // timing-flaky sleeps while exercising the real shared-memory producer.
++    for (const uint32_t fps : {30, 45, 60}) {
++        for (const uint32_t source_hz : {30, 45, 60, 72, 80, 90, 120}) {
++            p.close(); s->fps = fps; s->created_tick = now;
++            InterlockedExchange(&s->status, waiting); InterlockedExchange64(&s->heartbeat, now);
++            for (auto& slot : s->slots) InterlockedExchange(&slot.state, 0);
++            require(p.connect(pid, pid, token, fps, 10, now));
++            uint32_t frames = 0;
++            for (uint32_t n = 0; n < source_hz * 10; ++n) {
++                const auto at = now + uint64_t(n) * 1000 / source_hz;
++                InterlockedExchange64(&s->heartbeat, at);
++                if (p.publish(pixels, 4, 4, 24, n + 1, at + 1000, at, pose, true)) {
++                    ++frames; Frame row;
++                    require(take_latest(*s, 0, row) && row.frame == n + 1 && row.tick_ms == at);
++                    require(!p.publish(pixels, 4, 4, 24, n + 1, at + 1000, at, pose, true));
++                }
++            }
++            const auto expected = (std::min)(fps, source_hz) * 10;
++            require(frames >= expected - 1 && frames <= expected + 1);
++        }
++    }
++    p.close(); s->fps=30; s->created_tick=now;
++    InterlockedExchange(&s->status, waiting); InterlockedExchange64(&s->heartbeat, now);
++    require(p.connect(pid,pid,token,30,10,now));
++    require(p.publish(pixels,4,4,24,1,1234,now,pose,true));
++    InterlockedExchange64(&s->heartbeat,now+2500);
++    require(p.publish(pixels,4,4,24,2,3734,now+2500,pose,true));
++    require(!p.publish(pixels,4,4,24,3,3735,now+2501,pose,true));
++    p.close();
++    UnmapViewOfFile(s); CloseHandle(mapping);
++    std::cout << "PASS: video transport, backpressure, leases, 21 source/recording cadences and no catch-up bursts\n";
++    } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
++}
+diff --git a/tests/video_command_tests.cpp b/tests/video_command_tests.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/video_command_tests.cpp
+@@ -0,0 +1,54 @@
++#include "video_command.h"
++#include <iostream>
++#include <stdexcept>
++static void check(bool ok, int line) { if (!ok) throw std::runtime_error("Command check failed at " + std::to_string(line)); }
++#define require(ok) check((ok), __LINE__)
++int main(int argc, char** argv) {
++    try {
++        using namespace sim_video;
++        require(argc==2);
++        const auto pid=GetCurrentProcessId();
++        const auto root=std::filesystem::path(argv[1]) / ("video-command-" + std::to_string(pid));
++        require(std::filesystem::create_directory(root));
++        const auto folder=root/"OpenXR-Simulator";std::filesystem::create_directory(folder);
++        require(SetEnvironmentVariableW(L"LOCALAPPDATA",root.wstring().c_str())!=0);
++        const auto path=folder/("video_command-"+std::to_string(pid)+".json");
++        const std::string token="0123456789abcdef0123456789abcdef";
++        HANDLE mapping=CreateFileMappingW(INVALID_HANDLE_VALUE,nullptr,PAGE_READWRITE,0,sizeof(Shared),mapping_name(pid,token).c_str());
++        require(mapping && GetLastError()!=ERROR_ALREADY_EXISTS);
++        auto* s=static_cast<Shared*>(MapViewOfFile(mapping,FILE_MAP_ALL_ACCESS,0,0,sizeof(Shared)));
++        require(s);
++        s->signature=magic;s->protocol=version;s->runtime_pid=s->consumer_pid=pid;s->fps=30;
++        s->consumer_created=process_created(GetCurrentProcess());s->created_tick=GetTickCount64();
++        InterlockedExchange64(&s->heartbeat,GetTickCount64());
++        auto write=[&](uint32_t target, int protocol, uint64_t expires) {
++            std::ofstream f(path);
++            f << "{\"version\":" << protocol << ",\"runtime_pid\":" << target
++              << ",\"consumer_pid\":" << pid << ",\"token\":\"" << token
++              << "\",\"fps\":30,\"seconds\":2,\"expires_tick_ms\":" << expires << "}";
++            require(f.good());
++        };
++        write(pid+1,1,GetTickCount64()+10000);check_command(true);
++        require(std::filesystem::exists(path) && read_long(s->status)==waiting);
++        std::filesystem::remove(path); // Test-owned wrong-PID input is deliberately left untouched by the runtime.
++        for (int protocol : {0,2}) {
++            write(pid,protocol,GetTickCount64()+10000);check_command(true);
++            require(!std::filesystem::exists(path) && read_long(s->status)==waiting);
++        }
++        write(pid,1,GetTickCount64()-1);check_command(true);
++        require(!std::filesystem::exists(path) && read_long(s->status)==waiting);
++        write(pid,1,GetTickCount64()+10000);check_command(true);
++        require(!std::filesystem::exists(path) && read_long(s->status)==connected);
++        write(pid,1,GetTickCount64()+10000);check_command(true);
++        require(!std::filesystem::exists(path) && read_long(s->status)==connected); // Second request cannot steal the active lease.
++        uint8_t pixels[64]{};float pose[6]{};
++        require(producer.publish(pixels,4,4,16,1,1234,GetTickCount64(),pose,true));
++        Frame f;require(take_latest(*s,0,f) && f.unix_ms==1234);
++        producer.close();InterlockedExchange(&s->status,waiting);
++        write(pid,1,GetTickCount64()+10000);check_command(false);
++        require(read_long(s->status)==unsupported_layout);
++        producer.close();UnmapViewOfFile(s);CloseHandle(mapping);
++        std::filesystem::remove(folder);std::filesystem::remove(root);
++        std::cout << "PASS: process-scoped simulator command, expiry, protocol, active lease and unsupported layout\n";
++    } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 +}

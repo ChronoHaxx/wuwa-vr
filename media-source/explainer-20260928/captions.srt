@@ -1,0 +1,56 @@
+1
+00:00:00,300 --> 00:00:04,000
+WuWa VR: an unofficial, free fan mod that plays Wuthering Waves on a PC VR headset.
+
+2
+00:00:04,000 --> 00:00:08,000
+It turns the game's single flat camera into two eye views with head tracking.
+
+3
+00:00:08,000 --> 00:00:12,000
+The game renders a normal Unreal Engine camera, world and UI.
+
+4
+00:00:12,000 --> 00:00:16,000
+UEVR plus our native hooks redirect the scene and the real game UI. Lua scripts handle camera, body and controls.
+
+5
+00:00:16,000 --> 00:00:20,000
+A VR runtime (OpenXR) receives two eyes: the same moment, from slightly different viewpoints.
+
+6
+00:00:20,000 --> 00:00:24,000
+19–26 Sep: real game UI in VR, first person, head, body and shadow improvements.
+
+7
+00:00:24,000 --> 00:00:28,000
+27 Sep: turning Native Stereo Fix on repaired character materials (owner-reported).
+
+8
+00:00:28,000 --> 00:00:32,000
+Real progress on specific screens and cases, not a finished stereo renderer.
+
+9
+00:00:32,000 --> 00:00:36,000
+Still open: one tree animates in both eyes up close…
+
+10
+00:00:36,000 --> 00:00:41,000
+…but freezes in the left eye far away, even with zero eye separation and equal projection scale.
+
+11
+00:00:41,000 --> 00:00:45,000
+Also open: ultimate transitions (candidate not yet accepted), reflection submenus, some shadows.
+
+12
+00:00:45,000 --> 00:00:50,000
+Next: name the actual failing asset, then compare what each eye's draw really receives.
+
+13
+00:00:50,000 --> 00:00:55,000
+Then make the smallest proven fix, and test everything together in one grouped pass.
+
+14
+00:00:55,000 --> 00:01:00,000
+Free and experimental. Source and beginner guide: github.com/ChronoHaxx/wuwa-vr
+

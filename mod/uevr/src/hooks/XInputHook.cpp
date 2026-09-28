@@ -16,6 +16,7 @@
 #include "XInputHook.hpp"
 #include "mods/VR.hpp"
 #include "utility/WuWaInputTrace.hpp"
+#include "utility/WuWaInputSequenceBridge.hpp"
 
 namespace {
 void trace_xinput(uint32_t api, uint32_t index, uint32_t raw_result, const XINPUT_STATE& raw,
@@ -145,6 +146,12 @@ uint32_t stage_bit(std::string_view name) {
     if (name == "PluginLoader") return 8;
     if (name == "LuaLoader") return 16;
     return 32;
+}
+
+wuwa_input_sequence_bridge::RuntimeGates sequence_gates(bool passthrough,int slot_filter) {
+    const auto window=g_framework->get_window();
+    return {window && GetForegroundWindow()==window,g_framework->is_drawing_ui(),
+        passthrough,VR::get()->is_using_controllers(),slot_filter};
 }
 
 // Observe boundaries of the existing mod chain; never restore/override its
@@ -306,18 +313,25 @@ uint32_t XInputHook::get_state_hook_1_4(uint32_t user_index, XINPUT_STATE* state
     }
 
     auto ret = g_hook->m_xinput_1_4_get_state_hook.call<uint32_t>(user_index, state);
-    const auto trace = wuwa_test::observing_input();
+    const bool wuwa=wuwa_test::is_wuwa();
+    const auto trace = wuwa_test::observing_input() || (wuwa && wuwa_input_sequence_bridge::active.load());
     const auto raw_result = ret;
-    const XINPUT_STATE raw = trace && ret == ERROR_SUCCESS && state != nullptr ? *state : XINPUT_STATE{};
+    const XINPUT_STATE raw = ret == ERROR_SUCCESS && state != nullptr ? *state : XINPUT_STATE{};
 
     uint32_t changed_by{};
     const auto passthrough = VR::get()->physical_gamepad_passthrough();
     const auto slot_filter = VR::get()->gamepad_slot_filter();
-    if (wuwa_test::filter_input_slot(slot_filter, user_index)) {
+    const bool filtered=wuwa_test::filter_input_slot(slot_filter,user_index);
+    if (filtered) {
         if (state != nullptr) *state = {};
         ret = ERROR_DEVICE_NOT_CONNECTED;
         changed_by = 64; // Explicit device isolation, not lost button mapping.
-    } else if (!passthrough) run_input_mods(ret, user_index, state, trace, changed_by);
+    }
+    const auto feed=wuwa?wuwa_input_sequence_bridge::before_mods(14,user_index,raw_result,raw,
+        ret,state,caller,sequence_gates(passthrough,slot_filter)):wuwa_input_sequence_bridge::Poll{};
+    if(feed.generated) changed_by|=128;
+    if(!filtered && !passthrough) run_input_mods(ret,user_index,state,trace,changed_by);
+    if(wuwa) wuwa_input_sequence_bridge::after_mods(feed,ret,state);
 
     if (trace) {
         trace_xinput(14, user_index, raw_result, raw, ret, state, changed_by, caller, passthrough, slot_filter);
@@ -350,18 +364,25 @@ uint32_t XInputHook::get_state_hook_1_3(uint32_t user_index, XINPUT_STATE* state
     }
 
     auto ret = g_hook->m_xinput_1_3_get_state_hook.call<uint32_t>(user_index, state);
-    const auto trace = wuwa_test::observing_input();
+    const bool wuwa=wuwa_test::is_wuwa();
+    const auto trace = wuwa_test::observing_input() || (wuwa && wuwa_input_sequence_bridge::active.load());
     const auto raw_result = ret;
-    const XINPUT_STATE raw = trace && ret == ERROR_SUCCESS && state != nullptr ? *state : XINPUT_STATE{};
+    const XINPUT_STATE raw = ret == ERROR_SUCCESS && state != nullptr ? *state : XINPUT_STATE{};
 
     uint32_t changed_by{};
     const auto passthrough = VR::get()->physical_gamepad_passthrough();
     const auto slot_filter = VR::get()->gamepad_slot_filter();
-    if (wuwa_test::filter_input_slot(slot_filter, user_index)) {
+    const bool filtered=wuwa_test::filter_input_slot(slot_filter,user_index);
+    if (filtered) {
         if (state != nullptr) *state = {};
         ret = ERROR_DEVICE_NOT_CONNECTED;
         changed_by = 64;
-    } else if (!passthrough) run_input_mods(ret, user_index, state, trace, changed_by);
+    }
+    const auto feed=wuwa?wuwa_input_sequence_bridge::before_mods(13,user_index,raw_result,raw,
+        ret,state,caller,sequence_gates(passthrough,slot_filter)):wuwa_input_sequence_bridge::Poll{};
+    if(feed.generated) changed_by|=128;
+    if(!filtered && !passthrough) run_input_mods(ret,user_index,state,trace,changed_by);
+    if(wuwa) wuwa_input_sequence_bridge::after_mods(feed,ret,state);
 
     if (trace) {
         trace_xinput(13, user_index, raw_result, raw, ret, state, changed_by, caller, passthrough, slot_filter);

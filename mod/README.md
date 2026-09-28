@@ -1,22 +1,14 @@
-# Mod source — 26 Sep 2026 22:42 BST
+# Mod source — 28 Sep 2026 16:28 BST experimental checkpoint
 
-Matches `stereo-menus-20260926-r3` in the 23:02 beta.
+Matches `camera-trial-controls-20260928-r2` in the new experimental release.
+`uevr/` and `uesdk/` are exact changed-file overlays reconstructed from the
+pinned upstreams plus the frozen build patches. Follow [BUILD.md](BUILD.md).
+`lua/` contains the matching active scripts; localization and component notices remain.
 
-- `uevr/`: browsable copies of modified/new native files.
-- `uesdk/`: the two modified SDK files.
-- `source-changes/`: complete Git patches against pinned upstreams.
-- `lua/`: matching camera/controller scripts.
-- `localization/`: editable controls/shortcut-page translations.
-- `notices/`: upstream notices, including font licenses.
-- `../launcher/dev/`: the packaged launcher and SteamVR recorder source.
+Start with [the beginner code map, timeline and next experiments](../docs/UNDERSTANDING-WUWA-VR.md).
+The older 26 Sep public beta remains available at its release tag. Local checkpoint
+IDs are provenance; use the public tag for this exported source.
 
-`uevr/` is an overlay, not a standalone fork. Follow [BUILD.md](BUILD.md) to
-reconstruct a full checkout. The private checkpoint SHA in `checkpoint.json`
-records provenance; the public release tag identifies the exported files.
-
-Still open: doubled head-following reflections, eye-dependent materials
-(Lynae/Mornye/Iuno) and some NPC labels/bubbles. A recent simulator frame shows
-an NPC name in both eyes; that is not a complete headset acceptance pass.
-
-Native changes are not covered by the website's MIT grant. Upstream notices
-remain applicable. Credit the authors listed in the root CREDITS.md.
+Foliage/prop animation, lighting and ultimate desync remain open. Reflection
+submenus are deferred. Trigger/inventory tooling still requires live acceptance.
+Native changes retain upstream license terms; the combined mod is not blanket MIT.

@@ -296,6 +296,7 @@ VRRuntime::Error OpenXR::update_poses(bool from_view_extensions, uint32_t frame_
     }
 
     pipeline_state.stage_views = this->stage_views;
+    pipeline_state.pose_time = display_time;
     //this->frame_state_queue[frame_count % this->frame_state_queue.size()] = this->frame_state;
     
     if (should_enqueue) {
@@ -711,17 +712,21 @@ OpenXR::PipelineState OpenXR::get_submit_state() {
         last_submit_state.view_space_location = this->view_space_location;
         last_submit_state.frame_state = this->frame_state;
         last_submit_state.frame_count = this->internal_frame_count;
+        // This fallback may mix current and queued views. Do not report the
+        // previous submission's prediction time as if it described these poses.
+        last_submit_state.pose_time = 0;
     }
 
     if (wuwa_test::is_wuwa()) {
         SPDLOG_INFO_EVERY_N_SEC(2,
-            "[WuWaFrame] submit render_tag={} render_frame={} slot={} stored_frame={} previous={} game_frame={} display_time={} current_time={} native_fix={} double_advance={} timing_candidate={}",
+            "[WuWaFrame] submit render_tag={} render_frame={} slot={} stored_frame={} previous={} game_frame={} display_time={} current_time={} native_fix={} double_advance={} timing_candidate={} pose_time={} display_period={}",
             had_render_frame_count, this->internal_render_frame_count,
             this->internal_render_frame_count % QUEUE_SIZE, last_submit_state.frame_count,
             last_submit_state.prev_frame_count, this->internal_frame_count,
             last_submit_state.frame_state.predictedDisplayTime, this->frame_state.predictedDisplayTime,
             VR::get()->is_native_stereo_fix_enabled(), this->native_stereo_double_advance.load(),
-            VR::get()->is_wuwa_native_frame_timing_enabled());
+            VR::get()->is_wuwa_native_frame_timing_enabled(), last_submit_state.pose_time,
+            last_submit_state.frame_state.predictedDisplayPeriod);
     }
 
     this->has_render_frame_count = false;

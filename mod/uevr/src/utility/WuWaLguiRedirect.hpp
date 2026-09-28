@@ -10,6 +10,7 @@
 #include "WuWaWorldLabelStereo.hpp"
 #include "WuWaMenuSignals.hpp"
 #include "WuWaMotionTrace.hpp"
+#include "Logging.hpp"
 #include <cmath>
 #include <intrin.h>
 
@@ -68,6 +69,7 @@ struct State {
         registered{}, redirected{}, fitted{}, capture_suppressed{}, capture_pending{}, invalid{}, callback_errors{};
     std::atomic<uint64_t> menu_candidates{}, menu_redirected{}, menu_fitted{};
     std::atomic<uint64_t> stage3_calls{}, stage3_redirected{}, stage3_fitted{}, stage3_empty{}, stage3_samples{};
+    std::atomic<uint64_t> stage3_capture_suppressed{}, stage3_capture_pending{};
     struct MenuObservation {
         RejectedDescription target{};
         uint8_t depth{}, constrained{};
@@ -301,9 +303,10 @@ inline bool writable(uintptr_t address, size_t size) noexcept {
     return true;
 }
 
-struct SetupRoute { uintptr_t color{}; bool suppress{}; bool menu{}; };
-struct SetupContext { uintptr_t graph{}; bool menu{}, stage3{}; };
+struct SetupRoute { uintptr_t color{}; bool suppress{}; bool menu{}; MenuTargets targets{}; };
+struct SetupContext { uintptr_t graph{}; bool menu{}, stage3{}; MenuTargets targets{}; };
 inline thread_local SetupContext active_setup{};
+inline thread_local MenuFitReceipt menu_fit_receipt{};
 struct ScopedSetupContext {
     SetupContext previous{active_setup};
     explicit ScopedSetupContext(SetupContext value) { active_setup = value; }
@@ -438,8 +441,9 @@ inline void setup_callback(uintptr_t renderer, uintptr_t builder, uintptr_t colo
     if (!route.suppress) state().setup.call<void>(renderer, builder, route.color, depth, view, arg6);
 }
 
-// Stage 3 is a separate screen-canvas route. Observe descriptors even with
-// extraction off. Never borrow stage 2's game/capture equality or suppression.
+// Stage 3 is a separate screen-canvas route. Its NSF main/capture identities
+// were observed on September 27. It has its own successful-draw receipt;
+// stage 2's last_fitted_ui is not sufficient to suppress a menu copy.
 inline SetupRoute route_menu_setup(uintptr_t builder, uintptr_t color, uintptr_t depth, uintptr_t view) noexcept {
     auto& s = state();
     CallbackGuard guard{s};
@@ -452,6 +456,8 @@ inline SetupRoute route_menu_setup(uintptr_t builder, uintptr_t color, uintptr_t
         GraphStatus status{};
         graph_resource(color, source, &status, &vtable);
         const auto description = read_rejected(color, vtable, status);
+        if (source == target.game || !target.redirect_enabled || !target.menu_redirect_enabled)
+            menu_fit_receipt.reset();
         int32_t early{}, dispatch{};
         uint8_t depth_flag{}, constrain_flag{};
         float aspect{};
@@ -480,19 +486,32 @@ inline SetupRoute route_menu_setup(uintptr_t builder, uintptr_t color, uintptr_t
             }
         }
         if (!populated) { ++s.stage3_empty; return unchanged; }
-        if (!target.redirect_enabled || !target.menu_redirect_enabled || target.native_stereo_fix ||
-            depth_flag || !std::isfinite(aspect) || (constrain_flag && aspect > 0.0f)) return unchanged;
-        std::array<int32_t, 2> ui_size{}, game_size{};
-        // The live Esc trace identifies this exact current game resource. Do not
-        // redirect capture/UI aliases or borrow stage 2's transient Tonemap rule.
+        if (depth_flag || !std::isfinite(aspect) || (constrain_flag && aspect > 0.0f)) return unchanged;
+        std::array<int32_t, 2> ui_size{}, game_size{}, capture_size{};
         if (!target.ui || !target.game || !extent(target.ui, ui_size) || !extent(target.game, game_size) ||
-            !source || source != target.game || source == target.ui || source == target.capture ||
-            !is_stage3_view_family_target(description, game_size, target.native_stereo_fix)) return unchanged;
+            !source) return unchanged;
+        if (target.capture && source == target.capture) extent(target.capture, capture_size);
+        const MenuTargets targets{target.ui, target.game, target.capture};
+        const auto route = stage3_route(description, targets, source, game_size, capture_size, target.native_stereo_fix);
+        // Menu detection is also used by camera suspension and hidden-UI hints.
+        // It must not disappear merely because extraction is switched off.
+        if (route != MenuRoute::unchanged)
+            wuwa_menu::screen_overlay_at.store(GetTickCount64(),std::memory_order_relaxed);
+        if (!target.redirect_enabled || !target.menu_redirect_enabled) return unchanged;
+        if (route == MenuRoute::capture && s.mode == Mode::redirect) {
+            if (!menu_fit_receipt.consume(targets, GetTickCount64())) {
+                ++s.stage3_capture_pending;
+                return unchanged;
+            }
+            ++s.stage3_capture_suppressed;
+            return {color, true, true};
+        }
+        if (route != MenuRoute::main) return unchanged;
         const auto graph = register_ui_target(s, target, builder, ui_size);
         if (graph && s.mode == Mode::redirect) {
             ++s.stage3_redirected;
             wuwa_menu::screen_overlay_at.store(GetTickCount64(),std::memory_order_relaxed);
-            return {graph, false, true};
+            return {graph, false, true, targets};
         }
     } catch (...) { ++s.callback_errors; }
     return unchanged;
@@ -503,8 +522,9 @@ inline SetupRoute route_menu_setup(uintptr_t builder, uintptr_t color, uintptr_t
 inline void menu_setup_callback(uintptr_t renderer, uintptr_t builder, uintptr_t color,
         uintptr_t depth, uintptr_t view, uint32_t arg6) {
     const auto route = route_menu_setup(builder, color, depth, view);
-    ScopedSetupContext scope{{route.color != color ? route.color : 0, route.menu, true}};
-    state().menu_setup.call<void>(renderer, builder, route.color, depth, view, arg6);
+    ScopedSetupContext scope{{route.color != color ? route.color : 0, route.menu, true,
+        route.targets}};
+    if (!route.suppress) state().menu_setup.call<void>(renderer, builder, route.color, depth, view, arg6);
 }
 
 inline void fit_pass(safetyhook::Context& context, bool stage3) noexcept {
@@ -532,6 +552,8 @@ inline void fit_pass(safetyhook::Context& context, bool stage3) noexcept {
         const std::array<int32_t, 4> fitted{0, 0, ui_size[0], ui_size[1]};
         if (checked::guarded_copy(reinterpret_cast<void*>(capture + 0x14), fitted.data(), sizeof(fitted))) {
             if (stage3) {
+                if (active_setup.targets == MenuTargets{target.ui, target.game, target.capture})
+                    menu_fit_receipt.fitted(active_setup.targets, GetTickCount64());
                 if (s.stage3_fitted.fetch_add(1) == 0) {
                     spdlog::info("[WuWaLguiRedirect] stage3_fit original={},{},{},{} ui={}x{}",
                         original[0], original[1], original[2], original[3], ui_size[0], ui_size[1]);
@@ -670,6 +692,12 @@ inline void observe_stage0(safetyhook::Context& context,bool dispatch) noexcept 
     CallbackGuard guard{s};
     if (!s.active.load(std::memory_order_acquire)) return;
     try {
+        std::string recording_id;
+        {
+            std::unique_lock recording_lock{wuwa_motion::mutex,std::try_to_lock};
+            if (!recording_lock.owns_lock() || !wuwa_motion::active()) return;
+            recording_id=wuwa_motion::id;
+        }
         uintptr_t address{};
         if (dispatch) address=context.rsi;
         else if (!checked::read_field(context.rsp,0x28,address)) return;
@@ -700,7 +728,7 @@ inline void observe_stage0(safetyhook::Context& context,bool dispatch) noexcept 
             if (checked::read_field(context.rbp,0x410,matrices)) sample["uniform_prefix_64_floats"]=matrices;
             if (checked::read_field(context.rbp,0x830,depth_uv)) sample["depth_scale_bias"]=depth_uv;
         }
-        wuwa_motion::append_render_stage0(std::move(sample));
+        wuwa_motion::append_render_stage0(std::move(sample),recording_id);
     } catch (...) { ++s.callback_errors; }
 }
 inline void stage0_construct_callback(safetyhook::Context& context) noexcept { observe_stage0(context,false); }
@@ -860,8 +888,9 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                 s.world_disabled_skips.load(), s.world_mode_skips.load());
             spdlog::info("[WuWaLguiRedirect] menu_test enabled={} native_fix={} candidates={} redirected={} fitted={}",
                 target.menu_redirect_enabled, target.native_stereo_fix, s.menu_candidates.load(), s.menu_redirected.load(), s.menu_fitted.load());
-            spdlog::info("[WuWaLguiRedirect] stage3 ready={} calls={} empty={} redirected={} fitted={}",
-                s.menu_ready.load(), s.stage3_calls.load(), s.stage3_empty.load(), s.stage3_redirected.load(), s.stage3_fitted.load());
+            spdlog::info("[WuWaLguiRedirect] stage3 ready={} calls={} empty={} redirected={} fitted={} capture_suppressed={} capture_pending={}",
+                s.menu_ready.load(), s.stage3_calls.load(), s.stage3_empty.load(), s.stage3_redirected.load(), s.stage3_fitted.load(),
+                s.stage3_capture_suppressed.load(), s.stage3_capture_pending.load());
             if (s.invalid.load() != 0) {
                 spdlog::info("[WuWaLguiRedirect] rejected graph={} view={} wrap={} release={} registration={} pass_storage={} pass_rect={} pass_write={}",
                     s.invalid_graph.load(), s.invalid_view.load(), s.invalid_wrap.load(), s.invalid_release.load(),

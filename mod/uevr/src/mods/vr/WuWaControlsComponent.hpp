@@ -9,6 +9,9 @@
 #include "utility/WuWaMotionTrace.hpp"
 #include "utility/WuWaControlRecovery.hpp"
 #include "utility/WuWaPrivacy.hpp"
+#include "utility/WuWaVideoBridge.hpp"
+#include "utility/WuWaMenuSignals.hpp"
+#include "utility/WuWaPosePair.hpp"
 
 namespace vrmod {
 
@@ -24,10 +27,14 @@ public:
     void on_draw_language();
     void on_draw_recovery();
     void on_draw_shortcuts();
+    void on_draw_recording();
     void on_draw_experiments();
     void on_frame() override;
     void receive(std::string_view data);
     void record_rendered_view(int32_t index, const Rotator<float>* rotation, const Vector3f* position, bool doubles);
+    uint64_t pose_recording_session(std::string* recording_id = nullptr) noexcept;
+    static wuwa_pose_pair::Pose sample_recorded_pose(const Rotator<float>* rotation, const Vector3f* position, bool doubles) noexcept;
+    void record_pose_pair(const wuwa_pose_pair::Pair& pair) noexcept;
     nlohmann::json diagnostic_status();
     std::array<wuwa_privacy::Rect, 2> privacy_rectangles(int32_t width, int32_t height) const;
     bool floor_visible() const;
@@ -66,6 +73,18 @@ private:
         void config_save(utility::Config&) override {}
     } m_recording;
 
+    struct NativeMenuValue : ModToggle {
+        NativeMenuValue() : ModToggle{"WuWaControls_NativeMenu", false} {}
+        std::string get() const override {
+            // Only render observations here. Feeding the Lua cursor report
+            // back into this getter would keep a closed menu latched on.
+            return wuwa_menu::detected(GetTickCount64(), false) ? "true" : "false";
+        }
+        void set(const std::string&) override {}
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    } m_native_menu;
+
     // Adjustment is a temporary input mode, never restored on the next launch.
     struct AdjustValue : ModToggle {
         AdjustValue() : ModToggle{"WuWaControls_AdjustMode", false} {}
@@ -75,6 +94,10 @@ private:
 
     // Outside control recovery: resetting camera/input does not reset language.
     const ModString::Ptr m_language{ModString::create("WuWaLocale", "en")};
+    const ModCombo::Ptr m_video_fps{ModCombo::create("WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}, 0)};
+    const ModCombo::Ptr m_video_width{ModCombo::create("WuWaRecording_Width", {"720", "1024", "1280"}, 1)};
+    const ModToggle::Ptr m_video_telemetry{ModToggle::create("WuWaRecording_Telemetry", true)};
+    wuwa_video::Client m_video;
     const ModToggle::Ptr m_enabled{ModToggle::create("WuWaControls_Enabled", true)};
     const ModToggle::Ptr m_keep_camera{ModToggle::create("WuWaControls_KeepCameraOnFocusLoss", true)};
     const ModToggle::Ptr m_recenter_position{ModToggle::create("WuWaControls_RecenterPosition", true)};
@@ -153,6 +176,11 @@ private:
         uint64_t clock_ms{};
     };
     std::array<RecordedView,3> m_recorded_views{};
+    std::string m_pose_recording_id;
+    uint64_t m_pose_recording_session{};
+    wuwa_pose_pair::Pair m_recorded_pose_pair{};
+    uint64_t m_next_pose_constructor_emit_ms{};
+    std::atomic<uint64_t> m_pose_capture_lock_misses{};
     std::string m_recovery_status;
     wuwa_controls::Settings control_settings() const;
     void apply_control_settings(const wuwa_controls::Settings& settings);

@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#17191c">
+<meta name="wuwa-token" content="__TOKEN__">
 <title>WuWa VR Launcher</title>
 <link rel="icon" href="/guide/media/mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/guide/style.css">
 <script src="/guide/config.js" defer></script>
 <script src="/guide/app.js" defer></script>
+<script src="/launcher-language.js" defer></script>
 <style>
 .status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-block:20px}
 .status-item{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:12px 16px}
@@ -35,11 +37,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="header wrap"><span class="wordmark">WuWa VR Launcher</span>
-<nav aria-label="Guide"><a href="/guide/guide.html" target="_blank" rel="noopener">Player guide</a><a href="/guide/guide.html#controls" target="_blank" rel="noopener">Controls</a><a href="/guide/guide.html#recovery" target="_blank" rel="noopener">Problems</a><a href="/guide/risk.html" target="_blank" rel="noopener">Account risk</a></nav></header>
+<nav aria-label="Guide"><a href="/guide/package.html" target="_blank" rel="noopener">Player guide</a><a href="/guide/guide.html#controls" target="_blank" rel="noopener">Controls</a><a href="/guide/guide.html#recovery" target="_blank" rel="noopener">Problems</a><a href="/guide/risk.html" target="_blank" rel="noopener">Account risk</a></nav></header>
 <main class="wrap" id="main">
-<noscript><p class="notice risk">This launcher page needs JavaScript to apply builds. The <a href="/guide/guide.html">player guide</a> works without it.</p></noscript>
+<noscript><p class="notice risk">This launcher page needs JavaScript to apply builds. The <a href="/guide/package.html">player guide</a> works without it.</p></noscript>
 <p id="stopped" class="notice" hidden tabindex="-1">The launcher has stopped. You can close this tab. Open <strong>WuWa VR Launcher.exe</strong> again when you need it.</p>
 <h1>Play Wuthering Waves in VR</h1>
+<div class="actions"><label for="launcherLanguage">Language</label><select id="launcherLanguage" disabled><option value="en">English</option></select><a id="launcherSetup" href="/launcher-setup/en" target="_blank" rel="noopener">Setup instructions</a></div>
+<p id="launcherLanguageStatus" class="small" data-no-translate></p>
+<details><summary>Setup instructions</summary><p data-launcher-guide="extract"></p><p data-launcher-guide="controls"></p></details>
 <p class="intro">Unofficial fan project built on praydog's UEVR. This page runs only on your PC. It changes your UEVR profile and starts the injector; it never changes game files.</p>
 <p id="packageNote" class="small"></p>
 <p id="pathWarning" class="notice risk" hidden>This folder's path contains non-English characters. That has not been tested with the injector. If the game starts without VR, move the whole WuWa VR folder to a simple path such as <code>C:\Games\WuWa VR</code>.</p>
@@ -52,13 +57,14 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <div class="status-item"><span>Build in your UEVR profile</span><strong id="buildState">Checking…</strong></div>
 </div>
 <p id="xrHelp" class="small" hidden></p>
-<div class="actions"><button type="button" id="useHeadset">Use headset</button><button type="button" id="useSimulator">Use simulator</button></div>
-<p class="small">Switch with the game and injector closed. This changes OpenXR for all PC apps and asks for Windows permission. It applies on the next launch. Use headset restores the runtime saved before enabling the simulator.</p>
+<div class="actions"><button type="button" id="useHeadset">Use headset</button><button type="button" id="useSimulator">Use this package's simulator</button></div>
+<p id="simulatorCopy" class="small" hidden>Windows is registered to a simulator from another package. Opening this launcher does not update that runtime. When the game and injector are closed, choose Use this package's simulator to select its recording update.</p>
+<p class="small" data-launcher-guide="runtime">Switch with the game and injector closed. This changes OpenXR for all PC apps and asks for Windows permission. It applies on the next launch. Use headset restores the runtime saved before enabling the simulator.</p>
 </section>
 
 <section aria-labelledby="risk-heading">
 <h2 id="risk-heading">1. Account risk</h2>
-<div class="notice risk"><p><strong>Use at your own risk.</strong> This injects unofficial code into the game. Anti-cheat may detect it; account restrictions or a permanent ban are possible, including for cosmetic use. It is not approved by Kuro Games and nobody can guarantee account safety. <a href="/guide/risk.html" target="_blank" rel="noopener">Read the full notice</a>.</p></div>
+<div class="notice risk"><p data-launcher-guide="risk"><strong>Use at your own risk.</strong> This injects unofficial code into the game. Anti-cheat may detect it; account restrictions or a permanent ban are possible, including for cosmetic use. It is not approved by Kuro Games and nobody can guarantee account safety. <a href="/guide/risk.html" target="_blank" rel="noopener">Read the full notice</a>.</p></div>
 <div class="check-row"><input type="checkbox" id="risk"><label for="risk">I have read the account-risk notice and accept the risk.</label></div>
 </section>
 
@@ -70,7 +76,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 
 <section aria-labelledby="game-heading">
 <h2 id="game-heading">3. How do you start the game?</h2>
-<p>The standalone official launcher is the previously working route. The 26 Sep 23:02 package reached gameplay through the standalone launcher on the owner’s PC. SteamVR / Steam Link headset support is separate from the Steam version of the game.</p>
+<p>The standalone official launcher is the previously working route. This portable package still needs a real game-launch test. SteamVR / Steam Link headset support is separate from the Steam version of the game.</p>
 <fieldset id="gameChoices"><legend>Game start</legend></fieldset>
 <details id="customPath"><summary>Use a different launcher.exe location</summary>
 <label for="launcherPath">Full path to the official launcher.exe</label>
@@ -82,14 +88,16 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <h2 id="go-heading">4. Start</h2>
 <p>Put on or connect your headset and start its software first (for example SteamVR). Then:</p>
 <div class="actions"><button type="button" class="button primary" id="launch">Apply &amp; launch</button><button type="button" id="check">Check readiness</button><button type="button" id="apply">Apply without launching</button><button type="button" id="cancel" hidden>Stop waiting</button></div>
-<p class="small">Windows will ask for permission, because the game runs as administrator and the injector must match it. Choose <strong>Yes</strong>, then press <strong>Play</strong> in your chosen game launcher. Steam/Epic injection is unverified. In the game, <kbd>L3</kbd> + <kbd>R3</kbd> (or <kbd>Insert</kbd>) opens UEVR settings.</p>
+<p class="small" data-launcher-guide="start">Windows will ask for permission, because the game runs as administrator and the injector must match it. Choose <strong>Yes</strong>, then press <strong>Play</strong> in your chosen game launcher. Steam/Epic injection is unverified. In the game, <kbd>L3</kbd> + <kbd>R3</kbd> (or <kbd>Insert</kbd>) opens UEVR settings.</p>
 <div id="progress" class="progress" role="status" aria-live="polite">Loading…</div>
 </section>
 
 <section aria-labelledby="record-heading">
 <h2 id="record-heading">Record gameplay</h2>
-<p>SteamVR: clean side-by-side video for clips or debugging. The replay can export a single-eye or stereo still. No desktop or audio capture.</p>
+<p data-launcher-guide="recording">Record side-by-side video through SteamVR or the updated OpenXR Simulator. The source is detected for the running game. No desktop or audio capture; VDXR capture is not supported yet.</p>
+<p class="small">Simulator: keep the preview open with Both eyes, side-by-side and Full render off. Video resolution is limited by the preview size. The replay can export single-eye or stereo stills.</p>
 <p><label>Purpose <select id="recordPurpose"><option value="debug">Playtest with camera and Xbox data</option><option value="content">Content creation: clean video only</option></select></label></p>
+<p><label>Capture source <select id="recordSource"><option value="auto">Detect automatically</option><option value="simulator">OpenXR Simulator</option><option value="steamvr">SteamVR</option></select></label></p>
 <p><label>Target frame rate <select id="recordFps"><option value="30">30 fps</option><option value="45">45 fps</option><option value="60">60 fps</option></select></label> <label>Resolution per eye <select id="recordSize"><option value="720">720 px - lighter</option><option value="1024" selected>1024 px - balanced</option><option value="1280">1280 px - larger</option></select></label></p>
 <p class="small">Choose content creation for older builds without camera/controller recording.</p>
 <p class="small">30 fps is a useful starting point for 30-45 fps gameplay. Higher targets need more headroom. The recorder reports its measured capture rate; choosing 60 cannot create game frames that were never rendered. Video has no diagnostic labels burned in, in either mode.</p>
@@ -101,7 +109,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <details><summary>Undo, reset or remove</summary>
 <p><strong>Reset this build</strong> replaces the chosen build's settings with the ones it was supplied with. Your current settings are backed up first.</p>
 <p><strong>Restore my settings from before WuWa VR</strong> puts your UEVR profile and injector choice back to how they were before this launcher first changed them. The mod's settings are kept in a backup, so you can apply the build again later.</p>
-<p>To remove WuWa VR completely: select <strong>Use headset</strong> if the simulator is active, restore your settings, choose <strong>Stop launcher</strong>, then delete the WuWa VR folder. Backups and logs remain in the data folder until you delete it too.</p>
+<p data-launcher-guide="recovery">To remove WuWa VR completely: select <strong>Use headset</strong> if the simulator is active, restore your settings, choose <strong>Stop launcher</strong>, then delete the WuWa VR folder. Backups and logs remain in the data folder until you delete it too.</p>
 <div class="actions"><button type="button" id="reset">Reset this build</button><button type="button" id="restore">Restore my settings from before WuWa VR</button></div>
 </details>
 <details><summary>Check files and get help</summary>
@@ -112,6 +120,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <details><summary>Compare stereo rendering (experimental)</summary>
 <p>For the prepared stereo-labels candidate running through SteamVR. Open a scene showing the doubled reflections or one-eye material, close the UEVR overlay, then start below and return to WuWa. The batch waits for game focus; keep the view still until it finishes.</p>
 <p>Five reflection/material settings are tested separately, with before/changed/restored images. Each original value is restored before the next test. This helps diagnose a defect; it does not apply a permanent fix or change the VR runtime.</p>
+<p class="small">The planar setting can stop updates while leaving a cached reflection visible. Unchanged images do not rule that rendering path out.</p>
 <div class="actions"><button id="compareGraphics" type="button">Compare current scene</button><button id="openComparisons" type="button">Open comparisons</button></div>
 <p class="small">Captures include the HUD and may include your UID. Exact frame pairing between eyes is unavailable. Results remain local; review them before sharing.</p>
 </details>
@@ -212,8 +221,9 @@ function render(s) {
   game.textContent = s.gameRunning ? "Running" : s.injectorRunning ? "Injector waiting for the game" : "Closed";
   game.className = s.gameRunning || s.injectorRunning ? "warn" : "ok";
   const xr = $("xrState");
-  xr.textContent = s.openxr.available ? s.openxr.name : "Not found";
-  xr.className = s.openxr.available ? "ok" : "warn";
+  const otherSimulator = s.openxr.isSimulator && s.openxr.isBundledSimulator === false;
+  xr.textContent = s.openxr.available ? s.openxr.name + (otherSimulator ? " · registered from another package" : "") : "Not found";
+  xr.className = s.openxr.available && !otherSimulator ? "ok" : "warn";
   $("xrHelp").hidden = s.openxr.available; $("xrHelp").textContent = s.openxr.message || "";
   const selected = s.builds.find(b => b.id === s.selected);
   const reportBuild = selected ? selected.name + (s.selectionMatches ? " (applied)" : " (selected; not applied)") : "No applied build";
@@ -227,11 +237,12 @@ function render(s) {
   $("dataFolder").textContent = "Data folder: " + s.dataFolder;
   $("restore").disabled = !s.originalBackup;
   const job = s.job, busy = job.running || s.gameRunning || s.injectorRunning;
-  $("recordStart").disabled = job.running || !s.gameRunning || s.openxr.isSimulator || !s.recording?.available;
+  $("recordStart").disabled = job.running || !s.gameRunning || !s.recording?.available || (s.openxr.isSimulator && !s.recording?.sources?.simulator);
   $("recordStop").disabled = !s.recording?.running;
   $("compareGraphics").disabled = job.running || !s.gameRunning || s.openxr.isSimulator || !s.comparisons?.available;
   $("useHeadset").disabled = busy || !s.openxr.canHeadset || !s.openxr.isSimulator;
-  $("useSimulator").disabled = busy || !s.openxr.canSimulator || s.openxr.isSimulator;
+  $("useSimulator").disabled = busy || !s.openxr.canSimulator || s.openxr.isBundledSimulator;
+  $("simulatorCopy").hidden = !s.openxr.isSimulator || s.openxr.isBundledSimulator;
   for (const id of ["launch", "apply", "reset", "restore"]) $(id).disabled = busy || (id === "restore" && !s.originalBackup);
   $("check").disabled = job.running; $("verify").disabled = job.running; $("stop").disabled = job.running;
   const waiting = s.launch && ["preflight", "waiting-for-play", "game-starting", "injected", "settling"].includes(s.launch.phase) && !s.gameRunning;
@@ -272,7 +283,7 @@ $("reset").addEventListener("click", () => { if (confirm("Replace this build's c
 $("restore").addEventListener("click", () => { if (confirm("Restore your UEVR settings from before WuWa VR? The mod's settings are backed up first.")) act("/api/restore", {}, "Restoring…"); });
 $("verify").addEventListener("click", () => act("/api/verify", {}, "Checking package files…"));
 $("openData").addEventListener("click", () => act("/api/open", {folder: "data"}));
-$("recordStart").addEventListener("click", () => act("/api/record-start", {videoOnly: $("recordPurpose").value === "content", fps: Number($("recordFps").value), eyeWidth: Number($("recordSize").value)}, "Starting recording…"));
+$("recordStart").addEventListener("click", () => act("/api/record-start", {videoOnly: $("recordPurpose").value === "content", fps: Number($("recordFps").value), eyeWidth: Number($("recordSize").value), source: $("recordSource").value}, "Starting recording…"));
 $("recordStop").addEventListener("click", () => act("/api/record-stop", {}, "Finishing recording…"));
 $("openRecordings").addEventListener("click", () => act("/api/open", {folder: "recordings"}));
 $("compareGraphics").addEventListener("click", () => act("/api/compare-graphics", {}, "Waiting for WuWa focus…"));

@@ -68,3 +68,5 @@ ${start}
   require('./build-community.cjs');
   console.log('Generated simplified site, visual guide, risk/support pages and local test notes.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+// The published experimental banner is maintained in site/; the deep guide has its own generator.

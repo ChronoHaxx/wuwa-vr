@@ -900,7 +900,7 @@ local function tick(_,delta)
     -- Observe the real menu/cursor signal even when camera/input controls are
     -- disabled. Manual mouse adjustment and the utility chord are not menus.
     local pc=api:get_player_controller(0)
-    game_menu=pc~=nil and pc.bShowMouseCursor==true
+    game_menu=(pc~=nil and pc.bShowMouseCursor==true) or enabled("WuWaControls_NativeMenu")
     local controls_enabled=enabled("WuWaControls_Enabled")
     if not controls_enabled or not enabled("WuWaControls_MouseAssist") then set("WuWaControls_AdjustMode",false) end
     focused=controls_enabled and enabled("WuWaControls_Focused") and not functions.is_drawing_ui()
@@ -1047,14 +1047,14 @@ local function update_camera_before_draw()
     -- before either eye. Calibrate BEFORE hiding a new head, then refresh its
     -- position here. Never integrate flight twice, replay input, or inspect
     -- UObjects in the stereo callback. Option changes are applied at the tick.
-    if not camera_late or not late_update() then return end
     if not camera_active or mode~=3 or not frame then late_anchor_report="inactive"; return end
     local ok,err=pcall(function()
         local pc=api:get_player_controller(0)
-        if not pc or pc.bShowMouseCursor==true then
+        if not pc or pc.bShowMouseCursor==true or enabled("WuWaControls_NativeMenu") then
             if mesh_cache then mesh_cache.look_blend=nil end
             frame=nil; restore_mesh(); mesh_mode=-1; late_anchor_report="menu"; return
         end
+        if not camera_late or not late_update() then return end
         local pawn=api:get_local_pawn(0)
         local main,asset
         if pawn then main,asset=character_mesh(pawn) end

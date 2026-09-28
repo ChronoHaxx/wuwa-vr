@@ -209,6 +209,15 @@
     "X/Y/B: load / save slots 0/1/2": "X/Y/B: 슬롯 0/1/2 불러오기 / 저장",
     "XBOX CONTROLLER  /  POLAR SHORTCUTS": "Xbox 컨트롤러 / Polar 단축키",
     "Xbox shortcuts": "Xbox 단축키",
-    "Yaw": "요"
+    "Yaw": "요",
+    "Recording and privacy": "녹화 및 개인정보 보호",
+    "Target recording rate": "목표 녹화 프레임 속도",
+    "Maximum pixels per eye": "눈 하나당 최대 너비(픽셀)",
+    "Include camera and controller data": "카메라 및 컨트롤러 데이터 포함",
+    "Start video recording": "동영상 녹화 시작",
+    "Stop video recording": "동영상 녹화 중지",
+    "Waiting for the launcher...": "런처를 기다리는 중...",
+    "Finishing the video. Please wait.": "동영상을 저장하는 중입니다. 잠시 기다려 주세요.",
+    "Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.": "지원되는 메뉴를 VR 패널로 옮깁니다. Native Stereo Fix와 함께 사용할 수 있습니다. 기본값은 꺼짐입니다. 메뉴가 잘못 표시되면 끄세요. 로딩 화면과 흐림 효과는 추가 테스트가 필요합니다."
   }
 }

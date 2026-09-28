@@ -20,7 +20,9 @@ function Test-WuWaBuildReady {
     $selectedRuntime=Get-ItemPropertyValue -LiteralPath 'HKLM:\SOFTWARE\Khronos\OpenXR\1' -Name ActiveRuntime
     $simulator=Join-Path $ctx.Root 'dev-tools\OpenXR-Simulator\openxr_simulator.json'
     Assert-WuWaRuntimeManifest $selectedRuntime
-    $script:wuwaUseHeadset=$selectedRuntime -ne $simulator
+    # A previous portable package can still own the active simulator. Identify
+    # that runtime without replacing its registration or saved headset target.
+    $script:wuwaUseHeadset=-not ($selectedRuntime -eq $simulator -or (Test-WuWaSimulatorManifest $selectedRuntime))
     $script:wuwaSelectedOpenXR=$selectedRuntime
     $script:wuwaGameStart=Get-WuWaLaunchSettings $ctx
 }
@@ -56,7 +58,7 @@ try {
     New-Item -ItemType Directory -Path $run | Out-Null
     Start-Transcript -LiteralPath (Join-Path $run 'startup.log') | Out-Null
     $cancel=Join-Path $run 'cancel.request'
-    Write-LaunchState -Path $statePath -State ([ordered]@{pid=$PID;started=(Get-Process -Id $PID).StartTime.ToString('o');runDir=$run;cancelPath=$cancel;phase='preflight';message=('Launching ' + $build.name);buildId=$Id})
+    Write-LaunchState -Path $statePath -State ([ordered]@{pid=$PID;started=(Get-Process -Id $PID).StartTime.ToString('o');runDir=$run;cancelPath=$cancel;phase='preflight';message=('Launching ' + $build.name);buildId=$Id;elevated=$isAdmin;injectorStarted=$false})
     $build | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'build.json') -Encoding UTF8
     [ordered]@{mode=$(if($wuwaUseHeadset){'headset'}else{'simulator'});manifest=$wuwaSelectedOpenXR} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'openxr.json') -Encoding UTF8
     Write-Host ('OpenXR runtime: '+$wuwaSelectedOpenXR)
@@ -81,6 +83,7 @@ try {
         } else { Write-Warning 'Automatic recording Python is unavailable; manual capture remains available.' }
     }
     $simArguments=@{RuntimeName=(Split-Path -Leaf $runtime);Headset=$wuwaUseHeadset;WaitSeconds=600;SettleSeconds=30;StatePath=$statePath;CancelPath=$cancel}
+    if(-not $wuwaUseHeadset) { $simArguments.SimulatorPath=Split-Path -Parent $wuwaSelectedOpenXR }
     if($wuwaGameStart.Mode -eq 'manual') {
         Write-Host 'Start Wuthering Waves in your chosen launcher and press Play. Steam/Epic injection is unverified; Steam previously failed and has not been retested.'
     } else {

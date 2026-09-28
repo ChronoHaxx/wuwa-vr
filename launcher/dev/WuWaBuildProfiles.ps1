@@ -240,6 +240,25 @@ function Save-WuWaBuildState {
     Move-Item -LiteralPath $temp -Destination $Context.State -Force
 }
 
+function Test-WuWaTimingDefaultNeeded {
+    param([string]$Profile)
+    $path = Join-Path $Profile 'cvars_data.txt'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $true }
+    return -not (@(Get-Content -LiteralPath $path -Encoding UTF8) -match '^\s*Engine_r\.OneFrameThreadLag\s*=')
+}
+
+function Initialize-WuWaTimingDefault {
+    param([string]$Profile)
+    # A supplied default, not a per-launch override of an explicit user choice.
+    # Called only inside the backed-up profile transaction, with the game closed.
+    if (-not (Test-WuWaTimingDefaultNeeded $Profile)) { return }
+    $path = Join-Path $Profile 'cvars_data.txt'
+    $lines = @()
+    if (Test-Path -LiteralPath $path -PathType Leaf) { $lines = @(Get-Content -LiteralPath $path -Encoding UTF8) }
+    $lines += 'Engine_r.OneFrameThreadLag=0'
+    [IO.File]::WriteAllLines($path, [string[]]$lines, [Text.UTF8Encoding]::new($false))
+}
+
 function Select-WuWaBuild {
     param($Context, [string]$Id, [switch]$ResetToSupplied)
     $mutex = [Threading.Mutex]::new($false, 'Local\WuWaVRBuildProfileSwitch')
@@ -260,7 +279,8 @@ function Select-WuWaBuild {
         $saved = $state.savedProfiles.PSObject.Properties[$Id]
         if (-not $ResetToSupplied -and $saved -and (Test-Path -LiteralPath $saved.Value)) { $source = $saved.Value }
         if (-not (Test-Path -LiteralPath (Join-Path $source 'config.txt'))) { throw 'Target profile is missing.' }
-        if (-not $ResetToSupplied -and $state.selected -eq $Id -and $oldRuntime -eq $runtime) { return [pscustomobject]@{ selected=$Id; changed=$false; backup=$state.lastBackup } }
+        if (-not $ResetToSupplied -and $state.selected -eq $Id -and $oldRuntime -eq $runtime -and
+            -not (Test-WuWaTimingDefaultNeeded $Context.Profile)) { return [pscustomobject]@{ selected=$Id; changed=$false; backup=$state.lastBackup } }
         $backup = Join-Path $Context.Backups ((Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0,6))
         $before = Join-Path $backup 'profile'
         # A fresh PC has no UEVR profile or injector settings yet. Record what
@@ -284,6 +304,7 @@ function Select-WuWaBuild {
         try {
             if (-not $profileExisted) { New-Item -ItemType Directory -Path $Context.Profile -Force | Out-Null }
             Set-WuWaManagedProfile $source $Context.Profile
+            Initialize-WuWaTimingDefault $Context.Profile
             $injectorLines = @()
             if ($injectorExisted) { $injectorLines = @(Get-Content -LiteralPath (Join-Path $before 'injector_config.txt') -Encoding UTF8 | Where-Object { $_ -notmatch '^custom_var_(urvr_folder|last_pid|auto_focus|auto_inject|auto_close)=' }) }
             $injectorLines += @(('custom_var_urvr_folder=' + $runtime), 'custom_var_last_pid=0', 'custom_var_auto_focus=0', 'custom_var_auto_inject=1', 'custom_var_auto_close=1')

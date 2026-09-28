@@ -11,6 +11,15 @@
   "04  UEVR SETTINGS": [
     "utility/WuWaShortcutSheet.cpp"
   ],
+  "30 fps": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "45 fps": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "60 fps": [
+    "mods/vr/WuWaControlsComponent.hpp"
+  ],
   "A / B": [
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -73,6 +82,9 @@
   ],
   "Always (manual mask)": [
     "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "An automated stereo comparison is active. These three settings return to your choices when it ends (at most 60 seconds).": [
+    "mods/VR.cpp"
   ],
   "Animated position + stick pitch": [
     "mods/vr/WuWaControlsComponent.hpp"
@@ -185,6 +197,9 @@
   "Custom / saved behavior": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
+  "Custom-reflection comparison stopped or could not verify this game build. See the diagnostic log.": [
+    "mods/VR.cpp"
+  ],
   "Custom: Extreme Compatibility": [
     "mods/VR.cpp"
   ],
@@ -275,6 +290,9 @@
   ],
   "Fill whole frame (stretch)": [
     "mods/vr/OverlayComponent.hpp"
+  ],
+  "Finishing the video. Please wait.": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "First / fixed: height": [
     "utility/WuWaShortcutSheet.cpp"
@@ -399,6 +417,9 @@
   "Full frame at 1 fills both axes of the portal rectangle. It stretches the HUD if its proportions differ from the frame. Preserve proportions leaves space on one axis. Safe fit also leaves a margin for rounded/feathered edges. Your separate HUD layout is retained.": [
     "mods/vr/OverlayComponent.cpp"
   ],
+  "Full-resolution translucent materials in stereo (candidate)": [
+    "mods/VR.cpp"
+  ],
   "GAME UI HIDDEN - MENUS ARE HIDDEN TOO": [
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -478,6 +499,9 @@
   "Hidden UI stays quiet during normal gameplay. A recovery notice appears only when the game cursor or a known menu-rendering path indicates a menu. L3 + B restores UI. An unknown menu may not be detected; UEVR settings always retain the Show game UI button.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Hide Kuro material reflections (workaround candidate)": [
+    "mods/VR.cpp"
+  ],
   "Hide body in first person": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
@@ -529,6 +553,9 @@
   "In front of recentered headset origin": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
+  "Include camera and controller data": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Input candidates start off. Their effect on WuWa's intermittent combinations is not confirmed.": [
     "mods/VR.cpp"
   ],
@@ -543,6 +570,9 @@
   ],
   "KNOW YOUR BUTTONS": [
     "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Keep WuWa VR Launcher running to record from here. Its browser tab can be closed.": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Keep camera and head hiding during Alt-Tab / UEVR settings": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -739,6 +769,9 @@
   "Lower eye level by 5": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Maximum pixels per eye": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Maximum thrust / weight": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -787,6 +820,9 @@
   ],
   "Or: UEVR > WuWa Controls > Show game UI now": [
     "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Pairs each eye's reflection projection with its part of the reflection texture. Only applies to a verified two-eye layout. Visual acceptance is pending; Kuro's separate material-reflection path may require another correction.": [
+    "mods/VR.cpp"
   ],
   "Pause and disarm": [
     "utility/WuWaShortcutSheet.cpp"
@@ -902,6 +938,21 @@
   "Recording": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Recording and privacy": [
+    "mods/VR.cpp"
+  ],
+  "Recording failed. See the message below.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Recording saved. Use Open recordings in the launcher.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Recording video. Close the UEVR menu for a clear view.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Reflection correction stopped or could not verify this game build. See the diagnostic log.": [
+    "mods/VR.cpp"
+  ],
   "Refresh position before drawing (Custom)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -915,9 +966,6 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Rendering comparisons (live)": [
-    "mods/VR.cpp"
-  ],
-  "Requires Native Stereo Fix off. New Esc candidate matches the ViewFamilyTexture observed on September 24. Other menus keep the existing route. Compare off/on in the same menu; blur/backdrop and live acceptance are still pending.": [
     "mods/VR.cpp"
   ],
   "Reset headset position and direction now": [
@@ -976,6 +1024,9 @@
   ],
   "Scroll focused panel": [
     "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Select reflection parameters for each eye (candidate)": [
+    "mods/VR.cpp"
   ],
   "Send aim to player control rotation": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1052,6 +1103,9 @@
   "Simulator Home resets only the simulated headset and preview. Use this reset afterwards to align UEVR's origin. It preserves world scale and camera offsets.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Simulator: keep its preview open, choose Both eyes / side-by-side, and turn Full render off. Recording uses the preview size.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Smooth transition between animation and game view": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1061,8 +1115,17 @@
   "Start motion sidecar (5 minutes max)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Start video recording": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Starting the recorder. Close the UEVR menu for a clear view.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Starts off. Only affects Native Stereo Fix with OpenXR; requires a headset timing comparison before treating it as a fix.": [
     "mods/VR.cpp"
+  ],
+  "SteamVR and the updated OpenXR Simulator are supported. VDXR capture is not available yet. Video has no audio and stops after five minutes. Actual frame rate depends on the game.": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Stereo rendering compatibility": [
     "mods/VR.cpp"
@@ -1075,6 +1138,9 @@
   ],
   "Stop rotation; no auto-level": [
     "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Stop video recording": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Stopped": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1090,6 +1156,15 @@
   ],
   "Tap RB": [
     "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Target recording rate": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Tests the game's default texture in place of custom reflections for the two main eyes. This is an effect-removal workaround, not a projection repair, and can also remove correct custom reflections. Starts off and restores on the next rendered views when disabled.": [
+    "mods/VR.cpp"
+  ],
+  "The recorder is missing from this launcher package.": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "The saved renderer used Native Stereo Fix. Disable additional-menu extraction before restoring that combination, or keep native stereo without the fix.": [
     "mods/VR.cpp"
@@ -1138,6 +1213,9 @@
   ],
   "Transition duration (seconds)": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Translucency correction stopped or could not verify this game build. See the diagnostic log.": [
+    "mods/VR.cpp"
   ],
   "Try headset aim": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1194,6 +1272,9 @@
   "Use separate-eye renderer": [
     "mods/VR.cpp"
   ],
+  "Uses the game's full-resolution translucency path for ordinary two-eye views. Compare Lynae, Mornye and Iuno in both eyes. May cost performance. Both candidates require Native Stereo with Native Stereo Fix and Extreme Compatibility off; other renderers keep their normal behavior.": [
+    "mods/VR.cpp"
+  ],
   "View": [
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -1206,8 +1287,14 @@
   "WUWA VR": [
     "utility/WuWaShortcutSheet.cpp"
   ],
+  "Wait for the launcher operation to finish.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Waiting for a valid portal anchor.": [
     "mods/vr/OverlayComponent.cpp"
+  ],
+  "Waiting for the launcher...": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Warn when a menu opens with game UI hidden": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1259,5 +1346,8 @@
   ],
   "Yaw rate (degrees / second)": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.": [
+    "mods/VR.cpp"
   ]
 }

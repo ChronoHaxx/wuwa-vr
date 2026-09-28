@@ -1768,11 +1768,6 @@ void VR::on_config_load(const utility::Config& cfg, bool set_defaults) {
         option.config_load(cfg, set_defaults);
     }
 
-    if (wuwa_test::is_wuwa() && m_wuwa_lgui_menu_redirect->value() && m_native_stereo_fix->value()) {
-        m_native_stereo_fix->value() = false;
-        spdlog::warn("[WuWaRenderOptions] Conflicting saved options: disabled Native Stereo Fix while additional-menu extraction is enabled");
-    }
-
     if (get_runtime() != nullptr && get_runtime()->loaded) {
         get_runtime()->on_config_load(cfg, set_defaults);
 
@@ -1991,6 +1986,23 @@ void VR::on_frame() {
     m_cvar_manager->on_frame();
     m_wuwa_controls.on_frame();
     handle_keybinds();
+
+    const bool wuwa_native_stereo = wuwa_test::is_wuwa() && get_runtime()->ready() &&
+        m_rendering_method->value() == NATIVE_STEREO && !m_extreme_compat_mode->value();
+    const bool wuwa_serial_stereo = wuwa_native_stereo && !is_native_stereo_fix_enabled();
+    const bool planar_candidate=wuwa_test::stereo_candidate_value(0,m_wuwa_planar_eye_parameters->value());
+    const bool translucent_candidate=wuwa_test::stereo_candidate_value(1,m_wuwa_stereo_translucency->value());
+    const bool hide_reflections=wuwa_test::stereo_candidate_value(2,m_wuwa_hide_kuro_reflections->value());
+    wuwa_planar_probe::configure_correction(wuwa_serial_stereo && planar_candidate);
+    wuwa_reflection_capture::configure(wuwa_native_stereo && is_native_stereo_fix_enabled() &&
+        is_native_stereo_fix_same_pass_enabled() && planar_candidate);
+    wuwa_translucency::configure(wuwa_serial_stereo && translucent_candidate);
+    const bool water_candidate=wuwa_serial_stereo && m_wuwa_kuro_water_stereo->value();
+    wuwa_water_observation::configure(wuwa_serial_stereo && (translucent_candidate || water_candidate),water_candidate);
+    // Read-only texture/uniform sampling also accepts NSF's separate families.
+    // Texture removal retains its previous mode restriction. The NSF capture
+    // projection correction above has an independent validated contract.
+    wuwa_kuro_reflection::configure(wuwa_native_stereo && planar_candidate,wuwa_serial_stereo && hide_reflections);
 
     if (!get_runtime()->ready()) {
         return;
@@ -2426,6 +2438,9 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             m_overlay_component.on_draw_game_ui_controls();
         }
         wuwa_ui::TextWrapped("Camera / HUD layouts: LuaLoader > Script UI > WuWa VR comfort controls.");
+        if (wuwa_ui::CollapsingHeader("Recording and privacy")) {
+            m_wuwa_controls.on_draw_recording();
+        }
         if (wuwa_ui::CollapsingHeader("Stereo rendering compatibility")) {
             static wuwa_stereo::Comparison comparison;
             const auto current = [&] { return wuwa_stereo::Settings{m_rendering_method->value(),
@@ -2450,14 +2465,9 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             if (wuwa_ui::Button("Use native stereo"))
                 apply(comparison.select(current(), wuwa_stereo::Comparison::Choice::native));
             if (comparison.pending()) {
-                const bool can_restore = comparison.can_restore(m_wuwa_lgui_menu_redirect->value());
-                ImGui::BeginDisabled(!can_restore);
                 if (wuwa_ui::Button("Restore renderer from before this comparison")) {
-                    if (const auto saved = comparison.restore(m_wuwa_lgui_menu_redirect->value())) apply(*saved);
+                    if (const auto saved = comparison.restore()) apply(*saved);
                 }
-                ImGui::EndDisabled();
-                if (!can_restore)
-                    wuwa_ui::TextWrapped("The saved renderer used Native Stereo Fix. Disable additional-menu extraction before restoring that combination, or keep native stereo without the fix.");
             }
             wuwa_ui::TextWrapped("These buttons use UEVR's existing live rendering options. The image may pause while render targets rebuild. They leave camera, HUD placement and controller settings alone. Opening this section changes nothing; UEVR saves whichever renderer you leave selected.");
         }
@@ -2467,19 +2477,53 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         m_wuwa_controls.on_draw_experiments();
         ImGui::Separator();
         wuwa_ui::TextUnformatted("Rendering comparisons (live)");
+        const bool stereo_comparison_running=wuwa_test::stereo_candidate_lease.active(GetTickCount64());
+        if (stereo_comparison_running) wuwa_ui::TextWrapped("An automated stereo comparison is active. These three settings return to your choices when it ends (at most 60 seconds).");
+        ImGui::BeginDisabled(stereo_comparison_running);
+        wuwa_ui::draw(*m_wuwa_planar_eye_parameters,"Select reflection parameters for each eye (candidate)");
+        wuwa_ui::TextWrapped("With Native Stereo Fix and Use Same Stereo Pass on, keeps the source eye's projection for supported custom reflection captures. With Native Stereo Fix off, selects verified two-eye atlas parameters. Visual acceptance is pending.");
+        wuwa_ui::draw(*m_wuwa_stereo_translucency,"Full-resolution translucent materials in stereo (candidate)");
+        wuwa_ui::TextWrapped("Uses the game's full-resolution translucency path for ordinary two-eye views. Compare Lynae, Mornye and Iuno in both eyes. May cost performance. Requires Native Stereo with Native Stereo Fix and Extreme Compatibility off; other renderers keep their normal behavior.");
+        wuwa_ui::draw(*m_wuwa_hide_kuro_reflections,"Hide Kuro material reflections (workaround candidate)");
+        wuwa_ui::TextWrapped("Tests the game's default texture in place of custom reflections for the two main eyes. This is an effect-removal workaround, not a projection repair, and can also remove correct custom reflections. Starts off and restores on the next rendered views when disabled.");
+        ImGui::EndDisabled();
+        wuwa_ui::draw(*m_wuwa_kuro_water_stereo,"Kuro character materials in both eyes (candidate)");
+        wuwa_ui::TextWrapped("Adds the missing second-eye pass for the custom material path used by Lynae, Mornye and Iuno. Preserves the first eye. Requires Native Stereo, with Native Stereo Fix and Extreme Compatibility off. Visual acceptance pending.");
+        const auto water_correction=wuwa_water_observation::status();
+        if (water_correction.value("faulted",false) || wuwa_water_stereo::faulted.load())
+            wuwa_ui::TextWrapped("The Kuro material candidate stopped or could not verify this build. See the diagnostic log.");
+        const auto planar_correction = wuwa_planar_probe::correction_status();
+        const auto capture_correction = wuwa_reflection_capture::status();
+        if (capture_correction.value("faulted",false)) {
+            wuwa_ui::TextWrapped("Reflection capture correction stopped or could not verify this game build. See the diagnostic log.");
+            ImGui::TextWrapped("%s", capture_correction.value("error",std::string{}).c_str());
+        }
+        const auto translucent_correction = wuwa_translucency::status();
+        if (planar_correction.value("faulted",false)) {
+            wuwa_ui::TextWrapped("Reflection correction stopped or could not verify this game build. See the diagnostic log.");
+            ImGui::TextWrapped("%s", planar_correction.value("error",std::string{}).c_str());
+        }
+        if (translucent_correction.value("faulted",false)) {
+            wuwa_ui::TextWrapped("Translucency correction stopped or could not verify this game build. See the diagnostic log.");
+            ImGui::TextWrapped("%s", translucent_correction.value("error",std::string{}).c_str());
+        }
+        const auto kuro_correction = wuwa_kuro_reflection::status();
+        if (kuro_correction.value("faulted",false)) {
+            wuwa_ui::TextWrapped("Custom-reflection comparison stopped or could not verify this game build. See the diagnostic log.");
+            ImGui::TextWrapped("%s", kuro_correction.value("error",std::string{}).c_str());
+        }
         wuwa_ui::draw(*m_wuwa_world_labels,"World-space labels in both eyes (candidate)");
         wuwa_ui::TextWrapped("Draws the missing eye of the world-label stage with its own camera and depth rectangle. Requires the matching candidate DLL and native stereo without Native Stereo Fix. Unsupported layouts keep the original rendering. NPC/bubble acceptance is pending; this does not repair reflections or character materials.");
         wuwa_ui::draw(*m_wuwa_lgui_redirect,"Extract game HUD into the VR panel");
         wuwa_ui::TextWrapped("On uses our LGUI capture. Off shows the game's original HUD in the eye images. This does not hide the UEVR settings panel.");
-        const bool menu_blocked = !allows_wuwa_render_option_change("VR_WuWaLguiMenuRedirect", "true");
-        ImGui::BeginDisabled(menu_blocked && !m_wuwa_lgui_menu_redirect->value());
         wuwa_ui::draw(*m_wuwa_lgui_menu_redirect,"Extract additional game menus (experimental)");
-        ImGui::EndDisabled();
-        wuwa_ui::TextWrapped(menu_blocked
-            ? "Unavailable while Native Stereo Fix is on. These rendering options cannot be combined."
-            : "Requires Native Stereo Fix off. New Esc candidate matches the ViewFamilyTexture observed on September 24. Other menus keep the existing route. Compare off/on in the same menu; blur/backdrop and live acceptance are still pending.");
+        wuwa_ui::TextWrapped("Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.");
         wuwa_ui::draw(*m_wuwa_native_frame_timing,"Native Stereo Fix frame timing (experimental)");
         wuwa_ui::TextWrapped("Starts off. Only affects Native Stereo Fix with OpenXR; requires a headset timing comparison before treating it as a fix.");
+        wuwa_ui::draw(*m_wuwa_early_stereo_views,"Early stereo view setup (experimental)");
+        wuwa_ui::TextWrapped("Requires Native Stereo Fix and Use Same Stereo Pass. Applies the pass correction before game-side view setup. Turn off to return to the previous correction. Culling and lighting acceptance is pending.");
+        wuwa_ui::draw(*m_wuwa_stereo_base_pose,"Keep stereo camera transitions together (candidate)");
+        wuwa_ui::TextWrapped("Uses one game camera pose for both eyes during the same frame, while preserving headset movement and eye separation. Requires Native Stereo Fix. Menu and ultimate transitions still need visual acceptance; this does not repair foliage.");
         ImGui::Separator();
         wuwa_ui::TextWrapped("Live input tests. Change one option, close this menu, then repeat the same action.");
         wuwa_ui::draw(*m_controllers_allowed,"Allow VR motion-controller input");
@@ -2591,11 +2635,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
 
         ImGui::SetNextItemOpen(true, ImGuiCond_::ImGuiCond_Once);
         if (ImGui::TreeNode("Native Stereo Fix")) {
-            const bool native_fix_blocked = !allows_wuwa_render_option_change("VR_NativeStereoFix", "true");
-            ImGui::BeginDisabled(native_fix_blocked && !m_native_stereo_fix->value());
             m_native_stereo_fix->draw("Enabled");
-            ImGui::EndDisabled();
-            if (native_fix_blocked) ImGui::TextWrapped("Unavailable while additional-menu extraction is on. Enabling both preceded a WuWa crash. Keep Native Stereo Fix off for the menu comparison.");
             m_native_stereo_fix_same_pass->draw("Use Same Stereo Pass");
             m_native_stereo_fix_swap_eyes->draw("Swap Eyes");
             ImGui::TreePop();

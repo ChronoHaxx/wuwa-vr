@@ -42,6 +42,12 @@ IDLE_EXIT_SECONDS = 20 * 60
 EXIT_REPORTED = 3
 
 
+def launcher_text():
+    spec=importlib.util.spec_from_file_location('wuwa_localization',Path(__file__).with_name('wuwa_localization.py'))
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+
 class Config:
     """Resolved locations. Nothing is created until the launcher starts."""
 
@@ -79,7 +85,7 @@ TOKEN = secrets.token_urlsafe(32)
 BASE_URL = ""
 LOCK = threading.Lock()
 JOB = {"running": False, "kind": "", "message": "Ready", "output": "", "error": False, "code": None}
-RECORDING = {"running": False, "stopFile": "", "folder": ""}
+RECORDING = {"running": False, "stopFile": "", "folder": "", "id": "", "pid": None, "stopping": False}
 LAST_REQUEST = time.monotonic()
 VERIFY_RESULT: dict = {}
 SERVER = None
@@ -234,6 +240,7 @@ def openxr_status():
     headset = previous if is_simulator else active
     return {"available": ok, "name": name, "manifest": active,
             "isSimulator": is_simulator, "canSimulator": runtime_manifest(simulator) and ok,
+            "isBundledSimulator": is_simulator and Path(active).resolve() == simulator.resolve(),
             "canHeadset": runtime_manifest(headset) and not simulator_manifest(headset),
             "message": "" if ok else "The selected OpenXR runtime file is missing. Re-select your headset software as the OpenXR runtime."}
 
@@ -392,7 +399,8 @@ def launch_state():
     state = read_json(config().data / "launch-state.json")
     if not isinstance(state, dict):
         return {}
-    shown = {k: state.get(k) for k in ("phase", "message", "outcome", "buildId", "started") if k in state}
+    shown = {k: state.get(k) for k in ("phase", "message", "outcome", "buildId", "started",
+        "elevated", "injectorPid", "injectorStarted", "injectorRunning", "backendLogStarted", "firstFrameSeen") if k in state}
     run = state.get("runDir")
     if isinstance(run, str) and run:
         try:
@@ -436,7 +444,11 @@ def status():
         "launch": launch_state(),
         "integrity": dict(VERIFY_RESULT),
         "dataFolder": redact(config().data),
-        "recording": {"running": RECORDING["running"], "available": (config().app / "dev-tools/wuwa-recorder.exe").is_file()},
+        "recording": {"running": RECORDING["running"],
+                      "available": any((config().app / "dev-tools" / name).is_file() for name in
+                                       ('wuwa-recorder.exe','wuwa-simulator-recorder.exe')),
+                      "sources": {"steamvr": (config().app/'dev-tools/wuwa-recorder.exe').is_file(),
+                                  "simulator": (config().app/'dev-tools/wuwa-simulator-recorder.exe').is_file()}},
         "comparisons": {"available": all((config().app / "dev-tools" / name).is_file()
                                           for name in ("steamvr-capture.exe", "openvr_api.dll"))},
     }
@@ -491,10 +503,11 @@ def last_error_line(text):
 
 
 LAUNCH_RESULTS = {
-    0: "Windows permission accepted. Press Play in your chosen game launcher. Steam/Epic injection remains unverified. Progress appears below.",
+    0: "Startup helper confirmed. Press Play in your chosen game launcher. Watch the progress below for UEVR and its first stereo frame. Steam/Epic injection remains unverified.",
     2: "A launch is already in progress. Wait for it to finish, or use Stop waiting.",
     3: "A Windows permission prompt is already open. Look for it in the taskbar and answer it.",
     4: "Windows permission was declined, so nothing was started. Choose Apply & launch again when ready.",
+    5: "Startup is unconfirmed. Do not start another injector. Use Recovery > Copy diagnostics to check the helper and injector state.",
 }
 
 
@@ -601,6 +614,28 @@ def verify_package():
     return f"All {len(files)} packaged files match the manifest.{note}"
 
 
+def injector_diagnostics(build_id):
+    """Bounded injector output only; never read an arbitrary path from a request."""
+    build = build_by_id(build_id)
+    if not build:
+        return []
+    path = runtime_folder(build) / "Custom_UEVR_Injector.txt"
+    if not path.resolve().is_relative_to(config().app / "runtime"):
+        return []
+    try:
+        stamp = datetime.fromtimestamp(path.stat().st_mtime).astimezone().isoformat(timespec="seconds")
+        with path.open("rb") as handle:
+            handle.seek(0, 2)
+            size = handle.tell()
+            handle.seek(max(0, size - 65536))
+            text = handle.read(65536).decode("utf-8-sig", errors="replace")
+        return ["", f"Injector log for {build_id}, last modified {stamp}:",
+                "May be from an earlier attempt; compare this time with Last launch above.",
+                *(redact(line) for line in text.splitlines()[-35:])]
+    except OSError:
+        return ["", f"No readable injector log for {build_id}."]
+
+
 def diagnostics():
     info = status()
     lines = [f"WuWa VR Launcher diagnostics, {datetime.now().astimezone().isoformat(timespec='seconds')}",
@@ -620,13 +655,17 @@ def diagnostics():
         lines += ["", "Recent launcher log:", *(redact(line) for line in tail)]
     except (IndexError, OSError):
         pass
+    launch = info.get("launch") or {}
+    lines += injector_diagnostics(launch.get("buildId") or info["selected"])
     return "\n".join(lines) + "\n"
 
 
-def begin_job(kind, message, operation):
+def begin_job(kind, message, operation, prepare=None):
     with LOCK:
         if JOB["running"]:
             raise ValueError("Another operation is still running.")
+        if prepare:
+            prepare()
         JOB.update(running=True, kind=kind, message=message, output="", error=False, code=None)
 
     def work():
@@ -659,23 +698,87 @@ def open_folder(which):
     os.startfile(str(folder))  # Opens File Explorer; nothing is executed.
 
 
-def record_playtest(video_only=False, fps=30, eye_width=1024):
+def recording_target(pid=None):
+    folder=config().data / "recordings" / (datetime.now().strftime("%Y%m%d-%H%M%S")+'-'+secrets.token_hex(4))
+    folder.parent.mkdir(parents=True,exist_ok=True)
+    return dict(running=True, stopFile=str(folder.with_suffix('.stop')), folder=str(folder),
+                id=secrets.token_hex(16), pid=pid, stopping=False)
+
+
+def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None, source='auto'):
+    if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
     if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
     if type(eye_width) is not int or eye_width not in (720,1024,1280): raise ValueError('Choose 720, 1024 or 1280 pixels per eye.')
-    folder=config().data / "recordings" / (datetime.now().strftime("%Y%m%d-%H%M%S")+'-'+secrets.token_hex(2))
-    folder.parent.mkdir(parents=True,exist_ok=True)
-    stop_file=folder.with_suffix('.stop')
-    RECORDING.update(running=True,stopFile=str(stop_file),folder=str(folder))
+    games=[p for p in processes() if p['name'].lower() in ('client-win64-shipping','client-win64-shipping.exe')]
+    if len(games)!=1: raise ValueError('Launch one WuWa instance through SteamVR or the updated simulator before recording.')
+    pid=games[0]['pid']
+    if expected_pid is not None and expected_pid!=pid: raise ValueError('Game process changed before recording.')
+    if not any((config().app/'dev-tools'/name).is_file() for name in
+               ('wuwa-recorder.exe','wuwa-simulator-recorder.exe')): raise ValueError('Recorder is not included in this package.')
+    begin_job('recording',f'Recording stereo video at a target of {fps} fps (5 minutes max)',
+              lambda: record_playtest(video_only,fps,eye_width,source),
+              prepare=lambda: RECORDING.update(recording_target(pid)))
+
+
+def stop_recording(expected_id=None):
+    with LOCK:
+        if not RECORDING['running'] or not RECORDING['stopFile']: raise ValueError('No recording is active.')
+        if expected_id is not None and expected_id!=RECORDING['id']: raise ValueError('Recording has changed; refresh before stopping it.')
+        Path(RECORDING['stopFile']).write_text('stop',encoding='ascii')
+        RECORDING['stopping']=True
+
+
+def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto'):
+    if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
+    if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
+    if type(eye_width) is not int or eye_width not in (720,1024,1280): raise ValueError('Choose 720, 1024 or 1280 pixels per eye.')
+    if not RECORDING['running']:
+        RECORDING.update(recording_target())
+    folder=Path(RECORDING['folder'])
+    stop_file=Path(RECORDING['stopFile'])
     try:
         spec=importlib.util.spec_from_file_location('wuwa_recording',config().app/'dev/record-wuwa.py')
         module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
         args=argparse.Namespace(output=folder,seconds=300,stop_file=stop_file,video_only=video_only,
             recorder=config().app/'dev-tools/wuwa-recorder.exe',openvr=config().app/'dev-tools/openvr_api.dll',
-            pid=None,fps=fps,eye_width=eye_width,profile=config().profile)
+            simulator_recorder=config().app/'dev-tools/wuwa-simulator-recorder.exe',source=source,
+            pid=RECORDING.get('pid'),fps=fps,eye_width=eye_width,profile=config().profile)
         module.record(args)
         return 'Recording saved. Open recordings, then replay.html for controller/camera annotations or clean-sbs.mp4 for clean footage. '+str(folder)
     finally:
         RECORDING.update(running=False,stopFile='')
+
+
+def recording_snapshot():
+    with LOCK:
+        rec,job=dict(RECORDING),dict(JOB)
+    active=job['running'] and job['kind']=='recording'
+    captured=False
+    if rec.get('folder'):
+        try:
+            captured=(Path(rec['folder'])/'frames.jsonl').stat().st_size>0
+        except OSError:
+            pass
+    state=('finishing' if rec.get('stopping') else 'recording' if captured else 'starting') if active else (
+        'busy' if job['running'] else 'error' if job['kind']=='recording' and job['error'] else
+        'saved' if job['kind']=='recording' and job['code']==0 else 'idle')
+    return {'available':any((config().app/'dev-tools'/name).is_file() for name in
+                           ('wuwa-recorder.exe','wuwa-simulator-recorder.exe')),
+            'state':state,'recording_id':rec.get('id',''), 'folder':rec.get('folder',''),
+            'message':str(job['output'] if job['error'] else '')[:500]}
+
+
+def video_menu_bridge():
+    def load(name, filename):
+        spec=importlib.util.spec_from_file_location(name,config().app/'dev'/filename)
+        module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        return module
+    service=load('wuwa_video_menu_bridge','wuwa_video_bridge.py')
+    live=load('wuwa_video_menu_live','wuwa-test.py')
+    def inspect_game():
+        client=live.LiveTest(profile=config().profile)
+        return {'pid':client.pid,'created_ms':round(client.created*1000)}
+    return service.Bridge(config().profile,inspect_game,start_recording,stop_recording,recording_snapshot)
 
 
 def compare_graphics():
@@ -753,6 +856,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, html.encode("utf-8"), "text/html; charset=utf-8")
             if path == "/api/status":
                 return self.reply(200, status())
+            if path == '/api/language':
+                return self.reply(200,launcher_text().language(config().app,config().data))
+            if path == '/launcher-language.js':
+                return self.reply(200,(config().app/'dev/wuwa-launcher-language.js').read_bytes(),'text/javascript; charset=utf-8')
+            if path.startswith('/launcher-setup/'):
+                code=path.removeprefix('/launcher-setup/')
+                if code not in launcher_text().LANGUAGES: return self.reply(404,{'error':'Unknown language'})
+                return self.reply(200,launcher_text().setup_html(config().app,code).encode('utf-8'),'text/html; charset=utf-8')
             if path == "/api/identity":
                 return self.reply(200, {"app": APP_ID, "root": str(config().app), "pid": os.getpid()})
             if path == "/api/diagnostics":
@@ -771,26 +882,30 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(500, {"error": str(error)})
         return self.reply(404, {"error": "Not found"})
 
+    def drain_rejected_body(self):
+        # An unread Windows POST can reset TCP before the error is received.
+        # Bound discarded data and time; rejected content is never parsed.
+        previous_timeout=self.connection.gettimeout()
+        try:
+            length=int(self.headers.get('Content-Length',0))
+            if 0<length<=65536:
+                self.connection.settimeout(1)
+                self.rfile.read(length)
+        except (ValueError,OSError):
+            pass
+        finally:
+            self.connection.settimeout(previous_timeout)
+
     def do_POST(self):
         global LAST_REQUEST
         if not self.valid_host() or self.headers.get("Origin") != BASE_URL or self.headers.get("X-WuWa-Token") != TOKEN:
-            # Drain only small, bounded bodies before closing. On Windows an
-            # unread POST can reset TCP and hide the intended 403 response.
-            previous_timeout = self.connection.gettimeout()
-            try:
-                length = int(self.headers.get("Content-Length", 0))
-                if 0 < length < 8192:
-                    self.connection.settimeout(1)
-                    self.rfile.read(length)
-            except (ValueError, OSError):
-                pass
-            finally:
-                self.connection.settimeout(previous_timeout)
+            self.drain_rejected_body()
             return self.reply(403, {"error": "Use the launcher page opened by WuWa VR Launcher.exe."})
         LAST_REQUEST = time.monotonic()
         try:
             length = int(self.headers.get("Content-Length", 0))
             if not 0 < length < 8192:
+                self.drain_rejected_body()
                 raise ValueError("Invalid request size")
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
@@ -807,6 +922,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(500, {"error": str(error)})
 
     def post_action(self, path, body):
+        if path == '/api/language':
+            if not isinstance(body.get('language'),str): raise ValueError('Choose a supported launcher language.')
+            return self.reply(200,launcher_text().language(config().app,config().data,body['language']))
         if path == "/api/compare-graphics":
             if not any(p['name'].lower() == 'client-win64-shipping.exe' for p in processes()):
                 raise ValueError('Launch WuWa through SteamVR before comparing graphics.')
@@ -816,16 +934,10 @@ class Handler(BaseHTTPRequestHandler):
             return True
         if path == "/api/record-start":
             fps,eye_width=body.get('fps',30),body.get('eyeWidth',1024)
-            if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
-            if type(eye_width) is not int or eye_width not in (720,1024,1280): raise ValueError('Choose 720, 1024 or 1280 pixels per eye.')
-            if not any(p['name'].lower()=='client-win64-shipping' or p['name'].lower()=='client-win64-shipping.exe' for p in processes()):
-                raise ValueError('Launch WuWa through SteamVR before recording.')
-            if not (config().app/'dev-tools/wuwa-recorder.exe').is_file(): raise ValueError('Recorder is not included in this package.')
-            begin_job('recording',f'Recording stereo video at a target of {fps} fps (5 minutes max)',lambda: record_playtest(body.get('videoOnly') is True,fps,eye_width))
+            start_recording(body.get('videoOnly') is True,fps,eye_width,source=body.get('source','auto'))
             return True
         if path == "/api/record-stop":
-            if not RECORDING['running'] or not RECORDING['stopFile']: raise ValueError('No recording is active.')
-            Path(RECORDING['stopFile']).write_text('stop',encoding='ascii')
+            stop_recording()
             return {"ok":True,"message":"Finishing video and replay."}
         if path == "/api/settings":
             changes = {}
@@ -983,6 +1095,8 @@ def self_check():
 
 def serve(args):
     global BASE_URL, SERVER
+    bridge_stop=threading.Event()
+    bridge_thread=None
     config().data.mkdir(parents=True, exist_ok=True)
     with (config().data / "launcher.lock").open("a+b") as lock:
         lock.seek(0)
@@ -1016,9 +1130,18 @@ def serve(args):
                 if not args.no_open:
                     threading.Timer(0.3, lambda: webbrowser.open(BASE_URL)).start()
                 threading.Thread(target=idle_watch, daemon=True).start()
+                try:
+                    bridge=video_menu_bridge()
+                    bridge_thread=threading.Thread(target=bridge.run,args=(bridge_stop,),daemon=True)
+                    bridge_thread.start()
+                except (OSError,ValueError,ImportError) as error:
+                    log('In-game recording controls unavailable: '+str(error))
                 server.serve_forever(poll_interval=0.25)
                 log("Stopped.")
         finally:
+            bridge_stop.set()
+            if bridge_thread is not None:
+                bridge_thread.join(timeout=2)
             SERVER = None
             try:
                 receipt = read_json(config().data / "launcher.json")

@@ -1395,11 +1395,6 @@ void set_mod_value(const char* key, const char* value) {
         return;
     }
 
-    if (!VR::get()->allows_wuwa_render_option_change(key, value)) {
-        spdlog::warn("[WuWaRenderOptions] Refused {}={}: additional-menu extraction and Native Stereo Fix cannot be combined", key, value);
-        return;
-    }
-
     auto& mods = g_framework->get_mods()->get_mods();
 
     for (auto& mod : mods) {

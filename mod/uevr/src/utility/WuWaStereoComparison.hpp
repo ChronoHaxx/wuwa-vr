@@ -28,12 +28,7 @@ public:
     }
 
     bool pending() const { return saved.has_value(); }
-    bool can_restore(bool additional_menus) const {
-        return saved && !(additional_menus && saved->native_fix);
-    }
-    std::optional<Settings> restore(bool additional_menus) {
-        // Do not reintroduce the combination rejected by VR::on_frame.
-        if (!can_restore(additional_menus)) return std::nullopt;
+    std::optional<Settings> restore() {
         const auto result = saved;
         saved.reset();
         return result;

@@ -240,7 +240,7 @@ function Invoke-LaunchFrontEnd {
             return (New-LaunchFrontEndResult 'ChildExited' 1 "The elevated startup$childId closed before it began. Nothing was started; run dev\start-wuwa-rendering-test.ps1 -Status for the last recorded reason.")
         }
         if ($handoff -eq 'Timeout') {
-            return (New-LaunchFrontEndResult 'StartedUnconfirmed' 0 "Opened the elevated startup$childId, but it has not reported in after $HandoffTimeoutSeconds s. Check its 'WuWa VR rendering test' window.")
+            return (New-LaunchFrontEndResult 'StartedUnconfirmed' 5 "Startup$childId has not confirmed it is ready after $HandoffTimeoutSeconds s. Do not start another injector. Check the launch progress and use Recovery > Copy diagnostics; permission and injection are not confirmed by this result.")
         }
         return (New-LaunchFrontEndResult 'Started' 0 "Opened the 'WuWa VR rendering test' window$childId. Follow it there; press Play in the launcher.")
     } catch {

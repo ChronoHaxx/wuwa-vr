@@ -209,6 +209,15 @@
     "X/Y/B: load / save slots 0/1/2": "X/Y/B：读取／保存槽位 0/1/2",
     "XBOX CONTROLLER  /  POLAR SHORTCUTS": "Xbox 手柄／Polar 快捷键",
     "Xbox shortcuts": "Xbox 快捷键",
-    "Yaw": "偏航"
+    "Yaw": "偏航",
+    "Recording and privacy": "录制与隐私",
+    "Target recording rate": "目标录制帧率",
+    "Maximum pixels per eye": "每眼最大像素宽度",
+    "Include camera and controller data": "包含相机和手柄数据",
+    "Start video recording": "开始录制视频",
+    "Stop video recording": "停止录制视频",
+    "Waiting for the launcher...": "正在等待启动器……",
+    "Finishing the video. Please wait.": "正在保存视频，请稍候。",
+    "Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.": "将支持的菜单移至 VR 面板，也可与 Native Stereo Fix 同时开启。默认关闭。如果菜单显示异常，请关闭此选项。加载画面和模糊效果仍需测试。"
   }
 }

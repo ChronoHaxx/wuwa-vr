@@ -4,7 +4,7 @@
   "private": true,
   "description": "Development tools for the static WuWa VR guide and community website",
   "scripts": {
-    "build": "node dev/build-site.cjs",
+    "build": "node dev/build-site.cjs && node dev/render-understanding.cjs",
     "check": "node dev/check-site.cjs && node dev/check-community.cjs"
   },
   "devDependencies": {

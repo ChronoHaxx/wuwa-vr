@@ -10,19 +10,38 @@
 #include <imgui.h>
 #include <sdk/CVar.hpp>
 #include "WuWaInputTrace.hpp"
+#include "WuWaInputSequenceBridge.hpp"
 #include "WuWaShadowPass.hpp"
 #include "WuWaMotionTrace.hpp"
 #include "WuWaBooleanCVar.hpp"
 #include "WuWaPlanarCVar.hpp"
+#include "WuWaPlanarProbe.hpp"
+#include "WuWaTranslucencyStereo.hpp"
+#include "WuWaKuroReflection.hpp"
+#include "WuWaReflectionCapture.hpp"
+#include "WuWaWaterObservation.hpp"
+#include "WuWaStereoLease.hpp"
+#include "WuWaLodProbe.hpp"
+#include "WuWaSceneFrame.hpp"
+#include "WuWaStereoOrder.hpp"
 
 namespace wuwa_test {
 // Explicit, expiring requests for one-variable graphics comparisons. This is
 // not a console command endpoint. It never enumerates the console registry,
 // changes saved/frozen CVars, or falls back to speculative virtual calls.
 using Json = nlohmann::json;
-enum class CVarStorage { integer, boolean, planar_float };
+inline wuwa_stereo::CandidateLease stereo_candidate_lease;
+inline bool stereo_candidate_value(size_t i,bool configured) {
+    return stereo_candidate_lease.value(GetTickCount64(),i,configured);
+}
+inline Json stereo_candidate_status() {
+    const auto now=GetTickCount64();
+    return {{"active",stereo_candidate_lease.active(now)}, {"id",stereo_candidate_lease.id()},
+        {"values",stereo_candidate_lease.values()}, {"remaining_ms",stereo_candidate_lease.remaining(now)}};
+}
+enum class CVarStorage { integer, boolean, planar_float, impostor_integer, mesh_cache_integer };
 struct CVarSpec { const char* name; const wchar_t* wide_name; int minimum, maximum; CVarStorage storage{}; };
-inline constexpr std::array<CVarSpec, 14> test_cvars{{
+inline constexpr std::array<CVarSpec, 20> test_cvars{{
     {"r.AmbientOcclusionLevels", L"r.AmbientOcclusionLevels", -1, 4},
     {"r.ShadowQuality", L"r.ShadowQuality", 0, 5},
     {"r.ContactShadows", L"r.ContactShadows", 0, 1},
@@ -37,6 +56,20 @@ inline constexpr std::array<CVarSpec, 14> test_cvars{{
     {"r.ReflectionEnvironment", L"r.ReflectionEnvironment", 0, 2},
     {"r.Kuro.SeparateTranslucencyBlur", L"r.Kuro.SeparateTranslucencyBlur", 0, 1},
     {"r.KuroDownsampleTranslucencyFullRes", L"r.KuroDownsampleTranslucencyFullRes", 0, 1, CVarStorage::boolean},
+    // Registration in the inspected WuWa build uses GetIntData (+0x58) for
+    // these four. Custom Kuro foliage controls also include float/bool data;
+    // those must not be sent through the integer-pair writer.
+    {"r.AllowOcclusionQueries", L"r.AllowOcclusionQueries", 0, 1},
+    {"vr.RoundRobinOcclusion", L"vr.RoundRobinOcclusion", 0, 1},
+    {"foliage.ForceLOD", L"foliage.ForceLOD", -1, 8},
+    {"foliage.DisableCull", L"foliage.DisableCull", 0, 1},
+    // ForceMode alone has verified int32-pair storage. Enabled/NearestSlice
+    // are integer references and cannot use this writer.
+    {"r.ImposterVer2.ForceMode", L"r.ImposterVer2.ForceMode", 0, 2, CVarStorage::impostor_integer},
+    // The verified registration/accessor below use paired int32 data. This
+    // expiring comparison regenerates draw commands; it never hides geometry
+    // or changes the shipped rendering defaults.
+    {"r.MeshDrawCommands.UseCachedCommands", L"r.MeshDrawCommands.UseCachedCommands", 0, 1, CVarStorage::mesh_cache_integer},
 }};
 
 struct DataSample { sdk::TConsoleVariableData<int>* data{}; int game{}, render{}; uintptr_t boolean_slot{}, float_slot{}; };
@@ -224,7 +257,18 @@ inline Json test_status(const Json& camera, const Json& live_options) {
         {"active", graphics_lease.spec != nullptr}};
     status["shadow"] = wuwa_shadow::status();
     status["camera"] = camera;
+    status["input_sequence"]=wuwa_input_sequence_bridge::status();
     status["motion_recording"] = wuwa_motion::status();
+    status["planar_probe"] = wuwa_planar_probe::status();
+    status["planar_eye_correction"] = wuwa_planar_probe::correction_status();
+    status["stereo_translucency"] = wuwa_translucency::status();
+    status["kuro_reflection"] = wuwa_kuro_reflection::status();
+    status["reflection_capture_projection"] = wuwa_reflection_capture::status();
+    status["scene_frame_pair"] = wuwa_scene_frame::status();
+    status["native_submission_order_test"] = wuwa_stereo_order::status();
+    status["kuro_water_observation"] = wuwa_water_observation::status();
+    status["stereo_candidate_test"] = stereo_candidate_status();
+    status["lod_probe"] = wuwa_lod_probe::status();
     status["live_options"] = live_options;
     status["graphics_test_cvars"] = Json::array();
     for (const auto& spec : test_cvars) status["graphics_test_cvars"].push_back(spec.name);
@@ -253,6 +297,10 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         return;
     }
     const auto now = GetTickCount64();
+    if(wuwa_input_sequence_bridge::needs_guard_refresh(now)) {
+        try { wuwa_input_sequence_bridge::refresh_guards(camera_status()); }
+        catch(...) { wuwa_input_sequence_bridge::refresh_guards(Json::object()); }
+    }
     if (graphics_lease.spec != nullptr && now >= graphics_lease.until) {
         restore_graphics();
     }
@@ -262,7 +310,7 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         menu_shadow_result = "Temporary override ended; using current Same Pass setting.";
         spdlog::info("[WuWaTest] menu ended shadow comparison");
     } else if (menu_request == 1) {
-        if (graphics_lease.spec == nullptr && !wuwa_shadow::test_active() && wuwa_shadow::ready()) {
+        if (graphics_lease.spec == nullptr && !stereo_candidate_lease.active(now) && !wuwa_stereo_order::active(now) && !wuwa_shadow::test_active() && wuwa_shadow::ready()) {
             wuwa_shadow::set_test(20, false);
             menu_shadow_result = "20-second comparison started; restores automatically.";
             spdlog::info("[WuWaTest] menu shadow correction off for 20 seconds");
@@ -314,7 +362,36 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         }
         const auto op = request.at("op").get<std::string>();
         reply["op"] = op;
-        if (op == "record_motion") {
+        if (op == "input_sequence") {
+            reply["input_sequence"]=wuwa_input_sequence_bridge::request(request,camera_status());
+        } else if (op == "native_submission_order") {
+            const auto seconds = request.value("seconds", 0);
+            if (seconds < 0 || seconds > 30)
+                throw std::runtime_error("Submission order test duration must be 0..30 seconds");
+            if (seconds && (graphics_lease.spec || stereo_candidate_lease.active(now) ||
+                wuwa_shadow::test_active() || !wuwa_shadow::ready() || wuwa_stereo_order::active(now)))
+                throw std::runtime_error("Submission pair is not verified or another graphics test is active");
+            wuwa_stereo_order::until = seconds ? now + seconds * 1000 : 0;
+            reply["native_submission_order_test"] = wuwa_stereo_order::status();
+        } else if (op == "stereo_candidates") {
+            const auto seconds=request.value("seconds",0);
+            if (seconds==0) stereo_candidate_lease.end(now,request.value("lease_id",std::string{}));
+            else {
+                if (graphics_lease.spec || wuwa_shadow::test_active() || wuwa_stereo_order::active(now))
+                    throw std::runtime_error("Another graphics comparison is active");
+                const auto& values=request.at("values");
+                if (!values.is_array() || values.size()!=3 || !values[0].is_boolean() ||
+                    !values[1].is_boolean() || !values[2].is_boolean())
+                    throw std::runtime_error("Stereo comparison needs exactly three Boolean values");
+                stereo_candidate_lease.begin(now,seconds,id,values.get<std::array<bool,3>>());
+            }
+            reply["stereo_candidate_test"]=stereo_candidate_status();
+        } else if (op == "planar_probe") {
+            reply["planar_probe"] = wuwa_planar_probe::request(directory, request.value("seconds", 0));
+        } else if (op == "lod_probe") {
+            reply["lod_probe"] = wuwa_lod_probe::request(directory, request.value("seconds", 0),
+                request.value("view_uniforms",false), request.value("mesh_bindings",false));
+        } else if (op == "record_motion") {
             const auto seconds=request.value("seconds",0);
             if (seconds<0 || seconds>300) throw std::runtime_error("Motion recording duration must be 0..300 seconds");
             if (seconds==0) { wuwa_motion::stop(request.value("recording_id",std::string{})); reply["recording"]=wuwa_motion::status(); }
@@ -348,10 +425,10 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         } else if (op == "shadow_pass") {
             const auto seconds = request.value("seconds", 0);
             if (seconds < 0 || seconds > 60) throw std::runtime_error("shadow test duration must be 0..60 seconds");
-            if (seconds != 0 && (graphics_lease.spec != nullptr || wuwa_shadow::test_active() || !wuwa_shadow::ready())) {
+            if (seconds != 0 && (graphics_lease.spec != nullptr || stereo_candidate_lease.active(now) || wuwa_shadow::test_active() || wuwa_stereo_order::active(now) || !wuwa_shadow::ready())) {
                 throw std::runtime_error("shadow pair unverified, test faulted, or another graphics test is active");
             }
-            wuwa_shadow::set_test(seconds, request.value("enabled", true));
+            wuwa_shadow::set_test(seconds, request.value("enabled", true), request.value("full_view", false));
             reply["shadow"] = wuwa_shadow::status();
         } else if (op == "restore") {
             if (graphics_lease.spec != nullptr && request.value("lease_id", "") != graphics_lease.id) {
@@ -359,7 +436,7 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             }
             reply["restore"] = restore_graphics();
         } else if (op == "query" || op == "begin") {
-            if (graphics_lease.spec != nullptr || wuwa_shadow::test_active()) throw std::runtime_error("another graphics test is active");
+            if (graphics_lease.spec != nullptr || wuwa_shadow::test_active() || stereo_candidate_lease.active(now) || wuwa_stereo_order::active(now)) throw std::runtime_error("another graphics test is active");
             const auto name = request.at("name").get<std::string>();
             const CVarSpec* spec = nullptr;
             for (const auto& candidate : test_cvars) {
@@ -373,6 +450,23 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
                 slot = wuwa_planar_cvar::verified_slot();
             } else if (spec->storage == CVarStorage::boolean) {
                 slot = wuwa_boolean_cvar::full_resolution_slot(0x07109ce2d6076611ULL);
+            } else if (spec->storage == CVarStorage::impostor_integer) {
+                // Registration at 0x1fef1a10 stores GetIntData (+0x58) in this
+                // slot. Verify the complete registration before interpreting it.
+                static const uintptr_t verified = [] {
+                    constexpr std::array<wuwa_code_compatibility::Range, 1> ranges{{
+                        {0x1fef1a10, 112, 0xfba316eaf9087354ULL}}};
+                    return wuwa_code_check::verify("Impostor ForceMode integer data", ranges) + 0x37c9b558;
+                }();
+                slot = verified;
+            } else if (spec->storage == CVarStorage::mesh_cache_integer) {
+                static const uintptr_t verified = [] {
+                    constexpr std::array<wuwa_code_compatibility::Range, 2> ranges{{
+                        {0x20147d80, 115, 0x6c945d338d1019e1ULL},
+                        {0x23622d10, 66, 0xbef84d43c4fde750ULL}}};
+                    return wuwa_code_check::verify("Cached draw command integer data", ranges) + 0x37f5fa28;
+                }();
+                slot = verified;
             } else if (const auto wrapper = sdk::find_cvar_data_cached(L"Engine", spec->wide_name)) {
                 slot = wrapper->address();
             }

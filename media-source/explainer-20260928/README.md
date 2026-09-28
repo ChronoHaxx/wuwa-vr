@@ -10,4 +10,6 @@ Set FFBIN to your FFmpeg bin folder or put its executables on PATH.
 From this directory: `python src/render.py`, then `python src/verify.py`.
 Outputs go to out/. Optional WUWA_EXPLAINER_CLIP overrides the repository's
 site/media/feature-first-person.mp4. Font files are not redistributed.
-The public MP4 bytes are unchanged from the reviewed original render.
+Codex corrected and re-rendered the video on 28 Sep after the owner confirmed
+the ultimate camera fix in headset testing. The original design remains credited
+to Claude Opus 5.5; no new Claude session was used for this correction.

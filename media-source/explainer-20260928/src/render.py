@@ -64,10 +64,10 @@ CAPTIONS = [
     (16.0, 20.0, "A VR runtime (OpenXR) receives two eyes: the same moment, from slightly different viewpoints."),
     (20.0, 24.0, "19–26 Sep: real game UI in VR, first person, head, body and shadow improvements."),
     (24.0, 28.0, "27 Sep: turning Native Stereo Fix on repaired character materials (owner-reported)."),
-    (28.0, 32.0, "Real progress on specific screens and cases, not a finished stereo renderer."),
+    (28.0, 32.0, "28 Sep: the owner confirmed the ultimate camera fix in headset testing for the cases tested."),
     (32.0, 36.0, "Still open: one tree animates in both eyes up close…"),
     (36.0, 41.0, "…but freezes in the left eye far away, even with zero eye separation and equal projection scale."),
-    (41.0, 45.0, "Also open: ultimate transitions (candidate not yet accepted), reflection submenus, some shadows."),
+    (41.0, 45.0, "Still open: reflection submenus and some lighting and shadows."),
     (45.0, 50.0, "Next: name the actual failing asset, then compare what each eye's draw really receives."),
     (50.0, 55.0, "Then make the smallest proven fix, and test everything together in one grouped pass."),
     (55.0, 60.0, "Free and experimental. Source and beginner guide: github.com/ChronoHaxx/wuwa-vr"),
@@ -274,7 +274,7 @@ def scene3(img, d, t, clip):
         ("24–26 Sep", "Head placement · hidden head, full shadow · recovery", OK),
         ("26–27 Sep", "Public beta, source and portable launcher", OK),
         ("27 Sep", "Native Stereo Fix ON: character materials repaired*", OK),
-        ("27–28 Sep", "Main Resonators reflection page improved; submenus deferred", LEFT),
+        ("28 Sep", "Ultimate camera fix: owner-confirmed in headset*", OK),
     ]
     x = 88
     y0, step = 180, 84
@@ -353,7 +353,6 @@ def scene4(img, d, t):
             text(d, (678, y + 17), s, F["body"], TEXT, ai, "lm")
     ca = ramp(t, 9.0)
     cards = [
-        ("Ultimate transitions", "desync; camera candidate not yet accepted"),
         ("Reflection submenus", "weapon / lower pages offset or freeze"),
         ("Some lighting & shadows", "no repair demonstrated yet"),
     ]
@@ -395,7 +394,7 @@ def scene5(img, d, t):
             arrow(d, (x + bw + 3, y + 125), (x + bw + gap - 3, y + 125), ease((t - t0 - 1.2) / 0.5), ACCENT, width=2)
     na = ramp(t, 8.6)
     d.rounded_rectangle([x0, 500, W - x0, 546], 10, outline=mix(LEFT, na), width=2)
-    text(d, (W / 2, 523), "The 28 Sep 16:28 package adds test tools (triggers, asset inventory), not a rendering fix.",
+    text(d, (W / 2, 523), "The 28 Sep 16:28 package includes the camera fix and test tools; foliage remains unresolved.",
          F["body"], TEXT, na, "mm")
 
 

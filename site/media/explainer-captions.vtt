@@ -30,7 +30,7 @@ A VR runtime (OpenXR) receives two eyes: the same moment, from slightly differen
 
 8
 00:00:28.000 --> 00:00:32.000
-Real progress on specific screens and cases, not a finished stereo renderer.
+28 Sep: the owner confirmed the ultimate camera fix in headset testing for the cases tested.
 
 9
 00:00:32.000 --> 00:00:36.000
@@ -42,7 +42,7 @@ Still open: one tree animates in both eyes up close…
 
 11
 00:00:41.000 --> 00:00:45.000
-Also open: ultimate transitions (candidate not yet accepted), reflection submenus, some shadows.
+Still open: reflection submenus and some lighting and shadows.
 
 12
 00:00:45.000 --> 00:00:50.000

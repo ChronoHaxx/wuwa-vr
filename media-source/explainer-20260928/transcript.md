@@ -17,13 +17,13 @@ Silent video (no audio track). All information is carried by the burned-in capti
 
 - `00:20` 19–26 Sep: real game UI in VR, first person, head, body and shadow improvements.
 - `00:24` 27 Sep: turning Native Stereo Fix on repaired character materials (owner-reported).
-- `00:28` Real progress on specific screens and cases, not a finished stereo renderer.
+- `00:28` 28 Sep: the owner confirmed the ultimate camera fix in headset testing for the cases tested.
 
 ## 32–45 s · What's still broken
 
 - `00:32` Still open: one tree animates in both eyes up close…
 - `00:36` …but freezes in the left eye far away, even with zero eye separation and equal projection scale.
-- `00:41` Also open: ultimate transitions (candidate not yet accepted), reflection submenus, some shadows.
+- `00:41` Still open: reflection submenus and some lighting and shadows.
 
 ## 45–55 s · What's next
 
@@ -33,4 +33,3 @@ Silent video (no audio track). All information is carried by the burned-in capti
 ## 55–60 s · Project status
 
 - `00:55` Free and experimental. Source and beginner guide: github.com/ChronoHaxx/wuwa-vr
-

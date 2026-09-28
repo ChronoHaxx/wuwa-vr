@@ -12,7 +12,7 @@ The **28 Sep 16:28 BST experimental package** includes the portable launcher EXE
 4. Apply and launch; accept Windows' permission prompt, then press Play and enter gameplay.
 5. Keep the supplied settings for the first comparison. Open the in-game shortcut sheet for the authoritative bindings; restore the supplied profile through the launcher if settings become confusing.
 
-The new native DLL passed compilation and input-policy tests. The actual packaged EXE passed integrity, startup and refusal-to-overwrite-a-running-game checks. **This exact candidate still needs live trigger/inventory and closed-game apply/restore acceptance.** It adds testing tools; it does not contain a new foliage repair. It also carries the morning's same-draw camera-base candidate aimed at ultimate-transition desync; that change has **not been accepted with an actual ultimate recording**. The public download is an experimental checkpoint, not a stable release. The build label is 16:27; the ZIP was packaged at 16:28.
+The new native DLL passed compilation and input-policy tests. The actual packaged EXE passed integrity, startup and refusal-to-overwrite-a-running-game checks. **This exact candidate still needs live trigger/inventory and closed-game apply/restore acceptance.** It adds testing tools; it does not contain a new foliage repair. It also carries the morning's same-draw camera-base candidate aimed at ultimate-transition desync; the project owner **confirmed on 28 September that the end-of-ultimate camera mismatch is fixed in headset testing for the cases tested**. The public download is an experimental checkpoint, not a stable release. The build label is 16:27; the ZIP was packaged at 16:28.
 
 Unofficial injection carries anti-cheat/account-ban risk. This project is not approved by Kuro Games. Read the included risk and component-license notices. The website/independent guide's MIT license does not relicense UEVR or the whole bundle. Donations are optional and do not buy guaranteed support or future compatibility.
 
@@ -46,7 +46,7 @@ Both eyes need the **same instant of game state**, with deliberately different e
 | 26–27 Sep | Published source, website and a compact public beta. Added a portable EXE and clearer setup/recovery. | A shareable package, with attribution and known issues. The older beta supplied Native Stereo Fix off. |
 | 27 Sep | The user found **Native Stereo Fix on** repaired affected character materials. Indath suggested disabling one-frame thread lag for jitter; later profiles adopted timing corrections. | Stronger evidence than speculative shader edits. It did not solve every shadow, foliage or camera problem. |
 | 27–28 Sep | Reflection work improved the main Resonators page. Weapon/lower submenus still offset/freeze and were deliberately deferred. | Improvement on one page, not a complete reflection fix. |
-| 28 Sep morning | Captured divergent game-camera inputs between native eye calls. Added a same-draw camera-base candidate while preserving eye offsets. Repaired an unsafe diagnostic hook using real branch-path tests. | Offline evidence and a compiled candidate; ultimate transitions still need an actual ultimate recording. The old diagnostic hook was unsafe, but a specific crash was not conclusively attributed. |
+| 28 Sep morning | Captured divergent game-camera inputs between native eye calls. Added a same-draw camera-base candidate while preserving eye offsets. Repaired an unsafe diagnostic hook using real branch-path tests. | Initially a compiled candidate; the owner subsequently confirmed the ultimate-return fix in headset testing that evening. The old diagnostic hook was unsafe, but a specific crash was not conclusively attributed. |
 | 28 Sep afternoon | Agent-controlled menu navigation reached a character trial. Y activated a skill, not an ultimate. The older automation bridge lacked triggers. | Real controller automation works, but that skill clip cannot count as an ultimate test. |
 | 28 Sep, 16:00–16:28 | Added bounded LT/RT input and a dormant read-only asset inventory; compiled, packaged, saved source and checked the launcher. | The next tests can be performed by the agent after a restart. These are tools, not another claimed foliage fix. |
 | 28 Sep afternoon | Reproduced the same tree moving in both eyes nearby, then left-static/right-moving farther away, even during a zero-IPD retreat. | A repeatable distance-dependent failure. Ordinary eye spacing alone does not explain it. |
@@ -55,7 +55,9 @@ Both eyes need the **same instant of game state**, with deliberately different e
 
 **Observed improvements:** usable real-game UI in several screens; first-person tracking during sprint/grapple/flight reported much better; hidden head with a full character shadow reported working; recovery controls; Native Stereo Fix repairing the reported one-eye character materials; main Resonators reflection improvement. The simulator recordings and those user reports have different scopes—neither proves every headset, character or menu.
 
-**Still open:** foliage/prop representation and animation disagreements, some lighting/shadows, ultimate transition desync, and the deferred reflection submenus. No universal all-prop repair has been demonstrated. New trigger input and nearby-asset inventory are not yet accepted in the live game. The 16:28 package should not be described as fixing these defects.
+**Headset-confirmed on 28 Sep:** the end-of-ultimate camera mismatch is fixed for the owner’s tested cases. This is user acceptance, not a claim that every character or transition has been exhaustively tested.
+
+**Still open:** foliage/prop representation and animation disagreements, some lighting/shadows, and the deferred reflection submenus. No universal all-prop repair has been demonstrated. New trigger input and nearby-asset inventory are not yet accepted in the live game. The 16:28 package should not be described as fixing these defects.
 
 ## Why a tree can look frozen in one eye
 
@@ -82,7 +84,7 @@ Two render-side candidates were found in retained near/far traces. The strongest
 
 ## Next work, in order
 
-1. **Run the prepared tools once.** Install the 16:28 candidate with the game closed. Confirm its trigger capability and asset-inventory endpoint, then collect the affected scene. Record an actual RT/ultimate in a character trial, including the complete return to gameplay. Do not mistake Y/skill for ultimate again.
+1. **Run the prepared tools once.** Install the 16:28 candidate with the game closed. Confirm its trigger capability and asset-inventory endpoint, then collect the affected scene. The ultimate camera fix is now headset-confirmed; keep an ultimate return as a regression check after future rendering changes. Trigger-bridge acceptance is separate from the owner’s manual ultimate test.
 2. **Name the failing asset.** Use the bounded nearby mesh/material inventory, landmark positions and FModel to identify the actual tree and representations. No game asset dump needs to be published.
 3. **Join the visible failure to a draw.** Correlate the component/mesh with the relevant render primitive and exact shader permutation. Inspect the selected near/far representation and final View/material/instance inputs. This identity join is not done yet.
 4. **Measure the missing LOD inputs.** Actual per-view dimensions, LOD factors and the active temporal-origin branch are still missing. Do not interpret inactive/default trace values as real decisions. One interesting source lead is the original full-width target versus a custom eye-width target; its causal role is unproven.
@@ -141,4 +143,4 @@ For controller input changes, run the native input-sequence/bridge tests and Pyt
 
 Include release/build ID, game version, VR runtime/headset, selected NSF/profile settings, character and location, the exact action, expected result and a short SBS clip showing both eyes. Say which eye fails and when. Keep UID/player names private and review footage before uploading. Use the site's feedback form to prepare a GitHub issue; it does not silently upload private logs or post for you.
 
-For tonight, one combined report is enough: startup/controls, near/far foliage, ultimate return, menu roundtrip, first-person movement. Separate **fixed**, **still broken** and **not tested**. Keep the older 26 Sep public beta (included in this ZIP) for rollback.
+For future rendering candidates, one combined regression report is enough: startup/controls, near/far foliage, ultimate return, menu roundtrip, first-person movement. Separate **fixed**, **still broken** and **not tested**. Keep the older 26 Sep public beta (included in this ZIP) for rollback.

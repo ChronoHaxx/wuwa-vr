@@ -1,3 +1,5 @@
+> Historical review before headset acceptance. Update, 28 Sep 2026: the owner has now confirmed the ultimate camera fix in headset testing for the cases tested. The page, video and captions have been corrected. The quoted findings below retain their original review context.
+
 # Independent review of GUIDE.md (28 Sep 2026)
 
 Scope: read GUIDE.md against `foliage-evidence.md` and `projection-evidence.md` in this folder. Nothing outside this folder was edited or run. Claims I could not check against these two files (Indath's timing suggestion, the two VF/shader candidates, the 13:18 package) are marked as such rather than called wrong.

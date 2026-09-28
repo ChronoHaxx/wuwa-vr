@@ -7,5 +7,5 @@
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
   "backendSha256": "34455e5e2875300faa2741184e7ac38f971c14ce0654e2195843d8ec0c437c87",
   "frozenPatchSha256": "e858ab099b45aa964e99ddcdd185455007609c39457876b7c90fb27829416af4",
-  "liveAcceptance": "pending; tooling update, not a foliage fix"
+  "liveAcceptance": "Owner confirmed ultimate-return camera fix in headset on 2026-09-28 for tested cases; foliage remains unresolved; trigger/inventory and closed-game apply/restore acceptance remain pending."
 }

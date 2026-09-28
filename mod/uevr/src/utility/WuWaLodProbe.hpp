@@ -5,6 +5,7 @@
 #include "WuWaLodHookSpans.hpp"
 #include "WuWaViewUbTrace.hpp"
 #include "WuWaMeshBindingSnapshot.hpp"
+#include "WuWaEyeDiff.hpp"
 #include <atomic>
 #include <chrono>
 #include <fstream>
@@ -118,6 +119,23 @@ inline Json mesh_binding_json(const wuwa_mesh_binding::Record& r) {
         {"bounds_valid",r.bounds_valid},{"metadata_complete",r.metadata_complete},{"anchors_consistent",r.anchors_consistent},
         {"record_complete",r.complete},{"gpu_binding_proven",false}};
 }
+inline Json eye_diff_region_json(const auto& r) {
+    Json deltas = Json::array();
+    for (uint32_t i = 0; i < r.count; ++i)
+        deltas.push_back(Json::array({r.deltas[i].offset, r.deltas[i].first, r.deltas[i].second}));
+    return {{"begin", r.begin}, {"end", r.end}, {"valid", r.valid}, {"compared", r.compared},
+        {"unreadable", r.unreadable}, {"differing", r.differing}, {"truncated", r.truncated()},
+        {"deltas", deltas}};
+}
+inline Json eye_diff_json(const wuwa_eye_diff::Sample& s) {
+    return {{"type", "eye_pair_diff"}, {"tick_ms", s.id.tick_ms}, {"thread", s.id.thread},
+        {"sequence", s.id.sequence},
+        {"phase", s.id.phase == 1 ? "before_submissions" : "after_submissions"},
+        {"frames", s.id.frames}, {"views", s.views}, {"states", s.states},
+        {"view_region", eye_diff_region_json(s.view)}, {"state_region", eye_diff_region_json(s.state)},
+        {"view_verified_end", wuwa_eye_diff::view_verified_end},
+        {"first_is_eye_slot", 0}, {"gpu_binding_proven", false}};
+}
 struct Record {
     uint64_t tick{}, sequence{};
     uint32_t thread{}, phase{}, frame_offset{};
@@ -151,6 +169,11 @@ struct Probe {
     std::ofstream view_file;
     std::filesystem::path view_path;
     uint32_t view_drained{};
+    wuwa_eye_diff::Ring<> eye_diff_ring;
+    wuwa_eye_diff::Sampler eye_diff_sampler;
+    wuwa_eye_diff::Sample eye_diff_scratch; // pair() only, under the exclusive callback lock
+    std::atomic<uint64_t> eye_diff_dropped{};
+    uint32_t eye_diff_drained{};
     wuwa_mesh_binding::Ring<> mesh_ring;
     std::atomic<bool> mesh_requested{};
     std::atomic<uint64_t> mesh_calls{},mesh_filtered{},mesh_invalid{},mesh_dropped{},mesh_lock_misses{};
@@ -196,6 +219,12 @@ struct Probe {
             }
             file << j.dump() << '\n';
             if (!file) throw std::runtime_error("LOD trace write failed");
+        }
+        wuwa_eye_diff::Sample eye_diff{};
+        while (eye_diff_ring.pop(eye_diff)) {
+            file << eye_diff_json(eye_diff).dump() << '\n';
+            if (!file) throw std::runtime_error("Eye pair diff trace write failed");
+            ++eye_diff_drained;
         }
         if (file.is_open()) {
             file.flush();
@@ -481,6 +510,14 @@ inline uint64_t pair(const void* family, const void* first, const void* second,
                 token = sequence ? sequence : p->sequence.fetch_add(1) + 1;
                 r.sequence = token; r.phase = phase ? phase : sequence ? 2 : 1;
                 if (a.frame.value % 30 < 4 || b.frame.value % 30 < 4) p->append(r);
+                if (p->eye_diff_sampler.take(r.phase, token, a.frame.value, b.frame.value, p->eye_diff_ring.full())) {
+                    // Same exclusive lock and lease as the pair record above: raw
+                    // guarded reads of the two main views and their view states.
+                    wuwa_eye_diff::sample(p->eye_diff_scratch,
+                        {now, token, r.thread, r.phase, {a.frame.value, b.frame.value}},
+                        a.address, b.address, a.state.value, b.state.value, read);
+                    if (!p->eye_diff_ring.append(p->eye_diff_scratch)) ++p->eye_diff_dropped;
+                }
             } else ++p->reads_failed;
         }
         ReleaseSRWLockExclusive(&callbacks);
@@ -509,6 +546,10 @@ inline Json status_locked() {
         {"view_uniforms_supported",true},
         {"mesh_bindings_supported",true},
         {"mesh_binding_hook_revision",wuwa_mesh_binding::hook_revision},
+        {"eye_pair_diff_supported",true},
+        {"eye_pair_diff",{{"written",p->eye_diff_drained},{"capacity",wuwa_eye_diff::ring_capacity},
+            {"dropped",p->eye_diff_dropped.load()},{"truncated",p->eye_diff_ring.truncated()},
+            {"view_end",wuwa_eye_diff::view_end},{"state_end",wuwa_eye_diff::state_end}}},
         {"mesh_bindings",{{"requested",p->mesh_requested.load()},{"installed",mesh_hook_installed},
             {"installation_failed",mesh_hook_failed},{"path",std::string(mesh_path.begin(),mesh_path.end())},
             {"written",p->mesh_drained},{"capacity",wuwa_mesh_binding::capacity},
@@ -555,6 +596,7 @@ inline Json request(const std::filesystem::path& directory, int seconds, bool vi
         {"uniform_site_rva", uniform_site_rva},
         {"uniform_sampling", "CPU pre-tail constants at most 10 Hz per (eye, verified caller RVA, current-matrix source relation); eight fixed contexts per eye; state-frame index unavailable; no GPU readback"},
         {"uniform_snapshot_stage", "pre_tail_24adc060"},
+        {"eye_pair_diff", "raw dword differences between the two main-eye views and their view states; one before/after-submissions pair every 60 family frames; read-only guarded reads, 128 samples maximum, deltas ascending by offset and capped per region; addresses are historical identifiers, never dereference them; view-state extent unknown"},
         {"coverage", "instanced vertex-factory bindings only; cached draws, static mesh CPU LOD and impostors may not pass here"},
         {"identity", "eye slots from validated main-view states; family frames are CPU identity, not GPU frame proof"}}.dump() << '\n';
     memory::require(file.good(), "Cannot open LOD trace");
@@ -589,6 +631,8 @@ inline Json request(const std::filesystem::path& directory, int seconds, bool vi
         owner->view_file=std::move(view_file); owner->view_path=view_path;
         memory::require(owner->view_observer.reset(),"Cannot reset view uniform observer");
         owner->view_ring.reset(); owner->view_drained=0; owner->view_lock_misses=0;
+        owner->eye_diff_ring.reset(); owner->eye_diff_sampler.reset();
+        owner->eye_diff_drained=0; owner->eye_diff_dropped=0;
         owner->view_requested=view_uniforms;
         owner->mesh_file=std::move(mesh_file);owner->mesh_path=mesh_path;owner->mesh_requested=mesh_bindings;
         owner->mesh_ring.reset();owner->mesh_drained=0;owner->mesh_calls=0;owner->mesh_filtered=0;

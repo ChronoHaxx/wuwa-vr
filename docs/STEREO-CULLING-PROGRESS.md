@@ -1,10 +1,12 @@
 # Stereo foliage/prop mismatch: progress and evidence
 
-Updated 28 September 2026 (after the first paired-eye capture). **No rendering fix exists and
-none is proposed here.** The mismatch is unresolved: at distance the left-eye tree is static
+Updated after the paired far/near captures (PR #2 DLL `8bb228d9…`). **No rendering fix exists
+and none is proposed here.** The mismatch is unresolved: at distance the left-eye tree is static
 while the right eye's sways; nearer, both have been seen moving; several trees and locations are
 affected. "LOD/culling/impostor" remains a hypothesis. This update repairs the paired-eye
-diagnostic, which collected nothing in its first real run, and records what that run did show.
+diagnostic, which collected nothing in its first real run, and records what the far run and the
+later far/near pair showed. **Eye slots:** slot 0 is the **right** eye and slot 1 the **left**
+(frozen) eye (fact 14). Where older rows say "eye 0" they mean the right, working eye.
 Windows build, packaging and the one next session: [EYE-DIFF-HANDOFF.md](EYE-DIFF-HANDOFF.md).
 
 ## Baseline and accepted work
@@ -20,7 +22,10 @@ Windows build, packaging and the one next session: [EYE-DIFF-HANDOFF.md](EYE-DIF
 ## Confirmed facts
 
 Facts 1-7 predate this update; 8-12 come from the 28 Sep far capture (30 s, stationary, far
-tree failing; one run, no near control; auxiliary buffers truncated, so not exhaustive).
+tree failing; auxiliary buffers truncated). 13-21 come from the far/near pair taken with the
+repaired DLL (`8bb228d9…`): two 30 s stationary lightweight traces at one tree, 11 complete
+before/after pairs each. Labels come from the user's headset observation (far: left-eye tree
+frozen; near: both sway), not from an automated motion measurement.
 
 | # | Fact | Consequence |
 |---|---|---|
@@ -35,7 +40,16 @@ tree failing; one run, no near control; auxiliary buffers truncated, so not exha
 | 9 | CPU view time constants (`game_time`, `real_time`, `delta_time`, previous values) equal between eyes in all 147 same-frame main pairs | One eye's CPU view clock is not frozen (CPU stage only; GPU unproven) |
 | 10 | Frame 6870 mesh bindings: 343 primitives in both eyes, 0 vertex-factory **type** differences; 31 differ only in VF **instance**, each unique to its eye with identical section counts and shaders; 20 / 31 primitives seen in only eye 0 / eye 1 | The 31 match per-view VF allocation, not per-eye LOD. Eye-only primitives are unexplained (no bounds recorded; frustum edge is the default reading). One frame only |
 | 11 | All 7000 instanced-binder rows in both eyes have `lod_branch=false` | No per-instance LOD transition passed this binder in sampled frames; it is not where a steady per-eye LOD split would show |
-| 12 | Eye 0 has a second uniform production (236 throttled rows) from a different view object in eye 0's render family that carries **eye 0's view-state pointer**, eye 0's perspective projection and external matrices. Eye 1 has none | Identity unknown. Consistent with a view snapshot such as a shadow-depth view built from the first eye (NSF shares shadows); unverified. Any view that shares eye 0's `FSceneViewState` can write that eye's history |
+| 12 | Eye 0 (**right**) has a second uniform production (236 throttled rows) from a different view object in eye 0's render family that carries **eye 0's view-state pointer**, eye 0's perspective projection and external matrices. Eye 1 has none | Identity unknown. Consistent with a view snapshot such as a shadow-depth view built from the first eye (NSF shares shadows); unverified. Any view that shares eye 0's `FSceneViewState` can write that eye's history. Present at far and near alike (227/223 rows in the pair), so not distance-linked |
+| 13 | **Tooling works in the game:** 611/608 pairs, 11/11 scheduled pairs completed, 0 orphans, 0 lock misses and 80 rows in every phase. Before-submission family frame = `4294967295` in every sample | The repair's premise is measured: the frame is unassigned (`UINT_MAX`) before the first submission |
+| 14 | Slot 0 is the **right** eye, slot 1 the **left**: eye1 sits 6.4 units along −right of eye0 (view matrices and `+0x6ec` agree to 1e-5), and eye0's projection is off-centre right (M[2][0] = −0.245) while eye1's is off-centre left (+0.245) | The frozen eye is slot 1 (pass 3, second submission in the normal order). Assumes no compositor swap, which would invert depth |
+| 15 | Every state sample is truncated (about 2,430 of 4,096 dwords differ; 1,536 kept). Before-snapshots are complete up to `+0x31dc`; `+0x31dc..+0x4000` is unknown in **all** samples. From about `+0x2800` both sides are constant and nearly all different | Nothing can be said above `+0x31dc`. The region from about `+0x2800` is probably past both objects (neighbouring heap); inference |
+| 16 | Of 1,540 differing state offsets below the horizon, 1,513 differ in every sample in both conditions. Every per-eye position stored in the states that differs between the eyes differs by exactly **6.4** (IPD) at far and near; one scaled copy by 0.64 | No stale per-eye origin (temporal-LOD, previous-view or similar) in any **differing** position field at far. Positions stored identically in both eyes, or above the horizon, are not covered |
+| 17 | The left eye's state holds 693 dwords of the game's script text, unchanged across both captures (the right eye's: 13). They sit between fields that match the right eye's; the right eye's values there are also unchanged | Never-written bytes carrying allocation history. They dominate raw difference counts and say nothing about rendering |
+| 18 | **One stable far-only difference:** `+0x550` = 2 (right) vs 0 (left) in all 22 far snapshots (before and after), equal at near. It lies in `+0x528..+0x558`, where the right eye's state holds pointers and counts (3, 3, 1), identical in all 44 snapshots, and the left eye's holds null/zero in both conditions | A live structure populated for the right eye and empty for the left, whose one field moves with distance. Equal values are not recorded, so either (A) right goes 0→2 at far while left stays 0, or (B) right stays 2 while the **left** goes 2→0 at far. Unresolved |
+| 19 | Small counters (`+0x0d7c`, `+0x208c`, `+0x20dc`; values 25–27) differ between the eyes by ±1; which one differs changes within captures. The right eye's `+0x0d7c`/`+0x0d84` read 0 after the submissions in both conditions | Per-frame counters and transients; no consistent condition link |
+| 20 | View region: nothing differs only at far. A 156-dword block (right eye data, left eye zeros) switches on and off per sample (3/11 far, 9/11 near) and never repeats a value. The other near-only view differences are float rounding (1 to about 50 ulp) of coordinates both eyes share; near-only state `+0x298/+0x6a8/+0x72c` are 1-ulp | Allocation remnants and rounding, not a constructor-owned input that follows distance |
+| 21 | Instanced binder: no `lod_branch` rows at far or near. CPU view time constants equal per eye in all same-frame pairs (123 far, 84 near) | Same as facts 9 and 11, now at both positions |
 
 ## Rejected hypotheses and readings
 
@@ -45,7 +59,11 @@ tree failing; one run, no near control; auxiliary buffers truncated, so not exha
 | "PR #1's empty trace says something about rendering" | It is a tooling failure with a known mechanism (below) |
 | "The 60-frame cadence was merely too sparse" | Phase 1 never saw an assigned frame, so no cadence could open; and phase 2 lost the lock (below) |
 | "31 per-eye VF instances at far = per-eye LOD" | Fact 10: unique per eye, same sections and shaders: per-view allocation signature |
-| "One eye's wind clock is frozen in its CPU view constants" | Fact 9 |
+| "One eye's wind clock is frozen in its CPU view constants" | Facts 9, 21 |
+| "One eye's stored view origin is stale at far" (for every position field that differs between the eyes) | Fact 16 |
+| "The view objects differ in a distance-linked way at hand-off" (H2, for `+0..+0x1e40`) | Fact 20 |
+| "Many more state dwords differ, so the states diverge" | Facts 15 and 17: the count is allocation history and neighbouring heap |
+| "The right eye's extra auxiliary view explains the far-only split" | Fact 12: present at far and near alike |
 
 **Not rejected:** per-eye view-state history (H1), a constructor-owned view field (H2), a
 difference downstream of both (H3), and LOD/culling/impostor selection as the visible outcome.
@@ -85,7 +103,7 @@ failed independently:
 - Unchanged: memory bounds (128 samples, about 3 MB after a trace is requested), guarded reads,
   no file I/O on the game or render thread, read windows and capacities.
 
-## Tests actually run (Linux cloud; not MSVC, not the game)
+## Tests actually run
 
 | Check | Result |
 |---|---|
@@ -94,39 +112,45 @@ failed independently:
 | `test-eye-diff.cpp` (policy, 15 cases) | pass: g++ 13 with ASan+UBSan, clang 18 |
 | Lifecycle harness under g++ ASan+UBSan; fixture byte-identical from g++ and clang | pass |
 | Whole `WuWaLodProbe.hpp` with stub Windows/safetyhook/spdlog headers, `g++ -fsyntax-only` | no new diagnostic (one pre-existing sign-compare warning); a planted typo in the new status code is reported |
-| Python: summarizer (16) and candidate registration (4) | pass |
+| Python: summarizer (20: adds truncation horizon, unknown-is-not-equal in `--compare`, unchanged/text tags, eye sides) and candidate registration (4) | pass; the new compare test fails on the previous summarizer, which reported an unknown offset as "control only" |
 | Reconstruction patch: only the two header sections changed (97 sections); all 65 text new-file sections apply to an empty tree and equal the overlays | pass |
 
-Not run: MSVC, the game, overhead measurement, PowerShell launcher actions.
+**Local, user (Windows):** MSVC build `8bb228d9…` with zero errors; far and near traces in the game
+with the lifecycle counters in fact 13. Not run anywhere: overhead measurement, PowerShell
+launcher actions in cloud. Cloud checks are g++/clang only.
 
 ## Hypotheses (ranked; all untested on WuWa)
 
-1. **Per-eye view-state history diverges** (fade, HLOD, temporal LOD, occlusion). Fits 1-4.
-   Fact 12 gives a concrete way it could be one-sided: an extra view that shares eye 0's state.
-2. **A constructor-owned view field differs** (`LODDistanceFactor`, camera-cut/fade flags, rect).
+1. **A per-eye view-state structure diverges.** Now narrowed to one place: the structure at
+   `+0x528..+0x558` (fact 18) is populated only in the right eye's state and holds the one
+   field that separates far from near. Fits facts 1-4, 18. Not shown to be read by any draw.
+2. **A constructor-owned view field differs.** Weakened: no far-only view difference at hand-off
+   (fact 20). Fields past the verified `+0x1004` extent are still unproven.
 3. **Neither differs at hand-off**; the split is downstream (bindings, uniform payload beyond
-   the CPU view, a shader distance gate).
+   the CPU view, a shader distance gate). Still possible if (1) turns out to be unrelated.
 
 ## Next experiments, in order
 
-1. **The one session** in [EYE-DIFF-HANDOFF.md](EYE-DIFF-HANDOFF.md): lightweight far and near
-   traces at the same tree, failure confirmed in the headset first.
-
-   | Outcome of `--compare far near` | Establishes | Next |
-   |---|---|---|
-   | State dwords differ only while failing (clock-/flag-like) | H1 | Name the field; test whether fact 12's view writes it; never share histories between eyes |
-   | View-region unclassified/unexpected dwords differ | H2 | Decode the field; fix ownership at construction |
-   | Only expected eye geometry differs in both regions | H1 and H2 excluded for these windows | H3: needs the tree-to-draw join (2) before any fix |
-   | `LIFECYCLE:` warnings or no samples | Tooling still wrong | Report counters; infer nothing |
-
-2. **Tree-to-draw join (missing measurement for any rendering patch).** No capture yet says
-   which draw is the failing tree, so no per-eye draw difference can be attributed. The
-   nearby-mesh inventory records the component, asset, bounds and instances but deliberately
-   no render proxy. Joining needs one verified, read-only render identity for that component
-   (its scene proxy, or bounds recorded in the mesh-binding rows). Not implemented; it must be
-   code-checked for this build, not an arbitrary offset.
-3. Only if (1) and (2) point at the same field or draw: a minimal rendering change, accepted
-   only by a headset comparison at the same far and near positions.
+1. **Absolute values at `+0x528..+0x560` for both eyes, far and near (decides A vs B).** The
+   diff format cannot record equal values. The smallest change is a raw, bounded snapshot of both
+   state objects (no deltas) for the first one or two scheduled before-snapshots of a trace,
+   about 64 KB per capture. The same change should let the delta stream cover the whole window
+   (state capacity 4,096, ring about 64 samples) so nothing is truncated. Read-only, same guarded
+   reads; not implemented yet.
+2. **Does anything read `+0x550`?** Only after (1). A read-only watch of which code reads that
+   field (a verified hook site, not an arbitrary offset) would join it to the renderer. Without
+   that, (1) stays a correlation.
+3. **Tree-to-draw join** (unchanged): no capture yet says which draw is the failing tree.
+4. Only if (1)-(3) agree: a minimal rendering change, accepted only by a headset comparison at
+   the same far and near positions.
 
 Not repeated: CVar switches from fact 5; copying view state between eyes; removing parallax.
 Evidence and user recordings stay local; raw captures are not committed.
+
+### How to read a far/near compare now
+
+`wuwa_eye_diff_summary.py --compare far near` compares only up to the lowest known offset
+(`compared up to +0x…`), tags values that are `UNCHANGED` in every sample and script `TEXT`,
+and prints which slot is which eye. A difference is a lead only if it is (a) below the known
+horizon, (b) not text, not 1-ulp rounding and not a per-sample flicker, and (c) consistent in
+every snapshot of one condition and absent in the other. In this pair only `+0x550` passes.

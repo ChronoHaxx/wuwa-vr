@@ -194,6 +194,67 @@ class CommandLine(unittest.TestCase):
         self.assertIn('differs only while failing: 0', text)
 
 
+def state_sample(sequence, state, truncated=False):
+    row = sample(sequence)
+    row['state_region'] = dict(region(state, compared=4096, truncated=truncated), end=0x4000)
+    return row
+
+
+class Truncation(unittest.TestCase):
+    """A truncated region keeps its lowest deltas; above the last one, absence means unknown."""
+
+    def test_fractions_count_only_samples_that_know_the_offset(self):
+        far = [state_sample(1, [(0x10, 1, 2), (0x100, 3, 4)], truncated=True),
+               state_sample(2, [(0x10, 1, 2), (0x200, 5, 6)])]
+        out = s.summarize(far)
+        region = out['regions']['state_region']
+        self.assertEqual(region['known_until'], 0x100)
+        rows = {r['offset']: r for r in region['differing_offsets']}
+        self.assertEqual((rows[0x200]['seen'], rows[0x200]['of'], rows[0x200]['fraction']), (1, 1, 1.0))
+        self.assertEqual((rows[0x100]['seen'], rows[0x100]['of']), (1, 2))
+        self.assertIn('offsets above 0x100 are unknown', ' '.join(out['warnings']))
+
+    def test_compare_never_reads_unknown_as_equal(self):
+        # 0x200 differs in the control, but one failing sample stopped recording at 0x100:
+        # its absence there is unknown, so it must not be reported as "control only".
+        failing = s.summarize([state_sample(1, [(0x10, 1, 2), (0x100, 3, 4)], truncated=True)])
+        control = s.summarize([state_sample(2, [(0x80, 7, 8), (0x200, 5, 6)])])
+        region = s.compare(failing, control)['regions']['state_region']
+        self.assertEqual(region['known_until'], 0x100)
+        self.assertEqual([r['offset'] for r in region['differs_only_in_control']], [0x80])
+        self.assertEqual([r['offset'] for r in region['differs_only_while_failing']], [0x10, 0x100])
+
+
+class Remnants(unittest.TestCase):
+    def test_static_and_text_bytes_are_labelled_not_hidden(self):
+        text = int.from_bytes(b'.Pla', 'little')
+        rows = [state_sample(n, [(0x40, 2, 0), (0x44, 0xffffffff, text), (0x48, n, n + 1)]) for n in (1, 2, 3)]
+        by = {r['offset']: r for r in s.summarize(rows)['regions']['state_region']['differing_offsets']}
+        self.assertTrue(by[0x40]['static'] and not by[0x40]['text_like'])
+        self.assertTrue(by[0x44]['static'] and by[0x44]['text_like'])
+        self.assertFalse(by[0x48]['static'])  # rewritten every sample: live
+        self.assertFalse(s._text_like(bits(0.9)))   # 0x3f666666 is printable ("fff?") but a float
+        self.assertTrue(s._text_like(int.from_bytes(b' dom', 'little')))
+        self.assertEqual(s._describe(by[0x44]), 'unchanged in every sample, text bytes')
+
+
+class EyeSides(unittest.TestCase):
+    def test_slots_follow_projection_off_centre(self):
+        def view(m20):
+            projection = [0.9, 0, 0, 0, 0, 0.88, 0, 0, m20, 0.2, 0, 1, 0, 0, 10, 0]
+            return {'projection': projection}
+        rows = [{'type': 'pair', 'phase': 'before_submissions', 'views': [view(-0.2448), view(0.2448)]},
+                {'type': 'pair', 'phase': 'after_submissions', 'views': [view(0.5), view(-0.5)]}]
+        with tempfile.TemporaryDirectory() as directory:
+            path = write(directory, rows)
+            self.assertEqual(s.eye_sides(path), {'slot0': 'right', 'slot1': 'left'})
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                s.main([str(path)])
+            self.assertIn('eye slots: 0 = right eye, 1 = left eye', out.getvalue())
+        self.assertIsNone(s.eye_sides(NATIVE))  # no pair rows: no claim
+
+
 def pair_counts(calls, rows, lock_misses=0, invalid=0):
     return {'calls': calls, 'rows': rows, 'lock_misses': lock_misses, 'invalid': invalid}
 

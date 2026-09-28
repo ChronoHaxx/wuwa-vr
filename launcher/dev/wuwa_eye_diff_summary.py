@@ -56,6 +56,22 @@ def _is_time_like(a, b, clock):
             abs(fa - clock) <= TIME_WINDOW_SECONDS and abs(fb - clock) <= TIME_WINDOW_SECONDS)
 
 
+def _text_like(bits):
+    """Printable bytes that do not also read as an ordinary float: heap remnants such as script text.
+    (0.9 is 0x3f666666, "fff?", so printable alone is not enough.)"""
+    raw = (bits & 0xffffffff).to_bytes(4, 'little')
+    printable = sum(32 <= c < 127 for c in raw)
+    return (printable == 4 or (printable == 3 and 0 in raw)) and not _plausible_float(bits)
+
+
+def _horizon(region):
+    """Highest offset whose equality is known. Deltas are kept in ascending order, so a truncated
+    region knows nothing above its last retained delta: absent there means unknown, not equal."""
+    if region['truncated'] and region['deltas']:
+        return region['deltas'][-1][0]
+    return region['end'] - 4
+
+
 def _known(offset):
     for begin, end, label, kind in KNOWN_VIEW:
         if begin <= offset < end:
@@ -104,11 +120,13 @@ def summarize(samples, clock=(), phase='before'):
     for name in ('view_region', 'state_region'):
         per_offset = defaultdict(lambda: {'seen': 0, 'pairs': set(), 'values': [], 'time_like': 0})
         valid = unreadable = truncated = compared = 0
+        horizons = []
         for s in samples:
             region = s[name]
             if not region['valid']:
                 continue
             valid += 1
+            horizons.append(_horizon(region))
             unreadable += region['unreadable']
             compared += region['compared']
             truncated += bool(region['truncated'])
@@ -121,15 +139,22 @@ def summarize(samples, clock=(), phase='before'):
                     entry['values'].append((a, b))
                 entry['time_like'] += _is_time_like(a, b, now)
         rows = []
+        known_until = min(horizons) if horizons else None
         for offset in sorted(per_offset):
             entry = per_offset[offset]
             label, kind = _known(offset) if name == 'view_region' else (None, 'unclassified')
             a, b = entry['values'][0]
+            of = sum(1 for h in horizons if h >= offset)  # samples in which this offset is known
             rows.append({
-                'offset': offset, 'seen': entry['seen'], 'of': valid,
-                'fraction': entry['seen'] / valid if valid else 0.0, 'kind': kind, 'label': label,
+                'offset': offset, 'seen': entry['seen'], 'of': of,
+                'fraction': entry['seen'] / of if of else 0.0, 'kind': kind, 'label': label,
                 'first_values': [a, b], 'as_float': [_float(a), _float(b)],
                 'distinct_value_pairs': len(entry['values']),
+                # The same unequal pair in every sample that knows it. Either never written (members or
+                # padding showing allocation history, often text) or a live value that simply held
+                # still, e.g. a position in a stationary capture. Not a cause by itself either way.
+                'static': of > 1 and entry['seen'] == of and len(entry['values']) == 1,
+                'text_like': _text_like(a) or _text_like(b),
                 'time_like': entry['time_like'] > 0,
                 'small_int': a < 0x10000 and b < 0x10000,
                 # A pointer's low half at an 8-aligned offset: its equal high half is omitted, and
@@ -139,11 +164,13 @@ def summarize(samples, clock=(), phase='before'):
             })
         out['regions'][name] = {'valid_samples': valid, 'dwords_compared': compared,
                                 'unreadable_dwords': unreadable, 'truncated_samples': truncated,
-                                'differing_offsets': rows}
+                                'known_until': known_until, 'differing_offsets': rows}
         if valid == 0 and samples:
             out['warnings'].append(f'{name}: no valid comparison in any sample')
         if truncated:
-            out['warnings'].append(f'{name}: {truncated} sample(s) truncated; high offsets may be missing')
+            out['warnings'].append(f'{name}: {truncated} sample(s) truncated; offsets above '
+                                   f'{known_until:#x} are unknown in at least one sample and are '
+                                   f'excluded from --compare')
         if unreadable:
             out['warnings'].append(f'{name}: {unreadable} unreadable dword(s) were skipped')
     if not samples:
@@ -157,21 +184,27 @@ def compare(failing, control, threshold=0.8):
     for name in ('view_region', 'state_region'):
         a = {r['offset']: r for r in failing['regions'][name]['differing_offsets']}
         b = {r['offset']: r for r in control['regions'][name]['differing_offsets']}
+        limits = [x for x in (failing['regions'][name].get('known_until'),
+                              control['regions'][name].get('known_until')) if x is not None]
+        known_until = min(limits) if limits else None
         only_failing, only_control = [], []
         for offset in sorted(set(a) | set(b)):
+            if known_until is not None and offset > known_until:
+                continue  # unknown in at least one sample: absence would be read as equality
             fa = a[offset]['fraction'] if offset in a else 0.0
             fb = b[offset]['fraction'] if offset in b else 0.0
             source = a.get(offset) or b.get(offset)
             item = {'offset': offset, 'failing_fraction': fa, 'control_fraction': fb,
                     'kind': source['kind'], 'label': source['label'],
                     'first_values': source['first_values'], 'as_float': source['as_float'],
-                    'time_like': source['time_like'], 'small_int': source['small_int']}
+                    'time_like': source['time_like'], 'small_int': source['small_int'],
+                    'static': source.get('static', False), 'text_like': source.get('text_like', False)}
             if fa >= threshold and fb <= 1 - threshold:
                 only_failing.append(item)
             elif fb >= threshold and fa <= 1 - threshold:
                 only_control.append(item)
         result['regions'][name] = {'differs_only_while_failing': only_failing,
-                                   'differs_only_in_control': only_control}
+                                   'differs_only_in_control': only_control, 'known_until': known_until}
     return result
 
 
@@ -185,7 +218,36 @@ def _describe(row):
         bits.append('small int')
     if row.get('pointer_low_half_candidate'):
         bits.append('pointer low half?')
+    if row.get('static'):
+        bits.append('unchanged in every sample')
+    if row.get('text_like'):
+        bits.append('text bytes')
     return ', '.join(bits)
+
+
+def eye_sides(path):
+    """Which eye slot is left/right, from the before-submission pair rows' projections.
+
+    UE projection M[2][0] (flat index 8) is the horizontal off-centre term; a negative value puts the
+    frustum centre right of the optical axis. Headset eyes are wider on their outer side, so that is the
+    right eye. Assumes the compositor does not swap eyes (swapped stereo would look inverted)."""
+    terms = {0: [], 1: []}
+    for line in Path(path).read_text(encoding='utf-8').splitlines():
+        if '"pair"' not in line:
+            continue
+        row = json.loads(line)
+        if row.get('type') != 'pair' or row.get('phase') != 'before_submissions':
+            continue
+        for slot, view in enumerate(row.get('views', [])[:2]):
+            projection = view.get('projection')
+            if isinstance(projection, list) and len(projection) == 16:
+                terms[slot].append(projection[8])
+    sides = {}
+    for slot, values in terms.items():
+        if values:
+            middle = sorted(values)[len(values) // 2]
+            sides[f'slot{slot}'] = 'right' if middle < 0 else 'left' if middle > 0 else None
+    return sides or None
 
 
 def lifecycle(trace):
@@ -221,6 +283,10 @@ def lifecycle(trace):
 
 def render(summary):
     lines = [f"{summary['samples']} {summary['phase']}-phase samples from {summary['pairs']} pairs"]
+    if summary.get('eye_sides'):
+        sides = summary['eye_sides']
+        lines.append(f"eye slots: 0 = {sides.get('slot0')} eye, 1 = {sides.get('slot1')} eye "
+                     "(projection off-centre; eye0/eye1 below are these slots)")
     for warning in summary['warnings']:
         lines.append(f'WARNING: {warning}')
     life = summary.get('lifecycle')
@@ -256,10 +322,14 @@ def render(summary):
 
 def render_compare(result):
     lines = [f"failing: {result['failing_samples']} samples, control: {result['control_samples']} samples"]
+    if result.get('eye_sides'):
+        lines.append(f"eye slots: {result['eye_sides']}")
     for name, region in result['regions'].items():
         lines.append('')
         lines.append(f"{name}: differs only while failing: {len(region['differs_only_while_failing'])}, "
-                     f"only in control: {len(region['differs_only_in_control'])}")
+                     f"only in control: {len(region['differs_only_in_control'])}"
+                     + (f" (compared up to +{region['known_until']:#06x}; above is unknown)"
+                        if region.get('known_until') is not None else ''))
         for title, items in (('FAILING ONLY', region['differs_only_while_failing']),
                              ('control only', region['differs_only_in_control'])):
             for row in items[:100]:
@@ -267,7 +337,8 @@ def render_compare(result):
                 lines.append(f"  {title} +{row['offset']:#06x} fail={row['failing_fraction']:.2f} "
                              f"ctrl={row['control_fraction']:.2f} [{row['kind']}] eye0={a:#010x} eye1={b:#010x} "
                              f"f=({row['as_float'][0]:.6g},{row['as_float'][1]:.6g}) "
-                             f"{'TIME-LIKE ' if row['time_like'] else ''}{row['label'] or ''}")
+                             f"{'TIME-LIKE ' if row['time_like'] else ''}{'UNCHANGED ' if row.get('static') else ''}"
+                             f"{'TEXT ' if row.get('text_like') else ''}{row['label'] or ''}")
     return '\n'.join(lines)
 
 
@@ -283,6 +354,7 @@ def main(argv=None):
         parser.error('--compare takes exactly two traces (failing, control); otherwise pass one trace')
     summaries = [summarize(*load(path), phase=args.phase) for path in args.trace]
     result = compare(*summaries) if args.compare else summaries[0]
+    result['eye_sides'] = eye_sides(args.trace[0])
     if not args.compare:
         result['lifecycle'] = lifecycle(args.trace[0])
     if args.json:

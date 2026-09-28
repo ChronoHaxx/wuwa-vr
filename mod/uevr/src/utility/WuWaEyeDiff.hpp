@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 
 // Read-only, bounded comparison of the two main-eye scene views and of their
 // view-state objects, taken at the two points where the existing LOD trace
@@ -101,31 +102,67 @@ struct Sample {
     Region<state_capacity> state{};
 };
 
-// One "before submissions" (phase 1) snapshot every `interval_frames` family
-// frames, then the "after submissions" (phase 2) snapshot of THAT SAME pair
+// One "before submissions" (phase 1) snapshot every `interval_pairs` validated
+// NSF pairs, then the "after submissions" (phase 2) snapshot of THAT SAME pair
 // (same sequence token), so a 30 second far-to-near walk is not exhausted in
-// the first seconds. The mid-pair snapshot (phase 3) is never sampled. Used
-// only under the probe's exclusive callback lock; reset with the ring.
-inline constexpr uint32_t interval_frames = 60;
+// the first seconds. The mid-pair snapshot (phase 3) is never sampled.
+//
+// The schedule is keyed to the probe's own pair sequence, never to the family
+// frame. Phase 1 runs before the first submission, and there the family frame
+// field does not hold the frame the renderer assigns: in the 28 Sep far capture
+// no phase-1 read in 453 consecutive validated pairs passed the frame filter
+// that the phase-3 read of the SAME sequence passed every 30 frames. A frame
+// gate at phase 1 therefore never opened and no sample was taken. A sequence
+// is issued only to a validated phase-1 snapshot, so invalid early snapshots
+// do not consume one and a frame-counter stride cannot alias the schedule away.
+//
+// Used only by the pair() caller that owns the probe's pair guard; reset with
+// the ring under the exclusive callback lock. Counters are single-writer
+// relaxed atomics so the control thread can report them.
+inline constexpr uint32_t interval_pairs = 60;
+struct SamplerCounts {
+    std::atomic<uint32_t> before_seen{};  // phase-1 snapshots offered to the sampler
+    std::atomic<uint32_t> before_taken{}; // ...scheduled (on the interval, room for both)
+    std::atomic<uint32_t> after_taken{};  // matching phase-2 snapshots taken
+    std::atomic<uint32_t> ring_full{};    // refused for lack of ring room
+    std::atomic<uint32_t> orphaned{};     // scheduled before-snapshots whose phase 2 never arrived
+};
 class Sampler {
 public:
-    bool take(uint32_t phase, uint64_t sequence, uint32_t first_frame, uint32_t second_frame,
-              bool ring_full) noexcept {
-        if (ring_full || !sequence) return false;
+    // `free_slots` is the ring's unused capacity. A pair is started only when
+    // both of its snapshots fit, so a before-snapshot always has room for its after.
+    bool take(uint32_t phase, uint64_t sequence, size_t free_slots) noexcept {
+        if (!sequence) return false;
         if (phase == 1) {
-            if (first_frame % interval_frames != 0 && second_frame % interval_frames != 0) return false;
+            if (pending) orphan();
+            bump(counts_.before_seen);
+            if ((sequence - 1) % interval_pairs != 0) return false;
+            if (free_slots < 2) { bump(counts_.ring_full); return false; }
             pending = sequence;
+            bump(counts_.before_taken);
             return true;
         }
-        if (phase == 2 && pending == sequence) {
-            pending = 0;
-            return true;
-        }
-        return false;
+        if (phase != 2 || !pending) return false;
+        if (pending != sequence) { orphan(); return false; }
+        pending = 0;
+        if (!free_slots) { bump(counts_.ring_full); return false; }
+        bump(counts_.after_taken);
+        return true;
     }
-    void reset() noexcept { pending = 0; }
+    void reset() noexcept {
+        pending = 0;
+        for (auto* c : {&counts_.before_seen, &counts_.before_taken, &counts_.after_taken,
+                        &counts_.ring_full, &counts_.orphaned})
+            c->store(0, std::memory_order_relaxed);
+    }
+    const SamplerCounts& counts() const noexcept { return counts_; }
 private:
+    static void bump(std::atomic<uint32_t>& c) noexcept {
+        c.store(c.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
+    }
+    void orphan() noexcept { bump(counts_.orphaned); pending = 0; }
     uint64_t pending{};
+    SamplerCounts counts_{};
 };
 
 template<class Read>
@@ -138,13 +175,17 @@ void sample(Sample& out, const Identity& id, uintptr_t first_view, uintptr_t sec
     compare<state_capacity>(out.state, first_state, second_state, 0, state_end, read);
 }
 
-// One producer path (the pair snapshot, already serialized by the probe's
-// exclusive callback lock) and one control-thread consumer. Never overwrites.
+// One producer path (the pair snapshot, serialized by the probe's pair guard)
+// and one control-thread consumer. Never overwrites.
 template<size_t Capacity = ring_capacity> class Ring {
     static_assert(Capacity > 0);
     struct Slot { Sample sample{}; std::atomic<bool> ready{}; };
 public:
     bool full() const noexcept { return next.load(std::memory_order_relaxed) >= Capacity; }
+    size_t free_slots() const noexcept {
+        const auto used = next.load(std::memory_order_relaxed);
+        return used >= Capacity ? 0 : Capacity - used;
+    }
     bool append(const Sample& s) noexcept {
         auto index = next.load(std::memory_order_relaxed);
         do {

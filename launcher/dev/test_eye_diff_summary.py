@@ -53,7 +53,9 @@ class NativeShape(unittest.TestCase):
         self.assertEqual((both['samples'], both['pairs']), (4, 2))
         self.assertEqual(s.summarize(samples, clock, phase='after')['samples'], 2)
         view = {r['offset']: r for r in out['regions']['view_region']['differing_offsets']}
-        self.assertEqual(sorted(view), [0x2f8, 0x320, 0x324])
+        # +0x8 is each eye's own view-state pointer, read through the real pair() path.
+        self.assertEqual(sorted(view), [0x8, 0x2f8, 0x320, 0x324])
+        self.assertEqual((view[0x8]['kind'], view[0x8]['label']), ('expected', 'view-state pointer'))
         self.assertEqual((view[0x2f8]['kind'], view[0x2f8]['label']), ('unexpected', 'view rect'))
         self.assertEqual(view[0x320]['kind'], 'geometry')
         self.assertTrue(all(r['seen'] == r['of'] == 2 for r in view.values()))
@@ -190,6 +192,55 @@ class CommandLine(unittest.TestCase):
         code, text = self.run_main('--compare', str(NATIVE), str(NATIVE))
         self.assertEqual(code, 0)
         self.assertIn('differs only while failing: 0', text)
+
+
+def pair_counts(calls, rows, lock_misses=0, invalid=0):
+    return {'calls': calls, 'rows': rows, 'lock_misses': lock_misses, 'invalid': invalid}
+
+
+class Lifecycle(unittest.TestCase):
+    """The status wuwa-test.py saves beside a trace explains an empty or thin one."""
+
+    def run_with_inputs(self, probe):
+        with tempfile.TemporaryDirectory() as directory:
+            trace = write(directory, [{'type': 'header'}])
+            if probe is not None:
+                (Path(directory) / 'lod-inputs.json').write_text(json.dumps({'end': {'lod_probe': probe}}))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                s.main([str(trace)])
+            return s.lifecycle(trace), out.getvalue()
+
+    def test_no_inputs_file_adds_nothing(self):
+        life, text = self.run_with_inputs(None)
+        self.assertIsNone(life)
+        self.assertNotIn('LIFECYCLE', text)
+
+    def test_merged_pr1_status_cannot_explain_an_empty_trace(self):
+        # Shape of the 28 Sep far capture's end status: zero written, no per-phase counters.
+        life, text = self.run_with_inputs({'eye_pair_diff': {'written': 0, 'capacity': 128, 'dropped': 0},
+                                           'lock_misses': 478, 'read_failures': 68})
+        self.assertIn('predates the sampling repair', life['warnings'][0])
+        self.assertIn('LIFECYCLE: status has no per-phase pair counters', text)
+
+    def test_starved_sampler_and_lost_after_snapshots_are_named(self):
+        life, text = self.run_with_inputs({
+            'eye_pair_diff': {'before_seen': 450, 'before_taken': 0, 'after_taken': 0, 'orphaned': 0, 'ring_full': 0},
+            'pairs': {'before_submissions': pair_counts(450, 60),
+                      'after_first_submission': pair_counts(450, 60),
+                      'after_submissions': pair_counts(12, 2, lock_misses=438)}})
+        self.assertIn('none was scheduled', ' '.join(life['warnings']))
+        self.assertIn('after_submissions: 438 lock miss(es), 0 invalid snapshot(s) of 12 calls', text)
+        self.assertIn('sampler: 450 pairs seen, 0 scheduled, 0 completed', text)
+
+    def test_healthy_status_has_no_warning(self):
+        life, text = self.run_with_inputs({
+            'eye_pair_diff': {'before_seen': 475, 'before_taken': 8, 'after_taken': 8, 'orphaned': 0, 'ring_full': 0},
+            'pairs': {'before_submissions': pair_counts(475, 64), 'after_first_submission': pair_counts(475, 64),
+                      'after_submissions': pair_counts(475, 64)}})
+        self.assertEqual(life['warnings'], [])
+        self.assertIn('8 scheduled, 8 completed, 0 orphaned', text)
+        self.assertNotIn('LIFECYCLE', text)
 
 
 if __name__ == '__main__':

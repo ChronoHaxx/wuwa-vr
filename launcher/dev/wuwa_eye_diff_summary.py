@@ -188,10 +188,55 @@ def _describe(row):
     return ', '.join(bits)
 
 
+def lifecycle(trace):
+    """Probe counters from the `lod-inputs.json` wuwa-test.py writes beside a trace, or None.
+
+    They explain an empty or thin trace: how many pairs reached each phase, lock misses and
+    invalid snapshots per phase, and what the eye-diff sampler scheduled, took or orphaned.
+    """
+    inputs = Path(trace).with_name('lod-inputs.json')
+    if not inputs.is_file():
+        return None
+    try:
+        probe = json.loads(inputs.read_text(encoding='utf-8'))['end']['lod_probe']
+    except (OSError, ValueError, KeyError, TypeError):
+        return {'warnings': [f'{inputs.name}: unreadable or has no end.lod_probe status']}
+    sampler, pairs = probe.get('eye_pair_diff', {}), probe.get('pairs')
+    out = {'eye_pair_diff': sampler, 'pairs': pairs, 'warnings': []}
+    if pairs is None or 'before_taken' not in sampler:
+        out['warnings'].append('status has no per-phase pair counters: this DLL predates the '
+                               'sampling repair, so an empty trace cannot be explained from it')
+        return out
+    before = pairs.get('before_submissions', {})
+    if before.get('calls') and not sampler.get('before_taken'):
+        out['warnings'].append('validated pairs reached the sampler but none was scheduled')
+    if sampler.get('orphaned'):
+        out['warnings'].append(f"{sampler['orphaned']} scheduled pair(s) never got their after-submissions snapshot")
+    for phase, counts in pairs.items():
+        if isinstance(counts, dict) and (counts.get('lock_misses') or counts.get('invalid')):
+            out['warnings'].append(f"{phase}: {counts.get('lock_misses', 0)} lock miss(es), "
+                                   f"{counts.get('invalid', 0)} invalid snapshot(s) of {counts.get('calls', 0)} calls")
+    return out
+
+
 def render(summary):
     lines = [f"{summary['samples']} {summary['phase']}-phase samples from {summary['pairs']} pairs"]
     for warning in summary['warnings']:
         lines.append(f'WARNING: {warning}')
+    life = summary.get('lifecycle')
+    if life:
+        sampler, pairs = life.get('eye_pair_diff') or {}, life.get('pairs') or {}
+        if 'before_taken' in sampler:
+            lines.append(f"sampler: {sampler['before_seen']} pairs seen, {sampler['before_taken']} scheduled, "
+                         f"{sampler['after_taken']} completed, {sampler['orphaned']} orphaned, "
+                         f"{sampler['ring_full']} refused for ring room")
+        for phase in ('before_submissions', 'after_first_submission', 'after_submissions'):
+            if isinstance(pairs.get(phase), dict):
+                c = pairs[phase]
+                lines.append(f"  {phase}: {c['calls']} calls, {c['rows']} rows, "
+                             f"{c['lock_misses']} lock misses, {c['invalid']} invalid")
+        for warning in life['warnings']:
+            lines.append(f'LIFECYCLE: {warning}')
     for name, region in summary['regions'].items():
         lines.append('')
         lines.append(f"{name}: {region['valid_samples']} valid samples, {region['dwords_compared']} dwords compared, "
@@ -238,6 +283,8 @@ def main(argv=None):
         parser.error('--compare takes exactly two traces (failing, control); otherwise pass one trace')
     summaries = [summarize(*load(path), phase=args.phase) for path in args.trace]
     result = compare(*summaries) if args.compare else summaries[0]
+    if not args.compare:
+        result['lifecycle'] = lifecycle(args.trace[0])
     if args.json:
         json.dump(result, sys.stdout, indent=1)
         sys.stdout.write('\n')

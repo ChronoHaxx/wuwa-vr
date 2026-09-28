@@ -1,19 +1,32 @@
 #!/usr/bin/env python3
-"""Compile the probe's eye-diff JSON serializer and pair() call site against real nlohmann/json.
+"""Compile the probe's VERBATIM pair() and eye-diff serializer against real nlohmann/json and
+replay the real NSF callback lifecycle through them.
 
-WuWaLodProbe.hpp needs Windows headers, so this extracts the two serializer functions and the
-sampling call site VERBATIM from the header, wraps them in stub types with the same field
-types, and runs them over fake memory. The JSONL it writes is the schema the offline
-summarizer reads. Default mode fails if that output differs from the committed fixture, so
-the serializer, the call site and fixtures cannot drift apart silently.
+WuWaLodProbe.hpp needs Windows headers, so this extracts the two eye-diff serializers,
+`struct Record` and `pair()` verbatim, compiles them inside eye-diff-lifecycle-harness.cpp
+(instrumented SRW lock, clock and guarded reader over fake game memory) and drives the call
+order FFakeStereoRenderingHook.cpp uses:
 
-    check-eye-diff-json.py --json-include path/to/dir-containing-nlohmann   # verify
-    check-eye-diff-json.py --json-include ... --update                      # rewrite fixture
+    token = pair(family, view0, view1, 0x64)     # phase 1, before the first submission
+    <first submission assigns the family frame>
+    if token: pair(..., token, 3)                # phase 3, after the first submission
+    <second submission; render callbacks now hold the shared callback lock>
+    if token: pair(..., token)                   # phase 2, after both submissions
 
-Needs g++ (or $CXX) and nlohmann/json (single header, e.g. v3.11.3). Compilation here is not
-an MSVC build: the full native target still needs the Windows toolchain.
+Each scenario's outcome is checked here. The fixture scenario's JSONL is the schema the
+offline summarizer reads; default mode fails if it differs from the committed fixture.
+
+    check-eye-diff-json.py --json-include DIR                 # verify (DIR holds nlohmann/json.hpp)
+    check-eye-diff-json.py --json-include DIR --update        # rewrite the fixture
+    check-eye-diff-json.py --json-include DIR --utility OLD   # lifecycle only, against other sources
+
+`--utility` points at another copy of mod/uevr/src/utility (for example merged PR #1) to show
+which lifecycle expectations that version fails. Needs g++ (or $CXX) with C++20. This is not
+an MSVC build and not game evidence: the full native target still needs the Windows toolchain,
+and only a capture in the game shows what the game does.
 """
 import argparse
+import json
 import os
 import pathlib
 import subprocess
@@ -21,110 +34,136 @@ import sys
 import tempfile
 
 here = pathlib.Path(__file__).resolve().parent
-utility = (here / '../../mod/uevr/src/utility').resolve()
-if not utility.is_dir():
-    utility = (here / '../upstream/UEVR/src/utility').resolve()
+default_utility = (here / '../../mod/uevr/src/utility').resolve()
+if not default_utility.is_dir():
+    default_utility = (here / '../upstream/UEVR/src/utility').resolve()
 fixture = here / 'fixtures' / 'eye-pair-diff-native-sample.jsonl'
+harness = here / 'eye-diff-lifecycle-harness.cpp'
+INTERVAL = 60
+UNASSIGNED = 0xffffffff
 
-parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument('--json-include', required=True, help='directory that contains nlohmann/json.hpp')
-parser.add_argument('--update', action='store_true', help='rewrite the committed fixture')
-args = parser.parse_args()
 
-probe = (utility / 'WuWaLodProbe.hpp').read_bytes().decode().replace('\r\n', '\n')
-start = probe.index('inline Json eye_diff_region_json')
-end = probe.index('struct Record {', start)
-functions = probe[start:end]
-site_start = probe.index('if (p->eye_diff_sampler.take(')
-site_end = probe.index('} else ++p->reads_failed;', site_start)
-site = probe[site_start:site_end]
+def extract(utility):
+    probe = (utility / 'WuWaLodProbe.hpp').read_bytes().decode().replace('\r\n', '\n')
+    start = probe.index('inline Json eye_diff_region_json')
+    record = probe[start:probe.index('struct Slot {', start)]
+    pair_start = probe.index('inline uint64_t pair(')
+    pair = probe[pair_start:probe.index('inline Json status_locked()', pair_start)]
+    return record, pair
 
-harness = r'''
-#include <nlohmann/json.hpp>
-#include <fstream>
-#include <memory>
-#include <vector>
-#include <cassert>
-#include <iostream>
-#include "WuWaEyeDiff.hpp"
-using Json = nlohmann::json;
-template<class T> struct Field { T value{}; bool valid{}; };
-struct View { uintptr_t address{}; Field<uintptr_t> state{}; Field<uint32_t> frame{}; };
-struct Rec { uint32_t thread{}, phase{}; };
-struct Probe {
-    wuwa_eye_diff::Ring<> eye_diff_ring;
-    wuwa_eye_diff::Sampler eye_diff_sampler;
-    wuwa_eye_diff::Sample eye_diff_scratch;
-    std::atomic<uint64_t> eye_diff_dropped{};
-};
-''' + functions + r'''
-constexpr uintptr_t base_a = 0x100000, base_b = 0x900000, sbase_a = 0x1100000, sbase_b = 0x1900000;
-std::vector<uint32_t> mem_a(0x1000), mem_b(0x1000), smem_a(0x1000), smem_b(0x1000);
-bool reader_fn(uintptr_t at, void* out, size_t bytes) {
-    struct Area { uintptr_t base; std::vector<uint32_t>* mem; };
-    for (const Area& area : {Area{base_a, &mem_a}, Area{base_b, &mem_b}, Area{sbase_a, &smem_a}, Area{sbase_b, &smem_b}}) {
-        if (at >= area.base && at + bytes <= area.base + area.mem->size() * 4) {
-            std::memcpy(out, area.mem->data() + (at - area.base) / 4, bytes);
-            return true;
-        }
-    }
-    return false;
-}
-int main(int, char** argv) {
-    for (size_t i = 0; i < mem_a.size(); ++i) { mem_a[i] = mem_b[i] = uint32_t(i * 3 + 1); smem_a[i] = smem_b[i] = uint32_t(i * 5 + 7); }
-    // View: eye-specific matrix words, a rect x that differs, a scalar the reviewer must chase.
-    mem_b[0x320 / 4] = 0x3f0a0000; mem_b[0x324 / 4] = 0xbf000000;
-    mem_b[0x2f8 / 4] = 1;
-    // State: a time-like float pair 3.25 s apart, a pointer-like qword (low half differs, high half equal), a flag.
-    float t0 = 1234.5f, t1 = 1231.25f; std::memcpy(&smem_a[0x1c0 / 4], &t0, 4); std::memcpy(&smem_b[0x1c0 / 4], &t1, 4);
-    smem_a[0x40 / 4] = 0x8bfe9970; smem_b[0x40 / 4] = 0x8bfeb2d0; smem_a[0x44 / 4] = smem_b[0x44 / 4] = 0x1a;
-    smem_a[0x300 / 4] = 0; smem_b[0x300 / 4] = 1;
-    auto read = [](uintptr_t at, auto& out) { return reader_fn(at, &out, sizeof(out)); };
 
-    auto p = std::make_unique<Probe>();
-    std::ofstream out(argv[1], std::ios::binary);
-    out << Json{{"type", "header"}, {"version", 1}, {"seconds", 30}}.dump() << '\n';
-    uint64_t now = 100000; uint64_t token = 0;
-    for (uint32_t frame : {60u, 120u, 130u}) {
-        ++token;
-        View a{base_a, {base_a, true}, {frame, true}}, b{base_b, {base_b, true}, {frame, true}};
-        a.state.value = sbase_a; b.state.value = sbase_b;
-        for (uint32_t phase : {1u, 2u, 3u}) {
-            Rec r{0x1234, phase};
-            if (phase == 2) { a.frame.value = b.frame.value = frame + 1; }
-            // -------- verbatim pair() call site --------
-            ''' + site + r'''
-            // --------------------------------------------
-            now += 8;
-        }
-    }
-    wuwa_eye_diff::Sample popped;
-    int written = 0;
-    while (p->eye_diff_ring.pop(popped)) { out << eye_diff_json(popped).dump() << '\n'; ++written; }
-    // the sampler must have kept only the on-interval pair (frame 60) and 120: two pairs, phase 1+2 each
-    std::cout << "written=" << written << '\n';
-    assert(written == 4);
-    return 0;
-}
-'''
+def row_frames(frames):
+    return sum(1 for f in frames if f % 30 < 4)
 
-with tempfile.TemporaryDirectory() as work:
-    work = pathlib.Path(work)
-    (work / 'harness.cpp').write_text(harness)
-    build = subprocess.run([os.environ.get('CXX', 'g++'), '-std=c++20', '-Wall', '-Wextra', '-Werror', '-O1',
-                            f'-I{args.json_include}', f'-I{utility}', str(work / 'harness.cpp'),
-                            '-o', str(work / 'harness')], capture_output=True, text=True)
-    if build.returncode:
-        sys.exit('serializer/call-site compile failed:\n' + build.stdout + build.stderr)
-    produced = work / 'produced.jsonl'
-    run = subprocess.run([str(work / 'harness'), str(produced)], capture_output=True, text=True)
-    if run.returncode:
-        sys.exit('harness failed:\n' + run.stdout + run.stderr)
-    if args.update:
-        fixture.parent.mkdir(exist_ok=True)
-        fixture.write_bytes(produced.read_bytes())
-        print('fixture rewritten:', fixture)
-    elif produced.read_bytes() != fixture.read_bytes():
-        sys.exit('native serializer output differs from ' + str(fixture) + '; review, then rerun with --update')
-    else:
-        print('eye-diff serializer compiles and matches the committed fixture')
+
+def expectations(o):
+    """(label, actual, expected) for one scenario's output."""
+    name, e = o['scenario'], o['eye_diff']
+    seqs = o['sequences']
+    scheduled = [q for q in range(1, seqs + 1) if (q - 1) % INTERVAL == 0]
+    checks = [('pair() released every lock and never lost the guard', o['guard_misses'], 0),
+              ('no eye-diff sample dropped', e['dropped'], 0),
+              ('eye-diff ring never overflowed', e['truncated'], False),
+              ('every sampled region was valid', e['invalid_regions'], 0)]
+    if name == 'far_capture_lifecycle':
+        on = row_frames(o['valid_frames'])
+        checks += [
+            ('invalid early snapshots issue no sequence', seqs, 475),
+            ('invalid early snapshots are counted', o['pairs']['before']['invalid'], 5),
+            ('before-submission samples on the pair-sequence schedule', e['before_sequences'], scheduled),
+            ('each before-sample has its after-sample', (e['after'], e['after_paired']), (len(scheduled),) * 2),
+            ('before-sample frames are recorded as read (unassigned)', e['before_frames'], [UNASSIGNED]),
+            ('before rows emitted once the pair frame is assigned', o['rows']['before'], on),
+            ('after-first-submission rows', o['rows']['after_first'], on),
+            ('after-submission rows despite render callbacks holding the lock', o['rows']['after'], on),
+            ('no lock miss after the submissions', o['pairs']['after']['lock_misses'], 0),
+        ]
+    elif name == 'stride_two_odd_frames':
+        either = sum(1 for f, g in zip(o['valid_frames'], o['after_frames']) if f % 30 < 4 or g % 30 < 4)
+        checks += [
+            ('stride does not alias the schedule away', e['before_sequences'], scheduled),
+            ('each before-sample has its after-sample', e['after_paired'], len(scheduled)),
+            ('before row follows whichever later snapshot is on interval', o['rows']['before'], either),
+        ]
+    elif name == 'after_snapshot_lost':
+        checks += [
+            ('scheduled before-samples still taken', e['before'], len(scheduled)),
+            ('no after-sample without its phase-2 call', e['after'], 0),
+            ('lost after-snapshots counted as orphans', (o['sampler'] or {}).get('orphaned'), len(scheduled)),
+        ]
+    elif name == 'render_holds_lock_before':
+        misses = 420 // 7
+        checks += [
+            ('phase-1 lock misses counted per phase', o['pairs']['before']['lock_misses'], misses),
+            ('a missed phase 1 consumes no sequence', seqs, 420 - misses),
+            ('schedule continues over missed pairs', e['before_sequences'], scheduled),
+            ('each before-sample has its after-sample', e['after_paired'], len(scheduled)),
+        ]
+    elif name == 'state_changed_mid_pair':
+        changed = len(scheduled)  # indices 0, 60, ... are exactly the scheduled sequences
+        checks += [
+            ('changed state refused after the first submission', o['pairs']['after_first']['invalid'], changed),
+            ('changed state refused after both submissions', o['pairs']['after']['invalid'], changed),
+            ('no after-sample of a changed pair; orphan counted',
+             (e['after'], (o['sampler'] or {}).get('orphaned')), (0, changed)),
+            ('rows of unchanged pairs unaffected', o['rows']['after'],
+             row_frames(f for i, f in enumerate(o['valid_frames']) if i % 60)),
+        ]
+    elif name == 'ring_capacity':
+        checks += [
+            ('ring filled with whole pairs only', (e['before'], e['after'], e['after_paired']), (64, 64, 64)),
+            ('pairs refused for room are counted', (o['sampler'] or {}).get('ring_full'), len(scheduled) - 64),
+        ]
+    elif name == 'fixture':
+        checks += [('fixture holds two whole pairs', (e['before'], e['after_paired']), (2, 2))]
+    return checks
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--json-include', required=True, help='directory that contains nlohmann/json.hpp')
+    parser.add_argument('--utility', type=pathlib.Path, help='other WuWa utility sources; lifecycle only')
+    parser.add_argument('--update', action='store_true', help='rewrite the committed fixture')
+    args = parser.parse_args()
+    utility = (args.utility or default_utility).resolve()
+    record, pair = extract(utility)
+    with tempfile.TemporaryDirectory() as work:
+        work = pathlib.Path(work)
+        (work / 'probe-record.inc').write_text(record)
+        (work / 'probe-pair.inc').write_text(pair)
+        binary = work / 'harness'
+        build = subprocess.run([os.environ.get('CXX', 'g++'), '-std=c++20', '-Wall', '-Wextra', '-Werror', '-O1',
+                                f'-I{args.json_include}', f'-I{utility}', f'-I{work}', str(harness),
+                                '-o', str(binary)], capture_output=True, text=True)
+        if build.returncode:
+            sys.exit('pair()/serializer compile failed:\n' + build.stdout + build.stderr)
+        produced = work / 'produced.jsonl'
+        run = subprocess.run([str(binary), str(produced)], capture_output=True, text=True)
+        if run.returncode:
+            sys.exit('harness failed:\n' + run.stdout + run.stderr)
+        failures = 0
+        for line in run.stdout.splitlines():
+            outcome = json.loads(line)
+            for label, actual, expected in expectations(outcome):
+                ok = actual == expected
+                failures += not ok
+                if not ok or os.environ.get('VERBOSE'):
+                    print(f"{'ok  ' if ok else 'FAIL'} {outcome['scenario']}: {label}: {actual!r}"
+                          + ('' if ok else f' (expected {expected!r})'))
+        if failures:
+            sys.exit(f'{failures} lifecycle expectation(s) failed for {utility}')
+        print('pair() lifecycle scenarios pass')
+        if args.utility:
+            return
+        if args.update:
+            fixture.parent.mkdir(exist_ok=True)
+            fixture.write_bytes(produced.read_bytes())
+            print('fixture rewritten:', fixture)
+        elif produced.read_bytes() != fixture.read_bytes():
+            sys.exit('native serializer output differs from ' + str(fixture) + '; review, then rerun with --update')
+        else:
+            print('eye-diff serializer compiles and matches the committed fixture')
+
+
+if __name__ == '__main__':
+    main()

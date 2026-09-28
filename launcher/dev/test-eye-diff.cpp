@@ -146,43 +146,80 @@ void invalid_arguments_read_nothing() {
     assert(m.max_a == 0 && m.max_b == 0);
 }
 
+// Sampler policy. The schedule is keyed to the probe's pair sequence (issued only
+// to validated before-submission snapshots), never to a family frame: see
+// check-eye-diff-json.py for the same policy driven through the verbatim pair().
 void sampler_pairs_before_and_after_of_one_sequence() {
     Sampler s;
-    assert(s.take(1, 7, 120, 5, false));   // either eye's frame on the interval
-    assert(!s.take(3, 7, 120, 120, false)); // mid-pair snapshot never sampled
-    assert(s.take(2, 7, 121, 121, false)); // the matching after-snapshot
-    assert(!s.take(2, 7, 121, 121, false)); // ...exactly once
-    assert(s.take(1, 8, 5, 180, false));
-    assert(!s.take(2, 9, 181, 181, false)); // a different pair is not this pair's partner
-    assert(s.take(2, 8, 181, 181, false));  // ...but the real partner still is
+    assert(s.take(1, 1, 128));   // first validated pair of a capture is on the schedule
+    assert(!s.take(3, 1, 127));  // mid-pair snapshot never sampled
+    assert(s.take(2, 1, 127));   // the matching after-snapshot
+    assert(!s.take(2, 1, 126));  // ...exactly once
+    assert(s.take(1, 61, 126));  // next scheduled pair, 60 sequences later
+    assert(!s.take(2, 62, 125)); // a different pair is not this pair's partner: orphan
+    assert(!s.take(2, 61, 125)); // ...and the orphaned partner is forgotten, not revived
+    const auto& c = s.counts();
+    assert(c.before_taken == 2 && c.after_taken == 1 && c.orphaned == 1);
 }
 
-void sampler_refuses_off_interval_full_ring_and_unsequenced() {
+void sampler_refuses_off_schedule_full_ring_and_unsequenced() {
     Sampler s;
-    assert(!s.take(1, 1, 61, 59, false));  // neither frame on the 60-frame interval
-    assert(!s.take(2, 1, 62, 62, false));  // and so no partner is owed
-    assert(!s.take(1, 0, 60, 60, false));  // no sequence token, no sample
-    assert(!s.take(0, 2, 60, 60, false));
-    assert(!s.take(4, 2, 60, 60, false));
-    assert(!s.take(1, 3, 60, 60, true));   // full ring never starts a pair
-    assert(!s.take(2, 3, 61, 61, false));
-    assert(s.take(1, 4, 60, 60, false));
-    assert(!s.take(2, 4, 61, 61, true));   // ring filled in between: partner dropped, no crash
+    assert(!s.take(1, 2, 128));  // off the 60-pair schedule
+    assert(!s.take(2, 2, 128));  // and so no partner is owed
+    assert(!s.take(1, 0, 128));  // no sequence token (phase 1 failed validation), no sample
+    assert(!s.take(0, 1, 128));
+    assert(!s.take(4, 1, 128));
+    assert(!s.take(1, 61, 1));   // room for the before but not its after: never start a pair
+    assert(!s.take(2, 61, 1));
+    assert(s.take(1, 121, 2));
+    assert(!s.take(2, 121, 0));  // ring filled in between: partner refused, counted, no crash
+    assert(s.counts().ring_full == 2);
+    assert(s.take(1, 181, 128));
     s.reset();
-    assert(!s.take(2, 4, 61, 61, false));  // reset forgets the owed partner
+    assert(!s.take(2, 181, 128)); // reset forgets the owed partner
+    assert(s.counts().before_seen == 0 && s.counts().orphaned == 0); // ...and its counters
 }
 
+// One validated phase 1 per pair; phases 3 and 2 carry the same token. Frames
+// are not an input: the real family-frame lifecycle (unassigned before the first
+// submission, strides) is replayed through pair() in check-eye-diff-json.py.
 void sampler_cadence_over_a_simulated_walk() {
     Sampler s;
     uint32_t before = 0, after = 0;
-    uint64_t sequence = 0;
-    for (uint32_t frame = 0; frame < 600; ++frame) {
-        ++sequence;
-        if (s.take(1, sequence, frame, frame, false)) ++before;
-        if (s.take(3, sequence, frame, frame, false)) assert(false);
-        if (s.take(2, sequence, frame + 1, frame + 1, false)) ++after;
+    for (uint64_t sequence = 1; sequence <= 600; ++sequence) {
+        if (s.take(1, sequence, 128 - before - after)) ++before;
+        if (s.take(3, sequence, 128 - before - after)) assert(false);
+        if (s.take(2, sequence, 128 - before - after)) ++after;
     }
-    assert(before == 10 && after == 10); // one pair per 60 frames, none unpaired
+    assert(before == 10 && after == 10); // one pair per 60 pairs, none unpaired
+    assert(s.counts().before_seen == 600 && s.counts().orphaned == 0);
+}
+
+// Invalid early snapshots never reach the sampler (no token), so they neither
+// consume a sequence nor shift the schedule.
+void invalid_early_snapshots_do_not_shift_the_schedule() {
+    Sampler s;
+    uint64_t sequence = 0;
+    std::vector<uint64_t> scheduled;
+    for (uint32_t i = 0; i < 200; ++i) {
+        const bool valid = i >= 17;                       // first 17 pairs fail validation
+        if (!valid) continue;
+        ++sequence;
+        if (s.take(1, sequence, 128)) scheduled.push_back(sequence);
+        s.take(2, sequence, 128);
+    }
+    assert((scheduled == std::vector<uint64_t>{1, 61, 121, 181})); // 183 valid pairs
+}
+
+void ring_reports_free_slots() {
+    auto ring = std::make_unique<Ring<3>>();
+    auto s = std::make_unique<Sample>();
+    assert(ring->free_slots() == 3);
+    assert(ring->append(*s) && ring->free_slots() == 2);
+    assert(ring->append(*s) && ring->append(*s) && ring->free_slots() == 0);
+    assert(!ring->append(*s) && ring->free_slots() == 0);
+    ring->reset();
+    assert(ring->free_slots() == 3);
 }
 
 void sample_compares_views_and_states_independently() {
@@ -232,8 +269,10 @@ int main() {
     a_reused_region_is_fully_reset();
     invalid_arguments_read_nothing();
     sampler_pairs_before_and_after_of_one_sequence();
-    sampler_refuses_off_interval_full_ring_and_unsequenced();
+    sampler_refuses_off_schedule_full_ring_and_unsequenced();
     sampler_cadence_over_a_simulated_walk();
+    invalid_early_snapshots_do_not_shift_the_schedule();
+    ring_reports_free_slots();
     sample_compares_views_and_states_independently();
     ring_never_overwrites_and_resets();
     std::cout << "eye diff checks passed\n";

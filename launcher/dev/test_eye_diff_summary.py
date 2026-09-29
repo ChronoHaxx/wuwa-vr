@@ -251,8 +251,52 @@ class EyeSides(unittest.TestCase):
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
                 s.main([str(path)])
-            self.assertIn('eye slots: 0 = right eye, 1 = left eye', out.getvalue())
+            self.assertIn('eye slots (provisional, from projection off-centre; not verified against output): 0 = right, 1 = left', out.getvalue())
         self.assertIsNone(s.eye_sides(NATIVE))  # no pair rows: no claim
+
+
+def raw_row(sequence, phase, state0, state1, unreadable1=()):
+    def block(words, unreadable=()):
+        raw = b''.join(w.to_bytes(4, 'little') for w in words)
+        return {'address': 1, 'begin': 0, 'end': len(raw), 'readable_dwords': len(words),
+                'unreadable': [list(r) for r in unreadable], 'bytes_hex': raw.hex()}
+    return {'type': 'eye_pair_raw', 'sequence': sequence, 'phase': phase, 'raw_ordinal': 0, 'tick_ms': 1,
+            'slots': [{'slot': 0, 'view': block([0]), 'state': block(state0)},
+                      {'slot': 1, 'view': block([0]), 'state': block(state1, unreadable1)}]}
+
+
+class Raw(unittest.TestCase):
+    """Absolute values from raw rows: the one thing the diff format cannot show is equality."""
+
+    def test_equal_values_and_unreadable_dwords(self):
+        words0 = [0] * 0x160; words1 = [0] * 0x160
+        words0[0x550 // 4] = words1[0x550 // 4] = 2      # equal: invisible to eye_pair_diff
+        words0[0x554 // 4], words1[0x554 // 4] = 1, 0
+        rows = [raw_row(1, 'before_submissions', words0, words1, unreadable1=[(0x558, 0x560)])]
+        with tempfile.TemporaryDirectory() as directory:
+            path = write(directory, [{'type': 'header'}] + rows)
+            region, offsets = s.parse_raw_spec('state:0x550-0x560')
+            values = s.raw_values(path, region, offsets)[0]['values']
+            self.assertEqual([(v['slot0'], v['slot1'], v['equal']) for v in values],
+                             [(2, 2, True), (1, 0, False), (0, None, False), (0, None, False)])
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(s.main(['--raw', 'state:0x550,0x558', str(path), str(path)]), 0)
+            text = out.getvalue()
+            self.assertIn('+0x0550 slot0=0x00000002 slot1=0x00000002  equal', text)
+            self.assertIn('+0x0558 slot0=0x00000000 slot1=--', text)
+            self.assertIn('not physical eyes', text)
+            self.assertEqual(text.count('raw snapshot(s)'), 2)  # one table per trace
+
+    def test_trace_without_raw_rows_says_so(self):
+        region, offsets = s.parse_raw_spec('view:0x8')
+        self.assertEqual(s.raw_values(NATIVE, region, offsets), [])
+        self.assertIn('not requested, or the DLL predates them', s.render_raw('x', region, []))
+
+    def test_bad_specs_are_refused(self):
+        for spec in ('heap:0x10', 'state:', 'state:0x552'):
+            with self.assertRaises(ValueError):
+                s.parse_raw_spec(spec)
 
 
 def pair_counts(calls, rows, lock_misses=0, invalid=0):

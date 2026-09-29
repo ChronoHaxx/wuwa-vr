@@ -13,7 +13,8 @@ order FFakeStereoRenderingHook.cpp uses:
     <second submission; render callbacks now hold the shared callback lock>
     if token: pair(..., token)                   # phase 2, after both submissions
 
-Each scenario's outcome is checked here. The fixture scenario's JSONL is the schema the
+Each scenario's outcome is checked here, and the raw-snapshot rows (both eyes, every dword,
+equal values included) are decoded and checked against the values planted in fake memory. The fixture scenario's JSONL is the schema the
 offline summarizer reads; default mode fails if it differs from the committed fixture.
 
     check-eye-diff-json.py --json-include DIR                 # verify (DIR holds nlohmann/json.hpp)
@@ -41,6 +42,33 @@ fixture = here / 'fixtures' / 'eye-pair-diff-native-sample.jsonl'
 harness = here / 'eye-diff-lifecycle-harness.cpp'
 INTERVAL = 60
 UNASSIGNED = 0xffffffff
+RAW_SEQUENCES = [1, 1, 301, 301, 601, 601]  # eye-diff pairs 0, 5 and 10, before and after
+
+
+def raw_row_checks(path):
+    """Decode the raw rows the verbatim serializer wrote and compare with the planted memory."""
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    checks = [('raw rows written', len(rows), 6)]
+    for row in rows:
+        slots = {slot['slot']: slot for slot in row['slots']}
+        def dword(slot, region, offset):
+            raw = bytes.fromhex(slots[slot][region]['bytes_hex'])
+            return int.from_bytes(raw[offset:offset + 4], 'little')
+        tag = f"raw seq {row['sequence']} {row['phase']}"
+        checks += [
+            (f'{tag}: markers', (row['type'], row['equal_values_included'], row['physical_eye']),
+             ('eye_pair_raw', True, 'unverified; slot order only')),
+            (f'{tag}: full windows', [len(slots[k][r]['bytes_hex']) // 2 for k in (0, 1) for r in ('view', 'state')],
+             [0x1e40, 0x4000, 0x1e40, 0x4000]),
+            (f'{tag}: equal value kept in both eyes (+0x550)', (dword(0, 'state', 0x550), dword(1, 'state', 0x550)), (2, 2)),
+            (f'{tag}: unequal value (+0x554)', (dword(0, 'state', 0x554), dword(1, 'state', 0x554)), (1, 0)),
+            (f'{tag}: identity is the view-state pointer (+0x8)', (dword(0, 'view', 8), dword(1, 'view', 8)),
+             (0x1100000, 0x1900000)),
+            (f'{tag}: read validity', (slots[0]['state']['unreadable'], slots[1]['state']['unreadable'],
+                                       slots[1]['view']['unreadable']), ([], [[0x3c00, 0x4000]], [])),
+            (f'{tag}: unreadable bytes are zero', dword(1, 'state', 0x3ffc), 0),
+        ]
+    return checks
 
 
 def extract(utility):
@@ -61,10 +89,13 @@ def expectations(o):
     name, e = o['scenario'], o['eye_diff']
     seqs = o['sequences']
     scheduled = [q for q in range(1, seqs + 1) if (q - 1) % INTERVAL == 0]
+    raw = o.get('raw')
     checks = [('pair() released every lock and never lost the guard', o['guard_misses'], 0),
               ('no eye-diff sample dropped', e['dropped'], 0),
               ('eye-diff ring never overflowed', e['truncated'], False),
               ('every sampled region was valid', e['invalid_regions'], 0)]
+    if name not in ('raw_snapshots', 'ring_capacity'):
+        checks.append(('raw snapshots are opt-in', (raw or {}).get('snapshots', 0), 0))
     if name == 'far_capture_lifecycle':
         on = row_frames(o['valid_frames'])
         checks += [
@@ -113,6 +144,17 @@ def expectations(o):
         checks += [
             ('ring filled with whole pairs only', (e['before'], e['after'], e['after_paired']), (64, 64, 64)),
             ('pairs refused for room are counted', (o['sampler'] or {}).get('ring_full'), len(scheduled) - 64),
+            ('raw snapshots stop at their fixed pair budget', (raw or {}).get('sequences'), RAW_SEQUENCES),
+            ('raw ring never overflowed', ((raw or {}).get('dropped'), (raw or {}).get('truncated')), (0, False)),
+        ]
+    elif name == 'raw_snapshots':
+        checks += [
+            ('raw pairs follow every 5th eye-diff pair', (raw or {}).get('sequences'), RAW_SEQUENCES),
+            ('raw pairs are before/after of one sequence', (raw or {}).get('phases'), [1, 2] * 3),
+            ('raw ordinals', (raw or {}).get('ordinals'), [0, 0, 1, 1, 2, 2]),
+            ('readable dwords: views whole, second state short by 0x400 bytes',
+             (raw or {}).get('readable'), [[0x1e40 // 4, 0x1e40 // 4, 0x4000 // 4, 0x3c00 // 4]] * 6),
+            ('each raw pair is also an eye-diff pair', set((raw or {}).get('sequences') or [0]) <= set(e['before_sequences']), True),
         ]
     elif name == 'fixture':
         checks += [('fixture holds two whole pairs', (e['before'], e['after_paired']), (2, 2))]
@@ -138,17 +180,22 @@ def main():
         if build.returncode:
             sys.exit('pair()/serializer compile failed:\n' + build.stdout + build.stderr)
         produced = work / 'produced.jsonl'
-        run = subprocess.run([str(binary), str(produced)], capture_output=True, text=True)
+        raw_rows = work / 'raw.jsonl'
+        run = subprocess.run([str(binary), str(produced), str(raw_rows)], capture_output=True, text=True)
         if run.returncode:
             sys.exit('harness failed:\n' + run.stdout + run.stderr)
         failures = 0
+        results = []
         for line in run.stdout.splitlines():
             outcome = json.loads(line)
-            for label, actual, expected in expectations(outcome):
+            results += [(outcome['scenario'], *check) for check in expectations(outcome)]
+        results += [('raw_rows', *check) for check in raw_row_checks(raw_rows)]
+        for scenario, label, actual, expected in results:
+            if True:
                 ok = actual == expected
                 failures += not ok
                 if not ok or os.environ.get('VERBOSE'):
-                    print(f"{'ok  ' if ok else 'FAIL'} {outcome['scenario']}: {label}: {actual!r}"
+                    print(f"{'ok  ' if ok else 'FAIL'} {scenario}: {label}: {actual!r}"
                           + ('' if ok else f' (expected {expected!r})'))
         if failures:
             sys.exit(f'{failures} lifecycle expectation(s) failed for {utility}')

@@ -17,6 +17,12 @@
 #include <vector>
 #include "WuWaLodSnapshot.hpp"
 #include "WuWaEyeDiff.hpp"
+#if __has_include("WuWaRawSnapshot.hpp")
+#include "WuWaRawSnapshot.hpp"
+#define HARNESS_HAS_RAW 1
+#else
+#define HARNESS_HAS_RAW 0 // merged PR #1 sources
+#endif
 
 namespace wuwa_lod_probe {
 using Json = nlohmann::json;
@@ -75,6 +81,12 @@ struct Probe {
     std::atomic<bool> pair_guard{};
     std::atomic<uint32_t> pair_guard_misses{};
     Record before_row{};
+#if HARNESS_HAS_RAW
+    std::atomic<bool> raw_requested{};
+    wuwa_raw_snapshot::Schedule raw_schedule;
+    wuwa_raw_snapshot::Ring<> raw_ring;
+    std::atomic<uint64_t> raw_dropped{};
+#endif
 };
 inline std::atomic<bool> armed{true};
 inline SRWLOCK callbacks{};
@@ -114,6 +126,8 @@ void build_memory() {
     std::memcpy(&sa[0x1c0 / 4], &t0, 4); std::memcpy(&sb[0x1c0 / 4], &t1, 4);
     sa[0x40 / 4] = 0x8bfe9970; sb[0x40 / 4] = 0x8bfeb2d0; sa[0x44 / 4] = sb[0x44 / 4] = 0x1a;
     sa[0x300 / 4] = 0; sb[0x300 / 4] = 1;
+    // Equal in both eyes, so absent from every eye diff: only a raw snapshot shows it.
+    sa[0x550 / 4] = sb[0x550 / 4] = 2;
 }
 
 struct Scenario {
@@ -128,6 +142,8 @@ struct Scenario {
     uint32_t skip_after_every{}; // phase 2 not reached for pair indices divisible by this
     uint32_t busy_before_every{};// a render callback holds the shared lock at phase 1 on every Nth pair
     uint32_t restate_every{};    // first view reports a different state after phase 1 for indices divisible by this
+    bool raw{};                  // raw snapshots requested
+    bool short_second_state{};   // the second state's readable memory ends 0x400 bytes before the window
 };
 
 template<class S> Json sampler_counts(const S& sampler) {
@@ -142,12 +158,17 @@ template<class S> Json sampler_counts(const S& sampler) {
 }
 
 // Replays FFakeStereoRenderingHook.cpp's non-reversed NSF path for `s.pairs` game frames.
-Json run(const Scenario& s, std::ostream* fixture) {
+Json run(const Scenario& s, std::ostream* fixture, [[maybe_unused]] std::ostream* raw_out) {
     build_memory();
+    if (s.raw) { areas[3].words[0x554 / 4] = 1; areas[4].words[0x554 / 4] = 0; } // unequal, for contrast
+    if (s.short_second_state) areas[4].words.resize(0xf00);
     callbacks = {};
     clock_ms = 100000;
     auto probe = std::make_unique<Probe>();
     owner = probe.get();
+#if HARNESS_HAS_RAW
+    probe->raw_requested = s.raw;
+#endif
     const auto family = reinterpret_cast<const void*>(family_at);
     const auto first = reinterpret_cast<const void*>(view_a), second = reinterpret_cast<const void*>(view_b);
     std::vector<uint32_t> valid_frames, after_frames;
@@ -194,8 +215,22 @@ Json run(const Scenario& s, std::ostream* fixture) {
         return Json{{"calls", c.calls.load()}, {"lock_misses", c.lock_misses.load()},
                     {"invalid", c.invalid.load()}, {"rows", c.rows.load()}};
     };
+    Json raw = nullptr;
+#if HARNESS_HAS_RAW
+    raw = {{"snapshots", 0}, {"sequences", Json::array()}, {"phases", Json::array()}, {"ordinals", Json::array()},
+           {"readable", Json::array()}};
+    while (probe->raw_ring.consume([&](const wuwa_raw_snapshot::Snapshot& r) {
+        raw["snapshots"] = raw["snapshots"].get<int>() + 1;
+        raw["sequences"].push_back(r.id.sequence); raw["phases"].push_back(r.id.phase);
+        raw["ordinals"].push_back(r.ordinal);
+        raw["readable"].push_back({r.views[0].readable, r.views[1].readable, r.states[0].readable, r.states[1].readable});
+        if (raw_out) *raw_out << raw_snapshot_json(r).dump() << '\n';
+    })) {}
+    raw["dropped"] = probe->raw_dropped.load(); raw["truncated"] = probe->raw_ring.truncated();
+    raw["taken"] = probe->raw_schedule.counts().taken.load();
+#endif
     owner = nullptr;
-    return {{"scenario", s.name}, {"sequences", probe->sequence.load()},
+    return {{"scenario", s.name}, {"sequences", probe->sequence.load()}, {"raw", raw},
             {"valid_frames", valid_frames}, {"after_frames", after_frames},
             {"rows", {{"before", rows[1]}, {"after_first", rows[3]}, {"after", rows[2]}}},
             {"eye_diff", {{"before", before}, {"after", after}, {"after_paired", paired},
@@ -226,18 +261,23 @@ int main(int argc, char** argv) {
         // pair rather than record (or re-publish) a state the callbacks do not match.
         {.name = "state_changed_mid_pair", .pairs = 300, .first_frame = 90, .restate_every = 60},
         // Long enough to fill the 128-sample ring: pairs are never split, nothing overwritten.
-        {.name = "ring_capacity", .pairs = 60 * 70, .first_frame = 1},
+        // Raw snapshots requested too: they stop at their own fixed pair budget.
+        {.name = "ring_capacity", .pairs = 60 * 70, .first_frame = 1, .raw = true},
+        // Opt-in raw snapshots: both eyes, equal values included, with read validity.
+        {.name = "raw_snapshots", .pairs = 700, .first_frame = 30, .raw = true, .short_second_state = true},
         // Two sampled pairs written as the committed native-schema fixture.
         {.name = "fixture", .pairs = 61, .first_frame = 60},
     };
-    std::ofstream fixture;
+    std::ofstream fixture, raw_rows;
+    if (argc > 2) raw_rows.open(argv[2], std::ios::binary);
     if (argc > 1) {
         fixture.open(argv[1], std::ios::binary);
         fixture << Json{{"type", "header"}, {"version", 1}, {"seconds", 30}}.dump() << '\n';
     }
     for (const auto& s : scenarios) {
         const bool writes = argc > 1 && std::string(s.name) == "fixture";
-        std::cout << run(s, writes ? &fixture : nullptr).dump() << '\n';
+        const bool raw = argc > 2 && std::string(s.name) == "raw_snapshots";
+        std::cout << run(s, writes ? &fixture : nullptr, raw ? &raw_rows : nullptr).dump() << '\n';
     }
-    return fixture.is_open() && !fixture ? 1 : 0;
+    return (fixture.is_open() && !fixture) || (raw_rows.is_open() && !raw_rows) ? 1 : 0;
 }

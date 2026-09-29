@@ -1,85 +1,84 @@
-# Paired-eye diagnostic repair: Windows build, package and one session
+# Paired-eye diagnostics: local build, checks and next session
 
-This candidate repairs **tooling only**. It changes no rendering, no view field and no game
-memory. It keeps the headset-confirmed ultimate camera fix (`WuWaStereoBasePose.hpp` and
-`FFakeStereoRenderingHook.cpp` are byte-identical to `main`) and `r.OneFrameThreadLag=0`.
-Nothing below proves a foliage fix. Evidence and reasoning are in
-[STEREO-CULLING-PROGRESS.md](STEREO-CULLING-PROGRESS.md).
+Diagnostic tooling only: read-only, no rendering change, no write to game memory (including
+`+0x550`). `FFakeStereoRenderingHook.cpp` and `WuWaStereoBasePose.hpp` are unchanged, so the
+headset-confirmed ultimate camera fix and `r.OneFrameThreadLag=0` stay as they were. Evidence
+and open questions: [STEREO-CULLING-PROGRESS.md](STEREO-CULLING-PROGRESS.md).
 
 ## 1. Build (MSVC, existing tree)
 
-Only two native files changed: `src/utility/WuWaEyeDiff.hpp` and `src/utility/WuWaLodProbe.hpp`.
-In the tree that produced `583231192c…` (`E:\Coding\wuwa-vr\upstream\UEVR`):
+Native files on this branch (SHA-256 of the committed CRLF files):
+
+| File (`src/utility/`) | Change since `8bb228d9` build | SHA-256 |
+|---|---|---|
+| `WuWaEyeDiff.hpp` | none | `4aaaf6d295f6c76f5acf950af10682fe3e55873f8505e71795fa2023967c36bf` |
+| `WuWaRawSnapshot.hpp` | **new** | `241ac2b258decbc8dae7473526e5e70c2818eb0bec33c97824996a0e407d1d26` |
+| `WuWaLodProbe.hpp` | raw snapshots, status keys | `5b092330cfffe232df9927ee8555472dcbc2504f3f0836c3f15dd49f6513057f` |
+| `WuWaTestControl.hpp` | forwards `raw_snapshots` | `647d8ccb0cebddc920fdf9809b8562c6aaa52893d4e9ef14c482cebe279b647d` |
 
 ```powershell
-# A separate worktree leaves any unpushed local work in E:\Coding\wuwa-vr untouched.
 git -C E:\Coding\wuwa-vr fetch origin claude/jolly-turing-lflai7
-git -C E:\Coding\wuwa-vr worktree add E:\Coding\wuwa-vr-eye-diff origin/claude/jolly-turing-lflai7
-copy E:\Coding\wuwa-vr-eye-diff\mod\uevr\src\utility\WuWaEyeDiff.hpp  E:\Coding\wuwa-vr\upstream\UEVR\src\utility\
-copy E:\Coding\wuwa-vr-eye-diff\mod\uevr\src\utility\WuWaLodProbe.hpp E:\Coding\wuwa-vr\upstream\UEVR\src\utility\
+git -C E:\Coding\wuwa-vr worktree add E:\Coding\wuwa-vr-eye-diff-raw origin/claude/jolly-turing-lflai7
+foreach ($f in 'WuWaEyeDiff.hpp','WuWaRawSnapshot.hpp','WuWaLodProbe.hpp','WuWaTestControl.hpp') {
+  Copy-Item "E:\Coding\wuwa-vr-eye-diff-raw\mod\uevr\src\utility\$f" "E:\Coding\wuwa-vr\upstream\UEVR\src\utility\$f"
+  (Get-FileHash "E:\Coding\wuwa-vr\upstream\UEVR\src\utility\$f").Hash   # compare with the table
+}
 ```
 
-If the local `upstream\UEVR` copies of these two files differ from `main` for any other reason,
-stop and compare first; the cloud could only see the uploaded snapshot, which matched `main`.
+If a hash differs only because of line-ending conversion, `git -C E:\Coding\wuwa-vr-eye-diff-raw
+status` must still be clean. Rebuild `uevr.vcxproj` as before (RelWithDebInfo x64, new unique PDB
+name). No CMake change: the new header is included by `WuWaLodProbe.hpp`. A fresh tree can use
+`mod/BUILD.md`; the reconstruction patch differs only in those three sections.
 
-Then rebuild `uevr.vcxproj` exactly as in `relink-unrestricted-command.json` (RelWithDebInfo,
-x64, a new unique PDB name). For a fresh tree, `mod/BUILD.md` applies: the regenerated
-`uevr-working-tree-full.patch` differs from `main` only in those two file sections.
-
-Local checks (cloud already ran them with g++/clang; MSVC has not):
+## 2. Local tests (worktree)
 
 ```powershell
-launcher\dev\test-eye-diff.cmd                                   # MSVC policy test
-cd launcher\dev; python -m unittest test_eye_diff_summary test_register_candidate
-python check-eye-diff-json.py --json-include <dir with nlohmann\json.hpp>   # needs g++; optional on Windows
+cd E:\Coding\wuwa-vr-eye-diff-raw\launcher\dev
+.\test-eye-diff.cmd                                        # MSVC: 19 policy cases incl. raw block/schedule/ring
+python -m unittest test_eye_diff_summary test_register_candidate   # 23 + 7
+python check-eye-diff-json.py --json-include <dir with nlohmann\json.hpp>   # optional, needs g++
 ```
 
-## 2. Package into the usual portable Launcher.exe
+## 3. Diagnostic markers, before any far/near session
 
-Close Launcher.exe and the game. From the portable package folder (the one holding
-`Launcher.exe`, `app` and `python`), after copying `launcher\dev\wuwa_register_candidate.py`
-into `app\dev\`:
+1. **In the DLL** (string literals compiled in):
+   ```powershell
+   python -c "import sys;d=open(sys.argv[1],'rb').read();m=[b'eye_pair_raw',b'raw_snapshots_supported',b'validated pair sequence',b'frames_read_at'];print({k.decode():k in d for k in m})" <built UEVRBackend.dll>
+   ```
+   All four must be `True`.
+2. **Registration** into the portable package (Launcher.exe closed; copy
+   `launcher\dev\wuwa_register_candidate.py` into `app\dev\` first):
+   ```powershell
+   python\python.exe app\dev\wuwa_register_candidate.py --app app --backend <dll> --id eye-diff-raw-20260929 --dry-run
+   python\python.exe app\dev\wuwa_register_candidate.py --app app --backend <dll> --id eye-diff-raw-20260929
+   ```
+   The earlier `eye-diff-lifecycle-20260928` entry can stay for rollback. Hash corrections in
+   this version: a re-run hashes the installed runtime backend (not just its presence), the
+   base runtime must match its own catalog hash before it is copied, and a failed copy check
+   removes the half-made folders. Launcher.exe → Recovery → self-check should list the new
+   build as "backend matches catalog".
+3. **Live, short** (game running on the new build, anywhere):
+   ```powershell
+   python launcher\dev\wuwa-test.py lod-inputs --pid <pid> --seconds 8 --raw-snapshots --capture-source steamvr --output <tmp>\raw-smoke
+   python launcher\dev\wuwa_eye_diff_summary.py --raw state:0x550 <tmp>\raw-smoke\lod.jsonl
+   ```
+   Expect in `lod-inputs.json` → `end.lod_probe`: `raw_snapshots_supported: true`,
+   `raw_snapshots.requested: true`, `taken ≥ 2`, `written == taken`, `dropped: 0`,
+   `orphaned: 0`; and the summarizer printing `slot0=… slot1=…` rows (values, not `--`).
+   Without `--raw-snapshots`, `raw_snapshots.requested` must be `false` and no `eye_pair_raw`
+   rows appear.
+
+## 4. Far/near session (same tree, same order as last time)
+
+Confirm on the headset first (far: left-eye tree frozen; near: both sway), keep still, then:
 
 ```powershell
-python\python.exe app\dev\wuwa_register_candidate.py --app app --backend <built UEVRBackend.dll> --dry-run
-python\python.exe app\dev\wuwa_register_candidate.py --app app --backend <built UEVRBackend.dll>
+python launcher\dev\wuwa-test.py lod-inputs --pid <pid> --seconds 30 --raw-snapshots --capture-source steamvr --output <session>\far
+python launcher\dev\wuwa-test.py lod-inputs --pid <pid> --seconds 30 --raw-snapshots --capture-source steamvr --output <session>\near
+python launcher\dev\wuwa_eye_diff_summary.py --raw state:0x528-0x560 <session>\far\lod.jsonl <session>\near\lod.jsonl
+python launcher\dev\wuwa_eye_diff_summary.py --compare <session>\far\lod.jsonl <session>\near\lod.jsonl
 ```
 
-It copies the **Camera candidate + trigger controls · 28 Sep** runtime and profile seed
-(`camera-trial-controls-20260928-r2`, the profile Codex's entry was identical to), replaces
-only `UEVRBackend.dll`, and appends one `candidate` entry (`eye-diff-lifecycle-20260928`).
-Existing builds, runtimes and seeds are not modified. The catalog keeps its UTF-8 BOM. Recording
-controls and languages are untouched. **Rollback:** pick the earlier build in Launcher.exe, as
-usual (Select backs up the live profile first). Recovery → self-check should list the new build
-as "backend matches catalog". The older developer `.cmd`/web registration is no longer needed.
-
-## 3. One session: far then near, same tree
-
-Use Launcher.exe → the new candidate → Apply & launch. Stand at a tree where the left eye is
-static and the right eye sways. Keep still.
-
-1. **Confirm the failure is present** (headset, and a 10 s clip with the launcher's recording
-   controls). Stop recording before tracing, so the recorder does not load the trace.
-2. **Far trace, lightweight** (no `--view-uniforms`/`--mesh-bindings`: those slowed the last
-   run to about 16 pairs/s and filled their buffers within seconds):
-   ```powershell
-   python launcher\dev\wuwa-test.py lod-inputs --pid <game pid> --seconds 30 --capture-source steamvr --output <session>\far
-   ```
-3. Walk in until **both** eyes sway; keep still; repeat into `<session>\near`.
-4. Summaries (any Python 3, from the repo):
-   ```powershell
-   python launcher\dev\wuwa_eye_diff_summary.py <session>\far\lod.jsonl
-   python launcher\dev\wuwa_eye_diff_summary.py --compare <session>\far\lod.jsonl <session>\near\lod.jsonl
-   ```
-
-**The tooling repair is accepted** only if the far run shows: `lod-inputs.json` →
-`end.lod_probe.eye_pair_diff.before_taken ≥ 1` and `written ≥ 2`; `pair` rows with
-`"phase":"before_submissions"` in `lod.jsonl`; `pairs.after_submissions.lock_misses` near 0; and
-no `LIFECYCLE:` warning from the summarizer. Also note the `frames` value on the
-before-submission samples (the repair assumes it is not the assigned frame; stock UE would
-show `4294967295`).
-
-Send back: both `lod-inputs.json` files, both summary outputs, the two `lod.jsonl`, the clip,
-and one line on what each eye showed at far and near. What each outcome would mean is in the
-progress document's table. A clean summary is not a visual fix; only a later rendering change,
-compared in the headset at the same far and near positions, can be accepted as one.
+The `--raw` table answers only which slot's `+0x550` differs between positions (reading A or B
+in the progress document). It does not identify the field, show that rendering reads it, or
+map slots to physical eyes. Send back both folders (about 13 MB each) and the two outputs.

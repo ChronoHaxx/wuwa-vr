@@ -541,7 +541,7 @@ class LiveTest:
             self.require_foreground = previous
 
     def lod_inputs(self, output: Path, seconds: int = 8, view_uniforms: bool = False,
-                   mesh_bindings: bool = False) -> dict:
+                   mesh_bindings: bool = False, raw_snapshots: bool = False) -> dict:
         """Capture an expiring read-only trace and images; no rendering change."""
         if not 1 <= seconds <= 30:
             raise ValueError("LOD input recording must be 1..30 seconds")
@@ -554,6 +554,8 @@ class LiveTest:
             raise RuntimeError("This backend does not support View uniform tracing")
         if mesh_bindings and state["lod_probe"].get("mesh_bindings_supported") is not True:
             raise RuntimeError("This backend does not support mesh binding tracing")
+        if raw_snapshots and state["lod_probe"].get("raw_snapshots_supported") is not True:
+            raise RuntimeError("This backend does not support raw eye snapshots")
         revision = state["lod_probe"].get("mesh_binding_hook_revision")
         if mesh_bindings and (type(revision) is not int or revision != 2):
             raise RuntimeError("Mesh tracing is blocked on this backend: its observer can overwrite a native branch target. Use a backend with hook revision 2; ordinary gameplay and recording do not install this observer.")
@@ -561,6 +563,7 @@ class LiveTest:
         report = dict(pid=self.pid, status="incomplete", read_only=True, seconds=seconds,
                       view_uniforms_requested=view_uniforms,
                       mesh_bindings_requested=mesh_bindings,
+                      raw_snapshots_requested=raw_snapshots,
                       interpretation="Instanced binding inputs only. Matching CPU family frames is not GPU frame proof; visual review is required.")
         started = None
         extra_traces = []
@@ -589,8 +592,13 @@ class LiveTest:
         try:
             self.assert_focus()
             self.capture(output / "baseline", self.capture_layer())
-            started = self.request("lod_probe", seconds=seconds, **{key: True for key, _, _ in extra_traces})
+            options = {key: True for key, _, _ in extra_traces}
+            if raw_snapshots:
+                options["raw_snapshots"] = True
+            started = self.request("lod_probe", seconds=seconds, **options)
             report["begin"] = started
+            if raw_snapshots and (started["lod_probe"].get("raw_snapshots") or {}).get("requested") is not True:
+                raise RuntimeError("Backend did not acknowledge the requested raw eye snapshots")
             for key, label, prefix in extra_traces:
                 extra_sources[key] = extra_trace_path(started["lod_probe"], key, label, prefix)
             self.wait_frames(seconds)
@@ -893,6 +901,7 @@ def main() -> int:
     lod = commands.add_parser("lod-inputs", help="Read-only LOD input trace and stationary scene captures")
     lod.add_argument("--view-uniforms", action="store_true", help="Also record bounded View uniform ownership on a supporting backend")
     lod.add_argument("--mesh-bindings", action="store_true", help="Also record bounded mesh bindings before vertex-factory dispatch; this is not GPU draw proof")
+    lod.add_argument("--raw-snapshots", action="store_true", help="Also record bounded raw copies of both eye slots' view and view-state windows (equal values included) in lod.jsonl")
     lod.add_argument("--output", type=Path, required=True)
     lod.add_argument("--pid", type=int, required=True)
     lod.add_argument("--seconds", type=int, choices=range(1, 31), metavar="1..30", default=8)
@@ -942,7 +951,7 @@ def main() -> int:
             result = client.impostors(args.output)
         elif args.command == "lod-inputs":
             result = client.lod_inputs(args.output, args.seconds, view_uniforms=args.view_uniforms,
-                                       mesh_bindings=args.mesh_bindings)
+                                       mesh_bindings=args.mesh_bindings, raw_snapshots=args.raw_snapshots)
         elif args.command == "stereo-candidates":
             result = client.stereo_candidates(args.output)
         elif args.command == "reflection-values":

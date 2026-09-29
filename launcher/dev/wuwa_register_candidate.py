@@ -64,9 +64,15 @@ def register(app, backend, build_id=DEFAULT_ID, base_id=DEFAULT_BASE, name=None,
     digest = sha256(backend)
     existing = next((b for b in builds if b.get('id') == build_id), None)
     if existing is not None:
-        if str(existing.get('sha256', '')).lower() == digest and (app / existing['runtime'] / 'UEVRBackend.dll').is_file():
-            return {'changed': False, 'id': build_id, 'sha256': digest}
-        raise ValueError(f'build id {build_id!r} is already registered with another backend; choose a new --id')
+        if str(existing.get('sha256', '')).lower() != digest:
+            raise ValueError(f'build id {build_id!r} is already registered with another backend; choose a new --id')
+        # Hash the installed file, not just its presence: Launcher.exe refuses Select when the
+        # runtime backend differs from the catalog, so "unchanged" must mean it will launch.
+        installed = app / existing['runtime'] / 'UEVRBackend.dll'
+        if not installed.is_file() or sha256(installed) != digest:
+            raise ValueError(f'build id {build_id!r} is registered, but {installed} is missing or differs from '
+                             'the catalog hash; restore that file or register under a new --id')
+        return {'changed': False, 'id': build_id, 'sha256': digest}
     if any(str(b.get('sha256', '')).lower() == digest for b in builds):
         raise ValueError('this backend is already registered under another id')
     base = next((b for b in builds if b.get('id') == base_id), None)
@@ -76,6 +82,10 @@ def register(app, backend, build_id=DEFAULT_ID, base_id=DEFAULT_BASE, name=None,
     missing = [n for n in REQUIRED if not (base_runtime / n).is_file()]
     if missing or not base_seed.is_dir():
         raise ValueError(f'base build is incomplete: missing {missing or [str(base_seed)]}')
+    # The launcher's own check (Assert-WuWaBuildFiles): never copy from a base runtime whose
+    # backend no longer matches its catalog entry.
+    if sha256(base_runtime / 'UEVRBackend.dll') != str(base.get('sha256', '')).lower():
+        raise ValueError(f'base build {base_id!r}: its runtime backend differs from the catalog hash')
     runtime_rel = f'runtime/Wuthering Waves UEVR - {build_id}'
     seed_rel = f'builds/{build_id}/profile'
     runtime, seed = app / runtime_rel, app / seed_rel
@@ -101,11 +111,18 @@ def register(app, backend, build_id=DEFAULT_ID, base_id=DEFAULT_BASE, name=None,
             'runtime': str(runtime), 'seed': str(seed), 'catalog': str(catalog_path), 'entry': entry}
     if dry_run:
         return plan
-    shutil.copytree(base_runtime, runtime)
-    shutil.copy2(backend, runtime / 'UEVRBackend.dll')
-    shutil.copytree(base_seed, seed)
-    if sha256(runtime / 'UEVRBackend.dll') != digest:
-        raise RuntimeError('copied backend hash differs from the source')
+    try:
+        shutil.copytree(base_runtime, runtime)
+        shutil.copy2(backend, runtime / 'UEVRBackend.dll')
+        shutil.copytree(base_seed, seed)
+        if sha256(runtime / 'UEVRBackend.dll') != digest:
+            raise RuntimeError('copied backend hash differs from the source')
+    except BaseException:
+        # Leave no half-registered folders: they would block a retry with "already exists".
+        for created in (runtime, seed.parent):
+            if created.exists() and inside(app, created):
+                shutil.rmtree(created)
+        raise
     (seed.parent / 'registration.json').write_text(json.dumps(
         {'id': build_id, 'base': base_id, 'backend_source': str(backend), 'sha256': digest,
          'registered_at': stamp, 'published': False, 'visual_fix_claim': False}, indent=2), encoding='utf-8')

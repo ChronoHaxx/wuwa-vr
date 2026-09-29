@@ -11,6 +11,10 @@ document for what each outcome does and does not establish.
 
     wuwa_eye_diff_summary.py lod-far.jsonl
     wuwa_eye_diff_summary.py --compare lod-far.jsonl lod-near.jsonl
+    wuwa_eye_diff_summary.py --raw state:0x528-0x560 lod-far.jsonl lod-near.jsonl
+
+--raw reads the opt-in eye_pair_raw rows (every dword of both eye slots, equal values included,
+with read validity) and prints absolute values; slots are not physical eyes until verified.
 """
 import argparse
 import json
@@ -57,8 +61,9 @@ def _is_time_like(a, b, clock):
 
 
 def _text_like(bits):
-    """Printable bytes that do not also read as an ordinary float: heap remnants such as script text.
-    (0.9 is 0x3f666666, "fff?", so printable alone is not enough.)"""
+    """Printable bytes that do not also read as an ordinary float, e.g. script text. Their origin is
+    unknown: they do not show object extent or constructor behaviour. (0.9 is 0x3f666666, "fff?",
+    so printable alone is not enough.)"""
     raw = (bits & 0xffffffff).to_bytes(4, 'little')
     printable = sum(32 <= c < 127 for c in raw)
     return (printable == 4 or (printable == 3 and 0 in raw)) and not _plausible_float(bits)
@@ -150,9 +155,9 @@ def summarize(samples, clock=(), phase='before'):
                 'fraction': entry['seen'] / of if of else 0.0, 'kind': kind, 'label': label,
                 'first_values': [a, b], 'as_float': [_float(a), _float(b)],
                 'distinct_value_pairs': len(entry['values']),
-                # The same unequal pair in every sample that knows it. Either never written (members or
-                # padding showing allocation history, often text) or a live value that simply held
-                # still, e.g. a position in a stationary capture. Not a cause by itself either way.
+                # The same unequal pair in every sample that knows it: a value that did not change during
+                # the capture (a live field that held still, or bytes nothing rewrote). Not a cause by
+                # itself either way, and not evidence of where an object ends.
                 'static': of > 1 and entry['seen'] == of and len(entry['values']) == 1,
                 'text_like': _text_like(a) or _text_like(b),
                 'time_like': entry['time_like'] > 0,
@@ -226,11 +231,12 @@ def _describe(row):
 
 
 def eye_sides(path):
-    """Which eye slot is left/right, from the before-submission pair rows' projections.
+    """Provisional left/right label per eye slot, from the before-submission pair rows' projections.
 
     UE projection M[2][0] (flat index 8) is the horizontal off-centre term; a negative value puts the
     frustum centre right of the optical axis. Headset eyes are wider on their outer side, so that is the
-    right eye. Assumes the compositor does not swap eyes (swapped stereo would look inverted)."""
+    right eye. Assumes the compositor does not swap eyes. Geometry only: not verified against the
+    displayed output, so callers must present it as provisional."""
     terms = {0: [], 1: []}
     for line in Path(path).read_text(encoding='utf-8').splitlines():
         if '"pair"' not in line:
@@ -285,8 +291,8 @@ def render(summary):
     lines = [f"{summary['samples']} {summary['phase']}-phase samples from {summary['pairs']} pairs"]
     if summary.get('eye_sides'):
         sides = summary['eye_sides']
-        lines.append(f"eye slots: 0 = {sides.get('slot0')} eye, 1 = {sides.get('slot1')} eye "
-                     "(projection off-centre; eye0/eye1 below are these slots)")
+        lines.append(f"eye slots (provisional, from projection off-centre; not verified against output): "
+                     f"0 = {sides.get('slot0')}, 1 = {sides.get('slot1')}; eye0/eye1 below are slots")
     for warning in summary['warnings']:
         lines.append(f'WARNING: {warning}')
     life = summary.get('lifecycle')
@@ -323,7 +329,7 @@ def render(summary):
 def render_compare(result):
     lines = [f"failing: {result['failing_samples']} samples, control: {result['control_samples']} samples"]
     if result.get('eye_sides'):
-        lines.append(f"eye slots: {result['eye_sides']}")
+        lines.append(f"eye slots (provisional, not verified against output): {result['eye_sides']}")
     for name, region in result['regions'].items():
         lines.append('')
         lines.append(f"{name}: differs only while failing: {len(region['differs_only_while_failing'])}, "
@@ -342,6 +348,63 @@ def render_compare(result):
     return '\n'.join(lines)
 
 
+def parse_raw_spec(spec):
+    """'state:0x528-0x560' (end exclusive) or 'view:0x8,0x150' -> (region, [offsets])."""
+    region, _, items = spec.partition(':')
+    if region not in ('view', 'state') or not items:
+        raise ValueError(f'raw spec {spec!r}: use view:OFFSETS or state:OFFSETS')
+    offsets = []
+    for item in items.split(','):
+        if '-' in item:
+            begin, end = (int(x, 0) for x in item.split('-', 1))
+            offsets += range(begin, end, 4)
+        else:
+            offsets.append(int(item, 0))
+    if any(o % 4 for o in offsets):
+        raise ValueError(f'raw spec {spec!r}: offsets must be dword-aligned')
+    return region, offsets
+
+
+def raw_values(path, region, offsets):
+    """Absolute dwords of both eye slots from eye_pair_raw rows, with read validity."""
+    out = []
+    for line in Path(path).read_text(encoding='utf-8').splitlines():
+        if '"eye_pair_raw"' not in line:
+            continue
+        row = json.loads(line)
+        if row.get('type') != 'eye_pair_raw':
+            continue
+        slots = {slot['slot']: slot[region] for slot in row['slots']}
+        values = []
+        for offset in offsets:
+            cells = []
+            for slot in (0, 1):
+                block = slots[slot]
+                raw = bytes.fromhex(block['bytes_hex'])
+                inside = offset + 4 <= len(raw)
+                readable = inside and not any(b <= offset < e for b, e in block['unreadable'])
+                cells.append(int.from_bytes(raw[offset:offset + 4], 'little') if readable else None)
+            values.append({'offset': offset, 'slot0': cells[0], 'slot1': cells[1],
+                           'equal': cells[0] is not None and cells[0] == cells[1]})
+        out.append({'sequence': row['sequence'], 'phase': row['phase'], 'raw_ordinal': row.get('raw_ordinal'),
+                    'tick_ms': row.get('tick_ms'), 'values': values})
+    return out
+
+
+def render_raw(path, region, rows):
+    lines = [f"{path}: {len(rows)} raw snapshot(s), {region} region; slot0/slot1 are not physical eyes "
+             "until verified against output; '--' = unreadable"]
+    if not rows:
+        lines.append('  no eye_pair_raw rows: raw snapshots were not requested, or the DLL predates them')
+    for row in rows:
+        lines.append(f"  seq {row['sequence']} {row['phase']} (raw pair {row['raw_ordinal']})")
+        for v in row['values']:
+            fmt = lambda x: '--' if x is None else f'{x:#010x}'
+            lines.append(f"    +{v['offset']:#06x} slot0={fmt(v['slot0'])} slot1={fmt(v['slot1'])}"
+                         f"{'  equal' if v['equal'] else ''}")
+    return '\n'.join(lines)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('trace', nargs='+', help='one trace, or with --compare: failing then control')
@@ -349,7 +412,21 @@ def main(argv=None):
     parser.add_argument('--json', action='store_true', help='machine-readable output')
     parser.add_argument('--phase', choices=sorted(PHASES), default='before',
                         help="which snapshot to read (default: before; 'after' may race with the render thread)")
+    parser.add_argument('--raw', metavar='REGION:OFFSETS',
+                        help="print absolute values from eye_pair_raw rows, e.g. state:0x528-0x560 (any number of traces)")
     args = parser.parse_args(argv)
+    if args.raw:
+        try:
+            region, offsets = parse_raw_spec(args.raw)
+        except ValueError as error:
+            parser.error(str(error))
+        tables = [(path, raw_values(path, region, offsets)) for path in args.trace]
+        if args.json:
+            json.dump([{'trace': path, 'rows': rows} for path, rows in tables], sys.stdout, indent=1)
+            sys.stdout.write('\n')
+        else:
+            print('\n\n'.join(render_raw(path, region, rows) for path, rows in tables))
+        return 0
     if args.compare != (len(args.trace) == 2) or len(args.trace) > 2:
         parser.error('--compare takes exactly two traces (failing, control); otherwise pass one trace')
     summaries = [summarize(*load(path), phase=args.phase) for path in args.trace]

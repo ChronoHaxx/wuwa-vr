@@ -390,7 +390,8 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             reply["planar_probe"] = wuwa_planar_probe::request(directory, request.value("seconds", 0));
         } else if (op == "lod_probe") {
             reply["lod_probe"] = wuwa_lod_probe::request(directory, request.value("seconds", 0),
-                request.value("view_uniforms",false), request.value("mesh_bindings",false));
+                request.value("view_uniforms",false), request.value("mesh_bindings",false),
+                request.value("raw_snapshots",false));
         } else if (op == "record_motion") {
             const auto seconds=request.value("seconds",0);
             if (seconds<0 || seconds>300) throw std::runtime_error("Motion recording duration must be 0..300 seconds");

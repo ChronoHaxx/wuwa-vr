@@ -18,15 +18,19 @@ class Register(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.app = Path(self.tmp.name) / 'app'
         (self.app / 'dev').mkdir(parents=True)
-        self.original = CATALOG.read_bytes()
-        (self.app / 'dev' / 'wuwa-builds.json').write_bytes(self.original)
-        for build in json.loads(self.original.decode('utf-8-sig'))['builds']:
+        # The committed catalog, with each hash replaced by its placeholder backend's hash, as in
+        # a real package where every registered runtime matches its catalog entry.
+        catalog = json.loads(CATALOG.read_bytes().decode('utf-8-sig'))
+        for build in catalog['builds']:
             runtime = self.app / build['runtime']
             runtime.mkdir(parents=True)
             for name in reg.REQUIRED:
                 (runtime / name).write_bytes(f'{build["id"]}:{name}'.encode())
+            build['sha256'] = reg.sha256(runtime / 'UEVRBackend.dll')
             (self.app / build['seed']).mkdir(parents=True)
             (self.app / build['seed'] / 'config.txt').write_text('r.OneFrameThreadLag=0\n')
+        self.original = b'\xef\xbb\xbf' + (json.dumps(catalog, indent=2, ensure_ascii=False) + '\n').encode()
+        (self.app / 'dev' / 'wuwa-builds.json').write_bytes(self.original)
         self.backend = Path(self.tmp.name) / 'UEVRBackend.dll'
         self.backend.write_bytes(b'locally built backend')
 
@@ -86,6 +90,37 @@ class Register(unittest.TestCase):
         (self.app / 'runtime' / f'Wuthering Waves UEVR - {reg.DEFAULT_ID}').mkdir()
         with self.assertRaisesRegex(ValueError, 'already exists'):
             reg.register(self.app, self.backend, now=NOW)
+        self.assertEqual((self.app / 'dev' / 'wuwa-builds.json').read_bytes(), self.original)
+
+    def test_rerun_hashes_the_installed_backend(self):
+        reg.register(self.app, self.backend, now=NOW)
+        entry = self.catalog()['builds'][-1]
+        (self.app / entry['runtime'] / 'UEVRBackend.dll').write_bytes(b'overwritten after registration')
+        with self.assertRaisesRegex(ValueError, 'differs from the catalog hash'):
+            reg.register(self.app, self.backend, now=NOW)  # Select would refuse this runtime
+
+    def test_base_runtime_must_match_its_catalog_hash(self):
+        base = next(b for b in self.catalog()['builds'] if b['id'] == reg.DEFAULT_BASE)
+        # setUp writes placeholder DLLs; give the base a backend whose hash the catalog does not list.
+        (self.app / base['runtime'] / 'UEVRBackend.dll').write_bytes(b'not the registered base backend')
+        with self.assertRaisesRegex(ValueError, 'differs from the catalog hash'):
+            reg.register(self.app, self.backend, now=NOW)
+        self.assertEqual((self.app / 'dev' / 'wuwa-builds.json').read_bytes(), self.original)
+
+    def test_failed_copy_verification_leaves_nothing_behind(self):
+        original = reg.sha256
+        calls = []
+        def flaky(path):
+            calls.append(Path(path))
+            return 'bad' if len(calls) > 1 and Path(path).parent.name.endswith(reg.DEFAULT_ID) else original(path)
+        reg.sha256 = flaky
+        try:
+            with self.assertRaisesRegex(RuntimeError, 'copied backend hash differs'):
+                reg.register(self.app, self.backend, now=NOW)
+        finally:
+            reg.sha256 = original
+        self.assertFalse((self.app / 'runtime' / f'Wuthering Waves UEVR - {reg.DEFAULT_ID}').exists())
+        self.assertFalse((self.app / 'builds' / reg.DEFAULT_ID).exists())
         self.assertEqual((self.app / 'dev' / 'wuwa-builds.json').read_bytes(), self.original)
 
 

@@ -285,7 +285,7 @@ class Raw(unittest.TestCase):
             text = out.getvalue()
             self.assertIn('+0x0550 slot0=0x00000002 slot1=0x00000002  equal', text)
             self.assertIn('+0x0558 slot0=0x00000000 slot1=--', text)
-            self.assertIn('not physical eyes', text)
+            self.assertIn('slot 1 is views[1]', text)
             self.assertEqual(text.count('raw snapshot(s)'), 2)  # one table per trace
 
     def test_trace_without_raw_rows_says_so(self):
@@ -297,6 +297,179 @@ class Raw(unittest.TestCase):
         for spec in ('heap:0x10', 'state:', 'state:0x552'):
             with self.assertRaises(ValueError):
                 s.parse_raw_spec(spec)
+
+
+TEXT = int.from_bytes(b't")}', 'little')   # script-text bytes, as slot 1 holds in the 29 Sep captures
+
+
+class Extent(unittest.TestCase):
+    """The view-state compare stops at the state extent: past the known layout a difference is not eye state."""
+
+    def captures(self):
+        failing = [state_sample(n, [(0x0e24, 0, 3), (0x2070, 0xbe0, 0xbd0), (0x2074, 0, TEXT),
+                                    (0x2100, 1, 2), (0x3000, TEXT, 0)]) for n in (1, 2)]
+        control = [state_sample(n, [(0x2074, 0, TEXT), (0x2800, 5, 6)]) for n in (1, 2)]
+        return failing, control
+
+    def test_compare_stops_at_the_state_extent_by_default(self):
+        failing, control = self.captures()
+        result = s.compare(s.summarize(failing), s.summarize(control))
+        region = result['regions']['state_region']
+        self.assertEqual(s.STATE_EXTENT, 0x20a8)
+        self.assertEqual(region['known_until'], 0x20a4)
+        self.assertEqual(region['extent'], 0x20a8)
+        # Inside the shared layout: still reported. 0x2074 differs in both captures: not failing-only.
+        self.assertEqual([r['offset'] for r in region['differs_only_while_failing']], [0x0e24, 0x2070])
+        self.assertEqual(region['differs_only_in_control'], [])
+        self.assertEqual(region['beyond_extent'], [2, 1])  # counted, never compared
+        text = s.render_compare(result)
+        self.assertIn('compared up to +0x20a4', text)
+        self.assertIn('not compared at or above it (failing 2, control 1 differing offsets there)', text)
+        self.assertNotIn('+0x2100', text)
+        self.assertNotIn('+0x3000', text)
+
+    def test_a_larger_extent_from_the_binary_compares_further(self):
+        failing, control = self.captures()
+        result = s.compare(s.summarize(failing, state_extent=0x4000), s.summarize(control, state_extent=0x4000))
+        region = result['regions']['state_region']
+        self.assertEqual([r['offset'] for r in region['differs_only_while_failing']], [0x0e24, 0x2070, 0x2100, 0x3000])
+        self.assertEqual([r['offset'] for r in region['differs_only_in_control']], [0x2800])
+        self.assertIn('set with --state-extent', s.render_compare(result))
+
+    def test_view_region_is_not_cut_by_the_state_extent(self):
+        out = s.summarize([sample(1, view=[(0x1e00, 1, 2)])])
+        view = out['regions']['view_region']
+        self.assertEqual(([r['offset'] for r in view['differing_offsets']], view['extent']), ([0x1e00], None))
+
+    def test_truncation_above_the_extent_is_not_a_gap(self):
+        # 1,536 kept deltas that end at +0x2800: everything below the extent was recorded.
+        out = s.summarize([state_sample(1, [(0x10, 1, 2), (0x2800, 3, 4)], truncated=True)])
+        region = out['regions']['state_region']
+        self.assertEqual((region['known_until'], region['truncated_samples']), (0x20a4, 0))
+        self.assertFalse([w for w in out['warnings'] if 'truncated' in w])
+
+    def test_command_line_extent(self):
+        failing, control = self.captures()
+        with tempfile.TemporaryDirectory() as directory:
+            a = Path(directory) / 'a'; b = Path(directory) / 'b'
+            a.mkdir(); b.mkdir()
+            paths = [str(write(a, failing)), str(write(b, control))]
+            for argv, present, absent in ((['--compare'], '+0x2070', '+0x3000'),
+                                          (['--compare', '--state-extent', '0x4000'], '+0x3000', None)):
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    self.assertEqual(s.main(argv + paths), 0)
+                self.assertIn(present, out.getvalue())
+                if absent:
+                    self.assertNotIn(absent, out.getvalue())
+            for bad in ('0x2001', '0', 'x'):
+                with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                    s.main(['--compare', '--state-extent', bad] + paths)
+
+
+def layout_words(marker_at_0x2080=True):
+    words0, words1 = [0] * (0x2100 // 4), [0] * (0x2100 // 4)
+    def qword(words, offset, value):
+        words[offset // 4], words[offset // 4 + 1] = value & 0xffffffff, value >> 32
+    for words, heap in ((words0, 0x1a8d831a80), (words1, 0x1a4591d9c0)):
+        qword(words, 0x0, 0x1677a0b40)               # class pointer in the game image
+        qword(words, 0x8, heap)                      # each object's own heap pointer: not a marker
+        qword(words, 0x2058, 0x16755f188)
+        qword(words, 0x2060, heap + 0x40)
+        qword(words, 0x2070, 0xbe0)
+    qword(words0, 0x2080, 0x16755f188)
+    qword(words1, 0x2080, 0x16755f188 if marker_at_0x2080 else 0)
+    words1[0x2074 // 4] = TEXT                       # padding half: not a boundary
+    return words0, words1
+
+
+class Layout(unittest.TestCase):
+    def test_shared_class_pointers_bound_the_layout(self):
+        rows = [raw_row(n, 'before_submissions', *layout_words()) for n in (1, 301)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = write(directory, rows)
+            layout = s.layout_markers(path)
+            self.assertEqual(layout['snapshots'], 2)
+            self.assertEqual([o for o, _ in layout['markers']], [0x0, 0x2058, 0x2080])
+            self.assertEqual(layout['lower_bound'], 0x20a8)   # repeated member: last marker + 0x28 stride
+            self.assertIn('matching the state extent in use', s.render_layout(path, layout))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(s.main(['--layout', str(path)]), 0)
+            self.assertIn('+0x2080 both slots 0x16755f188', out.getvalue())
+
+    def test_a_marker_missing_from_one_snapshot_is_not_shared(self):
+        rows = [raw_row(1, 'before_submissions', *layout_words()),
+                raw_row(301, 'before_submissions', *layout_words(marker_at_0x2080=False))]
+        with tempfile.TemporaryDirectory() as directory:
+            path = write(directory, rows)
+            layout = s.layout_markers(path)
+            self.assertEqual(([o for o, _ in layout['markers']], layout['lower_bound']), ([0x0, 0x2058], 0x2060))
+            self.assertIn('WARNING: shared layout runs to at least +0x2060', s.render_layout(path, layout))
+        self.assertEqual(s.layout_markers(NATIVE), {'snapshots': 0, 'markers': [], 'lower_bound': None})
+
+    def test_raw_reads_stop_at_the_extent(self):
+        words0, words1 = layout_words()
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(write(directory, [raw_row(1, 'before_submissions', words0, words1)]))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                s.main(['--raw', 'state:0x20a0-0x20b0', path])
+            text = out.getvalue()
+            self.assertIn('+0x20a4 slot0=', text)
+            self.assertNotIn('+0x20a8 slot0=', text)
+            self.assertIn('2 requested offset(s) at or above the state extent +0x20a8', text)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                s.main(['--raw', 'state:0x20a0-0x20b0', '--state-extent', '0x2100', path])
+            self.assertIn('+0x20ac slot0=', out.getvalue())
+            self.assertNotIn('not read', out.getvalue())
+        self.assertEqual(s.split_extent('view', [0x2100]), ([0x2100], []))  # the view window is separate
+
+
+class Conditions(unittest.TestCase):
+    def make(self, directory, swap, early, passes):
+        root = Path(directory)
+        (root / 'baseline').mkdir()
+        (root / 'baseline' / 'config.txt').write_text(
+            f'VR_NativeStereoFixSamePass=true\nVR_NativeStereoFixSwapEyes={str(swap).lower()}\n'
+            f'VR_WuWaEarlyStereoViews={str(early).lower()}\nOther=1\n', encoding='utf-8')
+        shadow = {'early_configured': early, 'early_applied': 40 if early else 0, 'early_skipped': 0,
+                  'applied': 0 if early else 900, 'restored': 0 if early else 900,
+                  'full_view_enabled': False, 'full_applied': 0, 'faulted': False}
+        (root / 'baseline' / 'capture.json').write_text(json.dumps({'backend': {'shadow': shadow}}), encoding='utf-8')
+        rows = [{'type': 'pair', 'phase': 'before_submissions', 'views': [{'pass': passes[0]}, {'pass': passes[1]}]}] * 3
+        rows += [{'type': 'uniforms', 'eye_slot': 0, 'producer_context': {'source_relation': 'external'}}] * 2
+        rows += [{'type': 'uniforms', 'eye_slot': 1, 'producer_context': {'source_relation': 'view_plus_0x320'}}]
+        return write(root, rows)
+
+    def test_settings_passes_producers_and_display_halves(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c = s.conditions(self.make(directory, swap=True, early=False, passes=(2, 3)))
+            self.assertEqual(c['settings'], {'VR_NativeStereoFixSamePass': True, 'VR_NativeStereoFixSwapEyes': True,
+                                             'VR_WuWaEarlyStereoViews': False})
+            self.assertEqual(c['display']['left'], 'slot1 (views[1], scene capture)')
+            self.assertEqual(c['passes'], [{'phase': 'before_submissions', 'passes': [2, 3], 'rows': 3}])
+            self.assertEqual(c['producers'], [{'slot': 0, 'relation': 'external', 'rows': 2},
+                                              {'slot': 1, 'relation': 'view_plus_0x320', 'rows': 1}])
+            self.assertIsNone(c['shadow']['after'])
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.make(directory, swap=False, early=True, passes=(2, 2))
+            c = s.conditions(path)
+            self.assertEqual(c['display']['left'], 'slot0 (views[0], game target)')
+            text = s.render_conditions(path, c)
+            self.assertIn('Early stereo view setup=on', text)
+            self.assertIn('early configured=True applied=40', text)
+            self.assertIn('pass slot0/slot1 before_submissions: 2/2 x3', text)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(s.main(['--conditions', str(path), str(path)]), 0)
+            self.assertEqual(out.getvalue().count('uniform producers: slot0 external x2'), 2)
+
+    def test_a_bare_trace_claims_nothing(self):
+        c = s.conditions(NATIVE)
+        self.assertEqual((c['settings'], c['display'], c['passes']), ({}, None, []))
+        self.assertIn('settings: unknown', s.render_conditions('x', c))
 
 
 def pair_counts(calls, rows, lock_misses=0, invalid=0):

@@ -1,84 +1,89 @@
-# Paired-eye diagnostics: local build, checks and next session
+# Stereo freeze: tools update and Windows acceptance plan (29 Sep)
 
-Diagnostic tooling only: read-only, no rendering change, no write to game memory (including
-`+0x550`). `FFakeStereoRenderingHook.cpp` and `WuWaStereoBasePose.hpp` are unchanged, so the
-headset-confirmed ultimate camera fix and `r.OneFrameThreadLag=0` stay as they were. Evidence
-and open questions: [STEREO-CULLING-PROGRESS.md](STEREO-CULLING-PROGRESS.md).
+This round changes **only Python tools and docs**. No native file changed since `4bd6c86`, so
+the registered `eye-diff-raw-20260929` build stays as it is: no rebuild, no new registration.
+The ultimate camera fix, `r.OneFrameThreadLag=0` and the Launcher.exe recording UI are
+untouched. Evidence and reasoning: [STEREO-CULLING-PROGRESS.md](STEREO-CULLING-PROGRESS.md),
+section "Which pass is frozen".
 
-## 1. Build (MSVC, existing tree)
+The session tests two existing switches that split the remaining hypotheses:
 
-Native files on this branch (SHA-256 of the committed CRLF files):
-
-| File (`src/utility/`) | Change since `8bb228d9` build | SHA-256 |
+| Step | Switch | What it changes for `views[1]` (the frozen image) |
 |---|---|---|
-| `WuWaEyeDiff.hpp` | none | `4aaaf6d295f6c76f5acf950af10682fe3e55873f8505e71795fa2023967c36bf` |
-| `WuWaRawSnapshot.hpp` | **new** | `241ac2b258decbc8dae7473526e5e70c2818eb0bec33c97824996a0e407d1d26` |
-| `WuWaLodProbe.hpp` | raw snapshots, status keys | `5b092330cfffe232df9927ee8555472dcbc2504f3f0836c3f15dd49f6513057f` |
-| `WuWaTestControl.hpp` | forwards `raw_snapshots` | `647d8ccb0cebddc920fdf9809b8562c6aaa52893d4e9ef14c482cebe279b647d` |
+| E1 | UEVR menu → **Early stereo view setup (experimental)** | Primary (pass 2) from construction on, so also during game-thread setup, not only during its own submission |
+| E2 | `wuwa-test.py full-views` (45 s, restores itself) | Both views render as full views (pass 0) in both submissions; game-thread setup unchanged |
+
+## 1. Update the tools (no rebuild)
 
 ```powershell
 git -C E:\Coding\wuwa-vr fetch origin claude/jolly-turing-lflai7
-git -C E:\Coding\wuwa-vr worktree add E:\Coding\wuwa-vr-eye-diff-raw origin/claude/jolly-turing-lflai7
-foreach ($f in 'WuWaEyeDiff.hpp','WuWaRawSnapshot.hpp','WuWaLodProbe.hpp','WuWaTestControl.hpp') {
-  Copy-Item "E:\Coding\wuwa-vr-eye-diff-raw\mod\uevr\src\utility\$f" "E:\Coding\wuwa-vr\upstream\UEVR\src\utility\$f"
-  (Get-FileHash "E:\Coding\wuwa-vr\upstream\UEVR\src\utility\$f").Hash   # compare with the table
-}
-```
-
-If a hash differs only because of line-ending conversion, `git -C E:\Coding\wuwa-vr-eye-diff-raw
-status` must still be clean. Rebuild `uevr.vcxproj` as before (RelWithDebInfo x64, new unique PDB
-name). No CMake change: the new header is included by `WuWaLodProbe.hpp`. A fresh tree can use
-`mod/BUILD.md`; the reconstruction patch differs only in those three sections.
-
-## 2. Local tests (worktree)
-
-```powershell
+git -C E:\Coding\wuwa-vr-eye-diff-raw checkout --detach origin/claude/jolly-turing-lflai7
+git -C E:\Coding\wuwa-vr-eye-diff-raw diff --stat 4bd6c86 HEAD -- mod    # must print nothing
 cd E:\Coding\wuwa-vr-eye-diff-raw\launcher\dev
-.\test-eye-diff.cmd                                        # MSVC: 19 policy cases incl. raw block/schedule/ring
-python -m unittest test_eye_diff_summary test_register_candidate   # 23 + 7
-python check-eye-diff-json.py --json-include <dir with nlohmann\json.hpp>   # optional, needs g++
+python -m unittest test_eye_diff_summary test_register_candidate        # 33 + 7, all OK
 ```
 
-## 3. Diagnostic markers, before any far/near session
+Native header hashes are unchanged from the last build:
 
-1. **In the DLL** (string literals compiled in):
-   ```powershell
-   python -c "import sys;d=open(sys.argv[1],'rb').read();m=[b'eye_pair_raw',b'raw_snapshots_supported',b'validated pair sequence',b'frames_read_at'];print({k.decode():k in d for k in m})" <built UEVRBackend.dll>
-   ```
-   All four must be `True`.
-2. **Registration** into the portable package (Launcher.exe closed; copy
-   `launcher\dev\wuwa_register_candidate.py` into `app\dev\` first):
-   ```powershell
-   python\python.exe app\dev\wuwa_register_candidate.py --app app --backend <dll> --id eye-diff-raw-20260929 --dry-run
-   python\python.exe app\dev\wuwa_register_candidate.py --app app --backend <dll> --id eye-diff-raw-20260929
-   ```
-   The earlier `eye-diff-lifecycle-20260928` entry can stay for rollback. Hash corrections in
-   this version: a re-run hashes the installed runtime backend (not just its presence), the
-   base runtime must match its own catalog hash before it is copied, and a failed copy check
-   removes the half-made folders. Launcher.exe → Recovery → self-check should list the new
-   build as "backend matches catalog".
-3. **Live, short** (game running on the new build, anywhere):
-   ```powershell
-   python launcher\dev\wuwa-test.py lod-inputs --pid <pid> --seconds 8 --raw-snapshots --capture-source steamvr --output <tmp>\raw-smoke
-   python launcher\dev\wuwa_eye_diff_summary.py --raw state:0x550 <tmp>\raw-smoke\lod.jsonl
-   ```
-   Expect in `lod-inputs.json` → `end.lod_probe`: `raw_snapshots_supported: true`,
-   `raw_snapshots.requested: true`, `taken ≥ 2`, `written == taken`, `dropped: 0`,
-   `orphaned: 0`; and the summarizer printing `slot0=… slot1=…` rows (values, not `--`).
-   Without `--raw-snapshots`, `raw_snapshots.requested` must be `false` and no `eye_pair_raw`
-   rows appear.
+| File (`src/utility/`) | SHA-256 |
+|---|---|
+| `WuWaEyeDiff.hpp` | `4aaaf6d295f6c76f5acf950af10682fe3e55873f8505e71795fa2023967c36bf` |
+| `WuWaRawSnapshot.hpp` | `241ac2b258decbc8dae7473526e5e70c2818eb0bec33c97824996a0e407d1d26` |
+| `WuWaLodProbe.hpp` | `5b092330cfffe232df9927ee8555472dcbc2504f3f0836c3f15dd49f6513057f` |
+| `WuWaTestControl.hpp` | `647d8ccb0cebddc920fdf9809b8562c6aaa52893d4e9ef14c482cebe279b647d` |
 
-## 4. Far/near session (same tree, same order as last time)
+The commands below use `$t = "E:\Coding\wuwa-vr-eye-diff-raw\launcher\dev"` and
+`$s = <session folder>`.
 
-Confirm on the headset first (far: left-eye tree frozen; near: both sway), keep still, then:
+## 2. Session (one tree, about 15 minutes)
+
+Start with Launcher.exe on `eye-diff-raw-20260929`, with Same Pass on, Swap Eyes on and Early
+stereo view setup **off**. Stand where the left-eye tree freezes and keep still.
+
+**Launcher recording and `wuwa-test.py` share one control lock and cannot run at the same
+time**, so run each step's recording (Record gameplay → Start/Stop recording, 20 s) first, then
+its trace.
+
+| # | Position | Do | Headset: note left-eye tree |
+|---|---|---|---|
+| 1 | far | Record, then `python $t\wuwa-test.py lod-inputs --pid <pid> --seconds 30 --raw-snapshots --view-uniforms --capture-source steamvr --output $s\far-e0` | frozen expected |
+| 2 | far | Early stereo view setup **on**, wait 5 s, record, then the same trace to `$s\far-e1` | **sways or frozen?** |
+| 3 | far | Early **off**, wait 5 s, watch 20 s | does the freeze return? |
+| 4 | far | `Start-Sleep 5; python $t\wuwa-test.py full-views --pid <pid> --capture-source steamvr --output $s\far-e2`, then click into WuWa within 5 s (it stops if WuWa loses focus). Watch during the 45 s window; it cannot be recorded | **sways or frozen?** |
+| 5 | near | Early off: record, trace to `$s\near-e0` | both sway expected |
+| 6 | near | Early **on**: record, trace to `$s\near-e1`; then Early **off** | both sway expected (no regression) |
+
+In steps 2 and 6, also check for any new eye difference: brightness or exposure, shadows,
+reflections, the end-of-ultimate camera, frame time. Leave Early stereo view setup **off** at
+the end; it is saved in the profile.
+
+## 3. Check the conditions, then read the result
 
 ```powershell
-python launcher\dev\wuwa-test.py lod-inputs --pid <pid> --seconds 30 --raw-snapshots --capture-source steamvr --output <session>\far
-python launcher\dev\wuwa-test.py lod-inputs --pid <pid> --seconds 30 --raw-snapshots --capture-source steamvr --output <session>\near
-python launcher\dev\wuwa_eye_diff_summary.py --raw state:0x528-0x560 <session>\far\lod.jsonl <session>\near\lod.jsonl
-python launcher\dev\wuwa_eye_diff_summary.py --compare <session>\far\lod.jsonl <session>\near\lod.jsonl
+python $t\wuwa_eye_diff_summary.py --conditions $s\far-e0\lod.jsonl $s\far-e1\lod.jsonl $s\near-e0\lod.jsonl $s\near-e1\lod.jsonl
+python $t\wuwa_eye_diff_summary.py --layout $s\far-e0\lod.jsonl
+python $t\wuwa_eye_diff_summary.py --compare $s\far-e0\lod.jsonl $s\near-e0\lod.jsonl
+Get-Content $s\far-e2\comparison.json | Select-String status
 ```
 
-The `--raw` table answers only which slot's `+0x550` differs between positions (reading A or B
-in the progress document). It does not identify the field, show that rendering reads it, or
-map slots to physical eyes. Send back both folders (about 13 MB each) and the two outputs.
+A step counts only if its live markers match. The `saved settings` line is the profile file and
+can lag a menu change, so it does not decide.
+- **e0 traces:** `early configured=False`, `pass slot0/slot1 before_submissions: 2/3`.
+- **e1 traces:**
+  - `early configured=True`, with `applied=` rising from `baseline` to `after`;
+  - `pass slot0/slot1 before_submissions: 2/2`;
+  - `same-pass applied=` equal in `baseline` and `after`.
+- **e2:** `comparison.json` status `captured_and_restored_visual_review_pending` (applied and
+  restored cleanly).
+- **`--layout`:** says `matching the state extent in use`. A WARNING means a game update moved
+  the state layout, and `--compare` must not be trusted until the extent is re-checked.
+
+| E1 far (step 2) | E2 far (step 4) | Reading | Next |
+|---|---|---|---|
+| sways, and step 3 freezes again | any | **H1**: primary-only game-thread setup skips `views[1]` | Steps 5–6 clean? Then the existing option is the fix candidate. Accept it only after a headset check at far and near, then a later default change. If `--conditions` shows slot 1 gaining an `external` producer, note it |
+| frozen | sways | **H2**: render-thread stereo-eye logic | A trace aimed at the pass-gated render path (next round) |
+| frozen | frozen | H1 and H2 excluded after construction; the view state (H3) or the target (H4) remain | Decide whether to approve E3, the timed state-pointer exchange (progress doc) |
+
+Nothing here is a fix until the headset check passes at both positions. Send back:
+- the six folders, the recordings, and the four summary outputs;
+- one line per step: sways or frozen, and which eye.

@@ -310,7 +310,7 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         menu_shadow_result = "Temporary override ended; using current Same Pass setting.";
         spdlog::info("[WuWaTest] menu ended shadow comparison");
     } else if (menu_request == 1) {
-        if (graphics_lease.spec == nullptr && !stereo_candidate_lease.active(now) && !wuwa_stereo_order::active(now) && !wuwa_shadow::test_active() && wuwa_shadow::ready()) {
+        if (graphics_lease.spec == nullptr && !stereo_candidate_lease.active(now) && !wuwa_stereo_order::active(now) && !wuwa_shadow::test_active() && !wuwa_shadow::state_swap_active() && wuwa_shadow::ready()) {
             wuwa_shadow::set_test(20, false);
             menu_shadow_result = "20-second comparison started; restores automatically.";
             spdlog::info("[WuWaTest] menu shadow correction off for 20 seconds");
@@ -369,7 +369,8 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             if (seconds < 0 || seconds > 30)
                 throw std::runtime_error("Submission order test duration must be 0..30 seconds");
             if (seconds && (graphics_lease.spec || stereo_candidate_lease.active(now) ||
-                wuwa_shadow::test_active() || !wuwa_shadow::ready() || wuwa_stereo_order::active(now)))
+                wuwa_shadow::test_active() || wuwa_shadow::state_swap_active() || !wuwa_shadow::ready() ||
+                wuwa_stereo_order::active(now)))
                 throw std::runtime_error("Submission pair is not verified or another graphics test is active");
             wuwa_stereo_order::until = seconds ? now + seconds * 1000 : 0;
             reply["native_submission_order_test"] = wuwa_stereo_order::status();
@@ -377,7 +378,8 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             const auto seconds=request.value("seconds",0);
             if (seconds==0) stereo_candidate_lease.end(now,request.value("lease_id",std::string{}));
             else {
-                if (graphics_lease.spec || wuwa_shadow::test_active() || wuwa_stereo_order::active(now))
+                if (graphics_lease.spec || wuwa_shadow::test_active() || wuwa_shadow::state_swap_active() ||
+                    wuwa_stereo_order::active(now))
                     throw std::runtime_error("Another graphics comparison is active");
                 const auto& values=request.at("values");
                 if (!values.is_array() || values.size()!=3 || !values[0].is_boolean() ||
@@ -426,10 +428,23 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         } else if (op == "shadow_pass") {
             const auto seconds = request.value("seconds", 0);
             if (seconds < 0 || seconds > 60) throw std::runtime_error("shadow test duration must be 0..60 seconds");
-            if (seconds != 0 && (graphics_lease.spec != nullptr || stereo_candidate_lease.active(now) || wuwa_shadow::test_active() || wuwa_stereo_order::active(now) || !wuwa_shadow::ready())) {
+            if (seconds != 0 && (graphics_lease.spec != nullptr || stereo_candidate_lease.active(now) || wuwa_shadow::test_active() || wuwa_shadow::state_swap_active() || wuwa_stereo_order::active(now) || !wuwa_shadow::ready())) {
                 throw std::runtime_error("shadow pair unverified, test faulted, or another graphics test is active");
             }
             wuwa_shadow::set_test(seconds, request.value("enabled", true), request.value("full_view", false));
+            reply["shadow"] = wuwa_shadow::status();
+        } else if (op == "state_swap") {
+            // Diagnostic view-state exchange between the two main views, per pair,
+            // for a bounded window; 0 ends it. Nothing is saved to the profile.
+            const auto seconds = request.value("seconds", 0);
+            if (seconds < 0 || seconds > 60) throw std::runtime_error("State swap duration must be 0..60 seconds");
+            if (seconds != 0 && (graphics_lease.spec != nullptr || stereo_candidate_lease.active(now) ||
+                wuwa_shadow::test_active() || wuwa_shadow::state_swap_active() || wuwa_stereo_order::active(now) ||
+                !wuwa_shadow::ready() || wuwa_shadow::faulted.load())) {
+                throw std::runtime_error("Eye pair unverified, writes faulted, or another graphics test is active");
+            }
+            wuwa_shadow::set_state_swap(seconds);
+            spdlog::info("[WuWaTest] view-state swap window {} s", seconds);
             reply["shadow"] = wuwa_shadow::status();
         } else if (op == "restore") {
             if (graphics_lease.spec != nullptr && request.value("lease_id", "") != graphics_lease.id) {
@@ -437,7 +452,7 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             }
             reply["restore"] = restore_graphics();
         } else if (op == "query" || op == "begin") {
-            if (graphics_lease.spec != nullptr || wuwa_shadow::test_active() || stereo_candidate_lease.active(now) || wuwa_stereo_order::active(now)) throw std::runtime_error("another graphics test is active");
+            if (graphics_lease.spec != nullptr || wuwa_shadow::test_active() || wuwa_shadow::state_swap_active() || stereo_candidate_lease.active(now) || wuwa_stereo_order::active(now)) throw std::runtime_error("another graphics test is active");
             const auto name = request.at("name").get<std::string>();
             const CVarSpec* spec = nullptr;
             for (const auto& candidate : test_cvars) {

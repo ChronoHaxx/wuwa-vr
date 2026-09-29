@@ -541,8 +541,12 @@ class LiveTest:
             self.require_foreground = previous
 
     def lod_inputs(self, output: Path, seconds: int = 8, view_uniforms: bool = False,
-                   mesh_bindings: bool = False, raw_snapshots: bool = False) -> dict:
-        """Capture an expiring read-only trace and images; no rendering change."""
+                   mesh_bindings: bool = False, raw_snapshots: bool = False, state_swap: bool = False) -> dict:
+        """Capture an expiring read-only trace and images; no rendering change unless state_swap.
+
+        state_swap: for the trace window only, the two main views exchange their view-state
+        pointers every frame (restored after each frame's submissions and when the window
+        ends). A diagnostic write; the trace records which state each eye slot carried."""
         if not 1 <= seconds <= 30:
             raise ValueError("LOD input recording must be 1..30 seconds")
         state = self.assert_live()
@@ -556,11 +560,19 @@ class LiveTest:
             raise RuntimeError("This backend does not support mesh binding tracing")
         if raw_snapshots and state["lod_probe"].get("raw_snapshots_supported") is not True:
             raise RuntimeError("This backend does not support raw eye snapshots")
+        shadow = state.get("shadow") or {}
+        if state_swap:
+            if shadow.get("state_swap_supported") is not True:
+                raise RuntimeError("This backend does not support the view-state swap")
+            if (not shadow.get("ready") or shadow.get("faulted") or shadow.get("test_active")
+                    or shadow.get("state_swap_active")):
+                raise RuntimeError("Eye pair is not verified and idle; the view-state swap was not started")
         revision = state["lod_probe"].get("mesh_binding_hook_revision")
         if mesh_bindings and (type(revision) is not int or revision != 2):
             raise RuntimeError("Mesh tracing is blocked on this backend: its observer can overwrite a native branch target. Use a backend with hook revision 2; ordinary gameplay and recording do not install this observer.")
         output.mkdir(parents=True, exist_ok=False)
-        report = dict(pid=self.pid, status="incomplete", read_only=True, seconds=seconds,
+        report = dict(pid=self.pid, status="incomplete", read_only=not state_swap, seconds=seconds,
+                      state_swap_requested=state_swap,
                       view_uniforms_requested=view_uniforms,
                       mesh_bindings_requested=mesh_bindings,
                       raw_snapshots_requested=raw_snapshots,
@@ -573,6 +585,7 @@ class LiveTest:
             extra_traces.append(("mesh_bindings", "Mesh binding", "mesh-bindings"))
         extra_sources = {}
         stopped_cleanly = False
+        swap_started = swap_stopped = False
 
         def extra_trace_path(trace: dict, key: str, label: str, prefix: str) -> Path:
             sample = trace.get(key)
@@ -595,6 +608,16 @@ class LiveTest:
             options = {key: True for key, _, _ in extra_traces}
             if raw_snapshots:
                 options["raw_snapshots"] = True
+            if state_swap:
+                # Longer than the trace so every traced pair is swapped; ended explicitly below.
+                swap_started = True
+                begin = self.request("state_swap", seconds=min(60, seconds + 15))["shadow"]
+                report["state_swap_begin"] = begin
+                if not begin.get("state_swap_active"):
+                    raise RuntimeError("Backend did not open the view-state swap window")
+                self.wait_frames(1)
+                if self.request("shadow_query")["shadow"].get("state_swap_applied", 0) <= begin.get("state_swap_applied", 0):
+                    raise RuntimeError("View-state swap did not apply to any eye pair")
             started = self.request("lod_probe", seconds=seconds, **options)
             report["begin"] = started
             if raw_snapshots and (started["lod_probe"].get("raw_snapshots") or {}).get("requested") is not True:
@@ -634,6 +657,17 @@ class LiveTest:
                 (output / f"{prefix}.jsonl").write_bytes(data)
                 report[f"{key}_trace_sha256"] = hashlib.sha256(data).hexdigest()
                 report[f"{key}_trace_truncated"] = sample["truncated"]
+            if state_swap:
+                report["state_swap_end"] = self.request("shadow_query")["shadow"]
+                report["state_swap_stop"] = self.request("state_swap", seconds=0)["shadow"]
+                swap_stopped = True
+                self.wait_frames(1)
+                final = self.request("shadow_query")["shadow"]
+                report["state_swap_restored"] = final
+                if (final.get("faulted") or final.get("state_swap_active")
+                        or final.get("state_swap_restored") != final.get("state_swap_applied")
+                        or final.get("state_swap_applied", 0) <= report["state_swap_begin"].get("state_swap_applied", 0)):
+                    raise RuntimeError("View-state swap did not apply and restore cleanly")
             self.capture(output / "after", self.capture_layer())
             report["status"] = "captured_inputs_visual_review_pending" if trace.get("written", 0) else "no_covered_draws"
             return report
@@ -641,6 +675,11 @@ class LiveTest:
             report["error"] = str(error)
             raise
         finally:
+            if swap_started and not swap_stopped:
+                try:
+                    report["state_swap_cleanup"] = self.request("state_swap", seconds=0)
+                except BaseException as error:
+                    report["state_swap_cleanup_error"] = str(error)  # The window expires within 60 seconds.
             if started is not None and not stopped_cleanly:
                 try:
                     report["cleanup"] = self.request("lod_probe", seconds=0)
@@ -648,6 +687,24 @@ class LiveTest:
                     report["cleanup_error"] = str(error)  # Backend expires within 30 seconds.
             self.require_foreground = previous
             write_json(output / "lod-inputs.json", report)
+
+    def state_swap_window(self, seconds: int) -> dict:
+        """Open (1..60 s) or end (0) the diagnostic view-state swap and return at once, so Launcher.exe
+        can record the swapped condition: this client's control lock is released on exit, and the
+        window expires on its own in the backend."""
+        if not 0 <= seconds <= 60:
+            raise ValueError("View-state swap window must be 0..60 seconds")
+        shadow = self.assert_live().get("shadow") or {}
+        if seconds:
+            if shadow.get("state_swap_supported") is not True:
+                raise RuntimeError("This backend does not support the view-state swap")
+            if (not shadow.get("ready") or shadow.get("faulted") or shadow.get("test_active")
+                    or shadow.get("state_swap_active")):
+                raise RuntimeError("Eye pair is not verified and idle; the view-state swap was not started")
+        reply = self.request("state_swap", seconds=seconds)["shadow"]
+        if bool(reply.get("state_swap_active")) != bool(seconds):
+            raise RuntimeError("Backend did not " + ("open" if seconds else "end") + " the view-state swap window")
+        return reply
 
     @staticmethod
     def candidate_state(state: dict, values: tuple) -> None:
@@ -902,12 +959,16 @@ def main() -> int:
     lod.add_argument("--view-uniforms", action="store_true", help="Also record bounded View uniform ownership on a supporting backend")
     lod.add_argument("--mesh-bindings", action="store_true", help="Also record bounded mesh bindings before vertex-factory dispatch; this is not GPU draw proof")
     lod.add_argument("--raw-snapshots", action="store_true", help="Also record bounded raw copies of both eye slots' view and view-state windows (equal values included) in lod.jsonl")
+    lod.add_argument("--state-swap", action="store_true", help="Diagnostic write: the two main views exchange view-state pointers for the trace window, restored every frame and at the end")
     lod.add_argument("--output", type=Path, required=True)
     lod.add_argument("--pid", type=int, required=True)
     lod.add_argument("--seconds", type=int, choices=range(1, 31), metavar="1..30", default=8)
     for command in (capture, graphics, reflections, translucency, stereo, visibility, candidates, shadows, full_views, impostors, lod):
         command.add_argument("--capture-source", choices=("simulator", "steamvr"), default="simulator",
                              help="Select an already running runtime; never switches or starts one")
+    swap_window = commands.add_parser("state-swap", help="Diagnostic: open (1..60 s) or end (0) the view-state swap and exit; it expires on its own")
+    swap_window.add_argument("--seconds", type=int, required=True, choices=range(0, 61), metavar="0..60")
+    swap_window.add_argument("--pid", type=int, required=True)
     shadow_pass = commands.add_parser("shadow-pass")
     shadow_pass.add_argument("--seconds", type=int, default=0)
     trace = commands.add_parser("trace")
@@ -930,7 +991,7 @@ def main() -> int:
         parser.error("SteamVR mirrors cannot isolate projection/quad layers; use --layer all")
     client = LiveTest()
     client.capture_source = getattr(args, "capture_source", "simulator")
-    if args.command in ("reflections", "reflection-values", "translucency", "stereo", "visibility", "stereo-candidates", "full-views", "impostors", "lod-inputs") and args.pid is not None and client.pid != args.pid:
+    if args.command in ("reflections", "reflection-values", "translucency", "stereo", "visibility", "stereo-candidates", "full-views", "impostors", "lod-inputs", "state-swap") and args.pid is not None and client.pid != args.pid:
         raise RuntimeError("Game process changed before graphics comparison")
     with client.exclusive():
         if args.command == "status":
@@ -951,7 +1012,8 @@ def main() -> int:
             result = client.impostors(args.output)
         elif args.command == "lod-inputs":
             result = client.lod_inputs(args.output, args.seconds, view_uniforms=args.view_uniforms,
-                                       mesh_bindings=args.mesh_bindings, raw_snapshots=args.raw_snapshots)
+                                       mesh_bindings=args.mesh_bindings, raw_snapshots=args.raw_snapshots,
+                                       state_swap=args.state_swap)
         elif args.command == "stereo-candidates":
             result = client.stereo_candidates(args.output)
         elif args.command == "reflection-values":
@@ -965,6 +1027,8 @@ def main() -> int:
             result = client.full_views(args.output)
         elif args.command == "shadow-pass":
             result = client.request("shadow_pass", seconds=args.seconds)
+        elif args.command == "state-swap":
+            result = client.state_swap_window(args.seconds)
         elif args.command == "trace":
             result = client.request("trace", seconds=0 if args.until_stopped else args.seconds, until_stopped=args.until_stopped)
         elif args.command == "record-motion":

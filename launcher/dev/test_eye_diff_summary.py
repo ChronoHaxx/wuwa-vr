@@ -428,7 +428,7 @@ class Layout(unittest.TestCase):
 
 
 class Conditions(unittest.TestCase):
-    def make(self, directory, swap, early, passes):
+    def make(self, directory, swap, early, passes, states=(0x3cd8aac0, 0x43ee8020), state_swap=None):
         root = Path(directory)
         (root / 'baseline').mkdir()
         (root / 'baseline' / 'config.txt').write_text(
@@ -438,7 +438,10 @@ class Conditions(unittest.TestCase):
                   'applied': 0 if early else 900, 'restored': 0 if early else 900,
                   'full_view_enabled': False, 'full_applied': 0, 'faulted': False}
         (root / 'baseline' / 'capture.json').write_text(json.dumps({'backend': {'shadow': shadow}}), encoding='utf-8')
-        rows = [{'type': 'pair', 'phase': 'before_submissions', 'views': [{'pass': passes[0]}, {'pass': passes[1]}]}] * 3
+        rows = [{'type': 'pair', 'phase': 'before_submissions',
+                 'views': [{'pass': passes[0], 'state': states[0]}, {'pass': passes[1], 'state': states[1]}]}] * 3
+        if state_swap is not None:
+            (root / 'lod-inputs.json').write_text(json.dumps(state_swap), encoding='utf-8')
         rows += [{'type': 'uniforms', 'eye_slot': 0, 'producer_context': {'source_relation': 'external'}}] * 2
         rows += [{'type': 'uniforms', 'eye_slot': 1, 'producer_context': {'source_relation': 'view_plus_0x320'}}]
         return write(root, rows)
@@ -466,9 +469,35 @@ class Conditions(unittest.TestCase):
                 self.assertEqual(s.main(['--conditions', str(path), str(path)]), 0)
             self.assertEqual(out.getvalue().count('uniform producers: slot0 external x2'), 2)
 
+    def test_state_swap_run_shows_exchanged_states_and_its_counters(self):
+        report = {'state_swap_requested': True, 'state_swap_begin': {'state_swap_applied': 7},
+                  'state_swap_restored': {'state_swap_applied': 1807, 'state_swap_restored': 1807, 'faulted': False}}
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            plain = self.make(a, swap=True, early=False, passes=(2, 3), state_swap={'state_swap_requested': False})
+            swapped = self.make(b, swap=True, early=False, passes=(2, 3), states=(0x43ee8020, 0x3cd8aac0),
+                                state_swap=report)
+            c = s.conditions(swapped)
+            self.assertEqual(c['states'], [{'slot': 0, 'state': 0x43ee8020, 'rows': 3},
+                                           {'slot': 1, 'state': 0x3cd8aac0, 'rows': 3}])
+            self.assertEqual((c['swap']['applied_before'], c['swap']['applied_after'], c['swap']['restored_after']),
+                             (7, 1807, 1807))
+            text = s.render_conditions(swapped, c)
+            self.assertIn('state swap: requested; applied 7 -> 1807, restored 1807; faulted=False', text)
+            self.assertIn('state slot0: 0x43ee8020 x3', text)
+            self.assertEqual(s.conditions(plain)['swap'], {'requested': False})
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(s.main(['--conditions', str(plain), str(swapped)]), 0)
+            self.assertIn(f'states exchanged: {plain} carries the states of {swapped} the other way round',
+                          out.getvalue())
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                s.main(['--conditions', str(plain), str(plain)])
+            self.assertNotIn('states exchanged', out.getvalue())   # same assignment: nothing to report
+
     def test_a_bare_trace_claims_nothing(self):
         c = s.conditions(NATIVE)
-        self.assertEqual((c['settings'], c['display'], c['passes']), ({}, None, []))
+        self.assertEqual((c['settings'], c['display'], c['passes'], c['states'], c['swap']), ({}, None, [], [], None))
         self.assertIn('settings: unknown', s.render_conditions('x', c))
 
 

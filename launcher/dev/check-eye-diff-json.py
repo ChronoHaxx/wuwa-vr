@@ -140,6 +140,18 @@ def expectations(o):
             ('rows of unchanged pairs unaffected', o['rows']['after'],
              row_frames(f for i, f in enumerate(o['valid_frames']) if i % 60)),
         ]
+    elif name == 'state_swap_window':
+        inside = [q for q in scheduled if 100 <= q - 1 < 250]
+        checks += [
+            ('no phase refused a swapped pair',
+             [o['pairs'][p]['invalid'] for p in ('before', 'after_first', 'after')], [0, 0, 0]),
+            ('every scheduled pair completed, none orphaned',
+             (e['before'], e['after'], e['after_paired'], (o['sampler'] or {}).get('orphaned')),
+             (len(scheduled), len(scheduled), len(scheduled), 0)),
+            ('samples inside the window record the exchanged states, before and after',
+             (e['before_swapped'], e['after_swapped']), (len(inside), len(inside))),
+            ('rows keep their usual cadence', o['rows']['after'], row_frames(o['valid_frames'])),
+        ]
     elif name == 'ring_capacity':
         checks += [
             ('ring filled with whole pairs only', (e['before'], e['after'], e['after_paired']), (64, 64, 64)),

@@ -506,7 +506,8 @@ def render_layout(path, layout, state_extent=STATE_EXTENT):
 SETTINGS = {'VR_NativeStereoFixSamePass': 'Same Pass', 'VR_NativeStereoFixSwapEyes': 'Swap Eyes',
             'VR_WuWaEarlyStereoViews': 'Early stereo view setup'}
 SHADOW_KEYS = ('early_configured', 'early_applied', 'early_skipped', 'applied', 'restored',
-               'full_view_enabled', 'full_applied', 'faulted')
+               'full_view_enabled', 'full_applied', 'faulted', 'state_swap_active', 'state_swap_applied',
+               'state_swap_restored', 'state_swap_skipped')
 
 
 def _read_settings(folder):
@@ -526,6 +527,20 @@ def _read_shadow(folder):
     return {key: shadow.get(key) for key in SHADOW_KEYS}
 
 
+def _read_swap(trace):
+    """The view-state swap block wuwa-test.py writes into lod-inputs.json for `lod-inputs --state-swap`."""
+    try:
+        report = json.loads(Path(trace).with_name('lod-inputs.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not report.get('state_swap_requested'):
+        return {'requested': False}
+    begin, final = report.get('state_swap_begin') or {}, report.get('state_swap_restored') or {}
+    return {'requested': True, 'applied_before': begin.get('state_swap_applied'),
+            'applied_after': final.get('state_swap_applied'), 'restored_after': final.get('state_swap_restored'),
+            'faulted': final.get('faulted'), 'error': report.get('error')}
+
+
 def conditions(trace):
     """What was in effect during one trace, from the trace and the folders wuwa-test.py writes beside it.
 
@@ -537,9 +552,10 @@ def conditions(trace):
     stereo view setup working, slot 1 reads 2 already before the submissions. `producers`: uniform rows per
     slot and producer relation ('external' is the extra per-frame production of fact 12). `display`: which
     half shows which slot, from Swap Eyes and D3D12Component (the game texture holds views[0], the scene
-    capture views[1])."""
+    capture views[1]). `states`: which view-state object each slot carried before the submissions; with
+    `lod-inputs --state-swap` slot 0 carries the state slot 1 has without it. `swap`: that run's counters."""
     trace = Path(trace)
-    passes, producers = defaultdict(int), defaultdict(int)
+    passes, producers, states = defaultdict(int), defaultdict(int), defaultdict(int)
     for line in trace.read_text(encoding='utf-8').splitlines():
         if '"pair"' not in line and '"uniforms"' not in line:
             continue
@@ -547,6 +563,9 @@ def conditions(trace):
         if row.get('type') == 'pair':
             key = (row.get('phase'), tuple(view.get('pass') for view in row.get('views', [])[:2]))
             passes[key] += 1
+            if row.get('phase') == 'before_submissions':
+                for slot, view in enumerate(row.get('views', [])[:2]):
+                    states[(slot, view.get('state'))] += 1
         elif row.get('type') == 'uniforms':
             context = row.get('producer_context')
             relation = context.get('source_relation') if isinstance(context, dict) else None
@@ -556,7 +575,9 @@ def conditions(trace):
     display = None if swap is None else (
         {'left': 'slot1 (views[1], scene capture)', 'right': 'slot0 (views[0], game target)'} if swap else
         {'left': 'slot0 (views[0], game target)', 'right': 'slot1 (views[1], scene capture)'})
-    return {'settings': settings, 'display': display,
+    return {'settings': settings, 'display': display, 'swap': _read_swap(trace),
+            'states': [{'slot': slot, 'state': state, 'rows': n}
+                       for (slot, state), n in sorted(states.items(), key=lambda item: str(item[0]))],
             'shadow': {stage: _read_shadow(trace.parent / stage) for stage in ('baseline', 'after')},
             'passes': [{'phase': phase, 'passes': list(key), 'rows': n}
                        for (phase, key), n in sorted(passes.items(), key=lambda item: str(item[0]))],
@@ -578,13 +599,44 @@ def render_conditions(path, c):
             lines.append(f"  {stage}: early configured={shadow['early_configured']} applied={shadow['early_applied']} "
                          f"skipped={shadow['early_skipped']}; same-pass applied={shadow['applied']}; "
                          f"full view={shadow['full_view_enabled']}; faulted={shadow['faulted']}")
+    swap = c.get('swap')
+    if swap and swap.get('requested'):
+        lines.append(f"  state swap: requested; applied {swap['applied_before']} -> {swap['applied_after']}, "
+                     f"restored {swap['restored_after']}; faulted={swap['faulted']}"
+                     + (f"; ERROR {swap['error']}" if swap.get('error') else ''))
     for item in c['passes']:
         lines.append(f"  pass slot0/slot1 {item['phase']}: {'/'.join(str(p) for p in item['passes'])} x{item['rows']}")
+    for item in c.get('states', []):
+        state = item['state']
+        lines.append(f"  state slot{item['slot']}: {state:#x} x{item['rows']}" if isinstance(state, int)
+                     else f"  state slot{item['slot']}: {state} x{item['rows']}")
     if not c['passes']:
         lines.append('  no pair rows')
     lines.append('  uniform producers: ' + (', '.join(f"slot{p['slot']} {p['relation']} x{p['rows']}"
                                                        for p in c['producers']) or 'none (--view-uniforms not requested)'))
     return '\n'.join(lines)
+
+
+def _main_states(c):
+    """(slot0 state, slot1 state) when each slot carried exactly one state object in the trace."""
+    by = defaultdict(set)
+    for item in c.get('states', []):
+        by[item['slot']].add(item['state'])
+    if len(by.get(0, ())) == 1 and len(by.get(1, ())) == 1:
+        return next(iter(by[0])), next(iter(by[1]))
+    return None
+
+
+def exchanged_pairs(items):
+    """(i, j) where trace i's slots carry trace j's states the other way round, i.e. a --state-swap run
+    and a plain run of the same game session. Addresses identify objects only within one session."""
+    pairs = []
+    for i, (_, a) in enumerate(items):
+        for j, (_, b) in enumerate(items):
+            sa, sb = _main_states(a), _main_states(b)
+            if i != j and sa and sb and sa[0] != sa[1] and sa == (sb[1], sb[0]):
+                pairs.append((i, j))
+    return pairs
 
 
 def render_raw(path, region, rows):
@@ -627,8 +679,12 @@ def main(argv=None):
                       sys.stdout, indent=1)
             sys.stdout.write('\n')
         else:
-            print('\n\n'.join(render_layout(path, item, args.state_extent) if args.layout else
-                                render_conditions(path, item) for path, item in items))
+            text = '\n\n'.join(render_layout(path, item, args.state_extent) if args.layout else
+                                 render_conditions(path, item) for path, item in items)
+            if args.conditions:
+                text += ''.join(f"\n\nstates exchanged: {items[i][0]} carries the states of {items[j][0]} "
+                                "the other way round" for i, j in exchanged_pairs(items) if i < j)
+            print(text)
         return 0
     if args.raw:
         try:

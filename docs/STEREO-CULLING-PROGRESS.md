@@ -1,14 +1,17 @@
 # Stereo foliage/prop mismatch: progress and evidence
 
-Updated after the 29 Sep raw-snapshot far/near pair and the Swap Eyes check. **No rendering fix
-exists yet.** At distance the left-eye tree is static while the right eye's sways; nearer, both
-move; several trees and locations are affected. **The frozen image is `views[1]`**, the family's
-second main view, which WuWa constructs as its secondary eye pass (3) and UEVR renders into the
-scene-capture target (section "Which pass is frozen"). Nothing in either view state tracks the
-freeze across sessions. The next step is a pair of zero-code switches that split the remaining
-hypotheses. **Eye slots:** slot 1 is `views[1]`, shown in the left half with Swap Eyes on (the
-correct setting); verified against the output by the swap check (fact 22).
-Windows acceptance plan and commands: [EYE-DIFF-HANDOFF.md](EYE-DIFF-HANDOFF.md).
+Updated after the 29 Sep pass-split session (E1, E2). **No rendering fix exists yet.** At
+distance the left-eye tree is static while the right eye's sways; nearer, both move; several
+trees and locations are affected. **The frozen image is `views[1]`**, the family's second main
+view, which WuWa constructs as its secondary eye pass (3) and UEVR renders into the
+scene-capture target (section "Which pass is frozen"). **The stereo pass is ruled out**, on the
+game thread (E1) and the render thread (E2), and `views[1]`'s view-uniform clock does not go
+stale (fact 31). Still specific to `views[1]`: its own view state, which never receives the
+extra per-frame render that `views[0]`'s state gets, and its capture target (section "What is
+still specific to `views[1]`"). The next step, E3, is an opt-in, timed view-state swap that
+separates those two. **Eye slots:** slot 1 is `views[1]`, shown in the left half with Swap Eyes
+on (the correct setting); verified against the output by the swap check (fact 22).
+Windows plan and commands: [EYE-DIFF-HANDOFF.md](EYE-DIFF-HANDOFF.md).
 
 ## Baseline and accepted work
 
@@ -57,7 +60,12 @@ frozen; near: both sway), not from an automated motion measurement.
 | 25 | **State layout markers (raw rows, all 8 snapshots of both captures):** both states, allocated separately (`0x383a0aac0`, `0x38972d560`, stable across captures), hold the same game-image pointers at `+0x0` (`0x1677a0b40`), `+0x20`, `+0x1d8`, and `0x16755f188` at **`+0x2058` and `+0x2080`**: one class, a 0x28-byte member repeated (pointer, two heap pointers, an int32) | The shared layout runs to at least **`+0x20a8`**. The summarizer now stops the state compare there (`STATE_EXTENT`, `--layout`). The true `sizeof` is still unknown (how to read it: section "Which pass is frozen") |
 | 26 | The 29 Sep far-only `+0x2070/+0x2098` (`0xbe0` vs `0xbd0`) is that member's int32, once per instance; the text next to it (`+0x2074`, `+0x209c`) is the high half of the same 8-byte slot, i.e. padding. 28 Sep: the same field differs at far (`0x640`/`0x470`) **and at near** (`0xbb0`/`0xbe0`) | Inside the shared layout, not heap past the struct. A size-like per-eye value (all multiples of 16) that differs in working and failing captures: not a freeze marker. Rejected |
 | 27 | Slot 0's state is used by the extra uniform production of fact 12 in all five traces since 28 Sep (236; 227/223; 241/241 rows); slot 1 has none. Slot 0 alone holds three heap pointers at `+0x528..+0x53c` and 3/1 at `+0x550/+0x554`, where slot 1 holds zeros, in both sessions; `+0x540..+0x54c` (a pointer, then 4, 4) is populated in both | Standing asymmetries between the primary and secondary states, present at far and near. Not distance-linked by themselves; candidates for what the secondary view never receives (H3 below) |
-| 28 | Conditions (`--conditions`) of all five traces since 28 Sep: Same Pass on, Early stereo view setup **off** (`early_applied` 0), Swap Eyes on. The four far/near traces read slot passes 2/3 in all 76–80 pair rows of every phase, including before the submissions | `views[1]` is secondary (pass 3) from construction until its own submission. The Early stereo view setup and full-view switches have never been tried on this issue |
+| 28 | Conditions (`--conditions`) of all five traces since 28 Sep: Same Pass on, Early stereo view setup **off** (`early_applied` 0), Swap Eyes on. The four far/near traces read slot passes 2/3 in all 76–80 pair rows of every phase, including before the submissions | `views[1]` is secondary (pass 3) from construction until its own submission. Before 29 Sep afternoon, neither the early-setup nor the full-view switch had been tried on this issue (now facts 29, 30) |
+| 29 | **E1, far (29 Sep afternoon):** Early stereo view setup on. The trace shows it took effect: slot passes 2/2 in all 72 pair rows of every phase, `early_applied` 4066 → 4675 over the trace, Same Pass `applied` flat at 20940. Headset: the left-eye far tree **stayed frozen**; no other eye difference noticed | Making `views[1]` primary from construction on changes nothing visible. **Rejected:** primary-only work on the game thread (and anything else keyed on the pass after construction) |
+| 30 | **E2, far:** `full-views`. Both views rendered as full views (pass 0) in both submissions: `full_applied` = `full_restored` = 124, cleanly restored. Headset: frozen for the whole window. The command ends the override once its check capture is done, so the window was about 7–8 s (124 pairs at the ~15 fps these traces show), not 45 s as the handoff said | **Rejected:** render-thread logic keyed on "stereo eye pass" versus full view. With fact 29, the pass value is ruled out on both threads |
+| 31 | **View uniforms (far-e0, far-e1; 114 consecutive frames each, `view-ub.jsonl`).** At the own-update return, `views[1]`'s final payload has the same game time, real time and delta time as `views[0]`'s in every frame. Both advance every frame, "previous time" equals the last frame's time, and each state's frame index steps by exactly 1 (slot 1's is a constant 73 behind slot 0's in both traces). Family frame and origin shift are equal; planar-reflection and force-velocity flags are 0 for both. The shared view-UB cache makes the same skip/update decisions for both eyes | `views[1]`'s view clock is not stale at far. The payload fields read here contain no wind parameter; wind data in stock UE is per component, not per view. Not measured: per-primitive or wind buffers on the GPU |
+| 32 | **The extra "external" production (fact 12) in far-e0/e1:** slot 0 only (225, 235 rows), also with both views at pass 2 (E1). One per frame, on the same render thread, always inside slot 0's render family: the two eyes render in different families in 148/148 and 91/91 frames, and it never shares slot 1's. It usually comes between slot 0's and slot 1's main uniforms. It carries slot 0's view state and fallback origin, a perspective projection close to eye 0's (M[2][0] −0.2455 vs −0.2448) and a **different camera** (another view direction, with a translation). Its matrices come from one persistent object at a fixed address for the whole session | Decided by something other than the pass: the first submission, the player's primary view state, or the first view on the game thread. What it renders is unknown (guess: an auxiliary capture or pass whose output stays with state A). `views[1]`'s state B never gets it |
+| 33 | UEVR changes only the family's render-target pointer, view count and view order between the two submissions (`FFakeStereoRenderingHook.cpp`). No family or view flag is set for the scene-capture submission. During each submission the family holds one view, at index 0 | Render-thread "first view / view index" logic cannot single out `views[1]`. Game-thread logic keyed on `Views[0]` can: `views[1]` is index 1 there, and E1 did not change that. The UESDK setter itself (pinned outside this repo) was not read |
 
 ## Rejected hypotheses and readings
 
@@ -76,6 +84,10 @@ frozen; near: both sway), not from an automated motion measurement.
 | "`+0x0e20`, `+0x2070/+0x2098` differ only while failing" | Facts 24, 26: a moving heap pointer; a size field that also differs in a working capture |
 | "Text bytes show where the view state ends (about `+0x2070`)" | Facts 17, 25, 26: text sits inside the shared layout and in member padding |
 | "Second submission / once-per-frame work skips the frozen eye" | Facts 4 and 22: the freeze stays with `views[1]` in both orders |
+| "Primary-only (or any pass-keyed) work on the game thread skips `views[1]`" (H1 of the previous round) | Fact 29 (E1) |
+| "Render-thread logic keyed on the stereo eye pass" (H2 of the previous round) | Fact 30 (E2; a 7–8 s window) |
+| "`views[1]`'s view-uniform time goes stale at far" | Fact 31 |
+| "The extra production follows the primary pass" | Fact 32: still slot 0 only with both views at pass 2 |
 
 **Not rejected:** see "Hypotheses" below. LOD/culling/impostor selection or a per-view WPO gate
 remain possible as the visible outcome of any of them.
@@ -108,18 +120,18 @@ remain possible as the visible outcome of any of them.
   extra per-frame uniform production, and only slot 0's state holds the pointers and 3/1 values
   in `+0x528..+0x558` (fact 27).
 
-**Per-view updates `views[1]` could skip at distance** (guessed unless marked):
+**Per-view updates `views[1]` could skip at distance** (guessed unless marked; status updated after E1/E2):
 
 | Candidate | Status for `views[1]` |
 |---|---|
-| **Primary-only work on the game thread** between construction and submission: per-view LOD, significance, HLOD/impostor or foliage decisions, registrations, the extra production | **Open, best fit.** `views[1]` is pass 3 for that whole window (proven). Such systems are commonly distance-based and would stay tied to `views[1]` in both orders. Test: E1 |
+| **Primary-only work on the game thread** between construction and submission: per-view LOD, significance, HLOD/impostor or foliage decisions, registrations, the extra production | **Rejected by E1** (fact 29): primary from construction on changed nothing. Work keyed on `Views[0]` rather than on the pass remains (fact 33) |
 | Primary-only decision on the render thread | Weak: Same Pass makes `views[1]` primary for its submission (proven). Only a result cached before that call would escape |
-| Stereo-eye logic independent of primary/secondary (pass ≠ 0) | Open. Test: E2 (both views as full views) |
-| Per-view-state content the secondary state never receives (fact 27), or its history (temporal LOD, occlusion, fading) | Open. Nothing in the compared state tracks the freeze (proven for the fields read, below `+0x20a8`), but slot 0-only content exists. Test: E3 (proposed, writes a pointer) |
-| WPO/wind | The CPU view clock is equal per eye (facts 9, 21). WPO reads view uniforms (shared clock) and per-primitive wind data (one per component). A per-eye split needs a per-view input from one of the rows above. GPU side unmeasured |
+| Stereo-eye logic independent of primary/secondary (pass ≠ 0) | **Rejected by E2** (fact 30) |
+| Per-view-state content the secondary state never receives (fact 27), or its history (temporal LOD, occlusion, fading) | **Open, now first** (section below). Nothing in the compared state tracks the freeze (proven for the fields read, below `+0x20a8`), but slot 0-only content and the slot 0-only extra render exist. Test: E3 (implemented) |
+| WPO/wind | The CPU view clock is equal per eye (facts 9, 21), and so is the final view-uniform payload's clock, advancing every frame (fact 31). WPO reads view uniforms and per-primitive wind data (one per component). A per-eye split needs a per-view input from the view state. GPU side unmeasured |
 | Animation update rate (URO, visibility-based ticks) | Unlikely: game-thread, per component, one pose per frame for both views in stock UE. Would need a Kuro per-view animation path (none known) |
 | Cached mesh draw commands | Weak: cached per scene and pass, shared by both views; view data comes through the view uniform buffer. Fact 5: disabling via CVar did not fix it |
-| The scene-capture target itself | Unlikely: rects and projections match (facts 3, 20). Test: E4 (proposed) |
+| The scene-capture target itself | Open, second: rects and projections match (facts 3, 20), and no flag is set (fact 33). E3 separates it from the state; E4 (proposed) isolates it |
 | Constructor-time pass logic | Not covered by any existing switch. Constructor inputs are left untouched since changing the **first** view's constructor pass (2→1) crashed the game (RVA `0x24ac191c`, 24 Sep). Changing `views[1]`'s (3→2) is untried and riskier than E1–E4 |
 
 **View-state size.** The compare stops at `+0x20a8`, a lower bound (fact 25). The earlier
@@ -132,6 +144,22 @@ read the real `sizeof` from the game binary:
 - or find the `new` that allocates the state (`AllocateViewState`) and read its size.
 
 Pass the result as `--state-extent`. Until then, anything above `+0x20a8` stays uncompared.
+
+## What is still specific to `views[1]` (after E1 and E2)
+
+Ranked. "Proven" means shown by code or by the traces above; everything else is a guess.
+
+| # | Factor | Proven | Guessed |
+|---|---|---|---|
+| 1 | **Its own view state B** (history, caches, per-state registrations) | Tied to `views[1]` in both orders and at every pass (facts 4, 22, 29, 30). Only state A gets the extra per-frame render (facts 27, 32), and only A holds the `+0x528..+0x558` data. Clocks are equal (fact 31) | Far content in B comes from something refreshed only for A (for example the extra render's output kept per state), or B holds history that pins far objects |
+| 2 | **Its target: the scene-capture render target** | `views[1]` always renders into it, in both orders (fact 22). UEVR sets no family or view flag for it (fact 33) | Engine or Kuro code that treats a render-target texture differently from the viewport's target |
+| 3 | **Game-thread logic keyed on the first view (`Views[0]`)** | `views[1]` is index 1 there; E1 changed only the pass (facts 29, 33) | The extra production, or per-view LOD/culling state, built from `Views[0]` only |
+| 4 | **The extra production itself** | Slot 0 only, inside the first submission, not pass-decided (fact 32) | The mechanism behind rows 1 or 3, not a separate cause |
+| 5 | Constructor-time pass logic | Untouched by E1/E2 | Low: every later pass-keyed effect is already ruled out |
+
+Rows 1 and 2 separate cleanly by moving only the state. That is E3 (below). Rows 3 and 4 show up
+in E3's trace as a side result: which slot the extra production is tagged with while the states
+are exchanged.
 
 ## Why PR #1 collected nothing, and the repair
 
@@ -196,6 +224,12 @@ fact 25) unless `--state-extent` is given. Status adds `raw_snapshots_supported`
 | Python: summarizer (33: truncation horizon, unknown-is-not-equal in `--compare`, unchanged/text tags, provisional eye sides, `--raw` reader; **new:** state extent in `--compare`/`--raw`, truncation above the extent is not a gap, `--layout` markers and stride bound, `--conditions` settings/passes/producers/display halves) and candidate registration (7) | pass; 8 planted summarizer bugs (no extent skip, no horizon cap, raw not limited, stride ignored, truncation miscounted, one-slot markers, swapped display halves, `--state-extent` ignored) are all caught |
 | Raw snapshots through the verbatim `pair()`: opt-in (0 rows unless requested), every 5th eye-diff pair, 3-pair budget, before/after of one sequence, equal value kept in both slots, unreadable tail reported as a range and zeroed; `test-eye-diff.cpp` block/schedule/ring cases (19 cases total) | pass; 6 planted raw bugs (opt-in ignored, cadence, slots swapped, range off by one, stale words, missing validity) are caught |
 | Reconstruction patch: only the two header sections changed (97 sections); all 65 text new-file sections apply to an empty tree and equal the overlays | pass |
+| **E3 state swap.** `test-state-swap.cpp`, 6 cases under g++ ASan+UBSan and clang: swap and restore; refuse without writing (null, same, overlapping, unreadable, shared state); roll back a failed second write; a write that does not stick; never overwrite a foreign value; no write when already restored | pass; 4 planted bugs (no read-back, restore clobbers a foreign value, shared state allowed, no rollback) are caught |
+| Lifecycle harness `state_swap_window`: the verbatim `pair()` with the states exchanged before phase 1 and restored after phase 2 | pass (no refusals, every scheduled pair completed, swapped identities recorded); with the swap moved after phase 1 it fails 4 expectations (150 refused pairs per later phase, 3 orphans), so the placement is required. Merged PR #1 sources now fail 32 |
+| `WuWaShadowPass.hpp` (scope, helpers, status) and `WuWaTestControl.hpp` (op, conflict checks) with stub headers, `g++ -std=c++23 -fsyntax-only`, working tree versus `HEAD` | no new diagnostic; a planted typo in the new op is reported |
+| `wuwa-test.py lod-inputs --state-swap` and `state-swap` against a fake backend (`test_state_swap_runner.py`, 7): window opened before the trace and closed after it, restore verified, closed on failure, refused on an old backend or while a window is open, untouched without the flag | pass; 4 planted runner bugs are caught |
+| Python totals | summarizer 34, registration 7, runner 7: pass; pyflakes clean |
+| Reconstruction patch: `WuWaStateSwap.hpp` added; `WuWaShadowPass.hpp`, `WuWaTestControl.hpp` and `FFakeStereoRenderingHook.cpp` regenerated (99 sections). The upstream original of the latter was rebuilt by reverse-applying its old section (blob `148f143` matches) | all 67 text new-file sections apply to an empty tree and equal the overlays; the FFake section turns upstream into the new file exactly |
 
 **Local, user (Windows):** MSVC build `8bb228d9…` with zero errors; far and near traces in the game
 with the lifecycle counters in fact 13. Not run anywhere: overhead measurement, PowerShell
@@ -203,52 +237,54 @@ launcher actions in cloud. Cloud checks are g++/clang only.
 
 ## Hypotheses (ranked; all untested on WuWa)
 
-1. **H1: Game-thread setup that runs only for the primary pass.** `views[1]` is pass 3 from
-   construction until its submission (fact 28). A distance-based per-view decision or
-   registration made there would skip `views[1]` in both orders (fact 22). Test: E1.
-2. **H2: Render-thread stereo-eye logic** that keys on "is an eye pass" rather than primary or
-   secondary. Test: E2.
-3. **H3: The secondary view state lacks something the primary state gets** (fact 27), or holds a
-   history that pins far objects. Test: E3, only if E1 and E2 are negative.
-4. **H4: The capture target, or constructor-time pass logic.** Lowest prior. E4 for the target;
-   no existing switch reaches the constructor.
+The pass hypotheses (H1: game-thread, H2: render-thread) were rejected by E1 and E2 (facts 29,
+30).
+
+1. **H3: The view state carries it.** State B lacks something state A gets every frame (facts
+   27, 32), or holds history that pins far objects. Test: E3.
+2. **H4: The capture target**, or game-thread logic keyed on `Views[0]` (fact 33). Test: E3
+   separates H3 from these; E4 then separates the target from the index.
 
 ## Next experiments, in order
 
-E1 and E2 need **no native change**: the registered `eye-diff-raw-20260929` build has both
-switches, and each trace now reports whether the switch took effect (`--conditions`). Commands
-and the result table: [EYE-DIFF-HANDOFF.md](EYE-DIFF-HANDOFF.md).
+E1 and E2 are done (facts 29, 30), both negative. Commands for E3 and the result table:
+[EYE-DIFF-HANDOFF.md](EYE-DIFF-HANDOFF.md).
 
-1. **E1: Early stereo view setup on** (UEVR menu, `VR_WuWaEarlyStereoViews`; read on every view
-   construction, so it switches live). `views[1]` becomes pass 2 right after construction,
-   before game-thread setup. Constructor inputs, state pointers and exposure sharing are
-   unchanged. Trace markers:
-   - slot passes 2/2 before the submissions;
-   - `early_applied` rising;
-   - Same Pass `applied` flat, since `PassScope` sees pass 2 and leaves it.
+1. **E3: view-state swap (implemented; approved as opt-in, timed and auto-restoring).**
+   - **Switch:** WuWa test control op `state_swap` (0..60 s; 0 ends it), driven by
+     `wuwa-test.py lod-inputs --state-swap` (trace) or `wuwa-test.py state-swap --seconds N` (opens
+     the window and exits, so Launcher.exe can record it). No UI, no profile setting; off unless
+     requested.
+   - **What it does:** for each verified main pair, the two views exchange their view-state
+     pointers (`view+0x8`, constructor-proven) before the LOD probe's first snapshot and the
+     first submission. Both are restored when the NSF function returns. Each eye renders with
+     the other eye's state object. Nothing is copied between the states and nothing is shared.
+     This relies on the renderer copying each view inside its submission call, the same
+     inference Same Pass relies on. The trace proves the swap on the probe side; only the
+     headset shows the render side.
+   - **Guards:** the verified build and pair, both views in the family, first pass 2 and second
+     3 or 2. It never runs with another pass or order test. A failed write, read-back or
+     restore disables all writes in the module. Restore never overwrites a value it did not
+     write.
+   - **Cost:** at the start and end of the window each state gets one frame of the other eye
+     (a brief TAA or occlusion hiccup).
+   - **Readout:**
 
-   If the left-eye far tree sways, H1 holds; also look for slot 1 gaining an `external`
-   producer. If it stays frozen, H1 is excluded for everything after construction.
-2. **E2: `full-views`** (existing, 45 s, restores itself): both views render as pass 0 in both
-   submissions. It leaves game-thread setup alone, so it is independent of E1. If the far tree
-   sways during the window, H2 holds.
-3. **E3, proposed, not implemented:** swap the two views' state pointers (`view+0x8`, verified)
-   right after `views[1]` is constructed, for a timed window, restored like the pass scopes. If
-   the freeze moves to `views[0]`, the state carries it (H3). This replaces which history each
-   eye uses, so each state gets one frame of the other eye at the start and end of the window.
-   The codebase does not currently permit that ("not permission to share or replace
-   temporal/occlusion history"), so it needs explicit approval and its own review.
-4. **E4, proposed:** render `views[1]` to the game target and `views[0]` to the capture target,
-   with the display halves flipped. Separates the target from the view. More invasive (it
-   changes the NSF target swap, which UEVR notes is performance-sensitive); only if E1–E3 are
-   negative.
-5. **Fix stage.** If E1 fixes it, the fix already exists as a guarded, experimental option.
-   Accept it only after:
-   - a headset check at the same far and near positions;
-   - a regression pass (both-eye exposure, shadows, reflections, the ultimate camera, frame
-     time).
+     | Headset, far | Extra production tagged | Reading |
+     |---|---|---|
+     | **Right** eye freezes, left sways | slot 1 (stays with state A) | H3: the state carries it, and the extra render follows state A |
+     | Right eye freezes | slot 0 | H3 through history; the extra render follows the first submission |
+     | Left stays frozen | either | Not the state: H4 (target, or `Views[0]` on the game thread). Next: E4 |
 
-   Only then consider making it the WuWa default, in a separate change.
+     The trace proves the swap happened: `--conditions` shows slot 0 carrying the state slot
+     1 carries without it ("states exchanged"), with applied = restored.
+2. **E4, proposed:** render `views[1]` to the game target and `views[0]` to the capture target,
+   with the display halves flipped. It separates the target from `Views[0]`-keyed logic. It is
+   more invasive (it changes the NSF target swap, which UEVR notes is performance-sensitive),
+   so only if E3 says "not the state".
+3. **Fix stage:** only after E3/E4 point at one mechanism, and accepted only by a headset check
+   at the same far and near positions. A swap is a diagnostic, not a fix: it moves the freeze,
+   it cannot remove it.
 
 Not repeated: CVar switches from fact 5; copying view state between eyes; removing parallax.
 Evidence and user recordings stay local; raw captures are not committed.

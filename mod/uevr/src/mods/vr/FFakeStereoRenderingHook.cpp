@@ -3587,6 +3587,12 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
         return;
     }
 
+    // Diagnostic only (WuWa test control `state_swap`, timed; inert by default):
+    // the two main views exchange state pointers for this pair and get them back
+    // when this function returns. Built before the LOD probe's first snapshot so
+    // every probe phase and both submissions see one assignment.
+    wuwa_shadow::StateSwapScope state_swap{view_family,
+        prev_count == 2 ? views[0] : nullptr, prev_count == 2 ? views[1] : nullptr, prev_count};
     const auto lod_pair = prev_count == 2 ? wuwa_lod_probe::pair(view_family,
         views[0], views[1], SceneViewExtensionAnalyzer::frame_count_offset) : 0;
     wuwa_shadow::FullPairScope full_views{view_family,
@@ -3656,7 +3662,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     // identity for reflection history; it is not this loop's submission index.
     const bool reverse_requested = wuwa_stereo_order::active(GetTickCount64());
     const bool reverse_pair = reverse_requested && is_wuwa && wants_swap && prev_count == 2 &&
-        scene_frame.ready() && wuwa_shadow::ready() && !full_views.active() &&
+        scene_frame.ready() && wuwa_shadow::ready() && !full_views.active() && !state_swap.active() &&
         vr->is_native_stereo_fix_same_pass_enabled();
     if (reverse_requested && !reverse_pair) ++wuwa_stereo_order::refused;
     if (reverse_pair) {

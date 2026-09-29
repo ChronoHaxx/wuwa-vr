@@ -11,6 +11,7 @@
 #include "WuWaLguiProbe.hpp"
 #include "WuWaScenePass.hpp"
 #include "WuWaEarlyStereo.hpp"
+#include "WuWaStateSwap.hpp"
 
 namespace wuwa_shadow {
 namespace checked = wuwa_lgui_probe::detail;
@@ -38,6 +39,8 @@ inline std::atomic<bool> test_full_view{};
 inline std::atomic<uint64_t> full_applied{}, full_restored{};
 inline std::atomic<bool> early_configured{};
 inline std::atomic<uint64_t> early_applied{}, early_skipped{};
+// Diagnostic view-state swap: off unless the WuWa test control opens a window.
+inline std::atomic<uint64_t> swap_until{}, swap_applied{}, swap_restored{}, swap_skipped{};
 
 inline bool compatible() {
     std::call_once(verification, [] {
@@ -66,23 +69,48 @@ inline bool compatible() {
     return compatibility.load() == 1;
 }
 
-inline bool writable_field(uintptr_t address) {
+inline bool writable_span(uintptr_t address, size_t size) {
     MEMORY_BASIC_INFORMATION region{};
-    if (address == 0 || address > UINTPTR_MAX - sizeof(uint32_t) ||
+    if (address == 0 || address > UINTPTR_MAX - size ||
         VirtualQuery(reinterpret_cast<void*>(address), &region, sizeof(region)) != sizeof(region) ||
         !checked::readable(region)) return false;
     const auto protection = region.Protect & 0xff;
     const auto base = reinterpret_cast<uintptr_t>(region.BaseAddress);
     return (protection == PAGE_READWRITE || protection == PAGE_WRITECOPY) &&
         base <= address && region.RegionSize <= UINTPTR_MAX - base &&
-        address + sizeof(uint32_t) <= base + region.RegionSize;
+        address + size <= base + region.RegionSize;
 }
+
+inline bool writable_field(uintptr_t address) { return writable_span(address, sizeof(uint32_t)); }
 
 inline bool write_field(uintptr_t address, uint32_t value) {
     if (!writable_field(address) ||
         !checked::guarded_copy(reinterpret_cast<void*>(address), &value, sizeof(value))) return false;
     uint32_t actual{};
     return checked::read(address, actual) && actual == value;
+}
+
+// The constructor-proven view-state pointer (init+0x100 -> view+0x8), aligned.
+inline bool read_pointer(uintptr_t address, uintptr_t& value) {
+    return (address & 7) == 0 && checked::read(address, value);
+}
+
+inline bool write_pointer(uintptr_t address, uintptr_t value) {
+    return (address & 7) == 0 && writable_span(address, sizeof(value)) &&
+        checked::guarded_copy(reinterpret_cast<void*>(address), &value, sizeof(value));
+}
+
+inline bool state_swap_active() { return GetTickCount64() < swap_until.load(); }
+
+inline uint64_t state_swap_remaining_ms() {
+    const auto now = GetTickCount64();
+    const auto until = swap_until.load();
+    return until > now ? until - now : 0;
+}
+
+// 0 ends the window. The window only expires; nothing is saved to the profile.
+inline void set_state_swap(int seconds) {
+    swap_until = seconds > 0 ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
 }
 
 inline bool ready() {
@@ -132,7 +160,11 @@ inline nlohmann::json status() {
         {"full_view_supported", true}, {"full_view_enabled", full_view_enabled()},
         {"early_configured", early_configured.load()}, {"early_applied", early_applied.load()},
         {"early_skipped", early_skipped.load()},
-        {"full_applied", full_applied.load()}, {"full_restored", full_restored.load()}};
+        {"full_applied", full_applied.load()}, {"full_restored", full_restored.load()},
+        {"state_swap_supported", true}, {"state_swap_active", state_swap_active()},
+        {"state_swap_remaining_ms", state_swap_remaining_ms()},
+        {"state_swap_applied", swap_applied.load()}, {"state_swap_restored", swap_restored.load()},
+        {"state_swap_skipped", swap_skipped.load()}};
 }
 
 // Diagnostic-only full-view comparison. Both completed FSceneViews retain
@@ -273,5 +305,58 @@ private:
     uintptr_t view{};
     std::array<bool, 2> touched{};
     bool complete{};
+};
+
+// Diagnostic only, opened by the WuWa test control `state_swap` for at most 60
+// seconds; inert otherwise. For one verified main pair, the two views exchange
+// their view-state pointers and get them back after both submissions. Construct
+// before the LOD probe's first snapshot and the first submission, so every probe
+// phase and both render copies see one assignment. Each eye then renders with
+// the other eye's state object (history, caches, registrations); no state is
+// copied or shared. Not combined with the other pass or order tests. A failed
+// write or restore disables every write in this module, like the pass scopes.
+class StateSwapScope {
+public:
+    StateSwapScope(const void* family, void* first, void* second, int32_t count) {
+        if (!state_swap_active()) return;
+        const auto a = reinterpret_cast<uintptr_t>(first), b = reinterpret_cast<uintptr_t>(second);
+        uintptr_t af{}, bf{};
+        std::array<uint32_t, 2> ap{}, bp{};
+        bool valid = ready() && compatible() && !faulted.load() && !test_active() && count == 2 &&
+            family != nullptr && a && b && a != b && a <= UINTPTR_MAX - 8 && b <= UINTPTR_MAX - 8 &&
+            checked::read(a, af) && checked::read(b, bf) &&
+            af == reinterpret_cast<uintptr_t>(family) && bf == af;
+        // Only the main eye pair: first view primary, second secondary or already early-primary.
+        for (size_t i = 0; valid && i < pass_offsets.size(); ++i) {
+            valid = checked::read_field(a, pass_offsets[i], ap[i]) && checked::read_field(b, pass_offsets[i], bp[i]) &&
+                ap[i] == 2 && (bp[i] == 3 || bp[i] == 2);
+        }
+        if (!valid) { ++swap_skipped; return; }
+        patch.emplace(a + 8, b + 8, &read_pointer, &write_pointer);
+        if (patch->result() == wuwa_stereo::StateSwapTransaction::Result::write_failed) {
+            fail(patch->restore() ? "write failed; rolled back" : "write failed; rollback not confirmed");
+            patch.reset();
+            return;
+        }
+        if (!patch->applied()) { ++swap_skipped; patch.reset(); return; }
+        ++swap_applied;
+        SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaShadow] state swap applied: first_view={:x} second_view={:x} states {:x}<->{:x}",
+            a, b, patch->original(0), patch->original(1));
+    }
+    bool active() const { return patch && patch->applied(); }
+    ~StateSwapScope() {
+        if (!patch) return;
+        if (patch->restore()) ++swap_restored;
+        else fail("restore failed or the engine changed a state pointer");
+    }
+    StateSwapScope(const StateSwapScope&) = delete;
+    StateSwapScope& operator=(const StateSwapScope&) = delete;
+private:
+    static void fail(const char* what) {
+        faulted = true;
+        swap_until = 0;
+        spdlog::error("[WuWaShadow] state swap {}; further writes disabled", what);
+    }
+    std::optional<wuwa_stereo::StateSwapTransaction> patch;
 };
 } // namespace wuwa_shadow

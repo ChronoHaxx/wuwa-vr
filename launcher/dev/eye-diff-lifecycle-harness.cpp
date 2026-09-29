@@ -144,6 +144,8 @@ struct Scenario {
     uint32_t restate_every{};    // first view reports a different state after phase 1 for indices divisible by this
     bool raw{};                  // raw snapshots requested
     bool short_second_state{};   // the second state's readable memory ends 0x400 bytes before the window
+    uint32_t swap_from{}, swap_to{}; // pairs [from, to): views exchange state pointers before phase 1,
+                                     // restored after phase 2 (the StateSwapScope placement)
 };
 
 template<class S> Json sampler_counts(const S& sampler) {
@@ -175,6 +177,8 @@ Json run(const Scenario& s, std::ostream* fixture, [[maybe_unused]] std::ostream
     uint32_t frame = s.first_frame;
     for (uint32_t i = 0; i < s.pairs; ++i, frame += s.stride) {
         put64(areas[1].words, 8, i < s.invalid_first ? 0 : state_a);
+        const bool swapped = i >= s.swap_from && i < s.swap_to;
+        if (swapped) { put64(areas[1].words, 8, state_b); put64(areas[2].words, 8, state_a); }
         family_frame() = s.unassigned_before ? unassigned : frame;
         const bool busy_before = s.busy_before_every && i % s.busy_before_every == s.busy_before_every - 1;
         if (busy_before) ++callbacks.shared;
@@ -188,13 +192,14 @@ Json run(const Scenario& s, std::ostream* fixture, [[maybe_unused]] std::ostream
         if (s.render_busy_after) ++callbacks.shared;
         if (token && !skip_after) pair(family, first, second, 0x64, token);     // phase 2
         if (s.render_busy_after) --callbacks.shared;
+        if (swapped) { put64(areas[1].words, 8, state_a); put64(areas[2].words, 8, state_b); }
         if (token) { valid_frames.push_back(frame); after_frames.push_back(frame + s.second_advance); }
         if (callbacks.shared || callbacks.exclusive) std::abort(); // pair() released what it took
         clock_ms += 16;
     }
     std::array<uint32_t, 4> rows{};
     for (const auto& r : probe->rows) if (r.phase < rows.size()) ++rows[r.phase];
-    uint32_t before = 0, after = 0, paired = 0, invalid_regions = 0;
+    uint32_t before = 0, after = 0, paired = 0, invalid_regions = 0, before_swapped = 0, after_swapped = 0;
     std::set<uint64_t> before_set;
     std::vector<uint64_t> before_sequences;
     std::set<uint32_t> before_frames;
@@ -202,12 +207,13 @@ Json run(const Scenario& s, std::ostream* fixture, [[maybe_unused]] std::ostream
     while (probe->eye_diff_ring.pop(*popped)) {
         if (fixture) *fixture << eye_diff_json(*popped).dump() << '\n';
         if (!popped->view.valid || !popped->state.valid) ++invalid_regions;
+        const bool exchanged = popped->states[0] == state_b && popped->states[1] == state_a;
         if (popped->id.phase == 1) {
-            ++before; before_set.insert(popped->id.sequence);
+            ++before; before_set.insert(popped->id.sequence); before_swapped += exchanged;
             before_sequences.push_back(popped->id.sequence);
             before_frames.insert(popped->id.frames[0]); before_frames.insert(popped->id.frames[1]);
         } else {
-            ++after; if (before_set.count(popped->id.sequence)) ++paired;
+            ++after; after_swapped += exchanged; if (before_set.count(popped->id.sequence)) ++paired;
         }
     }
     const auto phase_counts = [&](size_t i) {
@@ -235,6 +241,7 @@ Json run(const Scenario& s, std::ostream* fixture, [[maybe_unused]] std::ostream
             {"rows", {{"before", rows[1]}, {"after_first", rows[3]}, {"after", rows[2]}}},
             {"eye_diff", {{"before", before}, {"after", after}, {"after_paired", paired},
                           {"before_sequences", before_sequences}, {"before_frames", before_frames},
+                          {"before_swapped", before_swapped}, {"after_swapped", after_swapped},
                           {"invalid_regions", invalid_regions}, {"dropped", probe->eye_diff_dropped.load()},
                           {"truncated", probe->eye_diff_ring.truncated()}}},
             {"lock_misses", probe->lock_misses.load()}, {"reads_failed", probe->reads_failed.load()},
@@ -260,6 +267,8 @@ int main(int argc, char** argv) {
         // A view's state changes after phase 1 published it: phases 3 and 2 must refuse the
         // pair rather than record (or re-publish) a state the callbacks do not match.
         {.name = "state_changed_mid_pair", .pairs = 300, .first_frame = 90, .restate_every = 60},
+        // Diagnostic state swap for pairs 100..249: applied before phase 1, restored after phase 2.
+        {.name = "state_swap_window", .pairs = 400, .first_frame = 60, .swap_from = 100, .swap_to = 250},
         // Long enough to fill the 128-sample ring: pairs are never split, nothing overwritten.
         // Raw snapshots requested too: they stop at their own fixed pair budget.
         {.name = "ring_capacity", .pairs = 60 * 70, .first_frame = 1, .raw = true},

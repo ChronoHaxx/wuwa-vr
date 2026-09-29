@@ -19,7 +19,7 @@ expect a brief blur or pop.
 
 ## 0. This machine (differences from the previous handoff)
 
-- **Checkout:** `E:\Coding\wuwa-vr-eye-diff-raw` is a partial clone of PR #2's branch (made
+- **Checkout:** `E:\Coding\wuwa-vr\repo` is a partial clone of PR #2's branch (made
   earlier with `git clone --filter=blob:none --branch claude/jolly-turing-lflai7 <repo URL>`). Your
   `E:\Coding\wuwa-vr` checkout does not track GitHub and is not touched.
 - **Python:** the PATH Python is 3.7 without Pillow. Use scoop Python everywhere:
@@ -32,7 +32,7 @@ expect a brief blur or pop.
   click into the game.
 
 ```powershell
-$t  = "E:\Coding\wuwa-vr-eye-diff-raw\launcher\dev"
+$t  = "E:\Coding\wuwa-vr\repo\launcher\dev"
 $s  = "E:\Coding\wuwa-vr\extracted\pr2-state-swap-20260929"   # local evidence only, never committed
 $py = "$env:USERPROFILE\scoop\apps\python\current\python.exe"
 ```
@@ -40,7 +40,7 @@ $py = "$env:USERPROFILE\scoop\apps\python\current\python.exe"
 ## 1. Update and test the tools
 
 ```powershell
-git -C E:\Coding\wuwa-vr-eye-diff-raw pull --ff-only
+git -C E:\Coding\wuwa-vr\repo pull --ff-only
 cd $t
 & $py -m unittest test_eye_diff_summary test_register_candidate test_state_swap_runner   # 34 + 7 + 7
 .\test-state-swap.cmd      # MSVC: "state swap: 6 cases passed"
@@ -61,7 +61,7 @@ hash. If not, the local tree has other changes: stop and send the diff instead o
 | `src\utility\WuWaEyeDiff.hpp`, `WuWaRawSnapshot.hpp`, `WuWaLodProbe.hpp` | unchanged (hashes as in the last build) | unchanged |
 
 ```powershell
-$from = "E:\Coding\wuwa-vr-eye-diff-raw\mod\uevr"; $to = "E:\Coding\wuwa-vr\upstream\UEVR"
+$from = "E:\Coding\wuwa-vr\repo\mod\uevr"; $to = "E:\Coding\wuwa-vr\upstream\UEVR"
 foreach ($f in 'src\utility\WuWaShadowPass.hpp','src\utility\WuWaTestControl.hpp','src\mods\vr\FFakeStereoRenderingHook.cpp') {
   "{0}  {1}" -f (Get-FileHash "$to\$f").Hash, $f          # must equal the Old column
 }

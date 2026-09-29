@@ -132,6 +132,45 @@ void field_already_restored_needs_no_write() {
     }
     check(original(), "original");
 }
+
+void share_modes_write_one_field_and_restore() {
+    using Mode = StateSwapTransaction::Mode;
+    reset();
+    {
+        StateSwapTransaction share{first_field, second_field, &read, &write, Mode::first_for_both};
+        check(share.applied(), "first_for_both applied");
+        check(memory.cells[first_field] == state_a && memory.cells[second_field] == state_a,
+            "second view uses the first view's state");
+        check(memory.writes == 1, "one write to share");
+    }
+    check(original(), "second view's own state back");
+    check(memory.writes == 2, "one write to restore");
+    reset();
+    {
+        StateSwapTransaction share{first_field, second_field, &read, &write, Mode::second_for_both};
+        check(share.applied(), "second_for_both applied");
+        check(memory.cells[first_field] == state_b && memory.cells[second_field] == state_b,
+            "first view uses the second view's state");
+    }
+    check(original(), "first view's own state back");
+}
+
+void share_mode_failure_rolls_back() {
+    using Mode = StateSwapTransaction::Mode;
+    reset();
+    memory.ignores_write.insert(second_field);
+    {
+        StateSwapTransaction share{first_field, second_field, &read, &write, Mode::first_for_both};
+        check(share.result() == Result::write_failed, "share write that does not stick is a failure");
+    }
+    check(original(), "nothing left shared");
+    reset(state_a, state_a);
+    {
+        StateSwapTransaction share{first_field, second_field, &read, &write, Mode::first_for_both};
+        check(share.result() == Result::skipped, "already shared: skipped");
+    }
+    check(memory.writes == 0, "no write when both views already share a state");
+}
 } // namespace
 
 int main() {
@@ -141,7 +180,9 @@ int main() {
     write_that_does_not_stick_is_a_failure();
     engine_change_is_never_overwritten();
     field_already_restored_needs_no_write();
+    share_modes_write_one_field_and_restore();
+    share_mode_failure_rolls_back();
     if (failures) { std::cerr << failures << " failure(s)\n"; return 1; }
-    std::cout << "state swap: 6 cases passed\n";
+    std::cout << "state swap: 8 cases passed\n";
     return 0;
 }

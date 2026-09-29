@@ -41,6 +41,9 @@ inline std::atomic<bool> early_configured{};
 inline std::atomic<uint64_t> early_applied{}, early_skipped{};
 // Diagnostic view-state swap: off unless the WuWa test control opens a window.
 inline std::atomic<uint64_t> swap_until{}, swap_applied{}, swap_restored{}, swap_skipped{};
+// 0 exchange (E3), 1 first view's state for both, 2 second view's state for both.
+inline std::atomic<int> swap_mode{};
+inline constexpr std::array<const char*, 3> swap_mode_names{"exchange", "first_for_both", "second_for_both"};
 
 inline bool compatible() {
     std::call_once(verification, [] {
@@ -109,7 +112,8 @@ inline uint64_t state_swap_remaining_ms() {
 }
 
 // 0 ends the window. The window only expires; nothing is saved to the profile.
-inline void set_state_swap(int seconds) {
+inline void set_state_swap(int seconds, int mode = 0) {
+    swap_mode = mode >= 0 && mode <= 2 ? mode : 0;
     swap_until = seconds > 0 ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
 }
 
@@ -163,6 +167,7 @@ inline nlohmann::json status() {
         {"full_applied", full_applied.load()}, {"full_restored", full_restored.load()},
         {"state_swap_supported", true}, {"state_swap_active", state_swap_active()},
         {"state_swap_remaining_ms", state_swap_remaining_ms()},
+        {"state_swap_mode", swap_mode_names[static_cast<size_t>(swap_mode.load())]},
         {"state_swap_applied", swap_applied.load()}, {"state_swap_restored", swap_restored.load()},
         {"state_swap_skipped", swap_skipped.load()}};
 }
@@ -332,7 +337,8 @@ public:
                 ap[i] == 2 && (bp[i] == 3 || bp[i] == 2);
         }
         if (!valid) { ++swap_skipped; return; }
-        patch.emplace(a + 8, b + 8, &read_pointer, &write_pointer);
+        patch.emplace(a + 8, b + 8, &read_pointer, &write_pointer,
+            static_cast<wuwa_stereo::StateSwapTransaction::Mode>(swap_mode.load()));
         if (patch->result() == wuwa_stereo::StateSwapTransaction::Result::write_failed) {
             fail(patch->restore() ? "write failed; rolled back" : "write failed; rollback not confirmed");
             patch.reset();
@@ -340,8 +346,8 @@ public:
         }
         if (!patch->applied()) { ++swap_skipped; patch.reset(); return; }
         ++swap_applied;
-        SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaShadow] state swap applied: first_view={:x} second_view={:x} states {:x}<->{:x}",
-            a, b, patch->original(0), patch->original(1));
+        SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaShadow] state swap applied ({}): first_view={:x} second_view={:x} states {:x}/{:x}",
+            swap_mode_names[static_cast<size_t>(swap_mode.load())], a, b, patch->original(0), patch->original(1));
     }
     bool active() const { return patch && patch->applied(); }
     ~StateSwapScope() {

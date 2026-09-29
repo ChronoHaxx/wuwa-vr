@@ -5,6 +5,8 @@
 // {"output":"E:/Coding/wuwa-vr/extracted/lgui-live/<unique>.bin"}.
 // The output directory must already exist. Files are never overwritten.
 // Remove the request after use; it is examined once per backend load.
+// Add "any_build": true to capture a game build other than the pinned one (for
+// porting offsets after a game update). Still read-only; the identity is recorded.
 
 #include <algorithm>
 #include <array>
@@ -155,7 +157,8 @@ inline json describe_pe(const PE& pe) {
     return result;
 }
 
-inline void validate_identity(const PE& pe) {
+inline void validate_identity(const PE& pe, bool any_build) {
+    if (any_build) return; // porting capture: identity is recorded in the metadata instead
     require(pe.nt.FileHeader.TimeDateStamp == expected_timestamp, "Unexpected WuWa PE timestamp");
     require(pe.nt.OptionalHeader.SizeOfImage == expected_image_size &&
         pe.nt.OptionalHeader.SizeOfHeaders == expected_header_size, "Unexpected WuWa PE image/header size");
@@ -271,6 +274,7 @@ inline void capture(const Work& work) {
     require(request.good() && fs::file_size(work.request) <= 4096, "Invalid capture request");
     const auto config = json::parse(request);
     const auto output = output_path(fs::u8path(config.at("output").get<std::string>()));
+    const bool any_build = config.value("any_build", false);
     const auto companion = fs::path{output.wstring() + L".json"};
     const auto pending_companion = fs::path{companion.wstring() + L".pending"};
     // Reserve this capture without publishing an empty final JSON. Interrupted
@@ -281,7 +285,7 @@ inline void capture(const Work& work) {
     FILETIME file_time{};
     GetSystemTimeAsFileTime(&file_time);
     const uint64_t capture_ticks = (static_cast<uint64_t>(file_time.dwHighDateTime) << 32) | file_time.dwLowDateTime;
-    json metadata{{"format", "wuwa-mapped-module-v1"}, {"layout", "memory"}, {"offset_equals_rva", true},
+    json metadata{{"format", "wuwa-mapped-module-v1"}, {"any_build", any_build}, {"layout", "memory"}, {"offset_equals_rva", true},
         {"pid", GetCurrentProcessId()}, {"started_utc", utc_now()}, {"status", "failed"},
         {"capture_id", fmt::format("{}-{}", GetCurrentProcessId(), capture_ticks)},
         {"phase", "initializing"}, {"checkpoint_sequence", 0}, {"attempted_range", nullptr},
@@ -315,8 +319,8 @@ inline void capture(const Work& work) {
         metadata["live"] = describe_pe(*live);
         // The running executable legitimately changes section metadata. Capture
         // its live layout while checking the observed image's stable identity.
-        validate_identity(pe);
-        validate_identity(*live);
+        validate_identity(pe, any_build);
+        validate_identity(*live, any_build);
         metadata["live_header_validated"] = true;
         image.value = CreateFileW(output.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
         require(image.value != INVALID_HANDLE_VALUE && GetFileType(image.value) == FILE_TYPE_DISK, "Cannot create capture image");

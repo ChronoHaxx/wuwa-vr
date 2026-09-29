@@ -17,14 +17,20 @@ public:
     using Read = bool (*)(uintptr_t, uintptr_t&);
     using Write = bool (*)(uintptr_t, uintptr_t);
     enum class Result { skipped, applied, write_failed };
+    // exchange: each view gets the other's state (E3). The share modes write one
+    // field only, so both views reference one state for the pair: first_for_both
+    // gives the second view the first view's state, second_for_both the reverse.
+    enum class Mode { exchange, first_for_both, second_for_both };
 
-    StateSwapTransaction(uintptr_t first_field, uintptr_t second_field, Read read, Write write)
-        : fields_{first_field, second_field}, read_{read}, write_{write} {
+    StateSwapTransaction(uintptr_t first_field, uintptr_t second_field, Read read, Write write,
+        Mode mode = Mode::exchange)
+        : fields_{first_field, second_field}, read_{read}, write_{write}, mode_{mode} {
         const auto distance = first_field > second_field ? first_field - second_field : second_field - first_field;
         if (!first_field || !second_field || distance < sizeof(uintptr_t) ||
             !read_(first_field, originals_[0]) || !read_(second_field, originals_[1]) ||
             !originals_[0] || !originals_[1] || originals_[0] == originals_[1]) return;
         for (std::size_t i = 0; i < fields_.size(); ++i) {
+            if (!writes(i)) continue;
             touched_[i] = true; // a failing write may still have changed the field
             uintptr_t check{};
             if (!write_(fields_[i], written(i)) || !read_(fields_[i], check) || check != written(i)) {
@@ -61,11 +67,17 @@ public:
     }
 
 private:
-    uintptr_t written(std::size_t i) const { return originals_[1 - i]; }
+    bool writes(std::size_t i) const {
+        return mode_ == Mode::exchange || (mode_ == Mode::first_for_both ? i == 1 : i == 0);
+    }
+    uintptr_t written(std::size_t i) const {
+        return mode_ == Mode::exchange ? originals_[1 - i] : originals_[mode_ == Mode::first_for_both ? 0 : 1];
+    }
     std::array<uintptr_t, 2> fields_{}, originals_{};
     std::array<bool, 2> touched_{};
     Read read_{};
     Write write_{};
+    Mode mode_{Mode::exchange};
     Result result_{Result::skipped};
     bool restored_{true};
 };

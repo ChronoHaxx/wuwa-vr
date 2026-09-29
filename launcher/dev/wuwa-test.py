@@ -23,6 +23,7 @@ import uuid
 
 PROFILE = Path(os.environ.get("APPDATA", "")) / "UnrealVRMod/Client-Win64-Shipping"
 SIMULATOR = Path(os.environ.get("LOCALAPPDATA", "")) / "OpenXR-Simulator"
+STATE_SWAP_MODES = ("exchange", "first_for_both", "second_for_both")
 TOOLS = Path(__file__).resolve().parent.parent / "dev-tools"
 REFLECTION_SOURCES = (
     ("planar", "Planar reflection updates", "r.Kuro.EnablePlanarReflection"),
@@ -541,7 +542,8 @@ class LiveTest:
             self.require_foreground = previous
 
     def lod_inputs(self, output: Path, seconds: int = 8, view_uniforms: bool = False,
-                   mesh_bindings: bool = False, raw_snapshots: bool = False, state_swap: bool = False) -> dict:
+                   mesh_bindings: bool = False, raw_snapshots: bool = False, state_swap: bool = False,
+                   state_swap_mode: str = "exchange") -> dict:
         """Capture an expiring read-only trace and images; no rendering change unless state_swap.
 
         state_swap: for the trace window only, the two main views exchange their view-state
@@ -611,7 +613,7 @@ class LiveTest:
             if state_swap:
                 # Longer than the trace so every traced pair is swapped; ended explicitly below.
                 swap_started = True
-                begin = self.request("state_swap", seconds=min(60, seconds + 15))["shadow"]
+                begin = self.request("state_swap", seconds=min(60, seconds + 15), mode=state_swap_mode)["shadow"]
                 report["state_swap_begin"] = begin
                 if not begin.get("state_swap_active"):
                     raise RuntimeError("Backend did not open the view-state swap window")
@@ -688,7 +690,7 @@ class LiveTest:
             self.require_foreground = previous
             write_json(output / "lod-inputs.json", report)
 
-    def state_swap_window(self, seconds: int) -> dict:
+    def state_swap_window(self, seconds: int, mode: str = "exchange") -> dict:
         """Open (1..60 s) or end (0) the diagnostic view-state swap and return at once, so Launcher.exe
         can record the swapped condition: this client's control lock is released on exit, and the
         window expires on its own in the backend."""
@@ -701,7 +703,7 @@ class LiveTest:
             if (not shadow.get("ready") or shadow.get("faulted") or shadow.get("test_active")
                     or shadow.get("state_swap_active")):
                 raise RuntimeError("Eye pair is not verified and idle; the view-state swap was not started")
-        reply = self.request("state_swap", seconds=seconds)["shadow"]
+        reply = self.request("state_swap", seconds=seconds, mode=mode)["shadow"]
         if bool(reply.get("state_swap_active")) != bool(seconds):
             raise RuntimeError("Backend did not " + ("open" if seconds else "end") + " the view-state swap window")
         return reply
@@ -959,6 +961,7 @@ def main() -> int:
     lod.add_argument("--view-uniforms", action="store_true", help="Also record bounded View uniform ownership on a supporting backend")
     lod.add_argument("--mesh-bindings", action="store_true", help="Also record bounded mesh bindings before vertex-factory dispatch; this is not GPU draw proof")
     lod.add_argument("--raw-snapshots", action="store_true", help="Also record bounded raw copies of both eye slots' view and view-state windows (equal values included) in lod.jsonl")
+    lod.add_argument("--state-swap-mode", choices=STATE_SWAP_MODES, default="exchange")
     lod.add_argument("--state-swap", action="store_true", help="Diagnostic write: the two main views exchange view-state pointers for the trace window, restored every frame and at the end")
     lod.add_argument("--output", type=Path, required=True)
     lod.add_argument("--pid", type=int, required=True)
@@ -969,6 +972,8 @@ def main() -> int:
     swap_window = commands.add_parser("state-swap", help="Diagnostic: open (1..60 s) or end (0) the view-state swap and exit; it expires on its own")
     swap_window.add_argument("--seconds", type=int, required=True, choices=range(0, 61), metavar="0..60")
     swap_window.add_argument("--pid", type=int, required=True)
+    swap_window.add_argument("--mode", choices=STATE_SWAP_MODES, default="exchange",
+                             help="exchange (E3), first_for_both or second_for_both (both views share one state)")
     shadow_pass = commands.add_parser("shadow-pass")
     shadow_pass.add_argument("--seconds", type=int, default=0)
     trace = commands.add_parser("trace")
@@ -1013,7 +1018,7 @@ def main() -> int:
         elif args.command == "lod-inputs":
             result = client.lod_inputs(args.output, args.seconds, view_uniforms=args.view_uniforms,
                                        mesh_bindings=args.mesh_bindings, raw_snapshots=args.raw_snapshots,
-                                       state_swap=args.state_swap)
+                                       state_swap=args.state_swap, state_swap_mode=args.state_swap_mode)
         elif args.command == "stereo-candidates":
             result = client.stereo_candidates(args.output)
         elif args.command == "reflection-values":
@@ -1028,7 +1033,7 @@ def main() -> int:
         elif args.command == "shadow-pass":
             result = client.request("shadow_pass", seconds=args.seconds)
         elif args.command == "state-swap":
-            result = client.state_swap_window(args.seconds)
+            result = client.state_swap_window(args.seconds, args.mode)
         elif args.command == "trace":
             result = client.request("trace", seconds=0 if args.until_stopped else args.seconds, until_stopped=args.until_stopped)
         elif args.command == "record-motion":

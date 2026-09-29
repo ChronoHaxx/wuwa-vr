@@ -323,6 +323,52 @@ void WuWaControlsComponent::on_draw_experiments() {
             wuwa_ui::draw(*m_collision_complex,"Trace mesh triangles when supported");
             wuwa_ui::TextWrapped("Sweeps the camera against surfaces that block the game's Visibility trace. Slides along contact surfaces. Unsupported queries hold movement and report a reason below. Physical headset leaning is not constrained. Starts off; world geometry still needs live verification.");
         }
+        if (wuwa_ui::TreeNode("Stereo freeze fix bench (60-second windows)")) {
+            // Diagnostic windows for the far-foliage freeze in one eye. Each button opens a
+            // 60 s window that expires by itself; nothing is saved to the profile. Verdicts
+            // go to the log with the active mode so the session can be read back afterwards.
+            static constexpr std::array<const char*, 3> labels{
+                "Swap the two eye states",
+                "Both eyes use the right eye's state (views[0])",
+                "Both eyes use the left eye's state (views[1])"};
+            const bool busy = wuwa_shadow::test_active() || wuwa_stereo_order::active(GetTickCount64());
+            const bool can_start = wuwa_shadow::ready() && !wuwa_shadow::faulted.load() && !busy &&
+                !wuwa_shadow::state_swap_active();
+            ImGui::BeginDisabled(!can_start);
+            for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
+                if (wuwa_ui::Button(labels[i])) {
+                    wuwa_shadow::set_state_swap(60, i);
+                    spdlog::info("[WuWaBench] start mode={} (menu)", wuwa_shadow::swap_mode_names[i]);
+                }
+            }
+            ImGui::EndDisabled();
+            const bool active = wuwa_shadow::state_swap_active();
+            if (active && wuwa_ui::Button("Stop now")) {
+                wuwa_shadow::set_state_swap(0);
+                spdlog::info("[WuWaBench] stopped (menu)");
+            }
+            const auto mode = wuwa_shadow::swap_mode_names[static_cast<size_t>(wuwa_shadow::swap_mode.load())];
+            if (active) wuwa_ui::Text("Active: %s, %llu s left, applied %llu, restored %llu", mode,
+                static_cast<unsigned long long>(wuwa_shadow::state_swap_remaining_ms() / 1000),
+                static_cast<unsigned long long>(wuwa_shadow::swap_applied.load()),
+                static_cast<unsigned long long>(wuwa_shadow::swap_restored.load()));
+            else if (wuwa_shadow::faulted.load()) wuwa_ui::TextWrapped("Stopped: a write or restore failed. Restart the game before trying again.");
+            else if (!wuwa_shadow::ready()) wuwa_ui::TextWrapped("Unavailable: the eye pair is not verified yet (or this game build is not supported).");
+            else if (busy) wuwa_ui::TextWrapped("Unavailable while another graphics test runs.");
+            else wuwa_ui::Text("Idle");
+            static constexpr std::array<const char*, 4> verdicts{
+                "Far tree: both eyes sway", "Far tree: left frozen", "Far tree: right frozen", "Visual problem (note it)"};
+            for (size_t i = 0; i < verdicts.size(); ++i) {
+                if (i) ImGui::SameLine();
+                if (wuwa_ui::Button(verdicts[i])) {
+                    spdlog::info("[WuWaBench] verdict=\"{}\" mode={} active={} remaining_ms={} applied={} restored={} skipped={}",
+                        verdicts[i], mode, active, wuwa_shadow::state_swap_remaining_ms(), wuwa_shadow::swap_applied.load(),
+                        wuwa_shadow::swap_restored.load(), wuwa_shadow::swap_skipped.load());
+                }
+            }
+            wuwa_ui::TextWrapped("Stand where the far tree freezes, start a window, close the menu and look, then press what you saw. Each start or stop may cause a one-frame blur.");
+            ImGui::TreePop();
+        }
     wuwa_ui::draw(*m_auto_mouse,"Automatically use mouse in game menus (legacy)");
     wuwa_ui::TextWrapped("These options are optional comparisons. Opening this section does not enable them or change your camera.");
 }

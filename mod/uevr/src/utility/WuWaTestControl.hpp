@@ -443,8 +443,13 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
                 !wuwa_shadow::ready() || wuwa_shadow::faulted.load())) {
                 throw std::runtime_error("Eye pair unverified, writes faulted, or another graphics test is active");
             }
-            wuwa_shadow::set_state_swap(seconds);
-            spdlog::info("[WuWaTest] view-state swap window {} s", seconds);
+            const auto mode_name = request.value("mode", std::string{"exchange"});
+            int mode = -1;
+            for (size_t i = 0; i < wuwa_shadow::swap_mode_names.size(); ++i)
+                if (mode_name == wuwa_shadow::swap_mode_names[i]) mode = static_cast<int>(i);
+            if (mode < 0) throw std::runtime_error("State swap mode must be exchange, first_for_both or second_for_both");
+            wuwa_shadow::set_state_swap(seconds, mode);
+            spdlog::info("[WuWaTest] view-state swap window {} s mode {}", seconds, mode_name);
             reply["shadow"] = wuwa_shadow::status();
         } else if (op == "restore") {
             if (graphics_lease.spec != nullptr && request.value("lease_id", "") != graphics_lease.id) {

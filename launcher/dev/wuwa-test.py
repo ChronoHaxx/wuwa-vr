@@ -969,6 +969,11 @@ def main() -> int:
     for command in (capture, graphics, reflections, translucency, stereo, visibility, candidates, shadows, full_views, impostors, lod):
         command.add_argument("--capture-source", choices=("simulator", "steamvr"), default="simulator",
                              help="Select an already running runtime; never switches or starts one")
+    bench = commands.add_parser("bench", help="Fix bench: open a timed construct_mode (1..3) or target_swap window and exit")
+    bench.add_argument("--pid", type=int, required=True)
+    bench.add_argument("--op", choices=("construct_mode", "target_swap", "eye_swap"), required=True)
+    bench.add_argument("--mode", type=int, default=0, choices=range(0, 4))
+    bench.add_argument("--seconds", type=int, required=True, choices=range(0, 61), metavar="0..60")
     swap_window = commands.add_parser("state-swap", help="Diagnostic: open (1..60 s) or end (0) the view-state swap and exit; it expires on its own")
     swap_window.add_argument("--seconds", type=int, required=True, choices=range(0, 61), metavar="0..60")
     swap_window.add_argument("--pid", type=int, required=True)
@@ -996,7 +1001,7 @@ def main() -> int:
         parser.error("SteamVR mirrors cannot isolate projection/quad layers; use --layer all")
     client = LiveTest()
     client.capture_source = getattr(args, "capture_source", "simulator")
-    if args.command in ("reflections", "reflection-values", "translucency", "stereo", "visibility", "stereo-candidates", "full-views", "impostors", "lod-inputs", "state-swap") and args.pid is not None and client.pid != args.pid:
+    if args.command in ("reflections", "reflection-values", "translucency", "stereo", "visibility", "stereo-candidates", "full-views", "impostors", "lod-inputs", "state-swap", "bench") and args.pid is not None and client.pid != args.pid:
         raise RuntimeError("Game process changed before graphics comparison")
     with client.exclusive():
         if args.command == "status":
@@ -1032,6 +1037,8 @@ def main() -> int:
             result = client.full_views(args.output)
         elif args.command == "shadow-pass":
             result = client.request("shadow_pass", seconds=args.seconds)
+        elif args.command == "bench":
+            result = client.request(args.op, seconds=args.seconds, mode=args.mode)["shadow"]
         elif args.command == "state-swap":
             result = client.state_swap_window(args.seconds, args.mode)
         elif args.command == "trace":

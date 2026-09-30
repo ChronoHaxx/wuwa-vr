@@ -105,6 +105,36 @@ inline bool write_pointer(uintptr_t address, uintptr_t value) {
 
 inline bool state_swap_active() { return GetTickCount64() < swap_until.load(); }
 
+// Diagnostic E4: for a bounded window the two main views draw into each other's
+// render target (views[0] into the scene-capture target, views[1] into the game
+// target); submission order, passes and states are unchanged, so the display
+// halves show swapped content. Off unless opened; nothing is saved.
+inline std::atomic<uint64_t> target_swap_until{}, target_swap_applied{};
+inline bool target_swap_active() { return GetTickCount64() < target_swap_until.load(); }
+inline void set_target_swap(int seconds) {
+    target_swap_until = seconds > 0 ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
+}
+
+// Diagnostic (fix bench, timed): change only how WuWa's secondary view (raw pass 3)
+// is constructed. 1: construct it with WuWa's primary pass 2. 2: pass 2 and hide the
+// family's existing views from the constructor. 3: hide the views only. The init
+// options and the family count are restored as soon as the constructor returns.
+inline std::atomic<uint64_t> construct_until{}, construct_applied{};
+// Diagnostic E6 (fix bench, timed): WuWa's two eye passes receive each other's eye
+// offset and projection, so views[1] renders with the right eye's pose.
+inline std::atomic<uint64_t> eye_swap_until{}, eye_swap_applied{};
+inline bool eye_swap_active() { return GetTickCount64() < eye_swap_until.load(); }
+inline void set_eye_swap(int seconds) {
+    eye_swap_until = seconds > 0 ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
+}
+inline std::atomic<int> construct_mode{};
+inline constexpr std::array<const char*, 4> construct_mode_names{"off", "pass2", "pass2_hidden", "hidden"};
+inline int construct_active() { return GetTickCount64() < construct_until.load() ? construct_mode.load() : 0; }
+inline void set_construct(int seconds, int mode) {
+    construct_mode = mode >= 1 && mode <= 3 ? mode : 0;
+    construct_until = seconds > 0 && construct_mode.load() ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
+}
+
 inline uint64_t state_swap_remaining_ms() {
     const auto now = GetTickCount64();
     const auto until = swap_until.load();
@@ -168,6 +198,10 @@ inline nlohmann::json status() {
         {"state_swap_supported", true}, {"state_swap_active", state_swap_active()},
         {"state_swap_remaining_ms", state_swap_remaining_ms()},
         {"state_swap_mode", swap_mode_names[static_cast<size_t>(swap_mode.load())]},
+        {"target_swap_active", target_swap_active()}, {"target_swap_applied", target_swap_applied.load()},
+        {"construct_mode", construct_mode_names[static_cast<size_t>(construct_active())]},
+        {"construct_applied", construct_applied.load()},
+        {"eye_swap_active", eye_swap_active()}, {"eye_swap_applied", eye_swap_applied.load()},
         {"state_swap_applied", swap_applied.load()}, {"state_swap_restored", swap_restored.load()},
         {"state_swap_skipped", swap_skipped.load()}};
 }

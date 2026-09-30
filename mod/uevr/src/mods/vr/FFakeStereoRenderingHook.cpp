@@ -3383,7 +3383,33 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
             pose_frames(),GetTickCount64(),pose_read);
         SetLastError(last_error);
     }
+    // Diagnostic (fix bench, timed): construct WuWa's secondary view (raw pass 3)
+    // differently; both changes are undone as soon as the constructor returns.
+    std::optional<int32_t> bench_pass{};
+    std::optional<uint32_t> bench_count{};
+    const int bench_construct = wuwa_process && vr->is_native_stereo_fix_enabled() && !vr->is_using_afr() &&
+        g_hook->get_render_target_manager()->get_scene_capture_render_target() != nullptr &&
+        static_cast<int32_t>(init_options_stereo_pass) == 3 ? wuwa_shadow::construct_active() : 0;
+    if (bench_construct == 1 || bench_construct == 2) {
+        bench_pass = 3;
+        init_options->set_stereo_pass(static_cast<EStereoscopicPass>(2));
+    }
+    if (bench_construct == 2 || bench_construct == 3) {
+        auto family = init_options->get_view_family();
+        auto family_views = family != nullptr ? family->get_views() : nullptr;
+        if (family_views != nullptr) {
+            bench_count = family_views->count;
+            family_views->count = 0;
+        }
+    }
+    if (bench_construct) ++wuwa_shadow::construct_applied;
     auto result = g_hook->m_sceneview_data.constructor_hook.unsafe_call<sdk::FSceneView*>(view, init_options, a3, a4);
+    if (bench_count.has_value()) {
+        auto family = init_options->get_view_family();
+        auto family_views = family != nullptr ? family->get_views() : nullptr;
+        if (family_views != nullptr) family_views->count = bench_count.value();
+    }
+    if (bench_pass.has_value()) init_options->set_stereo_pass(static_cast<EStereoscopicPass>(bench_pass.value()));
     if(pose_draw && wuwa_process && wuwa_motion::active()) {
         const auto last_error=GetLastError();
         pose_draw->constructor_output(pose_constructor,true,reinterpret_cast<uintptr_t>(result),
@@ -3704,6 +3730,14 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
         return;
     }
 
+    // Diagnostic E4 (fix bench, timed): each main view draws into the other's
+    // target; restored below with the existing target reset.
+    const bool swap_targets = wants_swap && is_wuwa && prev_count == 2 && wuwa_shadow::target_swap_active() &&
+        !state_swap.active();
+    if (swap_targets) {
+        view_family->set_render_target(rtfrt);
+        ++wuwa_shadow::target_swap_applied;
+    }
     {
         wuwa_reflection_capture::EyeScope reflection_eye{wants_swap ? views[0] : nullptr,0,wants_swap};
         g_hook->m_render_module_begin_render_viewfamily_hook.unsafe_call<void>(render_module, canvas, view_family_candidate);
@@ -3727,7 +3761,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
             static_cast<const void*>(rtfrt)
         );
 
-        view_family->set_render_target(rtfrt);
+        view_family->set_render_target(swap_targets ? original_target : rtfrt);
 
         if (is_wuwa) {
             const bool shared_frame=scene_frame.rewind();
@@ -5367,6 +5401,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
 
         const auto rotation_offset = vr->get_rotation_offset();
         const auto current_hmd_rotation = glm::normalize(rotation_offset * glm::quat{vr->get_rotation(0)});
+        // Diagnostic E6 (fix bench, timed): give each WuWa eye pass the other eye's pose.
+        const bool bench_eye_swap = wuwa_test::is_wuwa() && !is_full_pass && vr->is_native_stereo_fix_enabled() &&
+            wuwa_shadow::eye_swap_active();
+        if (bench_eye_swap) {
+            true_index ^= 1;
+            ++wuwa_shadow::eye_swap_applied;
+        }
         const auto current_eye_rotation_offset = glm::normalize(glm::quat{vr->get_eye_transform(true_index)});
 
         const auto new_rotation = glm::normalize(vqi_norm * current_hmd_rotation * current_eye_rotation_offset);
@@ -5609,6 +5650,11 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
     
         if (vr->is_using_afr()) {
             true_index = g_frame_count % 2;
+        }
+        // Diagnostic E6: the projection follows the swapped eye pose.
+        if (wuwa_test::is_wuwa() && VR::get()->is_native_stereo_fix_enabled() && view_index != 0 &&
+            wuwa_shadow::eye_swap_active()) {
+            true_index ^= 1;
         }
 
         auto& double_matrix = *(Matrix4x4d*)out;

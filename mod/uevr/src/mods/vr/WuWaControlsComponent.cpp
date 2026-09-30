@@ -333,7 +333,7 @@ void WuWaControlsComponent::on_draw_experiments() {
                 "Both eyes use the left eye's state (views[1])"};
             const bool busy = wuwa_shadow::test_active() || wuwa_stereo_order::active(GetTickCount64());
             const bool can_start = wuwa_shadow::ready() && !wuwa_shadow::faulted.load() && !busy &&
-                !wuwa_shadow::state_swap_active();
+                !wuwa_shadow::state_swap_active() && !wuwa_shadow::target_swap_active() && !wuwa_shadow::construct_active();
             ImGui::BeginDisabled(!can_start);
             for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
                 if (wuwa_ui::Button(labels[i])) {
@@ -341,14 +341,43 @@ void WuWaControlsComponent::on_draw_experiments() {
                     spdlog::info("[WuWaBench] start mode={} (menu)", wuwa_shadow::swap_mode_names[i]);
                 }
             }
+            static constexpr std::array<const char*, 3> construct_labels{
+                "Construct left view as primary (pass 2)",
+                "Construct left view as primary, family hidden",
+                "Construct left view with family hidden"};
+            for (int i = 0; i < 3; ++i) {
+                if (wuwa_ui::Button(construct_labels[i])) {
+                    wuwa_shadow::set_construct(60, i + 1);
+                    spdlog::info("[WuWaBench] start construct mode={} (menu)", wuwa_shadow::construct_mode_names[i + 1]);
+                }
+            }
+            if (wuwa_ui::Button("Swap the eyes' poses and projections (stereo looks inverted)")) {
+                wuwa_shadow::set_eye_swap(60);
+                spdlog::info("[WuWaBench] start eye_swap (menu)");
+            }
+            if (wuwa_ui::Button("Swap the eyes' render targets (stereo looks inverted)")) {
+                wuwa_shadow::set_target_swap(60);
+                spdlog::info("[WuWaBench] start target_swap (menu)");
+            }
             ImGui::EndDisabled();
-            const bool active = wuwa_shadow::state_swap_active();
+            const bool target_active = wuwa_shadow::target_swap_active() || wuwa_shadow::construct_active() != 0 ||
+                wuwa_shadow::eye_swap_active();
+            const bool active = wuwa_shadow::state_swap_active() || target_active;
             if (active && wuwa_ui::Button("Stop now")) {
                 wuwa_shadow::set_state_swap(0);
+                wuwa_shadow::set_target_swap(0);
+                wuwa_shadow::set_construct(0, 0);
+                wuwa_shadow::set_eye_swap(0);
                 spdlog::info("[WuWaBench] stopped (menu)");
             }
-            const auto mode = wuwa_shadow::swap_mode_names[static_cast<size_t>(wuwa_shadow::swap_mode.load())];
-            if (active) wuwa_ui::Text("Active: %s, %llu s left, applied %llu, restored %llu", mode,
+            const auto mode = wuwa_shadow::construct_active() ? wuwa_shadow::construct_mode_names[static_cast<size_t>(wuwa_shadow::construct_active())] :
+                wuwa_shadow::eye_swap_active() ? "eye_swap" :
+                wuwa_shadow::target_swap_active() ? "target_swap" :
+                wuwa_shadow::swap_mode_names[static_cast<size_t>(wuwa_shadow::swap_mode.load())];
+            if (target_active) wuwa_ui::Text("Active: %s (targets swapped %llu, constructed %llu)", mode,
+                static_cast<unsigned long long>(wuwa_shadow::target_swap_applied.load()),
+                static_cast<unsigned long long>(wuwa_shadow::construct_applied.load()));
+            else if (active) wuwa_ui::Text("Active: %s, %llu s left, applied %llu, restored %llu", mode,
                 static_cast<unsigned long long>(wuwa_shadow::state_swap_remaining_ms() / 1000),
                 static_cast<unsigned long long>(wuwa_shadow::swap_applied.load()),
                 static_cast<unsigned long long>(wuwa_shadow::swap_restored.load()));
@@ -361,9 +390,9 @@ void WuWaControlsComponent::on_draw_experiments() {
             for (size_t i = 0; i < verdicts.size(); ++i) {
                 if (i) ImGui::SameLine();
                 if (wuwa_ui::Button(verdicts[i])) {
-                    spdlog::info("[WuWaBench] verdict=\"{}\" mode={} active={} remaining_ms={} applied={} restored={} skipped={}",
+                    spdlog::info("[WuWaBench] verdict=\"{}\" mode={} active={} remaining_ms={} applied={} restored={} skipped={} target_swaps={}",
                         verdicts[i], mode, active, wuwa_shadow::state_swap_remaining_ms(), wuwa_shadow::swap_applied.load(),
-                        wuwa_shadow::swap_restored.load(), wuwa_shadow::swap_skipped.load());
+                        wuwa_shadow::swap_restored.load(), wuwa_shadow::swap_skipped.load(), wuwa_shadow::target_swap_applied.load());
                 }
             }
             wuwa_ui::TextWrapped("Stand where the far tree freezes, start a window, close the menu and look, then press what you saw. Each start or stop may cause a one-frame blur.");

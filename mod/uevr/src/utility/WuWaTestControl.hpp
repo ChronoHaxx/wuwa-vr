@@ -433,6 +433,26 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             }
             wuwa_shadow::set_test(seconds, request.value("enabled", true), request.value("full_view", false));
             reply["shadow"] = wuwa_shadow::status();
+        } else if (op == "construct_mode") {
+            // Fix bench: construct WuWa's secondary view differently for 0..60 s (0 ends it).
+            const auto seconds = request.value("seconds", 0);
+            const auto mode = request.value("mode", 0);
+            if (seconds < 0 || seconds > 60 || mode < 0 || mode > 3) throw std::runtime_error("construct_mode needs seconds 0..60 and mode 0..3");
+            wuwa_shadow::set_construct(seconds, mode);
+            spdlog::info("[WuWaBench] construct mode {} for {} s (control)", wuwa_shadow::construct_mode_names[static_cast<size_t>(wuwa_shadow::construct_active())], seconds);
+            reply["shadow"] = wuwa_shadow::status();
+        } else if (op == "eye_swap") {
+            const auto seconds = request.value("seconds", 0);
+            if (seconds < 0 || seconds > 60) throw std::runtime_error("eye_swap needs seconds 0..60");
+            wuwa_shadow::set_eye_swap(seconds);
+            spdlog::info("[WuWaBench] eye pose swap for {} s (control)", seconds);
+            reply["shadow"] = wuwa_shadow::status();
+        } else if (op == "target_swap") {
+            const auto seconds = request.value("seconds", 0);
+            if (seconds < 0 || seconds > 60) throw std::runtime_error("target_swap needs seconds 0..60");
+            wuwa_shadow::set_target_swap(seconds);
+            spdlog::info("[WuWaBench] target swap for {} s (control)", seconds);
+            reply["shadow"] = wuwa_shadow::status();
         } else if (op == "state_swap") {
             // Diagnostic view-state exchange between the two main views, per pair,
             // for a bounded window; 0 ends it. Nothing is saved to the profile.

@@ -12,7 +12,8 @@ Exact candidate live acceptance is pending. The full ZIP is 78.3 MiB.
 **[Download the older beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213)** · [Watch / guide](https://chronohaxx.github.io/wuwa-vr/)
 · [Report an issue](https://github.com/ChronoHaxx/wuwa-vr/issues)
 
-Extract **WuWa-VR-Launcher.zip**, then open **WuWa VR Launcher.exe**.
+Extract **WuWa-VR-Launcher-Experimental.zip** (the older beta's asset is
+**WuWa-VR-Launcher.zip**), then open **WuWa VR Launcher.exe**.
 Keep its companion folders together. No Python installation is needed.
 [Setup](docs/START-HERE.md) · [Xbox shortcuts](docs/CONTROLS.md) · [Recovery](docs/TROUBLESHOOTING.md)
 

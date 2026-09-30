@@ -5,17 +5,26 @@ anti-cheat, and account restrictions or a ban are possible. Use at your own
 risk; there is no publisher approval or account-safety guarantee.
 [Read the risk notice](RISK.md) before launching.
 
-[Download the complete beta ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213), extract it, and open
-**WuWa VR Launcher.exe**. Keep the `app` and `python` folders beside it.
-You need your own game, a Windows PC VR headset/runtime, and an Xbox/XInput
-controller connected to the PC. No separate Python installation is needed.
+[Download the experimental ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/experimental-2026-09-28-1628)
+or the [older beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213),
+extract it, and open **WuWa VR Launcher.exe**. Keep the `app` and `python` folders
+beside it. You need your own game, a Windows PC VR headset/runtime, and an
+Xbox/XInput controller connected to the PC. No separate Python installation
+is needed.
 
 ## Which build?
 
-The current download contains **Stereo, menus and languages · 26 Sep 22:42 BST**,
-from the owner-played 23:02 package. Its native files and supplied profile are
-unchanged. Older builds stay in separate releases to keep downloads smaller.
+There are two public packages, and the [README](../README.md) headlines the
+first:
+
+- The **[experimental package](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/experimental-2026-09-28-1628)** (asset **WuWa-VR-Launcher-Experimental.zip**) contains **Camera candidate + trigger controls · 28 Sep 16:27**. Select that build in its launcher; the older beta stays initially selected. This is a testing-tools update with camera work carried forward, **not a confirmed foliage or ultimate fix**, and its live acceptance is pending.
+- The **[older beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213)** (asset **WuWa-VR-Launcher.zip**) contains **Stereo, menus and languages · 26 Sep 22:42 BST**, from the owner-played 23:02 package; its native files and supplied profile are unchanged.
+
+Which one should you pick? Take the experimental package to test the camera
+candidate and trigger controls; take the older beta for the more-settled
+baseline. Both share the same gameplay bindings (see [controls](CONTROLS.md)).
 Your saved settings are retained; use **Reset this build** for supplied defaults.
+Older builds stay in separate releases to keep downloads smaller.
 
 ## Install and launch
 

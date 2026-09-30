@@ -1,8 +1,11 @@
 # Known issues and recovery
 
-Status: September 26, 2026. Keep the selected build name, timestamp and backend
-hash with a report. A result against one checkpoint does not automatically
-apply to another.
+Status: September 30, 2026. The current public builds are **Camera candidate +
+trigger controls · 28 Sep 16:27** (experimental) and **Stereo, menus and
+languages · 26 Sep 22:42 BST** (older beta); the candidate times below refer to
+the checkpoints in [CHECKPOINTS.md](CHECKPOINTS.md). Keep the selected build
+name, timestamp and backend hash with a report. A result against one checkpoint
+does not automatically apply to another.
 
 | Symptom | What to do / current finding |
 | --- | --- |
@@ -12,13 +15,13 @@ apply to another.
 | The game starts, but not in VR | Check the launcher shows your headset software as the OpenXR runtime and that it was running first. Unicode paths passed launcher/profile tests, but real injector startup from them is untested; use a simple path such as `C:\Games\WuWa VR` for that comparison. |
 | Use headset does not select SteamVR | It restores the runtime saved before enabling the simulator, which may be Virtual Desktop. For the grouped Steam Link/SteamVR test, select SteamVR as the active OpenXR runtime through its settings. |
 | Windows permission prompt was declined or missed | Nothing was started. Close any waiting injector from the taskbar, then choose **Apply & launch** again. |
-| Esc is blurred but its buttons are gone | Show game UI with L3+B. In the 23:31 candidate, the red notice is based on the game's menu/cursor signal; Show game UI now is also in WuWa Controls. |
+| Esc is blurred but its buttons are gone | Show game UI with L3+B. In both current builds (as in the 24 Sep 23:31 candidate), the red notice is based on the game's menu/cursor signal; Show game UI now is also in WuWa Controls. |
 | LB+Y fails after Alt-Tab | Close UEVR, release all buttons and return focus to WuWa. Forward Windows focus events helped in the user's later tests, but a universal fix is not confirmed. Test this separately from first-person grapple aiming. |
-| L3+LB does nothing | Use the 23:00+ candidate, enable Xbox mouse shortcuts, and disable Physical gamepad passthrough. Saved preferences can have mouse shortcuts off. Release all buttons after the chord. |
+| L3+LB does nothing | Both current public builds include it. Enable Xbox mouse shortcuts and disable Physical gamepad passthrough. Saved preferences can have mouse shortcuts off. Release all buttons after the chord. |
 | Menu bumpers/triggers do the wrong thing | Exit HUD/mouse adjustment with L3+LB. Leave automatic mouse in game menus off for native menu navigation. |
 | SteamVR periodically stutters | Keep Native Stereo Fix off; the user reproduced stutter with that checkbox on. This does not establish every possible streaming/GPU cause. |
 | An older build crashes with menu extraction + Native Stereo Fix | Do not repeat that combination. Use the preserved current menu route with Native Stereo Fix off. |
-| NPC name or speech bubble visible in one eye | The 19:04 and 20:11 candidates add a guarded per-eye label pass. It has not been verified in game. Unknown target layouts are left unchanged; this is still an open rendering issue. |
+| NPC name or speech bubble visible in one eye | The 19:04 and 20:11 candidates added a guarded per-eye label pass, included in both current builds. It has not been verified in game. Unknown target layouts are left unchanged; this is still an open rendering issue. |
 | Two reflections per eye in character/Echo previews | Open rendering issue in the scene layer. Planar and SSR CVars were already zero in a measured session; turning them off again is not a demonstrated solution. |
 | Iuno hair/head, Mornye leg transparency or Lynae effects absent in one eye | Open stereo-material defects. The reported head-following preview reflections are tracked separately; a shared shader cause has not been established. |
 | Full head shadow only works after toggling per character | Automatic retries and reused-component recovery are included. The owner reported the 15:39 head-bones/full-shadow mode working; it is the supplied default in 17:30 and later. If it recurs, record the character/build and check the active-copy status. |

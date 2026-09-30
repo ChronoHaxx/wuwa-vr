@@ -1,7 +1,13 @@
 # Xbox controller reference
 
-This reference describes **Stereo and camera candidate · 26 Sep 20:11 BST**.
-Earlier candidates contain different subsets of these features. The owner-tested
+This reference describes the gameplay bindings in the current public builds:
+**Camera candidate + trigger controls · 28 Sep 16:27** (experimental) and
+**Stereo, menus and languages · 26 Sep 22:42 BST** (older beta). Neither
+changes the bindings first checked against the **Stereo and camera candidate ·
+26 Sep 20:11 BST**: the 22:42 beta restricted hidden-UI warnings to detected
+menus and made Polar fly the supplied freecam default, and the 28 Sep 16:27
+build added developer trigger-input tooling with automatic input off. Earlier
+candidates contain different subsets of these features. The owner-tested
 **22:37 Camera + acro checkpoint** differs in a few places, listed at the end
 of this page. These
 bindings were checked against the Lua and native shortcut sheet, not assumed

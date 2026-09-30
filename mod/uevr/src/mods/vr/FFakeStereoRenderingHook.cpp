@@ -85,9 +85,9 @@ uintptr_t stereo_base_callsite() noexcept {
         // Native GetProjectionData supplies raw pass 2/3 and the game pose to
         // CalculateStereoViewOffset. CALL RBX is two bytes: return is +8402.
         constexpr std::array<wuwa_code_compatibility::Range,2> ranges{{
-            {0x24868050,25,0x6768d3242ced7ccaULL},
-            {0x2486839f,221,0x34b12aab29cda694ULL}}};
-        try {return wuwa_code_check::verify("Same-draw stereo game camera",ranges)+0x24868402;}
+            {0x526eea0,25,0x6768d3242ced7ccaULL},
+            {0x526f1ef,221,0xd84222f2627df3e4ULL}}};
+        try {return wuwa_code_check::verify("Same-draw stereo game camera",ranges)+0x526f252;}
         catch(const std::exception& e) {SPDLOG_WARN("[WuWaStereoBase] {}",e.what());return 0;}
         catch(...) {return 0;}
     }();

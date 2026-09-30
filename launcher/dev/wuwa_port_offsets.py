@@ -491,14 +491,11 @@ def apply(sites: list[Site], new_image: Image) -> dict[str, int]:
             by_file[s.file].append((s.hash_start, s.hash_end, f"0x{s.new_hash:016x}"))
     changed = {}
     for file, edits in by_file.items():
-        crlf = b"
-" in Path(file).read_bytes()
+        crlf = b"\r\n" in Path(file).read_bytes()
         text = Path(file).read_text(encoding="utf-8", errors="surrogateescape")   # offsets are in LF text
         for start, end, literal in sorted(set(edits), reverse=True):
             text = text[:start] + literal + text[end:]
-        with open(file, "w", encoding="utf-8", errors="surrogateescape", newline="
-" if crlf else "
-") as f:
+        with open(file, "w", encoding="utf-8", errors="surrogateescape", newline="\r\n" if crlf else "\n") as f:
             f.write(text)
         changed[file] = len(edits)
     return changed

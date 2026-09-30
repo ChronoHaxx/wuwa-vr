@@ -20,24 +20,24 @@ using Provider = wuwa_lgui_route::Provider;
 enum class Mode { register_only, redirect };
 enum class ViewContext : size_t { hud, tonemap, capture, count };
 
-constexpr uintptr_t setup_rva = 0x237a18c0;
-constexpr uintptr_t pass_rva = 0x2377f7a0;
-constexpr uintptr_t menu_setup_rva = 0x2379fcb0;
-constexpr uintptr_t menu_pass_rva = 0x2377f2d0;
-constexpr uintptr_t wrap_rva = 0x23e57e10;
-constexpr uintptr_t register_rva = 0x23e31570;
-constexpr uintptr_t graph_vtable_rva = 0x2759ec60;
-constexpr uintptr_t pooled_vtable_rva = 0x278b8d10;
-constexpr uintptr_t release_rva = 0x23e668d0;
-constexpr uintptr_t addref_rva = 0x23e533e0;
+constexpr uintptr_t setup_rva = 0x4117a20;
+constexpr uintptr_t pass_rva = 0x40f76b0;
+constexpr uintptr_t menu_setup_rva = 0x4115e10;
+constexpr uintptr_t menu_pass_rva = 0x40f7780;
+constexpr uintptr_t wrap_rva = 0x484d640;
+constexpr uintptr_t register_rva = 0x4826e60;
+constexpr uintptr_t graph_vtable_rva = 0x7d81540;
+constexpr uintptr_t pooled_vtable_rva = 0x80b76c0;
+constexpr uintptr_t release_rva = 0x485c140;
+constexpr uintptr_t addref_rva = 0x4848bc0;
 // September 19 disk variant: same PE timestamp, image smaller by two pages.
 // Accept its metadata only together with the code checks below, before hooks.
 constexpr uint32_t september19_image_size = 1029853184;
 constexpr std::array<std::array<uint8_t, 32>, 4> signatures{{
     {0x4c,0x8b,0xdc,0x4d,0x89,0x4b,0x20,0x4d,0x89,0x43,0x18,0x55,0x41,0x55,0x41,0x56,0x49,0x8d,0xab,0x68,0xfe,0xff,0xff,0x48,0x81,0xec,0x80,0x02,0x00,0x00,0x48,0x8b},
-    {0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57,0x48,0x83,0xec,0x30,0x41,0x0f,0xb7,0xd9,0x4c,0x89,0x44,0x24,0x20,0x48,0x8b,0xfa,0x48,0x8b,0xf1,0xe8,0x0d},
+    {0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57,0x48,0x83,0xec,0x30,0x41,0x0f,0xb7,0xd9,0x4c,0x89,0x44,0x24,0x20,0x48,0x8b,0xfa,0x48,0x8b,0xf1,0xe8,0x6d},
     {0x48,0x89,0x5c,0x24,0x10,0x48,0x89,0x74,0x24,0x18,0x55,0x57,0x41,0x54,0x41,0x56,0x41,0x57,0x48,0x8b,0xec,0x48,0x81,0xec,0x80,0x00,0x00,0x00,0x48,0x8b,0x02,0x48},
-    {0x40,0x53,0x55,0x57,0x41,0x55,0x41,0x56,0x41,0x57,0x48,0x81,0xec,0xc8,0x00,0x00,0x00,0x48,0x8b,0x05,0x50,0xde,0xd0,0x13,0x48,0x33,0xc4,0x48,0x89,0x84,0x24,0xb0}
+    {0x40,0x53,0x55,0x57,0x41,0x55,0x41,0x56,0x41,0x57,0x48,0x81,0xec,0xc8,0x00,0x00,0x00,0x48,0x8b,0x05,0x70,0xda,0xdc,0x04,0x48,0x33,0xc4,0x48,0x89,0x84,0x24,0xb0}
 }};
 
 // Hidden return storage, bare FRHITexture*, persistent name. The wrapped target
@@ -155,8 +155,8 @@ inline bool graph_resource(uintptr_t graph, uintptr_t& rhi,
 
 // Describe a rejected colour without trusting it: guarded reads only, nothing is
 // written or called. Offsets are verified in the Sep 8 capture: the RDG
-// resource base constructor 0x23e1b900 stores the debug name at +0x8, type at
-// +0x18 and flag bits at +0x19; texture constructor 0x210b6870 copies the
+// resource base constructor 0x4810760 stores the debug name at +0x8, type at
+// +0x18 and flag bits at +0x19; texture constructor 0xf095f0 copies the
 // descriptor extent to +0x54/+0x58 and the pixel format to +0x68. Do not follow
 // these offsets on another class. Repeated rejects need no string allocation.
 inline RejectedDescription read_rejected(uintptr_t color, uintptr_t vtable, GraphStatus status) noexcept {
@@ -189,7 +189,7 @@ inline std::string describe_rejected(const RejectedDescription& value) {
 }
 
 inline nlohmann::json sample_view_gate(uintptr_t view) {
-    // Raw inputs to the shipped 0x22ea9870 eligibility helper, inspected in
+    // Raw inputs to the shipped 0x3825130 eligibility helper, inspected in
     // _docs/lgui-menu-stage0-contract-2026-09-24.md. No predicate is bypassed
     // and no helper is called. Unknown reads stay unknown, never "false".
     // These observations distinguish the main view from the native capture;
@@ -197,7 +197,7 @@ inline nlohmann::json sample_view_gate(uintptr_t view) {
     uint32_t flags{}, stereo_pass{};
     uint8_t byte_ffe{}, byte_1000{};
     nlohmann::json result;
-    result["flags_d964"] = checked::read_field(view, 0xd964, flags) ? nlohmann::json(flags) : nlohmann::json(nullptr);
+    result["flags_d964"] = checked::read_field(view, 0xd9d4, flags) ? nlohmann::json(flags) : nlohmann::json(nullptr);
     result["byte_ffe"] = checked::read_field(view, 0xffe, byte_ffe) ? nlohmann::json(byte_ffe) : nlohmann::json(nullptr);
     result["byte_1000"] = checked::read_field(view, 0x1000, byte_1000) ? nlohmann::json(byte_1000) : nlohmann::json(nullptr);
     result["stereo_pass_c90"] = checked::read_field(view, 0xc90, stereo_pass) ? nlohmann::json(stereo_pass) : nlohmann::json(nullptr);
@@ -206,7 +206,7 @@ inline nlohmann::json sample_view_gate(uintptr_t view) {
 
 inline void sample_menu_stages(State& s, uintptr_t renderer, uintptr_t view, ViewContext view_context,
         const wuwa_lgui_route::Target& target) noexcept {
-    // The setup's early gate walks renderer+0x108/+0x110, stride 0xe8d0;
+    // The setup's early gate walks renderer+0x108/+0x110, stride 0xe940;
     // it does not inspect only the view argument. Both count arrays are
     // required. See _docs/lgui-cvar-render-route-2026-09-08.md. These are
     // read-only observations, not claims that visibility predicates passed.
@@ -220,7 +220,7 @@ inline void sample_menu_stages(State& s, uintptr_t renderer, uintptr_t view, Vie
         uintptr_t list{};
         int32_t count{};
         if (!checked::read_field(renderer, 0x108, list) || !checked::read_field(renderer, 0x110, count) ||
-            !list || count < 1 || count > 8 || list > UINTPTR_MAX - size_t(count) * 0xe8d0) {
+            !list || count < 1 || count > 8 || list > UINTPTR_MAX - size_t(count) * 0xe940) {
             SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaLguiRedirect] menu_stages unavailable context={} renderer={:x} list={:x} count={}",
                 names[context], renderer, list, count);
             return;
@@ -235,11 +235,11 @@ inline void sample_menu_stages(State& s, uintptr_t renderer, uintptr_t view, Vie
         bool view_in_array{};
         for (int32_t j = 0; j < count; ++j) {
             auto& sample = samples[j];
-            sample.address = list + size_t(j) * 0xe8d0;
+            sample.address = list + size_t(j) * 0xe940;
             view_in_array |= sample.address == view;
             for (size_t i = 0; i < 6; ++i) {
-                const bool a = checked::read_field(sample.address, 0x2104 + i * 4, sample.early[i]);
-                const bool b = checked::read_field(sample.address, 0x91cc + i * 0x320, sample.dispatch[i]);
+                const bool a = checked::read_field(sample.address, 0x2164 + i * 4, sample.early[i]);
+                const bool b = checked::read_field(sample.address, 0x922c + i * 0x320, sample.dispatch[i]);
                 if (!a || sample.early[i] < 0 || sample.early[i] > 100000) sample.early[i] = -1;
                 if (!b || sample.dispatch[i] < 0 || sample.dispatch[i] > 100000) sample.dispatch[i] = -1;
                 if (sample.early[i] >= 0 && sample.dispatch[i] >= 0) sample.valid_mask |= 1U << i;
@@ -390,7 +390,7 @@ inline SetupRoute route_setup(uintptr_t renderer, uintptr_t builder, uintptr_t c
         if (!transient_menu && source == target.game) sample_menu_stages(s, renderer, view, ViewContext::hud, target);
         else if (!transient_menu && target.capture && source == target.capture)
             sample_menu_stages(s, renderer, view, ViewContext::capture, target);
-        if (!checked::read_field(view, 0x254c, depth_flag)) { record_invalid(s, s.invalid_view); return unchanged; }
+        if (!checked::read_field(view, 0x25ac, depth_flag)) { record_invalid(s, s.invalid_view); return unchanged; }
         s.last_source.store(source, std::memory_order_relaxed);
         s.last_ui.store(target.ui, std::memory_order_relaxed);
         s.last_capture.store(target.capture, std::memory_order_relaxed);
@@ -461,8 +461,8 @@ inline SetupRoute route_menu_setup(uintptr_t builder, uintptr_t color, uintptr_t
         int32_t early{}, dispatch{};
         uint8_t depth_flag{}, constrain_flag{};
         float aspect{};
-        const bool view_ok = checked::read_field(view, 0x2110, early) && checked::read_field(view, 0x9b2c, dispatch) &&
-            checked::read_field(view, 0x254c, depth_flag) && checked::read_field(view, 0x2d9, constrain_flag) &&
+        const bool view_ok = checked::read_field(view, 0x2170, early) && checked::read_field(view, 0x9b8c, dispatch) &&
+            checked::read_field(view, 0x25ac, depth_flag) && checked::read_field(view, 0x2d9, constrain_flag) &&
             checked::read_field(view, 0x2dc, aspect);
         const bool populated = view_ok && early > 0 && early <= 100000 && dispatch > 0 && dispatch <= 100000;
         {
@@ -586,7 +586,7 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
     ++s.world_calls;
     try {
         const auto target = s.provider ? s.provider() : wuwa_lgui_route::Target{};
-        if (caller != s.base + 0x2379fc83) { ++s.world_caller_skips; return result; }
+        if (caller != s.base + 0x4115de3) { ++s.world_caller_skips; return result; }
         if (!target.world_labels_enabled) { ++s.world_disabled_skips; return result; }
         if (target.native_stereo_fix || target.independent_eyes) { ++s.world_mode_skips; return result; }
         // Only the verified last-view caller is expanded. Do not replay a pass
@@ -595,7 +595,7 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
         uintptr_t views{}, cv{}, dv{}, color_rhi{};
         if (!checked::read_field(renderer, 0x108, views) || !views ||
             !checked::read_field(renderer, 0x110, layout.views) || layout.views != 2 ||
-            views > UINTPTR_MAX - 0xe8d0 || view != views + 0xe8d0 ||
+            views > UINTPTR_MAX - 0xe940 || view != views + 0xe940 ||
             !checked::read(color, result.color) || !checked::read(depth, result.depth) ||
             !checked::read(result.color.graph, cv) || !checked::read(result.depth.graph, dv) ||
             cv != s.base + graph_vtable_rva || dv != cv ||
@@ -604,8 +604,8 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
             !extent(result.color.graph, layout.color_extent) || !extent(result.depth.graph, layout.depth_extent) ||
             !checked::read_field(views, 0xc90, layout.first_pass) ||
             !checked::read_field(view, 0xc90, layout.second_pass) ||
-            !checked::read_field(views, 0x2104, layout.first_early_count) ||
-            !checked::read_field(views, 0x91cc, layout.first_dispatch_count)) {
+            !checked::read_field(views, 0x2164, layout.first_early_count) ||
+            !checked::read_field(views, 0x922c, layout.first_dispatch_count)) {
             ++s.world_guard_skips;
             return result;
         }
@@ -614,9 +614,9 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
         layout.color_input = result.color.rect;
         layout.depth_input = result.depth.rect;
         for (size_t i = 0; i < 2; ++i) {
-            const auto eye = views + i * 0xe8d0;
+            const auto eye = views + i * 0xe940;
             if (!checked::read_field(eye, 0x2f8, layout.rects_2f8[i]) ||
-                !checked::read_field(eye, 0x1e30, layout.rects_1e30[i])) {
+                !checked::read_field(eye, 0x1e70, layout.rects_1e30[i])) {
                 ++s.world_guard_skips;
                 return result;
             }
@@ -674,7 +674,7 @@ inline void install_world_labels(State& s, HMODULE executable, uint32_t image_si
     try {
         checked::require(verify_code(executable, image_size, compatibility::world_label_code_ranges,
             "world-labels"), "World-label route code mismatch");
-        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + 0x237a01d0),
+        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + 0x4116330),
             &world_setup_callback, safetyhook::InlineHook::StartDisabled);
         checked::require(hook.has_value(), "Cannot create world-label setup hook");
         s.world_setup = std::move(*hook);
@@ -707,8 +707,8 @@ inline void observe_stage0(safetyhook::Context& context,bool dispatch) noexcept 
         if (!checked::read_field(payload.renderer,0x108,views) || !checked::read_field(payload.renderer,0x110,count) ||
             !views || count<1 || count>8 || payload.view<views) return;
         const auto distance=payload.view-views;
-        if (distance%0xe8d0 || distance/0xe8d0>=static_cast<uint64_t>(count)) return;
-        const auto index=static_cast<size_t>(distance/0xe8d0);
+        if (distance%0xe940 || distance/0xe940>=static_cast<uint64_t>(count)) return;
+        const auto index=static_cast<size_t>(distance/0xe940);
         const auto now=GetTickCount64();auto& next=s.next_stage0_sample[(dispatch ? 8 : 0)+index];
         auto prior=next.load(std::memory_order_relaxed);
         if (now<prior || !next.compare_exchange_strong(prior,now+1000)) return;
@@ -740,8 +740,8 @@ inline void disable_stage0_probe(State& s) noexcept {
 inline void install_stage0_probe(State& s,HMODULE executable,uint32_t image_size) noexcept {
     try {
         checked::require(verify_code(executable,image_size,compatibility::stage0_probe_code_ranges,"stage0-recording"),"Stage-0 probe code mismatch");
-        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x2377f3a0),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
-        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x23782e7c),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
+        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40f74a0),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
+        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40faf0c),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
         checked::require(constructor.has_value() && dispatch.has_value(),"Cannot create stage-0 recording probe");
         s.stage0_construct=std::move(*constructor);s.stage0_dispatch=std::move(*dispatch);
         checked::require(s.stage0_construct.enable().has_value() && s.stage0_dispatch.enable().has_value(),"Cannot enable stage-0 recording probe");
@@ -763,8 +763,8 @@ inline void install_menu(State& s, HMODULE executable, uint32_t image_size) noex
         checked::require(verify_code(executable, image_size, compatibility::menu_code_ranges, "menu-stage3"),
             "Menu stage code changed; preserving HUD-only hooks");
         uintptr_t thunk{};
-        checked::require(checked::read(s.base + 0x277fb6f8 + sizeof(uintptr_t), thunk) &&
-            thunk == s.base + 0x23791340, "Menu execute vtable changed; preserving HUD-only hooks");
+        checked::require(checked::read(s.base + 0x7feaca8 + sizeof(uintptr_t), thunk) &&
+            thunk == s.base + 0x410b880, "Menu execute vtable changed; preserving HUD-only hooks");
         auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + menu_setup_rva),
             &menu_setup_callback, safetyhook::InlineHook::StartDisabled);
         checked::require(setup.has_value(), "Cannot create menu setup hook");

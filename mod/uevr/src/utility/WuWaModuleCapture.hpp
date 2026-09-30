@@ -7,6 +7,9 @@
 // Remove the request after use; it is examined once per backend load.
 // Add "any_build": true to capture a game build other than the pinned one (for
 // porting offsets after a game update). Still read-only; the identity is recorded.
+// Optional: "skip": [[rva, rva_end], ...] never touches those spans; "only": [[...]]
+// captures just those spans; "checkpoint_every_chunk": true publishes progress after
+// every 1 MiB so a read that never returns can be located and skipped next time.
 
 #include <algorithm>
 #include <array>
@@ -179,6 +182,25 @@ inline void add_range(std::vector<Range>& ranges, uint64_t begin, uint64_t end) 
     ranges.resize(count);
 }
 
+// Spans minus the excluded ranges (both lists of [begin, end)).
+inline std::vector<Range> without(const std::vector<Range>& spans, const std::vector<Range>& excluded) {
+    std::vector<Range> result{};
+    for (const auto& span : spans) {
+        std::vector<Range> parts{span};
+        for (const auto& cut : excluded) {
+            std::vector<Range> next{};
+            for (const auto& part : parts) {
+                if (cut[1] <= part[0] || cut[0] >= part[1]) { next.push_back(part); continue; }
+                if (cut[0] > part[0]) next.push_back({part[0], cut[0]});
+                if (cut[1] < part[1]) next.push_back({cut[1], part[1]});
+            }
+            parts = std::move(next);
+        }
+        result.insert(result.end(), parts.begin(), parts.end());
+    }
+    return result;
+}
+
 inline std::vector<Range> missing_ranges(uint64_t begin, uint64_t end, const std::vector<Range>& captured) {
     std::vector<Range> missing{};
     for (const auto& range : captured) {
@@ -275,6 +297,29 @@ inline void capture(const Work& work) {
     const auto config = json::parse(request);
     const auto output = output_path(fs::u8path(config.at("output").get<std::string>()));
     const bool any_build = config.value("any_build", false);
+    const bool every_chunk = config.value("checkpoint_every_chunk", false);
+    std::vector<Range> excluded{};
+    const auto read_ranges = [&](const char* key) {
+        std::vector<Range> list{};
+        if (config.contains(key)) {
+            for (const auto& item : config.at(key)) {
+                const auto a = item.at(0).get<uint64_t>(), b = item.at(1).get<uint64_t>();
+                require(a < b, "Capture request range must be [begin, end) with begin < end");
+                list.push_back({a, b});
+            }
+            std::sort(list.begin(), list.end());
+        }
+        return list;
+    };
+    excluded = read_ranges("skip");
+    if (const auto only = read_ranges("only"); !only.empty()) {
+        uint64_t position{};
+        for (const auto& span : only) {
+            if (span[0] > position) excluded.push_back({position, span[0]});
+            position = (std::max)(position, span[1]);
+        }
+        excluded.push_back({position, UINT64_MAX});
+    }
     const auto companion = fs::path{output.wstring() + L".json"};
     const auto pending_companion = fs::path{companion.wstring() + L".pending"};
     // Reserve this capture without publishing an empty final JSON. Interrupted
@@ -285,7 +330,7 @@ inline void capture(const Work& work) {
     FILETIME file_time{};
     GetSystemTimeAsFileTime(&file_time);
     const uint64_t capture_ticks = (static_cast<uint64_t>(file_time.dwHighDateTime) << 32) | file_time.dwLowDateTime;
-    json metadata{{"format", "wuwa-mapped-module-v1"}, {"any_build", any_build}, {"layout", "memory"}, {"offset_equals_rva", true},
+    json metadata{{"format", "wuwa-mapped-module-v1"}, {"any_build", any_build}, {"excluded_ranges", excluded}, {"layout", "memory"}, {"offset_equals_rva", true},
         {"pid", GetCurrentProcessId()}, {"started_utc", utc_now()}, {"status", "failed"},
         {"capture_id", fmt::format("{}-{}", GetCurrentProcessId(), capture_ticks)},
         {"phase", "initializing"}, {"checkpoint_sequence", 0}, {"attempted_range", nullptr},
@@ -337,7 +382,7 @@ inline void capture(const Work& work) {
         uint64_t sequence{};
         const auto checkpoint = [&](bool force) {
             const auto now = GetTickCount64();
-            if (!force && copied_bytes - last_checkpoint_bytes < checkpoint_bytes &&
+            if (!force && !every_chunk && copied_bytes - last_checkpoint_bytes < checkpoint_bytes &&
                 now - last_checkpoint_tick < checkpoint_interval_ms) return;
             // A published checkpoint describes only successful writes confirmed
             // by a flush. Later phases never overwrite these captured intervals.
@@ -378,7 +423,7 @@ inline void capture(const Work& work) {
                     "Capture phase extends beyond executable image");
                 // Ranges stay normalized even when phases visit high RVAs first.
                 // Subtract successful prior writes, preserving old checkpoints.
-                const auto pending = missing_ranges(requested_range[0], requested_range[1], ranges);
+                const auto pending = without(missing_ranges(requested_range[0], requested_range[1], ranges), excluded);
                 for (const auto& span : pending) {
                     auto cursor = span[0];
                     while (cursor < span[1]) {

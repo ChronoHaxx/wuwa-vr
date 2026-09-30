@@ -154,8 +154,8 @@ inline void start(HMODULE backend, Provider provider) {
     s.output = parent / ("route-" + std::to_string(GetCurrentProcessId()));
     read_only::require(!std::filesystem::exists(s.output), "Route output already exists");
     std::filesystem::create_directory(s.output);
-    constexpr std::array<uintptr_t, 3> slots{0x26ca0820, 0x26ca08f0, 0x276032d8};
-    constexpr std::array<uintptr_t, 3> functions{0x205a67a0, 0x205a6830, 0x228bde10};
+    constexpr std::array<uintptr_t, 3> slots{0x7416cc0, 0x760b730, 0x7de5d78};
+    constexpr std::array<uintptr_t, 3> functions{0xcdf220, 0xcdf2b0, 0x3228c50};
     s.replacements = {reinterpret_cast<uintptr_t>(&draw<0>), reinterpret_cast<uintptr_t>(&draw<1>), reinterpret_cast<uintptr_t>(&execute)};
     for (size_t i = 0; i < slots.size(); ++i) {
         read_only::require(read_only::read(s.base + slots[i], s.originals[i]) && s.originals[i] == s.base + functions[i] &&

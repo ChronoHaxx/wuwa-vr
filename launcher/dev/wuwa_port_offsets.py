@@ -87,7 +87,8 @@ def load(path: Path) -> Image:
 
 
 # ---------------------------------------------------------------- source scan
-HASH_RANGE = re.compile(r"\{\s*(0x[0-9a-fA-F]+)\s*,\s*(\d+)\s*,\s*(0x[0-9a-fA-F]{16})(ULL)?\s*\}")
+HASH_RANGE = re.compile(r"\{\s*(0x[0-9a-fA-F]+)\s*,\s*(0x[0-9a-fA-F]+|\d+)\s*,\s*(0x[0-9a-fA-F]{16})(ULL)?\s*\}")
+BYTE_LIST = re.compile(r"\{\s*((?:0x[0-9a-fA-F]{1,2}\s*,\s*){7,}0x[0-9a-fA-F]{1,2})\s*,?\s*\}")
 HEX = re.compile(r"(?<![0-9A-Za-z_])0x[0-9a-fA-F]{6,8}(?![0-9A-Za-z_])")
 
 
@@ -98,7 +99,7 @@ class Site:
     start: int          # character offset of the literal in the file
     end: int
     old: int
-    kind: str           # rva | hash_range | timestamp | image_size
+    kind: str           # rva | hash_range | signature | timestamp | image_size
     size: int = 0
     old_hash: int = 0
     hash_start: int = 0
@@ -126,7 +127,7 @@ def collect(src: Path, old: Image) -> list[Site]:
             if old.section(rva) is None:
                 continue
             sites.append(Site(str(path), line_of(m.start()), m.start(1), m.end(1), rva, "hash_range",
-                              size=int(m.group(2)), old_hash=int(m.group(3), 16),
+                              size=int(m.group(2), 0), old_hash=int(m.group(3), 16),
                               hash_start=m.start(3), hash_end=m.end(3)))
             taken.add(m.start(1))
         for m in HEX.finditer(text):
@@ -140,10 +141,27 @@ def collect(src: Path, old: Image) -> list[Site]:
                 kind = "image_size"
             elif value in IGNORED:
                 continue
-            elif 0x100000 <= value < old.size and old.section(value) is not None:
+            elif 0x100000 < value < old.size and old.section(value) is not None:
                 kind = "rva"
             if kind:
                 sites.append(Site(str(path), line_of(m.start()), m.start(), m.end(), value, kind))
+        # Inline byte signatures: a byte list equal to the old image at one of this file's RVAs.
+        file_rvas = sorted({x.old for x in sites if x.file == str(path) and x.kind in ("rva", "hash_range")})
+        # RVAs declared as named constants win when identical twin functions match one list
+        named = {x.old for x in sites if x.file == str(path) and x.kind == "rva"
+                 and "constexpr" in text[text.rfind(chr(10), 0, x.start) + 1:x.start]}
+        for m in BYTE_LIST.finditer(text):
+            body = m.group(1)
+            values = bytes(int(v, 16) for v in re.findall(r"0x([0-9a-fA-F]{1,2})", body))
+            matches = [rva for rva in file_rvas if bytes(old.data[rva:rva + len(values)]) == values]
+            if len(matches) > 1:
+                matches = [rva for rva in matches if rva in named] or matches
+            if matches:
+                site = Site(str(path), line_of(m.start()), m.start(1), m.end(1), matches[0], "signature",
+                            size=len(values), detail={"spaced": ", " in body})
+                if len(matches) > 1:
+                    site.detail["twins"] = [hex(r) for r in matches]
+                sites.append(site)
         for m in re.finditer(r"(?<![0-9])%d(?![0-9])" % old.size, text):
             sites.append(Site(str(path), line_of(m.start()), m.start(), m.end(), old.size, "image_size_dec"))
     return sites
@@ -281,6 +299,36 @@ def resolve_ties(mapped: dict[int, dict]) -> None:
             m.update(status="ok", new=fits[0], resolved_by="neighbour_shift", expected_shift=expected)
 
 
+def local_search(old: Image, new: Image, rva: int, mapped: dict, span: int = 0x40000, width: int = 96) -> dict:
+    """Fuzzy match of the old bytes near the RVA its nearest confident neighbours predict."""
+    confident = sorted(((abs(r - rva), m["new"] - r) for r, m in mapped.items()
+                        if m["status"] == "ok" and m.get("resolved_by") != "local_search"))[:3]
+    if not confident:
+        return {"status": "unmapped"}
+    best_hits = []
+    for _, shift in confident:
+        pred = rva + shift
+        lo = max(pred - span, 0)
+        hi = min(pred + span + width, len(new.view))
+        region = new.view[lo:hi]
+        if len(region) <= width:
+            continue
+        window = old.view[rva:rva + width]
+        count = np.zeros(len(region) - width, np.int32)
+        for k in range(width):
+            count += region[k:k + len(count)] == window[k]
+        order = np.argsort(count)[::-1]
+        top = int(order[0])
+        runner = next((int(i) for i in order[1:64] if abs(int(i) - top) > 16), None)
+        best_hits.append((int(count[top]) / width, (int(count[runner]) / width) if runner is not None else 0.0, lo + top))
+    if not best_hits:
+        return {"status": "unmapped"}
+    best, second, where = max(best_hits)
+    ok = best >= 0.85 and best - second >= 0.08
+    return {"status": "ok" if ok else "ambiguous", "new": where, "score": round(best, 3),
+            "runner_up": round(second, 3), "resolved_by": "local_search", "review": True}
+
+
 def map_pointer_slot(old: Image, new: Image, rva: int, mapped: dict, cache: dict) -> dict:
     """A data slot that holds a pointer into the image (vtable slot, registered object):
     map the pointee, then find the unique slot in the new image holding the new pointer."""
@@ -343,8 +391,9 @@ def compare_function(old: Image, new: Image, rva: int, nrva: int, size: int) -> 
     unexplained = []
     for i in diffs:
         # a differing byte is explained if it sits inside some 4-byte displacement field
+        # the field may run past the end of the compared span; only its opcode must be inside
         if not any(displacement_field(a, s) and displacement_field(b, s)
-                   for s in range(max(i - 3, 0), min(i, size - 4) + 1)):
+                   for s in range(max(i - 3, 0), i + 1)):
             unexplained.append(i)
     return {"differing_bytes": len(diffs), "unexplained": unexplained[:16],
             "unexplained_count": len(unexplained), "new_hash": fnv(b)}
@@ -363,8 +412,8 @@ def run(old: Image, new: Image, src: Path) -> list[Site]:
     t = time.monotonic()
     log = lambda what: print(f"[{time.monotonic() - t:6.1f}s] {what}", file=sys.stderr, flush=True)
     log(f"{len(sites)} sites, {len(code)} code RVAs, {len(data)} data RVAs")
-    refs = rel32_references(old, data) if data else {}
-    log("data references scanned")
+    refs = rel32_references(old, data | code) if (data or code) else {}
+    log("references scanned")
     mapped: dict[int, dict] = {}
     for rva in sorted(code):
         mapped[rva] = map_code(old, new, rva, cache)
@@ -373,6 +422,20 @@ def run(old: Image, new: Image, src: Path) -> list[Site]:
         mapped[rva] = map_data(old, new, rva, refs.get(rva, []), cache)
     log("data sites mapped")
     resolve_ties(mapped)
+    # Code sites still open: first through their callers (call/jmp/lea rel32 that target them),
+    # then by a local fuzzy search around the position their confident neighbours predict.
+    for rva in sorted(code):
+        if mapped[rva]["status"] == "ok":
+            continue
+        via = map_data(old, new, rva, refs.get(rva, []), cache) if refs.get(rva) else {"status": "unmapped"}
+        if via["status"] == "ok":
+            via["resolved_by"] = "callers"
+            mapped[rva] = via
+            continue
+        local = local_search(old, new, rva, mapped)
+        if local["status"] == "ok":
+            mapped[rva] = local
+    log("callers and local search done")
     for rva in sorted(data):
         if mapped[rva]["status"] != "ok":
             fallback = map_pointer_slot(old, new, rva, mapped, cache)
@@ -382,6 +445,19 @@ def run(old: Image, new: Image, src: Path) -> list[Site]:
     for s in sites:
         if s.kind == "timestamp":
             s.new, s.status = new.timestamp, "ok"
+        elif s.kind == "signature":
+            m = mapped.get(s.old, {"status": "unmapped"})
+            spaced, twins = s.detail.get("spaced", False), s.detail.get("twins")
+            s.status, s.new = m["status"], m.get("new")
+            s.detail = {"spaced": spaced, "site_status": m["status"]}
+            if twins:
+                s.detail["twins"] = twins
+                s.status = "ambiguous"
+            if s.status == "ok":
+                cmp = compare_function(old, new, s.old, s.new, s.size)
+                s.detail["bytes"] = {k: v for k, v in cmp.items() if k != "new_hash"}
+                if cmp["unexplained_count"]:
+                    s.status = "changed"
         elif s.kind in ("image_size", "image_size_dec"):
             s.new, s.status = new.size, "ok"
         else:
@@ -399,10 +475,15 @@ def run(old: Image, new: Image, src: Path) -> list[Site]:
     return sites
 
 
-def apply(sites: list[Site]) -> dict[str, int]:
+def apply(sites: list[Site], new_image: Image) -> dict[str, int]:
     by_file: dict[str, list[tuple[int, int, str]]] = {}
     for s in sites:
         if s.status != "ok" or s.new is None:
+            continue
+        if s.kind == "signature":
+            sep = ", " if s.detail.get("spaced") else ","
+            new_bytes = bytes(new_image.data[s.new:s.new + s.size])
+            by_file.setdefault(s.file, []).append((s.start, s.end, sep.join(f"0x{b:02x}" for b in new_bytes)))
             continue
         literal = str(s.new) if s.kind == "image_size_dec" else f"0x{s.new:x}"
         by_file.setdefault(s.file, []).append((s.start, s.end, literal))
@@ -410,10 +491,14 @@ def apply(sites: list[Site]) -> dict[str, int]:
             by_file[s.file].append((s.hash_start, s.hash_end, f"0x{s.new_hash:016x}"))
     changed = {}
     for file, edits in by_file.items():
-        text = Path(file).read_text(encoding="utf-8", errors="surrogateescape")
+        crlf = b"
+" in Path(file).read_bytes()
+        text = Path(file).read_text(encoding="utf-8", errors="surrogateescape")   # offsets are in LF text
         for start, end, literal in sorted(set(edits), reverse=True):
             text = text[:start] + literal + text[end:]
-        with open(file, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
+        with open(file, "w", encoding="utf-8", errors="surrogateescape", newline="
+" if crlf else "
+") as f:
             f.write(text)
         changed[file] = len(edits)
     return changed
@@ -432,7 +517,18 @@ def main() -> int:
     ap.add_argument("--report", type=Path)
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--self-test", action="store_true", help="map the old image onto itself; every site must be identity")
+    ap.add_argument("--from-report", type=Path, help="apply an existing report instead of mapping again")
+    ap.add_argument("--files", nargs="*", help="apply only to these file names (e.g. WuWaLguiRedirect.hpp)")
     args = ap.parse_args()
+    if args.from_report:
+        if not (args.apply and args.new):
+            ap.error("--from-report needs --new and --apply")
+        data = json.loads(args.from_report.read_text(encoding="utf-8"))
+        sites = [Site(**d) for d in data["sites"]]
+        if args.files:
+            sites = [x for x in sites if Path(x.file).name in set(args.files)]
+        print(json.dumps(apply(sites, load(args.new)), indent=1))
+        return 0
     old = load(args.old)
     new = old if args.self_test else load(args.new)
     if new is None:
@@ -442,11 +538,11 @@ def main() -> int:
               "new": {"path": str(new.path), "timestamp": hex(new.timestamp), "size": new.size},
               "summary": summary(sites), "sites": [asdict(s) for s in sites]}
     if args.self_test:
-        bad = [s for s in sites if s.kind in ("rva", "hash_range") and (s.status != "ok" or s.new != s.old
+        bad = [s for s in sites if s.kind in ("rva", "hash_range", "signature") and (s.status != "ok" or s.new != s.old
                or (s.kind == "hash_range" and s.new_hash != s.old_hash))]
         report["self_test_failures"] = [f"{Path(s.file).name}:{s.line} {s.old:#x} {s.status}" for s in bad]
     if args.apply and not args.self_test:
-        report["applied"] = apply(sites)
+        report["applied"] = apply(sites, new)
     if args.report:
         args.report.write_text(json.dumps(report, indent=1, default=str), encoding="utf-8")
     print(json.dumps(report["summary"], indent=1))

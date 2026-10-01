@@ -5,17 +5,25 @@ anti-cheat, and account restrictions or a ban are possible. Use at your own
 risk; there is no publisher approval or account-safety guarantee.
 [Read the risk notice](RISK.md) before launching.
 
-[Download the complete beta ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213), extract it, and open
-**WuWa VR Launcher.exe**. Keep the `app` and `python` folders beside it.
-You need your own game, a Windows PC VR headset/runtime, and an Xbox/XInput
-controller connected to the PC. No separate Python installation is needed.
+[Download the beta ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01)
+(asset **WuWa-VR-Launcher.zip**), extract it, and open **WuWa VR Launcher.exe**.
+Keep the `app` and `python` folders beside it. You need your own game, a Windows
+PC VR headset/runtime, and an Xbox/XInput controller connected to the PC. No
+separate Python installation is needed.
 
 ## Which build?
 
-The current download contains **Stereo, menus and languages · 26 Sep 22:42 BST**,
-from the owner-played 23:02 package. Its native files and supplied profile are
-unchanged. Older builds stay in separate releases to keep downloads smaller.
+The beta contains one build for **game version 3.7**: **3.7 + far LOD fix ·
+1 Oct 11:30 BST**, tested by the owner in the headset. It ports the HUD, menus,
+ultimate-camera fix and Same Pass to 3.7, and makes far trees and props use the
+same detail level in both eyes. Its profile starts with **Native Stereo Fix and
+Same Pass on**; the fixes depend on them.
+
+Earlier packages ([28 Sep experimental](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/experimental-2026-09-28-1628),
+[26 Sep beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213))
+were made for the previous game version.
 Your saved settings are retained; use **Reset this build** for supplied defaults.
+Older builds stay in separate releases to keep downloads smaller.
 
 ## Install and launch
 
@@ -59,8 +67,9 @@ Both start in the game camera; experimental collision is off.
 - Enable **Xbox mouse shortcuts** in WuWa Controls before using mouse/HUD
   adjustment. Leave **Physical gamepad passthrough** off to use the mod's
   shortcuts; passthrough deliberately bypasses them.
-- Leave **Native Stereo Fix → Enabled** off. Keep **Native Stereo** as the
-  rendering method; those are different settings.
+- Keep **Native Stereo** as the rendering method with **Native Stereo Fix →
+  Enabled** and **Same Pass** on. The 3.7 build's fixes depend on them; builds
+  for the previous game version wanted Native Stereo Fix off.
 - Start in the ordinary game camera, with the portal and freecam off. Press
   **L3 + A** while sitting comfortably to recenter. Increase HUD size separately
   from world scale.

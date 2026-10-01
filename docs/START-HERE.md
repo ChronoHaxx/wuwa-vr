@@ -5,7 +5,7 @@ anti-cheat, and account restrictions or a ban are possible. Use at your own
 risk; there is no publisher approval or account-safety guarantee.
 [Read the risk notice](RISK.md) before launching.
 
-[Download the beta ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01)
+[Download the beta ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817)
 (asset **WuWa-VR-Launcher.zip**), extract it, and open **WuWa VR Launcher.exe**.
 Keep the `app` and `python` folders beside it. You need your own game, a Windows
 PC VR headset/runtime, and an Xbox/XInput controller connected to the PC. No
@@ -13,10 +13,10 @@ separate Python installation is needed.
 
 ## Which build?
 
-The beta contains one build for **game version 3.7**: **3.7 + far LOD fix ·
-1 Oct 11:30 BST**, tested by the owner in the headset. It ports the HUD, menus,
-ultimate-camera fix and Same Pass to 3.7, and makes far trees and props use the
-same detail level in both eyes. Its profile starts with **Native Stereo Fix and
+The beta contains one build for **game version 3.7**: **3.7 + reflection + far lighting fix v2 ·
+1 Oct 18:17 BST**, tested by the owner. It ports the HUD, menus,
+ultimate-camera fix, Same Pass and the Resonators reflection fix to 3.7, and makes
+far trees, props and far lighting match between the eyes. Its profile starts with **Native Stereo Fix and
 Same Pass on**; the fixes depend on them.
 
 Earlier packages ([28 Sep experimental](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/experimental-2026-09-28-1628),

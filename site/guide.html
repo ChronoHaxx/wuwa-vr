@@ -1,15 +1,15 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Visual Xbox controls, setup, comfort and recovery for WuWa VR."><meta name="theme-color" content="#17191c"><title>Player guide — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><aside class="notice"><strong>1 Oct update:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01">Beta for game 3.7 · 1 Oct 11:30 BST</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Far trees and props now match between the eyes, confirmed in headset. Still open: far lighting or fog that differs between the eyes. The Resonators and team-screen reflection fix works in testing (not in this download yet); weapon and Echo submenus are deferred.</aside><h1>Player guide</h1><p>Setup for the portable beta, illustrated controls and ways to recover when a setting feels wrong. <a href="languages.html">Getting started in 10 languages</a>.</p><button class="print-button" id="print-guide" type="button" hidden>Print / save this guide</button><div class="guide-grid"><nav class="toc" aria-label="Guide chapters"><a href="#start">Setup</a><a href="#visual-controls">Controller images</a><a href="#controls">All Xbox shortcuts</a><a href="#comfort">HUD and camera comfort</a><a href="#recovery">Problems and recovery</a><a href="#packaging">Portable launcher</a></nav><div class="guide-content"><section id="start"><h2>Setup</h2><p><strong>Account risk:</strong> this unofficial injector may be detected or blocked by
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Visual Xbox controls, setup, comfort and recovery for WuWa VR."><meta name="theme-color" content="#17191c"><title>Player guide — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><aside class="notice"><strong>1 Oct update:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">Beta for game 3.7 · 1 Oct 18:17 BST</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Far trees, props and far lighting now match between the eyes, and the Resonators and team-screen reflections are back in place. Weapon and Echo submenu reflections are deferred.</aside><h1>Player guide</h1><p>Setup for the portable beta, illustrated controls and ways to recover when a setting feels wrong. <a href="languages.html">Getting started in 10 languages</a>.</p><button class="print-button" id="print-guide" type="button" hidden>Print / save this guide</button><div class="guide-grid"><nav class="toc" aria-label="Guide chapters"><a href="#start">Setup</a><a href="#visual-controls">Controller images</a><a href="#controls">All Xbox shortcuts</a><a href="#comfort">HUD and camera comfort</a><a href="#recovery">Problems and recovery</a><a href="#packaging">Portable launcher</a></nav><div class="guide-content"><section id="start"><h2>Setup</h2><p><strong>Account risk:</strong> this unofficial injector may be detected or blocked by
 anti-cheat, and account restrictions or a ban are possible. Use at your own
 risk; there is no publisher approval or account-safety guarantee.
 <a href="risk.html">Read the risk notice</a> before launching.</p>
-<p><a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01">Download the beta ZIP</a> (asset <strong>WuWa-VR-Launcher.zip</strong>), extract it, and open
+<p><a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">Download the beta ZIP</a> (asset <strong>WuWa-VR-Launcher.zip</strong>), extract it, and open
 <strong>WuWa VR Launcher.exe</strong>. Keep the <code>app</code> and <code>python</code> folders beside it.
 You need your own game, a Windows PC VR headset/runtime, and an Xbox/XInput
 controller connected to the PC. No separate Python installation is needed.</p>
 <h3>Which build?</h3>
-<p>The beta contains one build for <strong>game version 3.7</strong>: <strong>3.7 + far LOD fix · 1 Oct 11:30 BST</strong>,
-tested by the owner in the headset. It ports the HUD, menus, ultimate-camera fix and Same Pass to 3.7,
-and makes far trees and props use the same detail level in both eyes. Its profile starts with
+<p>The beta contains one build for <strong>game version 3.7</strong>: <strong>3.7 + reflection + far lighting fix v2 · 1 Oct 18:17 BST</strong>,
+tested by the owner. It ports the HUD, menus, ultimate-camera fix, Same Pass and the Resonators reflection fix to 3.7,
+and makes far trees, props and far lighting match between the eyes. Its profile starts with
 <strong>Native Stereo Fix and Same Pass on</strong>; the fixes depend on them.
 Your saved settings are retained; use <strong>Reset this build</strong> for supplied defaults.</p>
 <p>Earlier packages (<a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/experimental-2026-09-28-1628">28 Sep experimental</a>,
@@ -709,6 +709,14 @@ automatically apply to another.</p>
 <tr>
 <td>Iuno hair/head, Mornye leg transparency or Lynae effects absent in one eye</td>
 <td>The owner found Native Stereo Fix repaired these materials. Current candidates preserve NSF and add timing repairs. Do not assume the rendering-comparison button restores NSF: both choices disable it; use that comparison&#39;s Restore button.</td>
+</tr>
+<tr>
+<td>Far objects look darker or flatter in one eye</td>
+<td>Fixed in the 1 Oct 18:17 beta: the game&#39;s lighting volume is refilled once for both eyes after the game starts, after loading screens and after teleports (a short hitch). If it recurs, use WuWa Controls → Refill far lighting now and report where it happened.</td>
+</tr>
+<tr>
+<td>Character reflection in the wrong place on the Resonators or team screen</td>
+<td>Fixed in the 1 Oct 18:17 beta for both screens. Weapon and Echo submenus still pause or misplace the reflection; deferred.</td>
 </tr>
 <tr>
 <td>One eye has static foliage, different prop detail, visibility or lighting</td>

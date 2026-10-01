@@ -971,8 +971,8 @@ def main() -> int:
                              help="Select an already running runtime; never switches or starts one")
     bench = commands.add_parser("bench", help="Fix bench: open a timed construct_mode (1..3) or target_swap window and exit")
     bench.add_argument("--pid", type=int, required=True)
-    bench.add_argument("--op", choices=("construct_mode", "target_swap", "eye_swap"), required=True)
-    bench.add_argument("--mode", type=int, default=0, choices=range(0, 4))
+    bench.add_argument("--op", choices=("construct_mode", "target_swap", "eye_swap", "second_eye", "lod_sync"), required=True)
+    bench.add_argument("--mode", type=int, default=0, choices=range(0, 5))
     bench.add_argument("--seconds", type=int, required=True, choices=range(0, 61), metavar="0..60")
     swap_window = commands.add_parser("state-swap", help="Diagnostic: open (1..60 s) or end (0) the view-state swap and exit; it expires on its own")
     swap_window.add_argument("--seconds", type=int, required=True, choices=range(0, 61), metavar="0..60")
@@ -1038,7 +1038,8 @@ def main() -> int:
         elif args.command == "shadow-pass":
             result = client.request("shadow_pass", seconds=args.seconds)
         elif args.command == "bench":
-            result = client.request(args.op, seconds=args.seconds, mode=args.mode)["shadow"]
+            reply = client.request(args.op, seconds=args.seconds, mode=args.mode)
+            result = reply.get("second_eye") or reply["shadow"]
         elif args.command == "state-swap":
             result = client.state_swap_window(args.seconds, args.mode)
         elif args.command == "trace":

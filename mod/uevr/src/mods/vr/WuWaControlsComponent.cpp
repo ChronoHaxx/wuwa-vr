@@ -124,7 +124,7 @@ nlohmann::json pose_pair_json(const wuwa_pose_pair::Pair& pair, uint64_t now, bo
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
-    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
@@ -341,15 +341,23 @@ void WuWaControlsComponent::on_draw_experiments() {
                     spdlog::info("[WuWaBench] start mode={} (menu)", wuwa_shadow::swap_mode_names[i]);
                 }
             }
-            static constexpr std::array<const char*, 3> construct_labels{
+            static constexpr std::array<const char*, 4> construct_labels{
                 "Construct left view as primary (pass 2)",
                 "Construct left view as primary, family hidden",
-                "Construct left view with family hidden"};
-            for (int i = 0; i < 3; ++i) {
+                "Construct left view with family hidden",
+                "Construct left view with eye index 0"};
+            for (int i = 0; i < 4; ++i) {
                 if (wuwa_ui::Button(construct_labels[i])) {
                     wuwa_shadow::set_construct(60, i + 1);
                     spdlog::info("[WuWaBench] start construct mode={} (menu)", wuwa_shadow::construct_mode_names[i + 1]);
                 }
+            }
+            if (wuwa_ui::Button("Sync left eye LOD to right eye (fix candidate)")) {
+                wuwa_shadow::set_lod_sync(60);
+                spdlog::info("[WuWaBench] start lod_sync (menu)");
+            }
+            if (wuwa_ui::Button("Build left view like the first eye (K5)")) {
+                if (wuwa_second_eye::set_window(60)) spdlog::info("[WuWaBench] start second_eye (menu)");
             }
             if (wuwa_ui::Button("Swap the eyes' poses and projections (stereo looks inverted)")) {
                 wuwa_shadow::set_eye_swap(60);
@@ -368,6 +376,8 @@ void WuWaControlsComponent::on_draw_experiments() {
                 wuwa_shadow::set_target_swap(0);
                 wuwa_shadow::set_construct(0, 0);
                 wuwa_shadow::set_eye_swap(0);
+                wuwa_second_eye::set_window(0);
+                wuwa_shadow::set_lod_sync(0);
                 spdlog::info("[WuWaBench] stopped (menu)");
             }
             const auto mode = wuwa_shadow::construct_active() ? wuwa_shadow::construct_mode_names[static_cast<size_t>(wuwa_shadow::construct_active())] :
@@ -465,6 +475,8 @@ void WuWaControlsComponent::on_draw_ui() {
         m_camera->value()=m_camera->value()==2 ? 0 : 2;
     wuwa_ui::draw(*m_keep_camera,"Keep camera and head hiding during Alt-Tab / UEVR settings");
     wuwa_ui::TextWrapped("Input still pauses when WuWa loses focus. Real game menus temporarily restore the game camera and character visibility.");
+    wuwa_ui::draw(*m_sync_eye_lod,"Match far-object detail between eyes");
+    wuwa_ui::TextWrapped("Fixes distant trees and props that freeze or look simpler in one eye. The game builds the second eye with a default 90 degree field of view, so it switched far objects to cheaper versions sooner.");
     wuwa_ui::draw(*m_recenter_position,"L3 + A also resets headset position (seated)");
     if (wuwa_ui::Button("Reset headset position and direction now")) recenter(true);
     wuwa_ui::TextWrapped("Simulator Home resets only the simulated headset and preview. Use this reset afterwards to align UEVR's origin. It preserves world scale and camera offsets.");

@@ -157,7 +157,7 @@ template<class Read> Binding binding(uintptr_t rbp, uintptr_t user, uint32_t fra
     return b;
 }
 
-// Native member metadata and 0x24ada230 prove these offsets. That complete
+// Native member metadata and 0x54e5c80 prove these offsets. That complete
 // helper is code-checked before arming. Its pre-epilogue observation has
 // view=r14 and parameters=rbx; StateFrameIndex is not proven initialized there.
 template<class Read> Uniforms uniforms(uintptr_t address, uintptr_t parameters, uint32_t frame_offset,

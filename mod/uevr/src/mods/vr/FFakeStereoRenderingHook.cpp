@@ -66,6 +66,7 @@
 #include "../../utility/WuWaSceneFrame.hpp"
 #include "../../utility/WuWaStereoOrder.hpp"
 #include "../../utility/WuWaStereoBasePose.hpp"
+#include "../../utility/WuWaSecondEyeBuild.hpp"
 
 #include "FFakeStereoRenderingHook.hpp"
 
@@ -3402,6 +3403,32 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
             family_views->count = 0;
         }
     }
+    // K5: record the second view's own state on normal frames; while K5 builds it with
+    // the first eye's pass, put that state back so only the game's early logic changes.
+    std::optional<uintptr_t> k5_state{};
+    if (wuwa_process) {
+        auto* state_slot = reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(init_options) + 0x100);
+        uintptr_t current{};
+        if (wuwa_lgui_probe::detail::read(reinterpret_cast<uintptr_t>(state_slot), current)) {
+            if (!wuwa_second_eye::forcing() && static_cast<int32_t>(init_options_stereo_pass) == 3 && current) {
+                wuwa_second_eye::second_state = current;
+            } else if (wuwa_second_eye::forcing() && wuwa_second_eye::second_state.load() && current != wuwa_second_eye::second_state.load()) {
+                k5_state = current;
+                *state_slot = wuwa_second_eye::second_state.load();
+                ++wuwa_second_eye::state_restored;
+            }
+        }
+    }
+    std::optional<uint32_t> bench_index{};
+    if (bench_construct == 4) {
+        // Only rewrite the per-eye index when it holds the second eye's 1.
+        auto* index = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(init_options) + wuwa_shadow::init_eye_index_offset);
+        uint32_t value{};
+        if (wuwa_lgui_probe::detail::read(reinterpret_cast<uintptr_t>(index), value) && value == 1) {
+            bench_index = value;
+            *index = 0;
+        }
+    }
     if (bench_construct) ++wuwa_shadow::construct_applied;
     auto result = g_hook->m_sceneview_data.constructor_hook.unsafe_call<sdk::FSceneView*>(view, init_options, a3, a4);
     if (bench_count.has_value()) {
@@ -3410,6 +3437,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
         if (family_views != nullptr) family_views->count = bench_count.value();
     }
     if (bench_pass.has_value()) init_options->set_stereo_pass(static_cast<EStereoscopicPass>(bench_pass.value()));
+    if (k5_state.has_value()) {
+        *reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(init_options) + 0x100) = k5_state.value();
+    }
+    if (bench_index.has_value()) {
+        *reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(init_options) + wuwa_shadow::init_eye_index_offset) = bench_index.value();
+    }
     if(pose_draw && wuwa_process && wuwa_motion::active()) {
         const auto last_error=GetLastError();
         pose_draw->constructor_output(pose_constructor,true,reinterpret_cast<uintptr_t>(result),
@@ -3617,6 +3650,9 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     // the two main views exchange state pointers for this pair and get them back
     // when this function returns. Built before the LOD probe's first snapshot so
     // every probe phase and both submissions see one assignment.
+    // LOD sync fix candidate: the second view takes the first view's LOD distance
+    // factor and FOV, so both eyes choose the same far LODs.
+    if (prev_count == 2) wuwa_shadow::lod_sync(vr->get_wuwa_controls().sync_eye_lod(), view_family, views[0], views[1], prev_count);
     wuwa_shadow::StateSwapScope state_swap{view_family,
         prev_count == 2 ? views[0] : nullptr, prev_count == 2 ? views[1] : nullptr, prev_count};
     const auto lod_pair = prev_count == 2 ? wuwa_lod_probe::pair(view_family,
@@ -5218,6 +5254,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
     const auto is_full_pass = view_index == 0 && !index_was_ever_two && !index_was_ever_negative && !g_hook->m_has_double_precision;
 
     auto true_index = index_starts_from_one ? ((view_index + 1) % 2) : (view_index % 2);
+    // K5: the second eye is being built with the first eye's pass; keep its own (left) pose.
+    if (wuwa_second_eye::forcing() && !is_full_pass) true_index = 0;
     const auto has_double_precision = g_hook->m_has_double_precision;
     const auto rot_d = (Rotator<double>*)view_rotation;
 
@@ -5651,6 +5689,7 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
         if (vr->is_using_afr()) {
             true_index = g_frame_count % 2;
         }
+        if (wuwa_second_eye::forcing() && view_index != 0) true_index = 0;   // K5: keep the left eye's projection
         // Diagnostic E6: the projection follows the swapped eye pose.
         if (wuwa_test::is_wuwa() && VR::get()->is_native_stereo_fix_enabled() && view_index != 0 &&
             wuwa_shadow::eye_swap_active()) {

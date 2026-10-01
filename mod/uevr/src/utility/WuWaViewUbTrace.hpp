@@ -11,16 +11,16 @@
 // No hook installation, game-memory writes, allocation, logging or file I/O.
 namespace wuwa_view_ub_trace {
 using wuwa_lod::Field;
-inline constexpr uint32_t payload_size = 0x16f0;
+inline constexpr uint32_t payload_size = 0x1740;
 // The shared holder's second resource is InstancedView, not another View.
 // Native metadata initializer 20205660 registers its 0x1200-byte layout.
 inline constexpr uint32_t instanced_payload_size = 0x1200;
 inline constexpr std::array<wuwa_code_compatibility::Range, 2> code_ranges{{
-    {0x235ebe60, 546, 0xe4147aa69e8eb2c2ULL},
-    {0x2360baf0, 920, 0x1bba5ef2bca2e877ULL}}};
+    {0x3f970c0, 546, 0x55662f443a9bf45fULL},
+    {0x3faf5e0, 920, 0x956cb697ba839be3ULL}}};
 
 enum class Stage : uint8_t { cache_decision, shared_update_returned_before_cache_store, own_update_returned };
-inline constexpr std::array<uint32_t, 3> site_rvas{0x235ebff1, 0x235ec05f, 0x2360bd66};
+inline constexpr std::array<uint32_t, 3> site_rvas{0x3f97251, 0x3f972bf, 0x3faf856};
 enum class Decision : uint8_t { unknown, would_skip, would_update };
 enum class Result : uint8_t { recorded, filtered, invalid, busy, watch_full, sink_full, exception, stopped };
 struct Registers { uintptr_t rbp{}, rbx{}, rdi{}, r14{}; };
@@ -56,8 +56,8 @@ struct Payload {
     // Wind-distance gates use WorldCameraOrigin independently of clip matrices.
     Field<std::array<float,3>> world_camera_origin{}, pre_view_translation{}; // +0x430/+0x460
     Field<std::array<float,3>> previous_world_camera_origin{}, previous_pre_view_translation{}; // +0x730/+0x750
-    Field<std::array<float,3>> origin_location{}; // +0x16b0, world-origin shift
-    Field<uint32_t> force_draw_all_velocities_bits{}, kuro_is_planar_reflection_view_bits{}; // +0xa00/+0x1310
+    Field<std::array<float,3>> origin_location{}; // +0x1700, world-origin shift
+    Field<uint32_t> force_draw_all_velocities_bits{}, kuro_is_planar_reflection_view_bits{}; // +0xa00/+0x1340
     bool clock_fields_consistent{};
 };
 struct Record {
@@ -113,7 +113,7 @@ template<class Read> Identity identity(uintptr_t view, uint32_t frame_offset, Re
     wuwa_lod::field(read, view, 0, i.family);
     wuwa_lod::field(read, view, 8, i.state);
     wuwa_lod::field(read, view, 0x10, i.own_ub);
-    wuwa_lod::field(read, view, 0x1e50, i.payload);
+    wuwa_lod::field(read, view, 0x1e90, i.payload);
     wuwa_lod::field(read, view, 0xc90, i.pass);
     if (frame_offset == 0x64 && i.family.valid)
         wuwa_lod::field(read, i.family.value, frame_offset, i.frame);
@@ -160,8 +160,8 @@ template<class Read> Payload payload(uintptr_t address, Read& read) {
         extract(0x0c0,p.translated_world_to_view);
         extract(0x430,p.world_camera_origin);extract(0x460,p.pre_view_translation);
         extract(0x730,p.previous_world_camera_origin);extract(0x750,p.previous_pre_view_translation);
-        extract(0x16b0,p.origin_location);
-        extract(0xa00,p.force_draw_all_velocities_bits);extract(0x1310,p.kuro_is_planar_reflection_view_bits);
+        extract(0x1700,p.origin_location);
+        extract(0xa00,p.force_draw_all_velocities_bits);extract(0x1340,p.kuro_is_planar_reflection_view_bits);
     }
     Field<std::array<uint32_t,2>> previous{};
     Field<std::array<uint32_t,3>> current{};

@@ -12,6 +12,7 @@
 #include "WuWaInputTrace.hpp"
 #include "WuWaInputSequenceBridge.hpp"
 #include "WuWaShadowPass.hpp"
+#include "WuWaSecondEyeBuild.hpp"
 #include "WuWaMotionTrace.hpp"
 #include "WuWaBooleanCVar.hpp"
 #include "WuWaPlanarCVar.hpp"
@@ -437,9 +438,23 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             // Fix bench: construct WuWa's secondary view differently for 0..60 s (0 ends it).
             const auto seconds = request.value("seconds", 0);
             const auto mode = request.value("mode", 0);
-            if (seconds < 0 || seconds > 60 || mode < 0 || mode > 3) throw std::runtime_error("construct_mode needs seconds 0..60 and mode 0..3");
+            if (seconds < 0 || seconds > 60 || mode < 0 || mode > 4) throw std::runtime_error("construct_mode needs seconds 0..60 and mode 0..4");
             wuwa_shadow::set_construct(seconds, mode);
             spdlog::info("[WuWaBench] construct mode {} for {} s (control)", wuwa_shadow::construct_mode_names[static_cast<size_t>(wuwa_shadow::construct_active())], seconds);
+            reply["shadow"] = wuwa_shadow::status();
+        } else if (op == "lod_sync") {
+            const auto seconds = request.value("seconds", 0);
+            if (seconds < 0 || seconds > 60) throw std::runtime_error("lod_sync needs seconds 0..60");
+            wuwa_shadow::set_lod_sync(seconds);
+            spdlog::info("[WuWaBench] LOD sync for {} s (control)", seconds);
+            reply["shadow"] = wuwa_shadow::status();
+        } else if (op == "second_eye") {
+            const auto seconds = request.value("seconds", 0);
+            if (seconds < 0 || seconds > 60) throw std::runtime_error("second_eye needs seconds 0..60");
+            if (!wuwa_second_eye::set_window(seconds)) throw std::runtime_error("K5 unavailable: CalcSceneView did not match this build");
+            spdlog::info("[WuWaBench] second eye built as first for {} s (control)", seconds);
+            reply["second_eye"] = {{"active", wuwa_second_eye::active()}, {"applied", wuwa_second_eye::applied.load()},
+                {"state_restored", wuwa_second_eye::state_restored.load()}, {"install", wuwa_second_eye::install_result.load()}};
             reply["shadow"] = wuwa_shadow::status();
         } else if (op == "eye_swap") {
             const auto seconds = request.value("seconds", 0);

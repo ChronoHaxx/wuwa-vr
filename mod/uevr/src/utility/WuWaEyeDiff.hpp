@@ -79,14 +79,14 @@ void compare(Region<Capacity>& region, uintptr_t first, uintptr_t second,
 }
 
 // Extents. The game-thread FSceneView is proven readable through +0x1002 (the
-// mode bytes the pair snapshot already reads); +0x1e40 is where the next
+// mode bytes the pair snapshot already reads); +0x1e80 (3.7; +0x1e40 before) is where the next
 // verified structure begins, so deltas above +0x1004 may be neighbouring heap
 // if the view is shorter. Ascending order keeps verified-extent deltas first.
 // The view-state extent is UNKNOWN: the window is deliberately wide because the
 // engine's per-eye LOD, fade and HLOD history lives in this object at an offset
 // this build has not established. Expect pointer noise; interpret only dwords
 // that stay non-pointer-like across many samples.
-inline constexpr uint32_t view_end = 0x1e40, state_end = 0x4000;
+inline constexpr uint32_t view_end = 0x1e80, state_end = 0x4000;
 inline constexpr uint32_t view_verified_end = 0x1004;
 inline constexpr size_t view_capacity = 384, state_capacity = 1536, ring_capacity = 128;
 

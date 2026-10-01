@@ -14,17 +14,17 @@ using wuwa_lod::Field;
 // Do not hook the three-byte call at b35: a five-byte jump there overwrites
 // b38, which is an incoming branch target for both native null checks.
 // This single five-byte store ends before the call and that shared join.
-constexpr uint32_t site_rva=0x23670b30, hook_revision=2;
+constexpr uint32_t site_rva=0x400edc0, hook_revision=2;
 constexpr std::array<uint8_t,5> site_bytes{0x4c,0x89,0x6c,0x24,0x20};
 inline bool valid_hook_span(std::span<const uint8_t> bytes) noexcept {
     return bytes.size()==site_bytes.size() && std::equal(bytes.begin(),bytes.end(),site_bytes.begin());
 }
 constexpr size_t max_resources=32, capacity=2048;
 constexpr std::array<wuwa_code_compatibility::Range,4> code_ranges{{
-    {0x23670a70,1308,0x0737958ccad5f668ULL},
-    {0x20a07340,564,0xca5c53ca57884fc3ULL},
-    {0x232eec30,741,0xa826ac16f6c4c6dbULL},
-    {0x23e737e0,610,0x0e2f1b5d5841171cULL}}};
+    {0x400ed00,1308,0x4de252864e0381c6ULL},
+    {0x115dd30,564,0x753322f75cf58070ULL},
+    {0x3c3d0c0,741,0xc5f5b5b0f1d79611ULL},
+    {0x486a520,610,0x5f5e712754fe83f3ULL}}};
 struct Registers {uintptr_t rsp{},rcx{},rdx{},r8{},r9{},r10{},r13{},r14{},rdi{},rsi{};};
 struct Resource {
     Field<uint16_t> slot{},parameter_size{};
@@ -79,8 +79,8 @@ template<class Read> Record snapshot(const Registers& c,uint32_t frame_offset,
     get(read,r.bindings.value,0x10,r.binding_data);
     get(read,r.binding_layout.value,8,r.layout_count);
     get(read,r.shader,0x98,r.name_count);get(read,r.shader,0xd8,r.collection_count);
-    get(read,image_base,0x37fbb6bc,r.tracking_enabled);
-    Field<uintptr_t> registry{};get(read,image_base,0x37c9afa8,registry);
+    get(read,image_base,0x9a8c5c8,r.tracking_enabled);
+    Field<uintptr_t> registry{};get(read,image_base,0x9610488,registry);
     const auto layout=array_pointer(r.binding_layout.value,read);
     const auto names=array_pointer(r.shader+0x90,read);
     const auto name_slots=array_pointer(r.shader+0xa0,read);
@@ -131,7 +131,7 @@ template<class Read> Record snapshot(const Registers& c,uint32_t frame_offset,
             // Validate both the pair and registry base after those reads.
             const auto offset=16*(b.raw_entry.value&0xffff);
             Field<uintptr_t> end_registry{},end_object{};Field<uint64_t> end_generation{};
-            get(read,image_base,0x37c9afa8,end_registry);
+            get(read,image_base,0x9610488,end_registry);
             get(read,registry.value,offset,end_object);
             get(read,registry.value,offset+8,end_generation);
             registry_consistent=wuwa_view_ub_trace::same(registry,end_registry) &&
@@ -150,7 +150,7 @@ template<class Read> Record snapshot(const Registers& c,uint32_t frame_offset,
     r.view_after=wuwa_view_ub_trace::identity(c.r9,frame_offset,read);
     Field<uintptr_t> end_layout{},end_data{};Field<uint8_t> end_mode{};Field<uint32_t> end_tracking{};
     get(read,r.bindings.value,0,end_layout);get(read,r.bindings.value,0x10,end_data);
-    get(read,r.bindings.value,8,end_mode);get(read,image_base,0x37fbb6bc,end_tracking);
+    get(read,r.bindings.value,8,end_mode);get(read,image_base,0x9a8c5c8,end_tracking);
     r.anchors_consistent=wuwa_view_ub_trace::consistent(r.view,r.view_after) &&
         wuwa_view_ub_trace::same(r.binding_layout,end_layout) && wuwa_view_ub_trace::same(r.binding_data,end_data) &&
         wuwa_view_ub_trace::same(r.binding_mode,end_mode) && wuwa_view_ub_trace::same(r.tracking_enabled,end_tracking);

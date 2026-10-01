@@ -94,6 +94,18 @@ inline bool write_field(uintptr_t address, uint32_t value) {
 }
 
 // The constructor-proven view-state pointer (init+0x100 -> view+0x8), aligned.
+// Fix candidate: the game builds the second eye's view with the default 90 degree FOV,
+// so its LOD distance factor is FOV/90 = 1.0 where the first eye's is the game camera's
+// (75.27/90 = 0.836 at the time of the 1 Oct capture). The second eye then drops to
+// cheaper, non-animated LODs at a shorter distance. Copy the first view's LOD distance
+// factor and FOV fields into the second view before either submission. 3.7 offsets.
+inline constexpr std::array<uint32_t, 6> lod_sync_offsets{0x2b8, 0x2d0, 0x2d4, 0xca4, 0xca8, 0xfd8};
+inline std::atomic<uint64_t> lod_sync_until{}, lod_sync_applied{}, lod_sync_failed{};
+inline bool lod_sync_active() { return GetTickCount64() < lod_sync_until.load(); }
+inline void set_lod_sync(int seconds) {
+    lod_sync_until = seconds > 0 ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
+}
+
 inline bool read_pointer(uintptr_t address, uintptr_t& value) {
     return (address & 7) == 0 && checked::read(address, value);
 }
@@ -128,10 +140,13 @@ inline void set_eye_swap(int seconds) {
     eye_swap_until = seconds > 0 ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
 }
 inline std::atomic<int> construct_mode{};
-inline constexpr std::array<const char*, 4> construct_mode_names{"off", "pass2", "pass2_hidden", "hidden"};
+// 4: the secondary view's per-eye index (init +0x114 -> view +0x2ec, 0/1 per eye on 3.7) is
+// constructed as 0, like the first eye; the pass is left alone.
+inline constexpr std::array<const char*, 5> construct_mode_names{"off", "pass2", "pass2_hidden", "hidden", "index0"};
+inline constexpr uint32_t init_eye_index_offset = 0x114;
 inline int construct_active() { return GetTickCount64() < construct_until.load() ? construct_mode.load() : 0; }
 inline void set_construct(int seconds, int mode) {
-    construct_mode = mode >= 1 && mode <= 3 ? mode : 0;
+    construct_mode = mode >= 1 && mode <= 4 ? mode : 0;
     construct_until = seconds > 0 && construct_mode.load() ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
 }
 
@@ -202,6 +217,8 @@ inline nlohmann::json status() {
         {"construct_mode", construct_mode_names[static_cast<size_t>(construct_active())]},
         {"construct_applied", construct_applied.load()},
         {"eye_swap_active", eye_swap_active()}, {"eye_swap_applied", eye_swap_applied.load()},
+        {"lod_sync_active", lod_sync_active()}, {"lod_sync_applied", lod_sync_applied.load()},
+        {"lod_sync_failed", lod_sync_failed.load()},
         {"state_swap_applied", swap_applied.load()}, {"state_swap_restored", swap_restored.load()},
         {"state_swap_skipped", swap_skipped.load()}};
 }
@@ -345,6 +362,20 @@ private:
     std::array<bool, 2> touched{};
     bool complete{};
 };
+
+// Copies the LOD inputs of the main pair's first view into the second. Only for the
+// verified main pair (first pass 2, second 3 or 2). Each write is read back.
+inline void lod_sync(bool enabled, const void* family, void* first, void* second, int32_t count) {
+    if ((!enabled && !lod_sync_active()) || !compatible() || faulted.load() || count != 2 || !family || !first || !second) return;
+    const auto a = reinterpret_cast<uintptr_t>(first), b = reinterpret_cast<uintptr_t>(second);
+    uint32_t pa{}, pb{};
+    if (!checked::read_field(a, 0xc90, pa) || !checked::read_field(b, 0xc90, pb) || pa != 2 || (pb != 3 && pb != 2)) return;
+    for (const auto offset : lod_sync_offsets) {
+        uint32_t value{};
+        if (!checked::read_field(a, offset, value) || !write_field(b + offset, value)) { ++lod_sync_failed; return; }
+    }
+    ++lod_sync_applied;
+}
 
 // Diagnostic only, opened by the WuWa test control `state_swap` for at most 60
 // seconds; inert otherwise. For one verified main pair, the two views exchange

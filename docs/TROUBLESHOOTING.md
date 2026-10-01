@@ -1,8 +1,11 @@
 # Known issues and recovery
 
-Status: September 26, 2026. Keep the selected build name, timestamp and backend
-hash with a report. A result against one checkpoint does not automatically
-apply to another.
+Status: October 1, 2026. The current public build is **3.7 + far LOD fix ·
+1 Oct 11:30 BST** (beta, game version 3.7). It keeps the controls, HUD and camera
+features of the earlier builds; the candidate times below refer to the
+checkpoints in [CHECKPOINTS.md](CHECKPOINTS.md). Keep the selected build
+name, timestamp and backend hash with a report. A result against one checkpoint
+does not automatically apply to another.
 
 | Symptom | What to do / current finding |
 | --- | --- |
@@ -12,15 +15,16 @@ apply to another.
 | The game starts, but not in VR | Check the launcher shows your headset software as the OpenXR runtime and that it was running first. Unicode paths passed launcher/profile tests, but real injector startup from them is untested; use a simple path such as `C:\Games\WuWa VR` for that comparison. |
 | Use headset does not select SteamVR | It restores the runtime saved before enabling the simulator, which may be Virtual Desktop. For the grouped Steam Link/SteamVR test, select SteamVR as the active OpenXR runtime through its settings. |
 | Windows permission prompt was declined or missed | Nothing was started. Close any waiting injector from the taskbar, then choose **Apply & launch** again. |
-| Esc is blurred but its buttons are gone | Show game UI with L3+B. In the 23:31 candidate, the red notice is based on the game's menu/cursor signal; Show game UI now is also in WuWa Controls. |
+| Esc is blurred but its buttons are gone | Show game UI with L3+B. In the current build (as in the 24 Sep 23:31 candidate), the red notice is based on the game's menu/cursor signal; Show game UI now is also in WuWa Controls. |
 | LB+Y fails after Alt-Tab | Close UEVR, release all buttons and return focus to WuWa. Forward Windows focus events helped in the user's later tests, but a universal fix is not confirmed. Test this separately from first-person grapple aiming. |
-| L3+LB does nothing | Use the 23:00+ candidate, enable Xbox mouse shortcuts, and disable Physical gamepad passthrough. Saved preferences can have mouse shortcuts off. Release all buttons after the chord. |
+| L3+LB does nothing | The current build includes it. Enable Xbox mouse shortcuts and disable Physical gamepad passthrough. Saved preferences can have mouse shortcuts off. Release all buttons after the chord. |
 | Menu bumpers/triggers do the wrong thing | Exit HUD/mouse adjustment with L3+LB. Leave automatic mouse in game menus off for native menu navigation. |
-| SteamVR periodically stutters | Keep Native Stereo Fix off; the user reproduced stutter with that checkbox on. This does not establish every possible streaming/GPU cause. |
-| An older build crashes with menu extraction + Native Stereo Fix | Do not repeat that combination. Use the preserved current menu route with Native Stereo Fix off. |
-| NPC name or speech bubble visible in one eye | The 19:04 and 20:11 candidates add a guarded per-eye label pass. It has not been verified in game. Unknown target layouts are left unchanged; this is still an open rendering issue. |
-| Two reflections per eye in character/Echo previews | Open rendering issue in the scene layer. Planar and SSR CVars were already zero in a measured session; turning them off again is not a demonstrated solution. |
-| Iuno hair/head, Mornye leg transparency or Lynae effects absent in one eye | Open stereo-material defects. The reported head-following preview reflections are tracked separately; a shared shader cause has not been established. |
+| SteamVR periodically stutters | The 3.7 build needs Native Stereo Fix on. On the previous game version the user reproduced stutter with it on; the owner's 1 Oct SteamVR test of the 3.7 build was near perfect apart from a far lighting difference. If it stutters, record the build and headset software. |
+| An older build crashes with menu extraction + Native Stereo Fix | Applies to builds for the previous game version: do not repeat that combination there. The 3.7 build's menu route runs with Native Stereo Fix on. |
+| NPC name or speech bubble visible in one eye | Not seen by the owner in 3.7 testing (1 Oct): NPC names and enemy health labels looked correct. Report it with the build name if it appears. |
+| Resonators / team-screen reflection sits in the wrong place in each eye | Open. The game rebuilds the mirror camera with a centred projection, so in a headset each eye's reflection slides outward and is too large. A per-eye projection fix is ported to 3.7 and in testing. |
+| Far objects look differently lit or fogged in each eye | Open, 3.7. Up close both eyes match. The second eye's view is built with different camera settings; the far trees/props part of this is fixed (LOD), the lighting/fog part is being tested. |
+| Iuno hair/head, Mornye leg transparency or Lynae effects absent in one eye | On 27 Sep the owner found Native Stereo Fix on repaired the affected character materials; the 3.7 build runs with it on. Report it with the character and build name if it recurs. |
 | Full head shadow only works after toggling per character | Automatic retries and reused-component recovery are included. The owner reported the 15:39 head-bones/full-shadow mode working; it is the supplied default in 17:30 and later. If it recurs, record the character/build and check the active-copy status. |
 | Buttons unexpectedly move the mouse or HUD | L3 + LB exits manual adjustment; release all controls. The control-recovery candidate has an always-visible amber notice and an Exit mouse mode now button above its settings. |
 | First-person torso appears during sprint/wing flight | The owner reported improved tracking with Animated position + stick pitch; later candidates preserve that path. Full-animation offsets have additional component-tested repairs. Physical headset displacement or some animations can still expose the torso. |

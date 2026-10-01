@@ -1,12 +1,13 @@
 # Releases
 
-[GitHub Releases](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213) hosts the complete portable beta and matching source.
+[GitHub Releases](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01) hosts the complete portable beta and matching source.
 Download **WuWa-VR-Launcher.zip** for play; source is a separate download for
 contributors. Checksums and a short START-HERE file sit beside them.
 
-The current beta uses the owner-played 26 Sep 23:02 build. Its native binaries
-and profile are unchanged; old comparison builds are excluded from the main
-download. Experimental rendering issues remain documented.
+The current beta (1 Oct, game version 3.7) contains one owner-tested build,
+**3.7 + far LOD fix · 1 Oct 11:30 BST**. `dev/package-beta.py` makes such a
+one-build package from the local test package and regenerates its manifest and
+checksums. Experimental rendering issues remain documented.
 
 Use a new timestamped release for each checkpoint. Keep native source, profile,
 notices and hashes paired. Verify the ZIP, launch wrapper and source patches.

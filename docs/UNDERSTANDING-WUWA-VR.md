@@ -50,6 +50,8 @@ Both eyes need the **same instant of game state**, with deliberately different e
 | 28 Sep afternoon | Agent-controlled menu navigation reached a character trial. Y activated a skill, not an ultimate. The older automation bridge lacked triggers. | Real controller automation works, but that skill clip cannot count as an ultimate test. |
 | 28 Sep, 16:00–16:28 | Added bounded LT/RT input and a dormant read-only asset inventory; compiled, packaged, saved source and checked the launcher. | The next tests can be performed by the agent after a restart. These are tools, not another claimed foliage fix. |
 | 28 Sep afternoon | Reproduced the same tree moving in both eyes nearby, then left-static/right-moving farther away, even during a zero-IPD retreat. | A repeatable distance-dependent failure. Ordinary eye spacing alone does not explain it. |
+| 29–30 Sep | Diagnostic builds swapped view states, render targets, construction pass, eye index and eye pose between the eyes. Game patch 3.7 then broke the HUD; the HUD, menus, ultimate-camera fix and Same Pass were ported to 3.7 by matching the old code's bytes in the new game. | Each test ruled out one cause of the far-tree freeze. The 3.7 HUD, menus and camera fix were confirmed by the owner. |
+| 1 Oct | A full field-by-field diff of the two eye views showed the second eye built with the default 90° FOV, so its LOD distance factor was 1.0 instead of 0.836. The second eye now copies the first eye's LOD factor and FOV before rendering. | **Far foliage/prop mismatch fixed**: measured in the simulator (left-eye canopy motion 2% → 67%) and confirmed in the headset. Still open: far lighting/fog differences between the eyes and the Resonators reflection. |
 
 ## What works, what remains open
 
@@ -57,9 +59,13 @@ Both eyes need the **same instant of game state**, with deliberately different e
 
 **Headset-confirmed on 28 Sep:** the end-of-ultimate camera mismatch is fixed for the owner’s tested cases. This is user acceptance, not a claim that every character or transition has been exhaustively tested.
 
-**Still open:** foliage/prop representation and animation disagreements, some lighting/shadows, and the deferred reflection submenus. No universal all-prop repair has been demonstrated. New trigger input and nearby-asset inventory are not yet accepted in the live game. The 16:28 package should not be described as fixing these defects.
+**Fixed on 1 Oct (game 3.7):** far trees and props now use the same detail level in both eyes; see the next section for the cause.
 
-## Why a tree can look frozen in one eye
+**Still open:** far objects lit or fogged differently in each eye (they match up close), the Resonators / team-screen reflection position, and the deferred reflection submenus.
+
+## Why a tree looked frozen in one eye
+
+**Answer (1 Oct):** the game built the second eye's view with the default 90° FOV instead of the camera's 75°, so its LOD distance factor was 1.0 instead of 0.836. Far objects counted as further away in that eye and switched to cheaper, non-animated detail levels sooner. Near, both eyes animated; very far, both froze; in between, only one eye froze. The fix copies the first eye's LOD factor and FOV into the second view before rendering. The background below is how the investigation got there.
 
 A distant tree may use a cheaper mesh, a flat impostor, different shader code, or a distance-based wind cutoff. Wind often moves vertices in the shader; the object's CPU transform can stay still. Therefore a static object transform does not prove a frozen animation clock.
 

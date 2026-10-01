@@ -1,9 +1,4 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Contributors and component-specific licensing."><meta name="theme-color" content="#17191c"><title>Credits — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Credits</h1><div class="guide-content"><p>The independent clean-video recorder uses Valve&#39;s OpenVR public mirror API,
-Microsoft Windows Media Foundation and nlohmann/json. The private package carries
-OpenVR and nlohmann/json notices. Camera/controller telemetry comes from the
-modified backend and is stored separately from the footage. Recording does not
-grant redistribution rights over captured game assets or player identifiers.</p>
-<p>This project brings existing community work together with local WuWa fixes and
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Contributors and component-specific licensing."><meta name="theme-color" content="#17191c"><title>Credits — WuWa VR</title><link rel="alternate" hreflang="en" href="https://chronohaxx.github.io/wuwa-vr/credits.html"><link rel="alternate" hreflang="zh-Hans" href="https://chronohaxx.github.io/wuwa-vr/l/zh-Hans/credits.html"><link rel="alternate" hreflang="ja" href="https://chronohaxx.github.io/wuwa-vr/l/ja/credits.html"><link rel="alternate" hreflang="ko" href="https://chronohaxx.github.io/wuwa-vr/l/ko/credits.html"><link rel="alternate" hreflang="es" href="https://chronohaxx.github.io/wuwa-vr/l/es/credits.html"><link rel="alternate" hreflang="pt-BR" href="https://chronohaxx.github.io/wuwa-vr/l/pt-BR/credits.html"><link rel="alternate" hreflang="fr" href="https://chronohaxx.github.io/wuwa-vr/l/fr/credits.html"><link rel="alternate" hreflang="de" href="https://chronohaxx.github.io/wuwa-vr/l/de/credits.html"><link rel="alternate" hreflang="ru" href="https://chronohaxx.github.io/wuwa-vr/l/ru/credits.html"><link rel="alternate" hreflang="ar" href="https://chronohaxx.github.io/wuwa-vr/l/ar/credits.html"><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Site"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav><details class="language-picker"><summary>Language / 语言 / اللغة</summary><nav aria-label="Languages"><a href="credits.html" lang="en" hreflang="en" dir="ltr" data-language="en">English</a><a href="l/zh-Hans/credits.html" lang="zh-Hans" hreflang="zh-Hans" dir="ltr" data-language="zh-Hans">简体中文</a><a href="l/ja/credits.html" lang="ja" hreflang="ja" dir="ltr" data-language="ja">日本語</a><a href="l/ko/credits.html" lang="ko" hreflang="ko" dir="ltr" data-language="ko">한국어</a><a href="l/es/credits.html" lang="es" hreflang="es" dir="ltr" data-language="es">Español</a><a href="l/pt-BR/credits.html" lang="pt-BR" hreflang="pt-BR" dir="ltr" data-language="pt-BR">Português (Brasil)</a><a href="l/fr/credits.html" lang="fr" hreflang="fr" dir="ltr" data-language="fr">Français</a><a href="l/de/credits.html" lang="de" hreflang="de" dir="ltr" data-language="de">Deutsch</a><a href="l/ru/credits.html" lang="ru" hreflang="ru" dir="ltr" data-language="ru">Русский</a><a href="l/ar/credits.html" lang="ar" hreflang="ar" dir="rtl" data-language="ar">العربية</a></nav></details></header><main class="wrap" id="main"><h1>Credits</h1><div class="guide-content"><p>This project brings existing community work together with local WuWa fixes and
 testing. Credit does not imply endorsement, partnership or permission to
 redistribute another project&#39;s files.</p>
 <div class="table-scroll"><table>
@@ -58,10 +53,9 @@ redistribute another project&#39;s files.</p>
 <td>Project direction, integration, game/headset testing and this workspace&#39;s controls, HUD, camera, diagnostic and packaging changes.</td>
 </tr>
 </tbody></table></div>
-<h3>Tools and artwork</h3>
-<p>Development uses AI-assisted coding with Codex and Claude (reviews, and the
-September 25 launcher package and website work), alongside human testing.
-Model output and passing checks do not replace live acceptance. The Xbox-style controller illustration was generated using image
+<h2>Tools and artwork</h2>
+<p>Development uses AI-assisted coding (Codex and Claude) alongside human testing
+in the game and headset. The Xbox-style controller illustration was generated using image
 generation; button placement was visually checked and shortcut labels are
 rendered by code. Xbox is a Microsoft trademark; the diagram is not an official
 Microsoft product asset or endorsement.</p>
@@ -72,10 +66,12 @@ content and trademarks remain with their respective owners, including Kuro
 Games. No game files or extracted meshes/textures are included in the site.
 The launcher-page image is an actual render of the local launcher in a sample
 state, not a game capture.</p>
-<p>The private launcher package bundles a copy of <a href="https://www.python.org/">CPython</a>
-under the Python Software Foundation licence, plus a small original launcher
-stub. Its <code>notices</code> folder lists every component&#39;s terms.</p>
-<h3>Licenses are component-specific</h3>
+<p>The launcher package bundles a copy of <a href="https://www.python.org/">CPython</a>
+under the Python Software Foundation licence and a small original launcher stub.
+The recorder uses Valve&#39;s OpenVR mirror API, Windows Media Foundation and
+nlohmann/json. Each download&#39;s <code>notices</code> folder lists every component&#39;s terms.
+Recordings do not grant rights over captured game content or player identifiers.</p>
+<h2>Licenses are component-specific</h2>
 <p>This project&#39;s original website, guides and explicitly listed independent
 work use the <a href="license.html">MIT license</a>. Forks and contributions to those parts
 are welcome. Please keep free access and give credit; requests against paid
@@ -87,20 +83,7 @@ The WuWa UI reference checkout has no top-level license file. The local
 OpenXR Simulator checkout has an MIT license, whose notice must accompany
 copies covered by it. Other dependencies have their own notices.</p>
 <p>No blanket license or redistribution permission is inferred from public GitHub
-access, a Discord attachment or this credit list. The website/guide can be
-reviewed separately while binary/source redistribution scope is clarified.
-Original notices are retained in the private recovery kit. See
-<a href="credits.html#distribution">release preparation</a> for the remaining publication work.</p>
-<section id="distribution"><h2>Distribution status</h2><p><a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">GitHub Releases</a> hosts the complete portable beta and matching source.
-Download <strong>WuWa-VR-Launcher.zip</strong> for play; source is a separate download for
-contributors. Checksums and a short START-HERE file sit beside them.</p>
-<p>The current beta (1 Oct, game version 3.7) contains one owner-tested build,
-<strong>3.7 + reflection + far lighting fix v2 · 1 Oct 18:17 BST</strong>. Old comparison builds are excluded
-from the download. Experimental rendering issues remain documented.</p>
-<p>Use a new timestamped release for each checkpoint. Keep native source, profile,
-notices and hashes paired. Verify the ZIP, launch wrapper and source patches.
-Never publish live profiles, logs, account IDs or raw captures by default.
-Respect component license scope; publication does not imply upstream endorsement.</p>
-<p>The website download points at the explicit beta asset. Do not mark an
-experimental build stable just to use GitHub&#39;s latest-stable shortcut.</p>
-</section></div></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>
+access, a Discord attachment or this credit list, and redistribution permission
+for the upstream components has not been formally confirmed. Each download keeps
+every component&#39;s original notices.</p>
+</div></main><footer class="footer wrap"><p>Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information"><a href="developers.html">Code &amp; contribute</a><a href="https://github.com/ChronoHaxx/wuwa-vr">GitHub</a><a href="https://github.com/ChronoHaxx/wuwa-vr/releases">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License</a><a href="support.html">Optional support</a></nav><p class="small">Original website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>

@@ -10,11 +10,11 @@ Copyright (c) 2026 ChronoHaxx. The [MIT license](LICENSES/MIT.md) applies to:
 
 - Original text in `README.md`, `SUPPORT.md`, `CONTRIBUTING.md`, `CREDITS.md`
   and `docs/`, excluding quoted third-party material.
-- Original website HTML, CSS and JavaScript under `site/`, the translated
-  getting-started text, and `site/media/mark.svg`.
+- Original website HTML, CSS and JavaScript under `site/`, the website
+  translations in `dev/i18n/` and `site/l/`, and `site/media/mark.svg`.
 - The original site generators and checks: `dev/build-site.cjs`,
-  `dev/build-community.cjs`, `dev/site-layout.cjs`, `dev/check-site.cjs`,
-  `dev/check-community.cjs`.
+  `dev/site-layout.cjs`, `dev/translate-site.py`, `dev/i18n/merge.py`,
+  `dev/check-site.py`.
 - Original local sharing configuration and its checks:
   `dev/configure-sharing.py` and `dev/test_configure_sharing.py`.
 - The original GitHub issue/PR templates, funding configuration and website

@@ -4,11 +4,10 @@
   "private": true,
   "description": "Development tools for the static WuWa VR guide and community website",
   "scripts": {
-    "build": "node dev/build-site.cjs && node dev/render-understanding.cjs",
-    "check": "node dev/check-site.cjs && node dev/check-community.cjs"
+    "build": "node dev/build-site.cjs && python dev/translate-site.py",
+    "check": "python dev/check-site.py"
   },
   "devDependencies": {
-    "marked": "17.0.5",
-    "playwright": "1.62.1"
+    "marked": "17.0.5"
   }
 }

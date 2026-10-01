@@ -1,11 +1,5 @@
 # Credits and provenance
 
-The independent clean-video recorder uses Valve's OpenVR public mirror API,
-Microsoft Windows Media Foundation and nlohmann/json. The private package carries
-OpenVR and nlohmann/json notices. Camera/controller telemetry comes from the
-modified backend and is stored separately from the footage. Recording does not
-grant redistribution rights over captured game assets or player identifiers.
-
 This project brings existing community work together with local WuWa fixes and
 testing. Credit does not imply endorsement, partnership or permission to
 redistribute another project's files.
@@ -26,9 +20,8 @@ redistribute another project's files.
 
 ## Tools and artwork
 
-Development uses AI-assisted coding with Codex and Claude (reviews, and the
-September 25 launcher package and website work), alongside human testing.
-Model output and passing checks do not replace live acceptance. The Xbox-style controller illustration was generated using image
+Development uses AI-assisted coding (Codex and Claude) alongside human testing
+in the game and headset. The Xbox-style controller illustration was generated using image
 generation; button placement was visually checked and shortcut labels are
 rendered by code. Xbox is a Microsoft trademark; the diagram is not an official
 Microsoft product asset or endorsement.
@@ -41,9 +34,11 @@ Games. No game files or extracted meshes/textures are included in the site.
 The launcher-page image is an actual render of the local launcher in a sample
 state, not a game capture.
 
-The private launcher package bundles a copy of [CPython](https://www.python.org/)
-under the Python Software Foundation licence, plus a small original launcher
-stub. Its `notices` folder lists every component's terms.
+The launcher package bundles a copy of [CPython](https://www.python.org/)
+under the Python Software Foundation licence and a small original launcher stub.
+The recorder uses Valve's OpenVR mirror API, Windows Media Foundation and
+nlohmann/json. Each download's `notices` folder lists every component's terms.
+Recordings do not grant rights over captured game content or player identifiers.
 
 ## Licenses are component-specific
 
@@ -60,7 +55,6 @@ OpenXR Simulator checkout has an MIT license, whose notice must accompany
 copies covered by it. Other dependencies have their own notices.
 
 No blanket license or redistribution permission is inferred from public GitHub
-access, a Discord attachment or this credit list. The website/guide can be
-reviewed separately while binary/source redistribution scope is clarified.
-Original notices are retained in the private recovery kit. See
-[release preparation](docs/RELEASING.md) for the remaining publication work.
+access, a Discord attachment or this credit list, and redistribution permission
+for the upstream components has not been formally confirmed. Each download keeps
+every component's original notices.

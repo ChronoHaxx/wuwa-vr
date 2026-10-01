@@ -1,0 +1,9 @@
+{
+  "updated": "1 October 2026",
+  "game": "3.7",
+  "tag": "beta-2026-10-01-1817",
+  "build": "3.7 + reflection + far lighting fix v2 · 1 Oct 18:17 BST",
+  "label": "1 Oct 18:17 BST",
+  "zipMB": 51,
+  "news": "Far trees, props and lighting now match between the eyes, and the Resonators and team-screen reflections are back in place."
+}

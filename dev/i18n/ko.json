@@ -1,0 +1,566 @@
+{
+ "015d62c750a5a4be": {
+  "en": "Report a bug or request a feature",
+  "t": "버그 신고 또는 기능 요청"
+ },
+ "04f00a61778e1637": {
+  "en": "<strong>Recording</strong> of side-by-side stereo video from the launcher.",
+  "t": "런처에서 좌우 나란히 배치한 입체 영상을 <strong>녹화</strong>."
+ },
+ "07232868ff050d09": {
+  "en": "Launcher step 1, Account risk: the risk notice and a ticked box, I have read the account-risk notice and accept the risk.",
+  "t": "런처 1단계, 계정 위험: 위험 안내와 체크된 '계정 위험 안내를 읽었으며 위험을 감수합니다' 상자."
+ },
+ "0a4470d64e9d3259": {
+  "en": "Skip to content",
+  "t": "본문으로 건너뛰기"
+ },
+ "0acc39ceb6443522": {
+  "en": "Project information",
+  "t": "프로젝트 정보"
+ },
+ "1074648b6d56a1eb": {
+  "en": "<strong>English</strong>",
+  "t": "<strong>English</strong>"
+ },
+ "136c4c9b93a07efa": {
+  "en": "Account risk and disclaimer — WuWa VR",
+  "t": "계정 위험 및 면책 조항 — WuWa VR"
+ },
+ "175ca2b037938a14": {
+  "en": "Free fan-made VR mod for Wuthering Waves on PC headsets: download, controller guide and known issues.",
+  "t": "PC VR 헤드셋용 무료 팬 제작 명조 VR 모드: 다운로드, 컨트롤러 가이드, 알려진 문제."
+ },
+ "1806e990dc4a6f00": {
+  "en": "This draft is too long for a reliable link. Copy it, open GitHub, then paste it into the issue.",
+  "t": "이 초안은 링크로 보내기에 너무 깁니다. 복사한 뒤 GitHub를 열어 이슈에 붙여 넣으세요."
+ },
+ "19c448281159e717": {
+  "en": "Launcher step 3, How do you start the game: the official launcher is selected; Steam/Epic startup is marked experimental.",
+  "t": "런처 3단계, 게임 시작 방법: 공식 런처가 선택되어 있고 Steam/Epic 실행은 실험적으로 표시되어 있습니다."
+ },
+ "1a8d187f4e449218": {
+  "en": "<strong>Español</strong>",
+  "t": "<strong>Español</strong>"
+ },
+ "1acde7f878a6842e": {
+  "en": "<strong>Deutsch</strong>",
+  "t": "<strong>Deutsch</strong>"
+ },
+ "1b0ea0d8ad9a0d46": {
+  "en": "Contribute translations, documentation, accessibility feedback or fixes.",
+  "t": "번역, 문서, 접근성 피드백, 수정으로 기여하기."
+ },
+ "1ceaa4b8399d9447": {
+  "en": "More stereo views",
+  "t": "더 많은 입체 화면"
+ },
+ "1cfe894a626438a1": {
+  "en": "This page has moved.",
+  "t": "이 페이지는 이동되었습니다."
+ },
+ "20e90cef07ee7fa3": {
+  "en": "Maintained in spare time; replies and fixes are not guaranteed. <a href=\"support.html\">Support expectations</a>.",
+  "t": "여가 시간에 관리하므로 답변과 수정은 보장되지 않습니다. <a href=\"support.html\">후원에 관한 안내</a>."
+ },
+ "242fc67c683a3f51": {
+  "en": "Requested language or translation correction (optional)",
+  "t": "요청할 언어 또는 번역 수정 (선택)"
+ },
+ "24f954ca5f71b5ba": {
+  "en": "Build and testing notes now live in the <a href=\"guide.html\">player guide</a> and the <a href=\"understanding.html\">explainer</a>. Every download is listed on <a href=\"https://github.com/ChronoHaxx/wuwa-vr/releases\">GitHub Releases</a>.",
+  "t": "빌드와 테스트 관련 내용은 이제 <a href=\"guide.html\">플레이어 가이드</a>와 <a href=\"understanding.html\">원리 설명</a>에 있습니다. 모든 다운로드는 <a href=\"https://github.com/ChronoHaxx/wuwa-vr/releases\">GitHub Releases</a>에 있습니다."
+ },
+ "255180f5b0eff0e7": {
+  "en": "Nothing here excludes or limits liability or rights where doing so would be unlawful. This disclaimer does not remove rights held by Kuro Games, other rights holders or users under applicable law, nor make unauthorized conduct permitted. It is not a guarantee of legal protection for the authors.",
+  "t": "책임이나 권리를 배제하거나 제한하는 것이 불법인 경우, 여기의 어떤 내용도 그렇게 하지 않습니다. 이 면책 조항은 Kuro Games, 다른 권리자, 사용자가 관련 법률에 따라 가진 권리를 없애지 않으며, 허가되지 않은 행위를 허용하지도 않습니다. 제작자에 대한 법적 보호를 보장하지도 않습니다."
+ },
+ "2a0c100322e56094": {
+  "en": "Open launcher step 1 at full size",
+  "t": "런처 1단계를 크게 보기"
+ },
+ "2b4cf6bcc561ab53": {
+  "en": "Launcher step 2, Choose a build, from an earlier package that contained two builds.",
+  "t": "런처 2단계, 빌드 선택. 빌드 두 개가 들어 있던 이전 패키지의 화면입니다."
+ },
+ "2b7b54308d709cf8": {
+  "en": "The optional 6DOF window during combat. Both eye views; actual headset footage. Recorded 26 September 2026, Quest Pro / SteamVR mirror, on an earlier build.",
+  "t": "전투 중 선택 기능인 6DOF 창. 양쪽 눈 화면, 실제 헤드셋 영상입니다. 2026년 9월 26일 Quest Pro / SteamVR 미러로 이전 빌드에서 녹화."
+ },
+ "2bf3375c357d2d03": {
+  "en": "<strong>Use at your own risk. Account restrictions, suspension or a permanent ban are possible.</strong> This unofficial fan-made modification injects third-party code into the game. It is not approved, endorsed or supported by Kuro Games. We have no confirmation that its use is allowed by the game's anti-cheat or account policies.",
+  "t": "<strong>사용에 따른 위험은 본인이 부담합니다. 계정 제한, 일시 정지 또는 영구 정지가 발생할 수 있습니다.</strong> 이 비공식 팬 제작 수정은 게임에 서드파티 코드를 주입합니다. Kuro Games의 승인, 보증, 지원을 받지 않았습니다. 게임의 안티치트나 계정 정책에서 사용이 허용된다는 확인은 없습니다."
+ },
+ "2c189923921bd8dc": {
+  "en": "Feedback and requests — WuWa VR",
+  "t": "피드백 및 요청 — WuWa VR"
+ },
+ "2c276a65f885945a": {
+  "en": "This is a free, unofficial fan project. Our original independent work uses MIT; each upstream component keeps its own terms.",
+  "t": "무료 비공식 팬 프로젝트입니다. 저희의 원본 독립 작업물에는 MIT가 적용되며, 각 상위 구성 요소는 각자의 조건을 따릅니다."
+ },
+ "2c8cc251eea0e6cb": {
+  "en": "What would you like to send?",
+  "t": "무엇을 보내시겠어요?"
+ },
+ "2c9adc2de40ae989": {
+  "en": "Open launcher step 2 at full size",
+  "t": "런처 2단계를 크게 보기"
+ },
+ "2cf835cd9adc29d8": {
+  "en": "<strong>Français</strong>",
+  "t": "<strong>Français</strong>"
+ },
+ "2d77964df6f2a895": {
+  "en": "WuWa VR — WuWa VR",
+  "t": "WuWa VR — WuWa VR"
+ },
+ "2d83f14c54389db9": {
+  "en": "Select and copy the draft below. Nothing has been submitted.",
+  "t": "아래 초안을 선택해 복사하세요. 아직 아무것도 제출되지 않았습니다."
+ },
+ "2dcc75e494df4b9a": {
+  "en": "<strong>Stereo VR with head tracking</strong>, using the game's own HUD and menus.",
+  "t": "게임 자체의 HUD와 메뉴를 사용하는 <strong>헤드 트래킹 입체 VR</strong>."
+ },
+ "2fb1a4ce7311643c": {
+  "en": "Feedback and requests",
+  "t": "피드백 및 요청"
+ },
+ "305127f7a0acd0aa": {
+  "en": "Free, unofficial fan project. Not affiliated with Kuro Games.",
+  "t": "무료 비공식 팬 프로젝트입니다. Kuro Games와 관련이 없습니다."
+ },
+ "3229609e15436ec5": {
+  "en": "License",
+  "t": "라이선스"
+ },
+ "32b93cdc14d6d12d": {
+  "en": "Start your headset software, then <strong>Apply &amp; launch</strong>. Accept the Windows permission prompt and press Play.",
+  "t": "헤드셋 소프트웨어를 먼저 실행한 뒤 <strong>Apply &amp; launch</strong>를 누릅니다. Windows 권한 요청을 허용하고 '게임 시작'을 누릅니다."
+ },
+ "344853c654f53807": {
+  "en": "Sources checked 25 September 2026. Policies may change or differ by region.",
+  "t": "자료는 2026년 9월 25일에 확인했습니다. 정책은 바뀌거나 지역마다 다를 수 있습니다."
+ },
+ "34bf376bcb8d060a": {
+  "en": "To the extent permitted by applicable law, our original work is provided <strong>as is</strong>, without warranties, including fitness for a particular purpose, compatibility, uninterrupted operation or account safety. Use may also cause crashes, lost settings or VR discomfort. Stop if you feel unwell. Authors and contributors do not promise updates, continued maintenance, individual help or compensation for account restrictions. Each component's precise license and warranty terms still apply; see <a href=\"license.html\">licenses</a>.",
+  "t": "관련 법률이 허용하는 범위에서 저희의 원본 작업물은 <strong>있는 그대로</strong> 제공되며, 특정 목적 적합성, 호환성, 중단 없는 작동, 계정 안전을 포함한 어떠한 보증도 없습니다. 사용 중 충돌, 설정 손실, VR 멀미가 생길 수도 있습니다. 몸이 불편하면 중단하세요. 제작자와 기여자는 업데이트, 지속적인 관리, 개별 도움, 계정 제한에 대한 보상을 약속하지 않습니다. 각 구성 요소의 정확한 라이선스와 보증 조건은 그대로 적용됩니다. <a href=\"license.html\">라이선스</a>를 참고하세요."
+ },
+ "35b3c7892b117e84": {
+  "en": "What happened, or what would help?",
+  "t": "무슨 일이 있었나요? 또는 무엇이 도움이 될까요?"
+ },
+ "394a49d9d0a96ce2": {
+  "en": "Optional support — WuWa VR",
+  "t": "선택적 후원 — WuWa VR"
+ },
+ "3a5d3924a4183a56": {
+  "en": "Open launcher step 4 at full size",
+  "t": "런처 4단계를 크게 보기"
+ },
+ "3a97b562c746072c": {
+  "en": "Account risk &amp; disclaimer",
+  "t": "계정 위험 및 면책 조항"
+ },
+ "3af61905fbbcb5e2": {
+  "en": "Build, headset and runtime (optional)",
+  "t": "빌드, 헤드셋, 런타임 (선택)"
+ },
+ "3c55c36817efec51": {
+  "en": "<strong>New:</strong> Far trees, props and lighting now match between the eyes, and the Resonators and team-screen reflections are back in place.",
+  "t": "<strong>새 소식:</strong> 먼 곳의 나무, 오브젝트, 조명이 이제 양쪽 눈에서 일치하며, 공명자 화면과 편성 화면의 반사도 제자리로 돌아왔습니다."
+ },
+ "3f661067dc184418": {
+  "en": "Report a bug, suggest a feature or request a language, in whichever language you prefer.",
+  "t": "버그 신고, 기능 제안, 언어 요청을 원하는 언어로 보내세요."
+ },
+ "41675778a86f9eab": {
+  "en": "Prepare report",
+  "t": "보고서 준비"
+ },
+ "41c8a7e50a566867": {
+  "en": "Add a short summary and description first.",
+  "t": "먼저 짧은 요약과 설명을 입력하세요."
+ },
+ "4439b97fe91af4ee": {
+  "en": "Support the original authors through links on their own pages.",
+  "t": "원작자들이 자신의 페이지에 올린 링크로 원작자를 후원하기."
+ },
+ "463416e09e88115d": {
+  "en": "Play Wuthering Waves in VR on a PC headset. A free, fan-made mod built on <a href=\"https://uevr.io/\">praydog's UEVR</a>, maintained by ChronoHaxx.",
+  "t": "PC VR 헤드셋으로 명조를 플레이하세요. <a href=\"https://uevr.io/\">praydog의 UEVR</a>을 기반으로 한 무료 팬 제작 모드이며 ChronoHaxx가 관리합니다."
+ },
+ "477b4fca0365f6f5": {
+  "en": "<strong>Xbox controls</strong> with an in-VR shortcut sheet and an adjustable HUD.",
+  "t": "VR 내 단축키 표와 조절 가능한 HUD를 갖춘 <strong>Xbox 컨트롤러 조작</strong>."
+ },
+ "47dc04c4f1b15c27": {
+  "en": "<strong>Optional 6DOF window</strong>, adapted from Elliott Tate's work.",
+  "t": "Elliott Tate의 작업을 바탕으로 한 <strong>선택형 6DOF 창</strong>."
+ },
+ "4bf66f6132eda903": {
+  "en": "No warranty or promise of support",
+  "t": "보증이나 지원 약속 없음"
+ },
+ "4c0824e0981f7f0b": {
+  "en": "The WuWa VR website in ten languages.",
+  "t": "WuWa VR 웹사이트는 10개 언어로 제공됩니다."
+ },
+ "4c3083d4c59130e4": {
+  "en": "Feature or accessibility request",
+  "t": "기능 또는 접근성 요청"
+ },
+ "4ed2589d468400e4": {
+  "en": "Copy report",
+  "t": "보고서 복사"
+ },
+ "4f289d80c790c38c": {
+  "en": "Your draft: review before sharing",
+  "t": "초안: 공유하기 전에 확인하세요"
+ },
+ "4f35228a75042b73": {
+  "en": "License and sharing — WuWa VR",
+  "t": "라이선스와 공유 — WuWa VR"
+ },
+ "51264c4ab12bb6b0": {
+  "en": "Report a bug, suggest a feature or request a language.",
+  "t": "버그 신고, 기능 제안, 언어 요청."
+ },
+ "52fcc3c8a349fcbf": {
+  "en": "See it in play",
+  "t": "플레이 영상"
+ },
+ "5442e2b64fa09764": {
+  "en": "GitHub",
+  "t": "GitHub"
+ },
+ "549be9c5511bd002": {
+  "en": "Anti-cheat or future updates may detect or block the modification. Successful tests, cosmetic-only use, avoiding combat or no previously reported ban do <strong>not</strong> establish account safety. We cannot predict enforcement, guarantee account access or restore accounts or purchases after a restriction. Do not use it if you are unwilling to accept that risk. Check the current terms for your region and platform.",
+  "t": "안티치트나 향후 업데이트가 이 수정을 감지하거나 차단할 수 있습니다. 테스트 성공, 외형 목적의 사용, 전투 회피, 지금까지 정지 사례가 보고되지 않은 것은 계정의 안전을 <strong>보장하지 않습니다</strong>. 제재를 예측하거나 계정 접근을 보장하거나 제한 이후 계정 또는 구매 내역을 복구할 수 없습니다. 이 위험을 감수할 수 없다면 사용하지 마세요. 거주 지역과 플랫폼의 현행 약관을 확인하세요."
+ },
+ "54acc2806d4d9274": {
+  "en": "Start here",
+  "t": "여기서 시작"
+ },
+ "55cd09ffba77535f": {
+  "en": "Launcher step 4, Start: Apply and launch, Check readiness and Apply without launching buttons, and a Ready message.",
+  "t": "런처 4단계, 시작: Apply and launch, Check readiness, Apply without launching 버튼과 'Ready' 메시지."
+ },
+ "5a7ee5acc806ab5a": {
+  "en": "Bug report",
+  "t": "버그 신고"
+ },
+ "5b6825d3c67a3589": {
+  "en": "Site",
+  "t": "사이트"
+ },
+ "5b7851fb155ec40b": {
+  "en": "This page has moved",
+  "t": "이 페이지는 이동되었습니다"
+ },
+ "5c9214a743abdf52": {
+  "en": "Choose how you start the game. The official launcher is the tested route; Steam and Epic are untested.",
+  "t": "게임을 시작할 방법을 고릅니다. 공식 런처가 테스트된 방법이며, Steam과 Epic 버전은 테스트되지 않았습니다."
+ },
+ "6147ce4950e6e757": {
+  "en": "Unofficial modification, anti-cheat and account restrictions.",
+  "t": "비공식 수정, 안티치트, 계정 제한."
+ },
+ "61fe6bf27781db5c": {
+  "en": "Share a clip of the current build, crediting the upstream creators and removing personal account details.",
+  "t": "상위 제작자를 표기하고 개인 계정 정보를 지운 뒤 현재 빌드의 클립을 공유하기."
+ },
+ "6622c072aa5b8818": {
+  "en": "What our MIT license covers and what it does not.",
+  "t": "MIT 라이선스가 적용되는 것과 적용되지 않는 것."
+ },
+ "6cf726d078b3ff76": {
+  "en": "Donations are optional and do not buy fixes, compatibility or support; see <a href=\"support.html\">support expectations</a>.",
+  "t": "후원은 선택 사항이며 수정, 호환성, 지원을 구매하는 것이 아닙니다. <a href=\"support.html\">후원에 관한 안내</a>를 참고하세요."
+ },
+ "6d9af75dcc9d1c83": {
+  "en": "Left and right eye views from a rooftop above the city at dusk.",
+  "t": "해 질 녘 도시 옥상에서 본 왼쪽 눈과 오른쪽 눈 화면."
+ },
+ "6e925134a57b44dd": {
+  "en": "A community request",
+  "t": "커뮤니티에 드리는 부탁"
+ },
+ "720d1e621ea5786e": {
+  "en": "Optional support for a spare-time hobby, without promised maintenance.",
+  "t": "여가 취미 프로젝트에 대한 선택적 후원이며, 지속적인 관리를 약속하지 않습니다."
+ },
+ "74c14c10ded2e4dd": {
+  "en": "The coast, same capture method.",
+  "t": "해안, 같은 캡처 방식."
+ },
+ "7510157a498b9124": {
+  "en": "Code &amp; contribute",
+  "t": "코드와 기여"
+ },
+ "77f1ddfb28d7bb99": {
+  "en": "WuWa VR",
+  "t": "WuWa VR"
+ },
+ "77fbc31402bb1682": {
+  "en": "MIT license text",
+  "t": "MIT 라이선스 전문"
+ },
+ "7a6ca68d0aa04a8f": {
+  "en": "Original website and guide work: MIT. Upstream components keep their own terms.",
+  "t": "원본 웹사이트와 가이드 작업: MIT. 상위 구성 요소는 각자의 조건을 따릅니다."
+ },
+ "7ad1ed94b7532534": {
+  "en": "Short summary",
+  "t": "짧은 요약"
+ },
+ "7d0e8f9f011586d5": {
+  "en": "Translations are machine-assisted drafts; corrections are welcome. <a href=\"feedback.html?kind=language\">Correct a translation or request a language</a>.",
+  "t": "번역은 기계 번역의 도움을 받은 초안이며, 수정을 환영합니다. <a href=\"feedback.html?kind=language\">번역 수정 또는 언어 요청</a>."
+ },
+ "867428e1ae0b1708": {
+  "en": "Your draft is ready. You choose whether to open GitHub and submit it.",
+  "t": "초안이 준비되었습니다. GitHub를 열어 제출할지는 직접 결정하세요."
+ },
+ "86cd8b752a7306d3": {
+  "en": "In VR, <kbd>L3</kbd> + <kbd>R3</kbd> opens settings and <kbd>L3</kbd> + <kbd>Menu</kbd> shows the shortcut sheet. <a href=\"guide.html#start\">Full setup, update and removal steps</a>.",
+  "t": "VR 안에서 <kbd>L3</kbd> + <kbd>R3</kbd>는 설정을 열고, <kbd>L3</kbd> + <kbd>Menu</kbd>는 단축키 표를 보여 줍니다. <a href=\"guide.html#start\">설치, 업데이트, 제거 전체 단계</a>."
+ },
+ "8827e262b74c7bb8": {
+  "en": "No destination is connected. Copy your draft; nothing has been sent.",
+  "t": "연결된 제출 대상이 없습니다. 초안을 복사하세요. 아직 아무것도 전송되지 않았습니다."
+ },
+ "8bce5579abc97015": {
+  "en": "Launcher screenshots from September 2026; your page may look slightly different.",
+  "t": "런처 스크린샷은 2026년 9월에 찍은 것으로, 실제 화면은 조금 다를 수 있습니다."
+ },
+ "8c90deabb4b92c70": {
+  "en": "<strong>There is no obligation to donate. Please do not donate if you expect me to support or maintain this mod forever.</strong> This is a spare-time hobby: I cannot promise updates, personal help, a response time or repairs after game updates, and I may pause or stop. Only contribute if you are happy to support the work as it is, with nothing owed in return.",
+  "t": "<strong>후원할 의무는 없습니다. 이 모드를 영원히 지원하거나 관리해 주기를 기대한다면 후원하지 마세요.</strong> 이것은 여가 시간의 취미입니다. 업데이트, 개별 도움, 답변 시간, 게임 업데이트 이후의 수정을 약속할 수 없으며, 쉬거나 중단할 수도 있습니다. 대가 없이 지금 모습 그대로의 작업을 응원하고 싶을 때만 후원해 주세요."
+ },
+ "8e106c0b8505a020": {
+  "en": "<a href=\"https://github.com/ChronoHaxx/wuwa-vr/issues\">Search existing issues</a> first.",
+  "t": "먼저 <a href=\"https://github.com/ChronoHaxx/wuwa-vr/issues\">기존 이슈를 검색</a>해 주세요."
+ },
+ "8fa41d59c259d95c": {
+  "en": "Releases",
+  "t": "릴리스"
+ },
+ "924f084e146a0488": {
+  "en": "Open launcher step 3 at full size",
+  "t": "런처 3단계를 크게 보기"
+ },
+ "9627fb89ef6f3789": {
+  "en": "Ways to help",
+  "t": "도울 수 있는 방법"
+ },
+ "9ae9df7cd5fb6548": {
+  "en": "Prepare a report here, review it on GitHub, then submit it yourself; this site never posts anything. Submitting needs a GitHub account; copying the draft does not.",
+  "t": "여기서 보고서를 준비하고 GitHub에서 확인한 뒤 직접 제출하세요. 이 사이트는 아무것도 게시하지 않습니다. 제출하려면 GitHub 계정이 필요하지만 초안 복사에는 필요하지 않습니다."
+ },
+ "9cb9dfec0c52530b": {
+  "en": "Reports are public on GitHub. Leave out account IDs, personal paths, passwords and unreviewed logs.",
+  "t": "보고서는 GitHub에 공개됩니다. 계정 ID, 개인 경로, 비밀번호, 확인하지 않은 로그는 빼 주세요."
+ },
+ "9d50cf7e7b111435": {
+  "en": "Forks and improvements are welcome where the licenses allow. Please keep it free and credit the creators. <a href=\"license.html\">License and sharing</a>.",
+  "t": "라이선스가 허용하는 범위에서 포크와 개선을 환영합니다. 무료로 유지하고 제작자를 표기해 주세요. <a href=\"license.html\">라이선스와 공유</a>."
+ },
+ "9fc30a6663c0d3eb": {
+  "en": "What it does not cover",
+  "t": "적용되지 않는 것"
+ },
+ "a2218a9d42735188": {
+  "en": "Downloads stay free, and support never limits access or participation. Our original work has a <a href=\"license.html\">scoped MIT license</a>; upstream code keeps its own terms. Please keep community access free and credit the original creators.",
+  "t": "다운로드는 계속 무료이며, 후원 여부가 이용이나 참여를 제한하지 않습니다. 저희의 원본 작업물에는 <a href=\"license.html\">범위가 한정된 MIT 라이선스</a>가 적용되며, 상위 코드는 각자의 조건을 따릅니다. 커뮤니티가 무료로 이용할 수 있게 하고 원작자를 표기해 주세요."
+ },
+ "a440946effa824e1": {
+  "en": "Please keep access free, credit creators, share improvements and avoid paid repacks or paywalled forks. This is a request, not an extra MIT condition: MIT permits commercial use and does not require forks to publish source.",
+  "t": "무료로 이용할 수 있게 하고, 제작자를 표기하고, 개선 사항을 공유하며, 유료 재패키징이나 유료화된 포크는 피해 주세요. 이는 부탁일 뿐 MIT의 추가 조건이 아닙니다. MIT는 상업적 이용을 허용하며 포크에 소스 공개를 요구하지 않습니다."
+ },
+ "a669decb8d443518": {
+  "en": "First-person combat in the city. One eye from the headset mirror. Recorded 26 September 2026, Quest Pro / SteamVR mirror, on an earlier build.",
+  "t": "도시에서의 1인칭 전투. 헤드셋 미러의 한쪽 눈 화면입니다. 2026년 9월 26일 Quest Pro / SteamVR 미러로 이전 빌드에서 녹화."
+ },
+ "a6b9effb15bcf340": {
+  "en": "Short clips from headset recordings; nothing autoplays.",
+  "t": "헤드셋으로 녹화한 짧은 클립입니다. 자동 재생되지 않습니다."
+ },
+ "a7b326fc120145be": {
+  "en": "Kuro's <a href=\"https://store.steampowered.com/eula/3513350_eula_0\">Wuthering Waves terms published with the Steam game</a> address unauthorized third-party programs, bypassing technical measures, cheat detection, suspension and termination. These are the publisher's decisions, not permissions this project can grant. The <a href=\"https://wutheringwaves.kurogames.com/p/en/produce.html\">fan-work guidelines</a> exclude software from their definition of covered derivative works; they are not blanket approval of this mod. This page is not legal advice or a determination of how the publisher will enforce its terms.",
+  "t": "Steam판과 함께 공개된 Kuro의 <a href=\"https://store.steampowered.com/eula/3513350_eula_0\">명조 약관</a>은 승인되지 않은 서드파티 프로그램, 기술적 보호 조치 우회, 부정 행위 탐지, 정지 및 해지를 다룹니다. 이는 퍼블리셔가 결정하는 사항이며 이 프로젝트가 허가할 수 있는 것이 아닙니다. <a href=\"https://wutheringwaves.kurogames.com/p/en/produce.html\">2차 창작 가이드라인</a>은 대상 2차 저작물의 정의에서 소프트웨어를 제외하며, 이 모드를 전면적으로 승인하는 것이 아닙니다. 이 페이지는 법률 조언이 아니며 퍼블리셔가 약관을 어떻게 집행할지 판단하는 것도 아닙니다."
+ },
+ "ab1a960e766d144b": {
+  "en": "Page moved — WuWa VR",
+  "t": "페이지 이동됨 — WuWa VR"
+ },
+ "ae739a4df2d1c6f6": {
+  "en": "This page is translated from the English original, which is authoritative where they differ. Parts not yet translated are shown in English.",
+  "t": "이 페이지는 영어 원문을 번역한 것이며, 내용이 다를 경우 영어 원문이 우선합니다. 아직 번역되지 않은 부분은 영어로 표시됩니다."
+ },
+ "aeecc493b1e04956": {
+  "en": "First-person body animation, viewed from one eye. Xbox-controlled; these hands are character animation. Recorded 26 September 2026, Quest Pro / SteamVR mirror, on an earlier build.",
+  "t": "1인칭 몸 애니메이션을 한쪽 눈으로 본 화면. Xbox 컨트롤러로 조작하며, 손은 캐릭터 애니메이션입니다. 2026년 9월 26일 Quest Pro / SteamVR 미러로 이전 빌드에서 녹화."
+ },
+ "b026e79baa3e5ddf": {
+  "en": "<a class=\"button primary\" href=\"https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-01-1817/WuWa-VR-Launcher.zip\">Download · 1 Oct 18:17 BST · Windows ZIP</a> <a href=\"https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817\">Release notes &amp; source</a>",
+  "t": "<a class=\"button primary\" href=\"https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-01-1817/WuWa-VR-Launcher.zip\">다운로드 · 1 Oct 18:17 BST · Windows ZIP</a> <a href=\"https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817\">릴리스 노트 및 소스</a>"
+ },
+ "b05203cf89b60eb3": {
+  "en": "Known issues",
+  "t": "알려진 문제"
+ },
+ "b27305161cb3b30a": {
+  "en": "This form needs JavaScript. You can also <a href=\"https://github.com/ChronoHaxx/wuwa-vr/issues/new/choose\">open a GitHub issue</a> directly.",
+  "t": "이 양식에는 JavaScript가 필요합니다. <a href=\"https://github.com/ChronoHaxx/wuwa-vr/issues/new/choose\">GitHub에서 직접 이슈를 열</a> 수도 있습니다."
+ },
+ "b2a4d6fee70d4392": {
+  "en": "Language or translation request",
+  "t": "언어 또는 번역 요청"
+ },
+ "b30e3623a88207f5": {
+  "en": "Review on GitHub",
+  "t": "GitHub에서 확인"
+ },
+ "b55ca256a1f55713": {
+  "en": "The whole site is available in ten languages. The game, UEVR's own menus and some build descriptions stay in their original language.",
+  "t": "사이트 전체를 10개 언어로 볼 수 있습니다. 게임 자체, UEVR 메뉴, 일부 빌드 설명은 원래 언어로 유지됩니다."
+ },
+ "b564473a4d8695cc": {
+  "en": "<a class=\"button\" href=\"https://ko-fi.com/chronohax\" rel=\"noopener noreferrer\">Support on Ko-fi</a>",
+  "t": "<a class=\"button\" href=\"https://ko-fi.com/chronohax\" rel=\"noopener noreferrer\">Ko-fi에서 후원하기</a>"
+ },
+ "b56af3f758d8f4d9": {
+  "en": "You will continue to Ko-fi. This website collects no payment details.",
+  "t": "Ko-fi로 이동합니다. 이 사이트는 결제 정보를 수집하지 않습니다."
+ },
+ "bee7c6b62dd978ff": {
+  "en": "Report a reproducible bug with the build name and headset software.",
+  "t": "재현 가능한 버그를 빌드 이름과 헤드셋 소프트웨어와 함께 신고하기."
+ },
+ "bf073fae640ded81": {
+  "en": "Guide",
+  "t": "가이드"
+ },
+ "bfac50d6424b5166": {
+  "en": "Credits",
+  "t": "크레딧"
+ },
+ "bfb132179b1aefb5": {
+  "en": "Open <strong>WuWa VR Launcher.exe</strong> from the extracted folder. Read the account-risk notice and tick the box.",
+  "t": "압축을 푼 폴더에서 <strong>WuWa VR Launcher.exe</strong>를 엽니다. 계정 위험 안내를 읽고 상자에 체크합니다."
+ },
+ "c6cf6a0a326726c4": {
+  "en": "Report copied. Nothing has been submitted.",
+  "t": "보고서를 복사했습니다. 아직 아무것도 제출되지 않았습니다."
+ },
+ "c73ab40b010d0231": {
+  "en": "<strong>Matching eyes</strong>: distant trees, props and lighting, and character-screen reflections, look the same in both eyes.",
+  "t": "<strong>양쪽 눈 일치</strong>: 먼 곳의 나무, 오브젝트, 조명, 캐릭터 화면의 반사가 양쪽 눈에서 똑같이 보입니다."
+ },
+ "c7ec69e87874fe2e": {
+  "en": "Account risk and disclaimer",
+  "t": "계정 위험 및 면책 조항"
+ },
+ "c8d7677e19495f21": {
+  "en": "Feedback",
+  "t": "피드백"
+ },
+ "caf54665615c86a9": {
+  "en": "The UEVR backend, native adaptations and patches, community scripts, game code, assets, screenshots and trademarks, and other owners' work. The generated controller illustration is not an official Xbox asset. The mod as a whole is <strong>not</strong> MIT. See <a href=\"credits.html\">component credits</a>; a published download does not change component terms or imply upstream endorsement.",
+  "t": "UEVR 백엔드, 네이티브 적용과 패치, 커뮤니티 스크립트, 게임 코드, 에셋, 스크린샷, 상표, 기타 소유자의 작업물. 생성한 컨트롤러 그림은 공식 Xbox 자료가 아닙니다. 모드 전체는 MIT가 <strong>아닙니다</strong>. <a href=\"credits.html\">구성 요소 크레딧</a>을 참고하세요. 공개된 다운로드가 구성 요소의 조건을 바꾸거나 상위 프로젝트의 보증을 뜻하지는 않습니다."
+ },
+ "cfe838aa58220601": {
+  "en": "License and sharing",
+  "t": "라이선스와 공유"
+ },
+ "d0700cb699087ac0": {
+  "en": "Prepare a request",
+  "t": "요청 준비"
+ },
+ "d34f3e9bc44766c7": {
+  "en": "Player guide",
+  "t": "플레이어 가이드"
+ },
+ "d59ecc3dd1f8e97e": {
+  "en": "Original text in the README, player docs and support, contribution and credit pages; original website HTML, CSS, JavaScript and translations; the abstract mark; and the site generators and checks. Quoted third-party material is excluded. Keep copyright and license notices.",
+  "t": "README, 플레이어 문서, 후원·기여·크레딧 페이지의 원본 글, 웹사이트의 원본 HTML, CSS, JavaScript와 번역, 추상 로고, 사이트 생성 도구와 검사 도구. 인용한 제3자 자료는 제외합니다. 저작권 표시와 라이선스 표시를 유지하세요."
+ },
+ "d9e6eb00c7029991": {
+  "en": "I build VR experiments, game mods and small tools because I enjoy using them. Support goes toward a GPU upgrade (more headroom for modded VR and for running open-weight AI models locally, so development depends less on hosted tools) and the time and equipment these projects take. It does not buy priority fixes, deadlines or guaranteed compatibility.",
+  "t": "저는 직접 쓰는 것이 즐거워서 VR 실험, 게임 모드, 작은 도구를 만듭니다. 후원금은 GPU 업그레이드(모드를 적용한 VR과 오픈 웨이트 AI 모델을 로컬에서 돌릴 여유를 늘려 개발에서 클라우드 도구 의존을 줄이기 위해)와 이 프로젝트들에 드는 시간과 장비에 쓰입니다. 우선 수정, 마감일, 호환성 보장을 사는 것이 아닙니다."
+ },
+ "db07be184479f340": {
+  "en": "Languages",
+  "t": "언어"
+ },
+ "db7bbaeab6b6846d": {
+  "en": "Do not disable or bypass anti-cheat or Windows security protections.",
+  "t": "안티치트나 Windows 보안 보호를 끄거나 우회하지 마세요."
+ },
+ "e27553242c45913a": {
+  "en": "Check the selected build. A download contains one build.",
+  "t": "선택된 빌드를 확인합니다. 다운로드에는 빌드가 하나 들어 있습니다."
+ },
+ "e32de7d094ec8333": {
+  "en": "How it starts",
+  "t": "시작 방법"
+ },
+ "e3361b652baf982e": {
+  "en": "What our MIT license covers",
+  "t": "MIT 라이선스가 적용되는 것"
+ },
+ "e3d998bbadfe5598": {
+  "en": "Left and right eye views of a character beside the coast under a blue sky.",
+  "t": "파란 하늘 아래 해안가에 있는 캐릭터의 왼쪽 눈과 오른쪽 눈 화면."
+ },
+ "e82fda924490fc3a": {
+  "en": "<strong>First person</strong> with the body visible and the head hidden, plus a comfort mode.",
+  "t": "몸은 보이고 머리는 숨기는 <strong>1인칭</strong>과 편안함 모드."
+ },
+ "e8f82068f4bd655e": {
+  "en": "See the controller guide",
+  "t": "컨트롤러 가이드 보기"
+ },
+ "e9d7974383fdaa12": {
+  "en": "Languages — WuWa VR",
+  "t": "언어 — WuWa VR"
+ },
+ "eaa72d3805fae363": {
+  "en": "Rooftop, left and right eye. OpenXR Simulator, 24 September 2026. The HUD is on a separate layer and is not shown.",
+  "t": "옥상, 왼쪽 눈과 오른쪽 눈. OpenXR Simulator, 2026년 9월 24일. HUD는 별도 레이어라 표시되지 않습니다."
+ },
+ "f1d66744f451d761": {
+  "en": "Optional tips: <a href=\"https://ko-fi.com/chronohax\">Ko-fi / ChronoHax</a>. Payments are handled by Ko-fi; this website collects no payment details.",
+  "t": "선택적 팁: <a href=\"https://ko-fi.com/chronohax\">Ko-fi / ChronoHax</a>. 결제는 Ko-fi가 처리하며, 이 사이트는 결제 정보를 수집하지 않습니다."
+ },
+ "f2816383a64be0dc": {
+  "en": "Optional support",
+  "t": "선택적 후원"
+ },
+ "f9ff9c45a882c1c1": {
+  "en": "<strong>Português (Brasil)</strong>",
+  "t": "<strong>Português (Brasil)</strong>"
+ },
+ "fa3060bcad11e9c7": {
+  "en": "<strong>Use at your own risk.</strong> This unofficial mod may be detected or blocked by anti-cheat; account restrictions or a ban are possible. It is not approved by Kuro Games. <a href=\"risk.html\">Read the account-risk notice</a>.",
+  "t": "<strong>사용에 따른 위험은 본인이 부담합니다.</strong> 이 비공식 모드는 안티치트에 감지되거나 차단될 수 있으며, 계정 제한이나 정지를 받을 수 있습니다. Kuro Games의 승인을 받지 않았습니다. <a href=\"risk.html\">계정 위험 안내 읽기</a>."
+ },
+ "fc2d5757477e6ace": {
+  "en": "For game version 3.7 · about 51 MB · portable, nothing to install",
+  "t": "게임 버전 3.7용 · 약 51 MB · 포터블, 설치 불필요"
+ },
+ "fc338f87a058158e": {
+  "en": "Features",
+  "t": "기능"
+ },
+ "fe49b10ef325dc38": {
+  "en": "Built on work by praydog and the UEVR contributors, mirudo2, polar, SannpoKun, Indath, endlessfalls and Elliott Tate. <a href=\"credits.html\">Contributions and licenses</a>.",
+  "t": "praydog과 UEVR 기여자, mirudo2, polar, SannpoKun, Indath, endlessfalls, Elliott Tate의 작업을 바탕으로 했습니다. <a href=\"credits.html\">기여와 라이선스</a>."
+ },
+ "ffcb226e1b4baf7a": {
+  "en": "<strong>Freecam</strong>: fly, drone, plane and acro cameras.",
+  "t": "<strong>자유 카메라</strong>: 비행, 드론, 비행기, 곡예 카메라."
+ }
+}

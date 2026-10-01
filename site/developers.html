@@ -1,9 +1,8 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Source map, known rendering problems and ways to contribute to WuWa VR."><meta name="theme-color" content="#17191c"><title>Code and contributions — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><aside class="notice"><strong>1 Oct update:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">Beta for game 3.7 · 1 Oct 18:17 BST</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Far trees, props and far lighting now match between the eyes, and the Resonators and team-screen reflections are back in place. Weapon and Echo submenu reflections are deferred.</aside><h1>Code and contributions</h1><nav class="page-links" aria-label="GitHub collaboration"><a data-project-link="code" hidden rel="noopener noreferrer">Browse GitHub</a><a data-project-link="fork" hidden rel="noopener noreferrer">Fork the repository</a><a data-project-link="issues" hidden rel="noopener noreferrer">Search issues</a><a href="feedback.html">Prepare a report</a></nav><p class="notice" data-repository-pending>The public repository has not been connected yet. The source map below explains the current review bundle; feedback drafts can still be copied.</p><div class="guide-content"><p>WuWa VR is an experimental integration built on UEVR and community WuWa work.
-Help with rendering, camera behavior, controller comfort, documentation and
-translations is welcome. A donation is never required to contribute.</p>
-<h3>Find the right starting point</h3>
-<p>The <a href="https://github.com/ChronoHaxx/wuwa-vr">public repository</a> contains the
-website, matching native source changes, Lua, language catalogs and launcher.</p>
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Source layout, building and contributing to WuWa VR."><meta name="theme-color" content="#17191c"><title>Code and contributions — WuWa VR</title><link rel="alternate" hreflang="en" href="https://chronohaxx.github.io/wuwa-vr/developers.html"><link rel="alternate" hreflang="zh-Hans" href="https://chronohaxx.github.io/wuwa-vr/l/zh-Hans/developers.html"><link rel="alternate" hreflang="ja" href="https://chronohaxx.github.io/wuwa-vr/l/ja/developers.html"><link rel="alternate" hreflang="ko" href="https://chronohaxx.github.io/wuwa-vr/l/ko/developers.html"><link rel="alternate" hreflang="es" href="https://chronohaxx.github.io/wuwa-vr/l/es/developers.html"><link rel="alternate" hreflang="pt-BR" href="https://chronohaxx.github.io/wuwa-vr/l/pt-BR/developers.html"><link rel="alternate" hreflang="fr" href="https://chronohaxx.github.io/wuwa-vr/l/fr/developers.html"><link rel="alternate" hreflang="de" href="https://chronohaxx.github.io/wuwa-vr/l/de/developers.html"><link rel="alternate" hreflang="ru" href="https://chronohaxx.github.io/wuwa-vr/l/ru/developers.html"><link rel="alternate" hreflang="ar" href="https://chronohaxx.github.io/wuwa-vr/l/ar/developers.html"><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Site"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav><details class="language-picker"><summary>Language / 语言 / اللغة</summary><nav aria-label="Languages"><a href="developers.html" lang="en" hreflang="en" dir="ltr" data-language="en">English</a><a href="l/zh-Hans/developers.html" lang="zh-Hans" hreflang="zh-Hans" dir="ltr" data-language="zh-Hans">简体中文</a><a href="l/ja/developers.html" lang="ja" hreflang="ja" dir="ltr" data-language="ja">日本語</a><a href="l/ko/developers.html" lang="ko" hreflang="ko" dir="ltr" data-language="ko">한국어</a><a href="l/es/developers.html" lang="es" hreflang="es" dir="ltr" data-language="es">Español</a><a href="l/pt-BR/developers.html" lang="pt-BR" hreflang="pt-BR" dir="ltr" data-language="pt-BR">Português (Brasil)</a><a href="l/fr/developers.html" lang="fr" hreflang="fr" dir="ltr" data-language="fr">Français</a><a href="l/de/developers.html" lang="de" hreflang="de" dir="ltr" data-language="de">Deutsch</a><a href="l/ru/developers.html" lang="ru" hreflang="ru" dir="ltr" data-language="ru">Русский</a><a href="l/ar/developers.html" lang="ar" hreflang="ar" dir="rtl" data-language="ar">العربية</a></nav></details></header><main class="wrap" id="main"><h1>Code and contributions</h1><nav class="page-links" aria-label="GitHub"><a href="https://github.com/ChronoHaxx/wuwa-vr">Browse GitHub</a><a href="https://github.com/ChronoHaxx/wuwa-vr/fork">Fork the repository</a><a href="https://github.com/ChronoHaxx/wuwa-vr/issues">Search issues</a><a href="feedback.html">Prepare a report</a></nav><div class="guide-content"><p>The repository holds the website, the launcher and the mod&#39;s source changes. It
+is an <strong>overlay</strong> on pinned upstream versions, not a standalone UEVR fork:
+<a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md">mod/BUILD.md</a>
+explains how to rebuild. Each release tag records the exact source of that
+download.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -12,75 +11,56 @@ website, matching native source changes, Lua, language catalogs and launcher.</p
 </tr>
 </thead>
 <tbody><tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/uevr">mod/uevr</a></td>
-<td>Modified native files: stereo/UI hooks, camera settings and portal</td>
+<td><code>mod/uevr</code></td>
+<td>Native changes: stereo, UI, camera, game-version checks</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/lua">mod/lua</a></td>
-<td>Camera, controller, head hiding and shadow scripts</td>
+<td><code>mod/lua</code></td>
+<td>Camera, controller, head-hiding and shadow scripts</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/source-changes">mod/source-changes</a></td>
-<td>Full patches against the pinned upstreams</td>
+<td><code>mod/localization</code></td>
+<td>In-game control and shortcut-sheet translations</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/localization">mod/localization</a></td>
-<td>Editable controls and shortcut translations</td>
+<td><code>launcher/dev</code></td>
+<td>Portable launcher, recorder and test/measurement tools</td>
 </tr>
 <tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/launcher/dev">launcher/dev</a></td>
-<td>Portable launcher, capture and SteamVR recording source</td>
+<td><code>site</code>, <code>docs</code>, <code>dev</code></td>
+<td>Website, player docs and their generators</td>
 </tr>
 </tbody></table></div>
-<h3>Reconstruct the release</h3><p>The public source overlay now matches the <strong>28 Sep 16:28 experimental candidate</strong>. <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md">Build instructions and pinned upstreams</a>. The older beta's matching source remains at its release tag.</p><p>95 changed native paths and two SDK paths were reconstructed from pinned upstream files plus the frozen patches. This is not a new full rebuild or live acceptance. The new candidate adds trigger input and dormant inventory tooling; its carried-forward camera change still needs an ultimate test.</p><h3>Remaining work</h3><p>Foliage/prop animation and visibility, some lighting, and ultimate transitions remain open. Main Resonators reflection improved; lower/weapon submenu offsets and freezing are deferred. NSF repaired reported character materials in user testing, with timing corrections in newer profiles.</p><p><a href="understanding.html">Read the evidence, unsuccessful experiments, code map and next steps</a>. Follow the settings supplied with your chosen package; older beta instructions are not the new candidate's defaults.</p><h3>A useful report or pull request</h3>
-<p>State what happened, what you expected, and the shortest reproduction. Include
-the build name/time, headset/runtime, controller connection, camera mode,
-character/menu, and whether a setting or Alt-Tab changes it. A single-eye or
-SBS crop can be useful; label which eye is affected. Review clips for account
-IDs before sharing. Do not upload whole logs or memory captures by default.</p>
-<p>Search existing issues first. Add new evidence to a matching report instead
-of creating another report for the same symptom. The website&#39;s feedback form
-prepares a draft for you to review and submit on GitHub; it sends nothing by
-itself. A GitHub account is required to submit there. Copying the draft also
-works for a community discussion.</p>
-<p>Small fixes and forks are welcome where each component&#39;s terms allow them.
-Credit upstream authors and describe what was actually tested. See the
-<a href="credits.html">credits</a> and <a href="developers.html#contributing">contribution guide</a>.</p>
-<section id="contributing"><h2>Contributing</h2><p>This is a free, unofficial fan project. You do not need to donate, write code
-or speak English to contribute. Clear bug reports, translations, comfort
-feedback and small fixes all help. Volunteers are welcome; response times and
-continued maintenance are not guaranteed.</p>
-<h3>Report something or request a language</h3>
-<p>Use <strong>Feedback</strong> on the website for a bug, feature, accessibility or language
-request. Describe the problem in the language you prefer. The form prepares a
-GitHub issue for you to review; it never posts automatically. GitHub sign-in
-is needed to submit there. You can also copy the report as plain text.</p>
-<p>Until the owner connects the public repository, the website clearly offers
-copy-only drafts. It does not pretend your request has been sent. On GitHub,
-choose <strong>New issue</strong> and the matching template. Do not include account IDs,
-personal paths, login details or unreviewed logs. A short description and the
-build/runtime are usually enough to start.</p>
+<p>The <a href="understanding.html">explainer</a> has a file-by-file map, the stereo fixes and
+how they were found. When changing rendering, keep each eye&#39;s own projection and
+history; never copy one eye&#39;s finished image into the other. Check a rendering
+change with a capture of the affected scene, not only a successful build.</p>
+<p>Build natively with bounded parallelism on modest PCs:
+<code>cmake --build out/build/x64-RelWithDebInfo --config RelWithDebInfo --target uevr --parallel 1 -- /p:CL_MPCount=1 /p:MultiProcMaxCount=1</code>.
+A new DLL needs a game restart.</p>
+<section id="contributing"><h2>Contributing</h2><p>This is a free, unofficial fan project. You do not need to donate, write code or
+speak English to help: bug reports, translations, comfort feedback and small
+fixes all count. Volunteers are welcome; replies and continued maintenance are
+not guaranteed.</p>
+<h3>Report something</h3>
+<p>Use the website&#39;s <a href="feedback.html">feedback form</a>
+for a bug, feature, accessibility or language request, in any language. It
+prepares a GitHub issue for you to review and submit; it never posts by itself.
+Leave out account IDs, personal paths, passwords and unreviewed logs.</p>
 <h3>Translations</h3>
-<p>Getting started, common Xbox shortcuts, feedback and support expectations are
-available in English, Simplified Chinese, Japanese, Korean, Spanish, Brazilian
-Portuguese, French, German, Russian and Arabic. These are initial translations
-and community language review is welcome. The full technical guide and native
-UEVR interface remain English; game language is not changed.</p>
-<p>Edit the appropriate <code>site/languages/*.js</code> source and run
-<code>node dev/build-community.cjs</code>. Each translated phrase has the same key as the
-English reference. Keep exact in-game option names and Xbox button names
-unchanged so players can find them. Do not add a remote translation service.
-Right-to-left languages use <code>dir=&quot;rtl&quot;</code>; controller chords remain left-to-right.
-Test keyboard use, small screens, long labels and the copy/report flow.</p>
+<p>The whole website is available in ten languages. Each language has a translation
+memory, <code>dev/i18n/&lt;lang&gt;.json</code>, mapping every English paragraph to its
+translation. To fix a translation, edit the <code>&quot;t&quot;</code> text of that entry and keep
+any HTML tags, links and button names (<code>L3 + R3</code>, <code>WuWa Controls</code>) as they are.
+When English text changes, its old translation no longer matches and that
+paragraph shows in English until it is translated again. See
+<a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/dev/i18n/README.md">dev/i18n/README.md</a>.</p>
 <h3>Code, forks and sharing</h3>
-<p>Keep a fix small, describe the actual problem and include how you checked it.
-Distinguish offline tests from game/headset acceptance. Preserve existing
-attribution. The <a href="license.html">scoped license</a> identifies original MIT work;
-do not relicense upstream code or publish private runtime/game data.</p>
-<p>Fork and improve the MIT-covered parts freely. Please keep community access
-free, share improvements and avoid sold repacks or paywalled forks. That is
-our community preference, not a restriction added to MIT: commercial use is
-allowed by MIT. Public combined-mod redistribution still needs the upstream
-scope clarified. Nothing in this project requires payment to report a bug,
-ask for a language or contribute.</p>
-</section></div></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>
+<p>Keep a fix small, describe the actual problem and how you checked it, and say
+whether you tested it in the game and headset. Keep existing attribution. Our
+<a href="license.html">scoped license</a> covers original work only; do not relicense
+upstream code or publish private game data.</p>
+<p>Forks of the MIT-covered parts are welcome. Please keep access free, share
+improvements and avoid paid repacks or paywalled forks. That is a community
+request, not an MIT condition: MIT allows commercial use.</p>
+</section></div></main><footer class="footer wrap"><p>Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information"><a href="developers.html">Code &amp; contribute</a><a href="https://github.com/ChronoHaxx/wuwa-vr">GitHub</a><a href="https://github.com/ChronoHaxx/wuwa-vr/releases">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License</a><a href="support.html">Optional support</a></nav><p class="small">Original website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>

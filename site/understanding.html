@@ -1,15 +1,4 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Timeline, beginner code map, experiments and a 60-second explanation."><meta name="theme-color" content="#17191c"><title>Understand WuWa VR — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><h1>Understand WuWa VR</h1><p class="intro">A timeline, code map and honest next steps. Read this before changing rendering settings or continuing the investigation.</p><figure><video controls preload="metadata" poster="media/explainer-poster.png" style="width:100%;aspect-ratio:16/9"><source src="media/explainer-60s.mp4?v=20260928-headset" type="video/mp4"><track kind="captions" src="media/explainer-captions.vtt?v=20260928-headset" srclang="en" label="English"><a href="media/explainer-60s.mp4?v=20260928-headset">Download the 60-second explainer</a></video><figcaption>60 seconds · silent, with visible captions · original design by Claude Opus 5.5; updated by Codex after headset confirmation on 28 Sep. Diagrams explain the system; gameplay is labelled earlier-build footage. <a href="media/explainer-transcript.md">Transcript</a>.</figcaption></figure><p><a class="button primary" href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">Beta download · 1 Oct 18:17 BST · game 3.7</a> <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/UNDERSTANDING-WUWA-VR.md">Read on GitHub</a></p><details open><summary>Jump to a section</summary><ul><li><a href="#start-here-tonight">Start here tonight</a></li><li><a href="#a-two-minute-mental-picture">A two-minute mental picture</a></li><li><a href="#timeline-the-useful-turning-points">Timeline: the useful turning points</a></li><li><a href="#what-works-what-remains-open">What works, what remains open</a></li><li><a href="#why-a-tree-looked-frozen-in-one-eye">Why a tree looked frozen in one eye</a></li><li><a href="#experiments-already-tried-avoid-another-blind-loop">Experiments already tried: avoid another blind loop</a></li><li><a href="#next-work-in-order">Next work, in order</a></li><li><a href="#codebase-cheat-sheet">Codebase cheat sheet</a></li></ul></details><article class="guide-content"><p>Updated 28 September 2026. This is a beginner&#39;s map of the project and an honest handoff, not a claim that stereo rendering is finished.</p>
-<h2 id="start-here-tonight">Start here tonight</h2>
-<p>The <strong>28 Sep 16:28 BST experimental package</strong> includes the portable launcher EXE, its runtime folders, the older 26 Sep beta and a newer camera/diagnostic candidate. Extract the whole ZIP; the EXE needs its adjacent folders. You do not need to install Python.</p>
-<ol>
-<li>Finish and close any existing game/injector session before applying a profile.</li>
-<li>Open <strong>WuWa VR Launcher.exe</strong>, read the account-risk notice, then select <strong>Camera candidate + trigger controls · 28 Sep 16:27</strong>. The package initially selects the older beta: explicitly choose this candidate to test the new work.</li>
-<li>Select your headset runtime or the bundled simulator. Start your headset software first. Use the standalone official WuWa launcher; Steam/Epic injection is still unverified.</li>
-<li>Apply and launch; accept Windows&#39; permission prompt, then press Play and enter gameplay.</li>
-<li>Keep the supplied settings for the first comparison. Open the in-game shortcut sheet for the authoritative bindings; restore the supplied profile through the launcher if settings become confusing.</li>
-</ol>
-<p>The new native DLL passed compilation and input-policy tests. The actual packaged EXE passed integrity, startup and refusal-to-overwrite-a-running-game checks. <strong>This exact candidate still needs live trigger/inventory and closed-game apply/restore acceptance.</strong> It adds testing tools; it does not contain a new foliage repair. It also carries the morning&#39;s same-draw camera-base candidate aimed at ultimate-transition desync; the project owner <strong>confirmed on 28 September that the end-of-ultimate camera mismatch is fixed in headset testing for the cases tested</strong>. The public download is an experimental checkpoint, not a stable release. The build label is 16:27; the ZIP was packaged at 16:28.</p>
-<p>Unofficial injection carries anti-cheat/account-ban risk. This project is not approved by Kuro Games. Read the included risk and component-license notices. The website/independent guide&#39;s MIT license does not relicense UEVR or the whole bundle. Donations are optional and do not buy guaranteed support or future compatibility.</p>
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="How WuWa VR works, the stereo bugs it fixes and a map of the code."><meta name="theme-color" content="#17191c"><title>Understand WuWa VR — WuWa VR</title><link rel="alternate" hreflang="en" href="https://chronohaxx.github.io/wuwa-vr/understanding.html"><link rel="alternate" hreflang="zh-Hans" href="https://chronohaxx.github.io/wuwa-vr/l/zh-Hans/understanding.html"><link rel="alternate" hreflang="ja" href="https://chronohaxx.github.io/wuwa-vr/l/ja/understanding.html"><link rel="alternate" hreflang="ko" href="https://chronohaxx.github.io/wuwa-vr/l/ko/understanding.html"><link rel="alternate" hreflang="es" href="https://chronohaxx.github.io/wuwa-vr/l/es/understanding.html"><link rel="alternate" hreflang="pt-BR" href="https://chronohaxx.github.io/wuwa-vr/l/pt-BR/understanding.html"><link rel="alternate" hreflang="fr" href="https://chronohaxx.github.io/wuwa-vr/l/fr/understanding.html"><link rel="alternate" hreflang="de" href="https://chronohaxx.github.io/wuwa-vr/l/de/understanding.html"><link rel="alternate" hreflang="ru" href="https://chronohaxx.github.io/wuwa-vr/l/ru/understanding.html"><link rel="alternate" hreflang="ar" href="https://chronohaxx.github.io/wuwa-vr/l/ar/understanding.html"><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Site"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav><details class="language-picker"><summary>Language / 语言 / اللغة</summary><nav aria-label="Languages"><a href="understanding.html" lang="en" hreflang="en" dir="ltr" data-language="en">English</a><a href="l/zh-Hans/understanding.html" lang="zh-Hans" hreflang="zh-Hans" dir="ltr" data-language="zh-Hans">简体中文</a><a href="l/ja/understanding.html" lang="ja" hreflang="ja" dir="ltr" data-language="ja">日本語</a><a href="l/ko/understanding.html" lang="ko" hreflang="ko" dir="ltr" data-language="ko">한국어</a><a href="l/es/understanding.html" lang="es" hreflang="es" dir="ltr" data-language="es">Español</a><a href="l/pt-BR/understanding.html" lang="pt-BR" hreflang="pt-BR" dir="ltr" data-language="pt-BR">Português (Brasil)</a><a href="l/fr/understanding.html" lang="fr" hreflang="fr" dir="ltr" data-language="fr">Français</a><a href="l/de/understanding.html" lang="de" hreflang="de" dir="ltr" data-language="de">Deutsch</a><a href="l/ru/understanding.html" lang="ru" hreflang="ru" dir="ltr" data-language="ru">Русский</a><a href="l/ar/understanding.html" lang="ar" hreflang="ar" dir="rtl" data-language="ar">العربية</a></nav></details></header><main class="wrap" id="main"><h1>Understand WuWa VR</h1><p class="intro">How the mod works, what was broken in stereo and why, and where to find things in the code.</p><figure><video controls preload="metadata" poster="media/explainer-poster.png" style="width:100%;aspect-ratio:16/9"><source src="media/explainer-60s.mp4?v=20260928-headset" type="video/mp4"><track kind="captions" src="media/explainer-captions.vtt?v=20260928-headset" srclang="en" label="English"><a href="media/explainer-60s.mp4?v=20260928-headset">Download the 60-second explainer</a></video><figcaption>A 60-second visual overview from 28 September, before the game 3.7 update and the October stereo fixes; the page below is current. <a href="media/explainer-transcript.md">Transcript</a>.</figcaption></figure><details open><summary>Jump to a section</summary><ul><li><a href="#a-two-minute-mental-picture">A two-minute mental picture</a></li><li><a href="#timeline">Timeline</a></li><li><a href="#where-things-stand">Where things stand</a></li><li><a href="#three-stereo-bugs-explained">Three stereo bugs, explained</a></li><li><a href="#game-updates">Game updates</a></li><li><a href="#codebase-cheat-sheet">Codebase cheat sheet</a></li></ul></details><article class="guide-content"><p>Updated 1 October 2026, for game version 3.7. How the mod works, what was broken in stereo and why, and where to find things in the code. To install and play, see the <a href="guide.html">player guide</a>; for known issues, its <a href="guide.html#recovery">problems section</a>.</p>
 <h2 id="a-two-minute-mental-picture">A two-minute mental picture</h2>
 <p>WuWa creates a normal game world and camera. <strong>UEVR</strong> intercepts parts of Unreal&#39;s rendering so a VR runtime can receive two eye views plus headset tracking. Our changes adapt WuWa&#39;s unusual rendering paths, extract its real UI, and add camera/controller conveniences.</p>
 <pre><code class="language-text">Portable launcher --&gt; apply selected profile --&gt; injector --&gt; WuWa + UEVRBackend.dll
@@ -23,164 +12,67 @@
                               optional recorder --&gt; video + diagnostic sidecars
 </code></pre>
 <p>The browser dashboard is a <strong>local controller for installed software</strong>. A website alone cannot inject the DLL into the game. OpenXR is an interface; the simulator and headset runtimes are implementations of that interface. Switching a runtime does not rebuild the mod. A downloaded DLL cannot replace code already loaded into a running game: a restart is necessary.</p>
-<p>Both eyes need the <strong>same instant of game state</strong>, with deliberately different eye positions and projections for depth. Copying one eye&#39;s finished image into the other would hide disagreement but destroy proper stereo. The goal is consistent scene decisions with correct separate eye views.</p>
-<h2 id="timeline-the-useful-turning-points">Timeline: the useful turning points</h2>
+<p>With <strong>Native Stereo Fix</strong>, UEVR asks the game to render the scene twice per frame, once per eye. Both renders need the <strong>same game decisions</strong> (which detail level, which lighting, which reflection), with deliberately different eye positions and projections for depth. Most of October&#39;s fixes were places where WuWa made a decision for the first eye only. Copying one eye&#39;s finished image into the other would hide those differences but destroy proper stereo, so each fix corrects the decision instead.</p>
+<h2 id="timeline">Timeline</h2>
 <div class="table-scroll"><table>
 <thead>
 <tr>
 <th>When</th>
-<th>Work and result</th>
-<th>What that established</th>
+<th>What happened</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>Early September</td>
-<td>Investigated WuWa&#39;s LGUI render paths and ported work to UEVR nightly 01143, commit <code>4ee5c6b…</code>.</td>
-<td>A pinned starting point; not a promise of tracking the newest upstream nightly.</td>
+<td>Early Sep</td>
+<td>Studied WuWa&#39;s UI rendering (LGUI) and started from UEVR nightly 01143.</td>
 </tr>
 <tr>
-<td>19–24 Sep</td>
-<td>Built native UI redirection, adjustable HUD, first person, shortcut pages, freecam and the optional 6DOF window. Added rollback/checkpoint workflows.</td>
-<td>The user found normal UI/gameplay increasingly usable; menu/reflection exceptions remained.</td>
-</tr>
-<tr>
-<td>24–26 Sep</td>
-<td>Improved moving-character head placement, full-animation/comfort choices, hidden-head shadows, controller recovery, privacy masking, translations and recording.</td>
-<td>The user confirmed several individual improvements, including the full shadow copy. This was not an all-character acceptance pass.</td>
-</tr>
-<tr>
-<td>26–27 Sep</td>
-<td>Published source, website and a compact public beta. Added a portable EXE and clearer setup/recovery.</td>
-<td>A shareable package, with attribution and known issues. The older beta supplied Native Stereo Fix off.</td>
+<td>19–26 Sep</td>
+<td>Built the real-game HUD in VR, first person, freecam, the 6DOF window, Xbox shortcuts, recovery tools, translations and recording. Published the first public beta and this website.</td>
 </tr>
 <tr>
 <td>27 Sep</td>
-<td>The user found <strong>Native Stereo Fix on</strong> repaired affected character materials. Indath suggested disabling one-frame thread lag for jitter; later profiles adopted timing corrections.</td>
-<td>Stronger evidence than speculative shader edits. It did not solve every shadow, foliage or camera problem.</td>
+<td>Native Stereo Fix turned out to repair one-eye character materials; it became the basis for later work. Indath&#39;s tip to disable one-frame thread lag fixed jitter.</td>
 </tr>
 <tr>
 <td>27–28 Sep</td>
-<td>Reflection work improved the main Resonators page. Weapon/lower submenus still offset/freeze and were deliberately deferred.</td>
-<td>Improvement on one page, not a complete reflection fix.</td>
+<td>First per-eye reflection fix for the Resonators screen. Fixed the brief eye mismatch after ultimates (confirmed in headset).</td>
 </tr>
 <tr>
-<td>28 Sep morning</td>
-<td>Captured divergent game-camera inputs between native eye calls. Added a same-draw camera-base candidate while preserving eye offsets. Repaired an unsafe diagnostic hook using real branch-path tests.</td>
-<td>Initially a compiled candidate; the owner subsequently confirmed the ultimate-return fix in headset testing that evening. The old diagnostic hook was unsafe, but a specific crash was not conclusively attributed.</td>
+<td>28–30 Sep</td>
+<td>Chased distant trees that froze in one eye with a series of diagnostic builds; each ruled out one cause.</td>
 </tr>
 <tr>
-<td>28 Sep afternoon</td>
-<td>Agent-controlled menu navigation reached a character trial. Y activated a skill, not an ultimate. The older automation bridge lacked triggers.</td>
-<td>Real controller automation works, but that skill clip cannot count as an ultimate test.</td>
+<td>30 Sep</td>
+<td>Game patch 3.7 broke the HUD. HUD, menus, the ultimate camera fix and Same Pass were ported to 3.7.</td>
 </tr>
 <tr>
-<td>28 Sep, 16:00–16:28</td>
-<td>Added bounded LT/RT input and a dormant read-only asset inventory; compiled, packaged, saved source and checked the launcher.</td>
-<td>The next tests can be performed by the agent after a restart. These are tools, not another claimed foliage fix.</td>
+<td>1 Oct, 11:30</td>
+<td>Found the far-tree cause (second eye built with the default 90° FOV) and fixed it; confirmed in headset.</td>
 </tr>
 <tr>
-<td>28 Sep afternoon</td>
-<td>Reproduced the same tree moving in both eyes nearby, then left-static/right-moving farther away, even during a zero-IPD retreat.</td>
-<td>A repeatable distance-dependent failure. Ordinary eye spacing alone does not explain it.</td>
-</tr>
-<tr>
-<td>29–30 Sep</td>
-<td>Diagnostic builds swapped view states, render targets, construction pass, eye index and eye pose between the eyes. Game patch 3.7 then broke the HUD; the HUD, menus, ultimate-camera fix and Same Pass were ported to 3.7 by matching the old code&#39;s bytes in the new game.</td>
-<td>Each test ruled out one cause of the far-tree freeze. The 3.7 HUD, menus and camera fix were confirmed by the owner.</td>
-</tr>
-<tr>
-<td>1 Oct</td>
-<td>A full field-by-field diff of the two eye views showed the second eye built with the default 90° FOV, so its LOD distance factor was 1.0 instead of 0.836. The second eye now copies the first eye&#39;s LOD factor and FOV before rendering.</td>
-<td><strong>Far foliage/prop mismatch fixed</strong>: measured in the simulator (left-eye canopy motion 2% → 67%) and confirmed in the headset. Still open: far lighting/fog differences between the eyes and the Resonators reflection.</td>
-</tr>
-<tr>
-<td>1 Oct, evening</td>
-<td>The Resonators reflection fix was re-verified for 3.7. Far objects were darker in one eye: swapping the eyes&#39; view states moved the problem, and of about 40 render settings only indirect light mattered. WuWa&#39;s Cascade Lighting Volume keeps indirect light per view state and a refresh filled only the first eye; the mod now refills it once in a frame that renders both eyes.</td>
-<td><strong>Far lighting and character-screen reflections fixed</strong> (simulator, 1 Oct 18:17 beta). Weapon/Echo submenu reflections deferred.</td>
+<td>1 Oct, 18:17</td>
+<td>Fixed far lighting (lighting volume filled for one eye only) and ported the Resonators/team-screen reflection fix to 3.7.</td>
 </tr>
 </tbody></table></div>
-<h2 id="what-works-what-remains-open">What works, what remains open</h2>
-<p><strong>Observed improvements:</strong> usable real-game UI in several screens; first-person tracking during sprint/grapple/flight reported much better; hidden head with a full character shadow reported working; recovery controls; Native Stereo Fix repairing the reported one-eye character materials; main Resonators reflection improvement. The simulator recordings and those user reports have different scopes—neither proves every headset, character or menu.</p>
-<p><strong>Headset-confirmed on 28 Sep:</strong> the end-of-ultimate camera mismatch is fixed for the owner’s tested cases. This is user acceptance, not a claim that every character or transition has been exhaustively tested.</p>
-<p><strong>Fixed on 1 Oct (game 3.7):</strong> far trees and props use the same detail level in both eyes (see the next section), far objects get the same indirect light in both eyes, and the Resonators and team-screen reflections sit in the right place.</p>
-<p><strong>Still open:</strong> weapon and Echo submenu reflections, and full-animation first-person aiming.</p>
-<h2 id="why-a-tree-looked-frozen-in-one-eye">Why a tree looked frozen in one eye</h2>
-<p><strong>Answer (1 Oct):</strong> the game built the second eye&#39;s view with the default 90° FOV instead of the camera&#39;s 75°, so its LOD distance factor was 1.0 instead of 0.836. Far objects counted as further away in that eye and switched to cheaper, non-animated detail levels sooner. Near, both eyes animated; very far, both froze; in between, only one eye froze. The fix copies the first eye&#39;s LOD factor and FOV into the second view before rendering. The background below is how the investigation got there.</p>
-<p>A distant tree may use a cheaper mesh, a flat impostor, different shader code, or a distance-based wind cutoff. Wind often moves vertices in the shader; the object&#39;s CPU transform can stay still. Therefore a static object transform does not prove a frozen animation clock.</p>
-<p>The affected tree stays frozen on the left while its neighbor moves in both eyes. Moving closer makes that same target move in both; retreating restores the asymmetry. Setting the eye-position separation to zero throughout the retreat did not prevent it. Recorded main-eye projection scales also match. <strong>A different mesh/shader path or different final shader inputs is a stronger lead than simply “the eyes are six centimetres apart.”</strong> This is a hypothesis, not a confirmed root cause.</p>
-<p>Two render-side candidates were found in retained near/far traces. The strongest uses different vertex-factory/shader groups per eye far away, matching groups nearby. It has <strong>not</strong> been matched to the visible tree. Its pointer is valid only as evidence from that recorded process; it is not a permanent asset ID or a UObject to dereference later.</p>
-<h2 id="experiments-already-tried-avoid-another-blind-loop">Experiments already tried: avoid another blind loop</h2>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Experiment/evidence</th>
-<th>Result</th>
-<th>Limit</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Native Stereo Fix enabled</td>
-<td>User reports affected character materials repaired.</td>
-<td>Other stereo defects remain.</td>
-</tr>
-<tr>
-<td>One-frame thread lag disabled</td>
-<td>Adopted after Indath&#39;s timing suggestion and user testing.</td>
-<td>Not proof that all view/animation synchronization is fixed.</td>
-</tr>
-<tr>
-<td>Cached mesh commands disabled</td>
-<td>Target left canopy remained frozen.</td>
-<td>Not an exhaustive test of every renderer cache.</td>
-</tr>
-<tr>
-<td>Submission order reversed</td>
-<td>The same physical eye still froze.</td>
-<td>Makes simple draw-order explanations less persuasive.</td>
-</tr>
-<tr>
-<td>Standard foliage LOD/culling and impostor comparisons</td>
-<td>No established repair of the target.</td>
-<td>Custom paths may bypass those settings; a CVar changing is not proof the target used it.</td>
-</tr>
-<tr>
-<td>Shadow-quality comparison</td>
-<td>No demonstrated foliage repair.</td>
-<td>Does not settle the separate lighting issue.</td>
-</tr>
-<tr>
-<td>Zero-IPD stationary and moving comparisons</td>
-<td>Failure persisted; sampled CPU offset outputs coincided, including 399 retreat rows.</td>
-<td>Four-call scopes did not satisfy strict two-eye pairing; this does not prove identical final GPU resources.</td>
-</tr>
-<tr>
-<td>Near/far movement</td>
-<td>Same tree fails far, recovers near.</td>
-<td>Does not alone distinguish LOD, impostor, shader distance gate or cached state.</td>
-</tr>
-<tr>
-<td>Main-eye projection comparison</td>
-<td>Equal scale factors in retained samples.</td>
-<td>Actual viewport dimensions, LOD distance factors and relevant temporal LOD inputs remain unrecorded. Auxiliary views have different projections: grouping by pass number alone creates a false mismatch.</td>
-</tr>
-<tr>
-<td>Generic View/binding trace</td>
-<td>Clocks advance; identified two representation candidates.</td>
-<td>Trace is capped and sampled before final binding. Shared buffer addresses do not prove stale contents.</td>
-</tr>
-</tbody></table></div>
-<h2 id="next-work-in-order">Next work, in order</h2>
-<ol>
-<li><strong>Run the prepared tools once.</strong> Install the 16:28 candidate with the game closed. Confirm its trigger capability and asset-inventory endpoint, then collect the affected scene. The ultimate camera fix is now headset-confirmed; keep an ultimate return as a regression check after future rendering changes. Trigger-bridge acceptance is separate from the owner’s manual ultimate test.</li>
-<li><strong>Name the failing asset.</strong> Use the bounded nearby mesh/material inventory, landmark positions and FModel to identify the actual tree and representations. No game asset dump needs to be published.</li>
-<li><strong>Join the visible failure to a draw.</strong> Correlate the component/mesh with the relevant render primitive and exact shader permutation. Inspect the selected near/far representation and final View/material/instance inputs. This identity join is not done yet.</li>
-<li><strong>Measure the missing LOD inputs.</strong> Actual per-view dimensions, LOD factors and the active temporal-origin branch are still missing. Do not interpret inactive/default trace values as real decisions. One interesting source lead is the original full-width target versus a custom eye-width target; its causal role is unproven.</li>
-<li><strong>Make the smallest demonstrated correction.</strong> If representation selection is wrong, fix that policy while retaining per-eye projection and visibility. If the selected path is right but an input is stale/wrong, fix that input&#39;s ownership/update. Do not flatten stereo or disable wind/reflections and call it solved.</li>
-<li><strong>One grouped acceptance pass.</strong> Test the reproduced tree near/far and another tree, non-tree props, shadows, an ultimate, UI roundtrip, and first-person movement. Keep before/after captures and an easy rollback. Return to reflection submenus afterward.</li>
-</ol>
-<p>FModel reveals asset/material structure; it does not prove what a live GPU draw consumed. RenderDoc/PIX or a narrower final-binding capture are possible next tools, <strong>not completed tests</strong>; compatibility, overhead and game/anti-cheat restrictions need evaluation. The NTE/custom-UEVR and community research has not supplied a verified drop-in fix. Avoid copying broad patches without understanding their target build.</p>
+<h2 id="where-things-stand">Where things stand</h2>
+<p><strong>Working on game 3.7:</strong> stereo view and head tracking; the real game HUD and menus in VR; first person, freecam and the 6DOF window; Xbox shortcuts; the end-of-ultimate camera fix; far trees, props and lighting matching between the eyes; Resonators and team-screen reflections.</p>
+<p><strong>Open:</strong> weapon and Echo submenu reflections, and full-animation first-person aiming. Far lighting after a long walk with no loading screen has not been measured. Not yet ported to 3.7 and not known to cause visible problems: the shared scene-frame counter and the water stereo diagnostics.</p>
+<h2 id="three-stereo-bugs-explained">Three stereo bugs, explained</h2>
+<p>Each of these made the two eyes disagree about something the game decides once per view.</p>
+<p><strong>Far trees froze in one eye (LOD).</strong> A distant object switches to cheaper versions of itself (levels of detail, LOD); the cheapest ones skip wind animation. The game built the second eye&#39;s view with the default 90° field of view instead of the camera&#39;s 75°, so its LOD distance factor was 1.0 instead of 0.836: far objects counted as further away in that eye and switched sooner. Near, both eyes animated; very far, both froze; in between, only one eye froze. <strong>Fix:</strong> before both eyes render, the second view takes the first view&#39;s LOD factor and FOV. Setting: <em>Match far-object detail between eyes</em>.</p>
+<p><strong>Far objects were darker in one eye (lighting).</strong> WuWa lights distant objects partly with a Cascade Lighting Volume (CLV): camera-centred cascades of stored indirect (bounce and sky) light. Each eye keeps its own copy in its <em>view state</em>, the per-eye memory the renderer keeps between frames. When the game rebuilds the volume (start, loading, teleport), only the eye rendered first gets the far cascades filled. <strong>Fix:</strong> after the game starts, after loading screens and after teleports, the mod asks for one refill in a frame that renders both eyes. A refill causes a ~0.2 s hitch, so automatic refills are at least 20 s apart. Setting: <em>Match far lighting between eyes</em>, plus a <em>Refill far lighting now</em> button.</p>
+<p><strong>Character-screen reflections slid outward (projection).</strong> The Resonators and team screens render a mirror image of the character. WuWa&#39;s reflection code rebuilds the mirror camera with a centred, symmetric projection; a headset eye&#39;s projection is off-centre, so each eye&#39;s reflection slid outward and was too large. <strong>Fix:</strong> the mirror capture keeps each eye&#39;s own projection, each eye gets its own reflection history, and the mirror camera is refreshed for each eye.</p>
+<h3>How they were found</h3>
+<ul>
+<li><strong>Diff everything, including what never changes.</strong> The LOD cause sat in raw view snapshots for days; an earlier comparison had filtered out &quot;constant&quot; differences, and the FOV difference is constant.</li>
+<li><strong>Swap, then bisect.</strong> Swapping the eyes&#39; view states showed the lighting problem lived in per-eye state. Switching one render setting at a time (with automatic restore) and scoring the left/right brightness gap of far objects narrowed ~40 settings to indirect light, then to the CLV and its refresh.</li>
+<li><strong>Measure instead of asking.</strong> The simulator&#39;s window can be captured and scored: motion of a far canopy for the LOD bug, an eye-aligned brightness gap for the lighting bug. The owner only had to stand still.</li>
+<li><strong>Ask about distance and angle early.</strong> The owner&#39;s observation that the mismatch appears only in a middle distance band was the decisive clue for the LOD bug.</li>
+</ul>
+<h2 id="game-updates">Game updates</h2>
+<p>Game patches move code and data. The mod refuses features whose code no longer matches byte for byte, so a patch disables them rather than crashing. Porting compares a capture of the old game with the new one: each hooked function is found again by its surrounding bytes and callers, data offsets are translated from aligned instructions, and anything that changed beyond moved addresses is reviewed by hand. Patch 3.7 moved the view object from 0xe8d0 to 0xe940 bytes and shifted several view fields.</p>
 <h2 id="codebase-cheat-sheet">Codebase cheat sheet</h2>
-<p>Public paths below are a <strong>source overlay</strong>, not a self-contained UEVR fork. <code>mod/BUILD.md</code> explains reconstruction against pinned upstream versions. Public release tags identify the exported code; local recovery checkpoint IDs record provenance and may not be reachable in public Git.</p>
+<p>Public paths below are a <strong>source overlay</strong>, not a self-contained UEVR fork. <code>mod/BUILD.md</code> explains reconstruction against pinned upstream versions. Release tags identify the exported code.</p>
 <div class="table-scroll"><table>
 <thead>
 <tr>
@@ -194,7 +86,7 @@
 </tr>
 <tr>
 <td>Dashboard, build selection, profile backup/apply and launch</td>
-<td><code>launcher/dev/wuwa-player.html</code>, <code>wuwa_player.py</code>, <code>wuwa-launcher.py</code>, <code>start-wuwa-build.ps1</code></td>
+<td><code>launcher/dev/wuwa-player.html</code>, <code>wuwa_player.py</code>, <code>start-wuwa-build.ps1</code></td>
 </tr>
 <tr>
 <td>Real game HUD/menu extraction</td>
@@ -205,43 +97,58 @@
 <td><code>mod/uevr/src/mods/vr/FFakeStereoRenderingHook.cpp</code></td>
 </tr>
 <tr>
-<td>One draw&#39;s shared game-camera base</td>
-<td><code>mod/uevr/src/utility/WuWaStereoBasePose.hpp</code></td>
+<td>Far LOD fix, Same Pass, view-state swap diagnostics</td>
+<td><code>mod/uevr/src/utility/WuWaShadowPass.hpp</code></td>
 </tr>
 <tr>
-<td>Mod controls/settings and recorded camera/controller state</td>
-<td><code>mod/uevr/src/mods/vr/WuWaControlsComponent.cpp</code>, <code>mod/uevr/src/mods/VR.cpp</code></td>
+<td>Far lighting fix (CLV refill)</td>
+<td><code>mod/uevr/src/utility/WuWaClvRefresh.hpp</code></td>
 </tr>
 <tr>
-<td>First person, body/head visibility, controller camera behavior</td>
-<td><code>mod/lua/</code> — start with <code>01_WuWaVR_Comfort.lua</code>, then <code>02_WuWaVR_PolarControls.lua</code></td>
+<td>Character-screen reflection fix</td>
+<td><code>mod/uevr/src/utility/WuWaReflectionCapture.hpp</code>, <code>WuWaReflectionHistory.hpp</code>, <code>WuWaReflectionProjection.hpp</code></td>
 </tr>
 <tr>
-<td>Bounded synthetic controller input</td>
-<td><code>WuWaInputSequence.hpp</code>, <code>WuWaInputSequenceBridge.hpp</code> under native <code>src/utility/</code>; <code>launcher/dev/wuwa_input_sequence.py</code></td>
+<td>Game-version checks</td>
+<td><code>mod/uevr/src/utility/WuWaCodeCompatibility.hpp</code>, <code>WuWaCodeCheck.hpp</code></td>
 </tr>
 <tr>
-<td>Nearby reflected assets, not a renderer modification</td>
-<td><code>launcher/dev/diagnostics/wuwa_nearby_inventory.lua</code> and dormant request wrapper</td>
+<td>Mod controls/settings</td>
+<td><code>mod/uevr/src/mods/vr/WuWaControlsComponent.cpp</code></td>
 </tr>
 <tr>
-<td>LOD/View/mesh diagnostic records</td>
-<td><code>WuWaLodProbe.hpp</code>, <code>WuWaLodSnapshot.hpp</code>, <code>WuWaMeshBindingSnapshot.hpp</code>; Python analyzers in <code>launcher/dev/</code></td>
+<td>First person, body/head visibility, controller camera behaviour</td>
+<td><code>mod/lua/</code>, starting with <code>01_WuWaVR_Comfort.lua</code>, then <code>02_WuWaVR_PolarControls.lua</code></td>
+</tr>
+<tr>
+<td>In-game test control (timed render-setting switches, captures, refills)</td>
+<td><code>mod/uevr/src/utility/WuWaTestControl.hpp</code>; client <code>launcher/dev/wuwa-test.py</code></td>
+</tr>
+<tr>
+<td>Stereo measurement tools</td>
+<td><code>launcher/dev/wuwa_light_batch.py</code>, <code>wuwa_clv_check.py</code>, <code>wuwa_motion_halves.py</code>, <code>wuwa_bench_run.py</code></td>
+</tr>
+<tr>
+<td>Porting to a new game version</td>
+<td><code>launcher/dev/wuwa_port_offsets.py</code>, <code>wuwa_offset_table.py</code>, <code>wuwa_merge_captures.py</code></td>
 </tr>
 <tr>
 <td>Recorder and replay</td>
 <td><code>launcher/dev/record-wuwa.py</code>, <code>recording-replay.html</code>, <code>steamvr-capture/</code></td>
 </tr>
 <tr>
-<td>Translations and website</td>
-<td><code>mod/localization/</code>, <code>launcher/localization/</code>, <code>site/</code></td>
+<td>One-build beta packaging</td>
+<td><code>dev/package-beta.py</code></td>
 </tr>
 <tr>
-<td>Exact native changes and build pins</td>
-<td><code>mod/source-changes/</code>, <code>mod/checkpoint.json</code>, <code>mod/BUILD.md</code></td>
+<td>Translations and website</td>
+<td><code>mod/localization/</code>, <code>launcher/localization/</code>, <code>site/</code>, <code>dev/build-site.cjs</code></td>
+</tr>
+<tr>
+<td>Investigation log</td>
+<td><code>docs/STEREO-CULLING-PROGRESS.md</code></td>
 </tr>
 </tbody></table></div>
-<p>For your private working checkout, <code>mod/uevr/</code> corresponds to <code>upstream/UEVR/</code>, <code>mod/lua/</code> to the packaged profile scripts / <code>dev/</code>, and <code>launcher/dev/</code> to <code>dev/</code>. <code>runtime/</code> contains runnable builds; <code>extracted/</code> holds frozen packages, recordings and private evidence; <code>_docs/HANDOFF-next-session.md</code> is the latest local handoff. Do not upload all of <code>extracted/</code>: it contains personal paths, gameplay identifiers and game-derived data.</p>
 <h3>Terms without the jargon</h3>
 <div class="table-scroll"><table>
 <thead>
@@ -252,15 +159,19 @@
 </thead>
 <tbody><tr>
 <td>Native Stereo / NSF</td>
-<td>Stereo rendering mode / an additional UEVR compatibility fix. These are separate switches.</td>
+<td>Stereo rendering mode / an additional UEVR compatibility fix that renders each eye separately. These are separate switches.</td>
 </tr>
 <tr>
-<td>View / view family</td>
-<td>One rendering camera&#39;s data / a group of views. Extra views need not correspond to a headset eye.</td>
+<td>View / view family / view state</td>
+<td>One rendering camera&#39;s data / a group of views rendered together / the per-view memory kept between frames (histories, caches).</td>
 </tr>
 <tr>
 <td>LOD / culling / impostor</td>
 <td>Cheaper distant model / skip invisible work / a cheaper image-like stand-in.</td>
+</tr>
+<tr>
+<td>Indirect light / CLV</td>
+<td>Light bounced off surfaces and from the sky / WuWa&#39;s Cascade Lighting Volume, which stores it around the camera.</td>
 </tr>
 <tr>
 <td>WPO / vertex factory</td>
@@ -268,15 +179,11 @@
 </tr>
 <tr>
 <td>Uniform buffer</td>
-<td>A packet of shader inputs such as matrices, time and camera position. Same address can hold updated data.</td>
-</tr>
-<tr>
-<td>Temporal history</td>
-<td>Previous-frame data used for effects; each eye needs correctly owned history.</td>
+<td>A packet of shader inputs such as matrices, time and camera position.</td>
 </tr>
 <tr>
 <td>LGUI / UI quad</td>
-<td>WuWa&#39;s UI rendering system / the surface or layer presenting UI in VR. We redirect actual game UI, not a Lua recreation of its text.</td>
+<td>WuWa&#39;s UI rendering system / the surface or layer presenting UI in VR. We redirect actual game UI, not a recreation.</td>
 </tr>
 <tr>
 <td>IPD / projection</td>
@@ -287,12 +194,6 @@
 <td>Compiled program / supplied configuration and scripts / the VR implementation connecting the application to its display.</td>
 </tr>
 </tbody></table></div>
-<h3>Reading, editing and testing efficiently</h3>
-<p>Start with the player guide and this map, then follow <strong>one feature</strong> from dashboard or setting → implementation → recorder/test. Don&#39;t start by reading the entire renderer hook. Small Lua/text changes are easier to understand than native rendering hooks; still keep a backup and follow the script reload/restart rules.</p>
-<p>A native <code>.hpp</code> change can rebuild many C++ units because headers are included widely. A backend DLL change needs a game restart. Recent build delays also included excessive inner MSVC workers and a locked PDB; the latter was solved by relinking existing objects to a new symbol filename. Compilation passing proves compilation, not correct stereo.</p>
-<p>For native builds, use the pinned instructions and keep both outer and MSVC inner parallelism bounded on this PC: <code>cmake --build out/build/x64-RelWithDebInfo --config RelWithDebInfo --target uevr --parallel 1 -- /p:CL_MPCount=1 /p:MultiProcMaxCount=1</code>. Keep the matching PDB privately. Do not overwrite a loaded DLL or copy random debug builds into the working profile.</p>
-<p>For controller input changes, run the native input-sequence/bridge tests and Python recording/input tests. For the inventory, run its Lua fixtures. For packaging, verify the archive and actual EXE using isolated test AppData. For a rendering change, you still need <strong>a recording of the failing scene</strong>, not just passing unit tests or counters. The input tools use bounded plans, neutral release, focus/physical-takeover checks and explicit requests; ordinary recording does not play the game.</p>
-<h3>A useful bug report</h3>
-<p>Include release/build ID, game version, VR runtime/headset, selected NSF/profile settings, character and location, the exact action, expected result and a short SBS clip showing both eyes. Say which eye fails and when. Keep UID/player names private and review footage before uploading. Use the site&#39;s feedback form to prepare a GitHub issue; it does not silently upload private logs or post for you.</p>
-<p>For future rendering candidates, one combined regression report is enough: startup/controls, near/far foliage, ultimate return, menu roundtrip, first-person movement. Separate <strong>fixed</strong>, <strong>still broken</strong> and <strong>not tested</strong>. Keep the older 26 Sep public beta (included in this ZIP) for rollback.</p>
-</article></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>
+<h3>Working on the code</h3>
+<p>Follow <strong>one feature</strong> from its setting to its implementation and test, rather than reading the whole renderer hook. A native header change can rebuild many files, and a new DLL needs a game restart. Passing compilation proves compilation, not correct stereo: check rendering changes with a capture of the affected scene, scored automatically where possible. Build steps and contribution notes are on the <a href="developers.html">developers page</a>.</p>
+</article></main><footer class="footer wrap"><p>Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information"><a href="developers.html">Code &amp; contribute</a><a href="https://github.com/ChronoHaxx/wuwa-vr">GitHub</a><a href="https://github.com/ChronoHaxx/wuwa-vr/releases">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License</a><a href="support.html">Optional support</a></nav><p class="small">Original website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>

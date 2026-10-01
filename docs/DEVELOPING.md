@@ -1,20 +1,24 @@
 # Code and contributions
 
-The source now matches the 28 Sep 16:28 experimental checkpoint. See the
-[beginner timeline, code map and next experiments](understanding.html).
-The older beta source remains at its GitHub release tag.
+The repository holds the website, the launcher and the mod's source changes. It
+is an **overlay** on pinned upstream versions, not a standalone UEVR fork:
+[mod/BUILD.md](https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md)
+explains how to rebuild. Each release tag records the exact source of that
+download.
 
-Read [native build instructions](https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md).
-The export is an overlay plus exact pinned patches, not a standalone UEVR fork.
-95 native paths and two SDK paths were reconstructed. The owner confirmed the ultimate camera fix in headset testing on 28 Sep
-for the tested cases. No fresh full rebuild or universal foliage repair is claimed.
+| Folder | Contents |
+| --- | --- |
+| `mod/uevr` | Native changes: stereo, UI, camera, game-version checks |
+| `mod/lua` | Camera, controller, head-hiding and shadow scripts |
+| `mod/localization` | In-game control and shortcut-sheet translations |
+| `launcher/dev` | Portable launcher, recorder and test/measurement tools |
+| `site`, `docs`, `dev` | Website, player docs and their generators |
 
-Foliage/prop and lighting disparities remain open. Main Resonators
-reflection improved; lower/weapon submenus are deferred. The new trigger and
-inventory tools are ready for live testing. Preserve distinct per-eye projections
-and temporal histories; do not copy one final eye image into the other.
+The [explainer](understanding.html) has a file-by-file map, the stereo fixes and
+how they were found. When changing rendering, keep each eye's own projection and
+history; never copy one eye's finished image into the other. Check a rendering
+change with a capture of the affected scene, not only a successful build.
 
-Source folders: mod/uevr, mod/uesdk, mod/lua, mod/localization, launcher/dev.
-Keep component licenses and attribution. Forks and evidenced improvements welcome.
-Report the exact build, runtime, scene and both-eye clip through the feedback form.
-Do not publish raw personal logs or game asset dumps.
+Build natively with bounded parallelism on modest PCs:
+`cmake --build out/build/x64-RelWithDebInfo --config RelWithDebInfo --target uevr --parallel 1 -- /p:CL_MPCount=1 /p:MultiProcMaxCount=1`.
+A new DLL needs a game restart.

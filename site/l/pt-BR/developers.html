@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width,initial-scale=1" name="viewport"/><meta content="Source layout, building and contributing to WuWa VR." name="description"/><meta content="#17191c" name="theme-color"/><title>Code and contributions — WuWa VR</title><link href="https://chronohaxx.github.io/wuwa-vr/developers.html" hreflang="en" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/zh-Hans/developers.html" hreflang="zh-Hans" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/ja/developers.html" hreflang="ja" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/ko/developers.html" hreflang="ko" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/es/developers.html" hreflang="es" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/pt-BR/developers.html" hreflang="pt-BR" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/fr/developers.html" hreflang="fr" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/de/developers.html" hreflang="de" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/ru/developers.html" hreflang="ru" rel="alternate"/><link href="https://chronohaxx.github.io/wuwa-vr/l/ar/developers.html" hreflang="ar" rel="alternate"/><link href="../../media/mark.svg" rel="icon" type="image/svg+xml"/><link href="../../style.css" rel="stylesheet"/><script defer="" src="../../config.js"></script><script defer="" src="../../app.js"></script></head><body><a class="skip" href="#main">Pular para o conteúdo</a><header class="header wrap"><a class="wordmark" dir="ltr" href="index.html" lang="en">WuWa VR</a><nav aria-label="Site"><a href="guide.html">Guia</a><a href="feedback.html">Feedback</a><a href="credits.html">Créditos</a><a href="languages.html">Idiomas</a></nav><details class="language-picker"><summary>Language / 语言 / اللغة</summary><nav aria-label="Languages"><a data-language="en" dir="ltr" href="../../developers.html" hreflang="en" lang="en">English</a><a data-language="zh-Hans" dir="ltr" href="../zh-Hans/developers.html" hreflang="zh-Hans" lang="zh-Hans">简体中文</a><a data-language="ja" dir="ltr" href="../ja/developers.html" hreflang="ja" lang="ja">日本語</a><a data-language="ko" dir="ltr" href="../ko/developers.html" hreflang="ko" lang="ko">한국어</a><a data-language="es" dir="ltr" href="../es/developers.html" hreflang="es" lang="es">Español</a><a data-language="pt-BR" dir="ltr" href="../pt-BR/developers.html" hreflang="pt-BR" lang="pt-BR">Português (Brasil)</a><a data-language="fr" dir="ltr" href="../fr/developers.html" hreflang="fr" lang="fr">Français</a><a data-language="de" dir="ltr" href="../de/developers.html" hreflang="de" lang="de">Deutsch</a><a data-language="ru" dir="ltr" href="../ru/developers.html" hreflang="ru" lang="ru">Русский</a><a data-language="ar" dir="rtl" href="../ar/developers.html" hreflang="ar" lang="ar">العربية</a></nav></details></header><main class="wrap" id="main"><p class="small translation-note">Esta página é uma tradução do original em inglês, que prevalece em caso de diferença. As partes ainda não traduzidas aparecem em inglês. <a href="../../developers.html" hreflang="en" lang="en">English</a></p><h1>Code and contributions</h1><nav aria-label="GitHub" class="page-links"><a href="https://github.com/ChronoHaxx/wuwa-vr">Browse GitHub</a><a href="https://github.com/ChronoHaxx/wuwa-vr/fork">Fork the repository</a><a href="https://github.com/ChronoHaxx/wuwa-vr/issues">Search issues</a><a href="feedback.html">Prepare a report</a></nav><div class="guide-content"><p>The repository holds the website, the launcher and the mod's source changes. It
+is an <strong>overlay</strong> on pinned upstream versions, not a standalone UEVR fork:
+<a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md">mod/BUILD.md</a>
+explains how to rebuild. Each release tag records the exact source of that
+download.</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>Folder</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>mod/uevr</code></td>
+<td>Native changes: stereo, UI, camera, game-version checks</td>
+</tr>
+<tr>
+<td><code>mod/lua</code></td>
+<td>Camera, controller, head-hiding and shadow scripts</td>
+</tr>
+<tr>
+<td><code>mod/localization</code></td>
+<td>In-game control and shortcut-sheet translations</td>
+</tr>
+<tr>
+<td><code>launcher/dev</code></td>
+<td>Portable launcher, recorder and test/measurement tools</td>
+</tr>
+<tr>
+<td><code>site</code>, <code>docs</code>, <code>dev</code></td>
+<td>Website, player docs and their generators</td>
+</tr>
+</tbody></table></div>
+<p>The <a href="understanding.html">explainer</a> has a file-by-file map, the stereo fixes and
+how they were found. When changing rendering, keep each eye's own projection and
+history; never copy one eye's finished image into the other. Check a rendering
+change with a capture of the affected scene, not only a successful build.</p>
+<p>Build natively with bounded parallelism on modest PCs:
+<code>cmake --build out/build/x64-RelWithDebInfo --config RelWithDebInfo --target uevr --parallel 1 -- /p:CL_MPCount=1 /p:MultiProcMaxCount=1</code>.
+A new DLL needs a game restart.</p>
+<section id="contributing"><h2>Contributing</h2><p>This is a free, unofficial fan project. You do not need to donate, write code or
+speak English to help: bug reports, translations, comfort feedback and small
+fixes all count. Volunteers are welcome; replies and continued maintenance are
+not guaranteed.</p>
+<h3>Report something</h3>
+<p>Use the website's <a href="feedback.html">feedback form</a>
+for a bug, feature, accessibility or language request, in any language. It
+prepares a GitHub issue for you to review and submit; it never posts by itself.
+Leave out account IDs, personal paths, passwords and unreviewed logs.</p>
+<h3>Translations</h3>
+<p>The whole website is available in ten languages. Each language has a translation
+memory, <code>dev/i18n/&lt;lang&gt;.json</code>, mapping every English paragraph to its
+translation. To fix a translation, edit the <code>"t"</code> text of that entry and keep
+any HTML tags, links and button names (<code>L3 + R3</code>, <code>WuWa Controls</code>) as they are.
+When English text changes, its old translation no longer matches and that
+paragraph shows in English until it is translated again. See
+<a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/dev/i18n/README.md">dev/i18n/README.md</a>.</p>
+<h3>Code, forks and sharing</h3>
+<p>Keep a fix small, describe the actual problem and how you checked it, and say
+whether you tested it in the game and headset. Keep existing attribution. Our
+<a href="license.html">scoped license</a> covers original work only; do not relicense
+upstream code or publish private game data.</p>
+<p>Forks of the MIT-covered parts are welcome. Please keep access free, share
+improvements and avoid paid repacks or paywalled forks. That is a community
+request, not an MIT condition: MIT allows commercial use.</p>
+</section></div></main><footer class="footer wrap"><p>Projeto de fãs gratuito e não oficial. Sem vínculo com a Kuro Games.</p><nav aria-label="Informações do projeto"><a href="developers.html">Código e contribuições</a><a href="https://github.com/ChronoHaxx/wuwa-vr">GitHub</a><a href="https://github.com/ChronoHaxx/wuwa-vr/releases">Versões</a><a href="risk.html">Riscos para a conta e isenção de responsabilidade</a><a href="license.html">Licença</a><a href="support.html">Apoio opcional</a></nav><p class="small">Trabalho original do site e do guia: MIT. Componentes de terceiros mantêm seus próprios termos.</p></footer></body></html>

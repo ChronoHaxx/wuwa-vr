@@ -1,0 +1,566 @@
+{
+ "015d62c750a5a4be": {
+  "en": "Report a bug or request a feature",
+  "t": "报告问题或提出功能建议"
+ },
+ "04f00a61778e1637": {
+  "en": "<strong>Recording</strong> of side-by-side stereo video from the launcher.",
+  "t": "在启动器中<strong>录制</strong>左右并排的立体视频。"
+ },
+ "07232868ff050d09": {
+  "en": "Launcher step 1, Account risk: the risk notice and a ticked box, I have read the account-risk notice and accept the risk.",
+  "t": "启动器第 1 步，账号风险：风险说明和已勾选的“我已阅读账号风险说明并接受风险”。"
+ },
+ "0a4470d64e9d3259": {
+  "en": "Skip to content",
+  "t": "跳到正文"
+ },
+ "0acc39ceb6443522": {
+  "en": "Project information",
+  "t": "项目信息"
+ },
+ "1074648b6d56a1eb": {
+  "en": "<strong>English</strong>",
+  "t": "<strong>English</strong>"
+ },
+ "136c4c9b93a07efa": {
+  "en": "Account risk and disclaimer — WuWa VR",
+  "t": "账号风险与免责声明 — WuWa VR"
+ },
+ "175ca2b037938a14": {
+  "en": "Free fan-made VR mod for Wuthering Waves on PC headsets: download, controller guide and known issues.",
+  "t": "免费的粉丝自制《鸣潮》PC 头显 VR 模组：下载、手柄指南与已知问题。"
+ },
+ "1806e990dc4a6f00": {
+  "en": "This draft is too long for a reliable link. Copy it, open GitHub, then paste it into the issue.",
+  "t": "草稿太长，无法通过链接可靠传递。请复制草稿，打开 GitHub，再粘贴到问题中。"
+ },
+ "19c448281159e717": {
+  "en": "Launcher step 3, How do you start the game: the official launcher is selected; Steam/Epic startup is marked experimental.",
+  "t": "启动器第 3 步，如何启动游戏：已选择官方启动器；Steam/Epic 启动标记为实验性。"
+ },
+ "1a8d187f4e449218": {
+  "en": "<strong>Español</strong>",
+  "t": "<strong>Español</strong>"
+ },
+ "1acde7f878a6842e": {
+  "en": "<strong>Deutsch</strong>",
+  "t": "<strong>Deutsch</strong>"
+ },
+ "1b0ea0d8ad9a0d46": {
+  "en": "Contribute translations, documentation, accessibility feedback or fixes.",
+  "t": "贡献翻译、文档、无障碍反馈或修复。"
+ },
+ "1ceaa4b8399d9447": {
+  "en": "More stereo views",
+  "t": "更多立体画面"
+ },
+ "1cfe894a626438a1": {
+  "en": "This page has moved.",
+  "t": "此页面已移动。"
+ },
+ "20e90cef07ee7fa3": {
+  "en": "Maintained in spare time; replies and fixes are not guaranteed. <a href=\"support.html\">Support expectations</a>.",
+  "t": "利用业余时间维护；不保证回复和修复。<a href=\"support.html\">关于支持的说明</a>。"
+ },
+ "242fc67c683a3f51": {
+  "en": "Requested language or translation correction (optional)",
+  "t": "申请的语言或翻译更正（可选）"
+ },
+ "24f954ca5f71b5ba": {
+  "en": "Build and testing notes now live in the <a href=\"guide.html\">player guide</a> and the <a href=\"understanding.html\">explainer</a>. Every download is listed on <a href=\"https://github.com/ChronoHaxx/wuwa-vr/releases\">GitHub Releases</a>.",
+  "t": "版本与测试说明现在位于<a href=\"guide.html\">玩家指南</a>和<a href=\"understanding.html\">原理说明</a>中。所有下载都列在 <a href=\"https://github.com/ChronoHaxx/wuwa-vr/releases\">GitHub Releases</a> 上。"
+ },
+ "255180f5b0eff0e7": {
+  "en": "Nothing here excludes or limits liability or rights where doing so would be unlawful. This disclaimer does not remove rights held by Kuro Games, other rights holders or users under applicable law, nor make unauthorized conduct permitted. It is not a guarantee of legal protection for the authors.",
+  "t": "如果排除或限制责任或权利是违法的，此处的任何内容都不会这样做。本免责声明不会取消库洛游戏、其他权利人或用户依据适用法律享有的权利，也不会使未经授权的行为变得被允许。它不保证为作者提供法律保护。"
+ },
+ "2a0c100322e56094": {
+  "en": "Open launcher step 1 at full size",
+  "t": "查看启动器第 1 步的完整大图"
+ },
+ "2b4cf6bcc561ab53": {
+  "en": "Launcher step 2, Choose a build, from an earlier package that contained two builds.",
+  "t": "启动器第 2 步，选择版本；截图来自一个包含两个版本的较早安装包。"
+ },
+ "2b7b54308d709cf8": {
+  "en": "The optional 6DOF window during combat. Both eye views; actual headset footage. Recorded 26 September 2026, Quest Pro / SteamVR mirror, on an earlier build.",
+  "t": "战斗中的可选 6DOF 窗口。双眼画面；真实头显录像。2026 年 9 月 26 日录制，Quest Pro / SteamVR 镜像，使用较早的版本。"
+ },
+ "2bf3375c357d2d03": {
+  "en": "<strong>Use at your own risk. Account restrictions, suspension or a permanent ban are possible.</strong> This unofficial fan-made modification injects third-party code into the game. It is not approved, endorsed or supported by Kuro Games. We have no confirmation that its use is allowed by the game's anti-cheat or account policies.",
+  "t": "<strong>使用风险自负。账号可能被限制、暂停或永久封禁。</strong>这个非官方粉丝自制修改会向游戏注入第三方代码。它未经库洛游戏批准、认可或支持。我们无法确认游戏的反作弊或账号政策允许使用它。"
+ },
+ "2c189923921bd8dc": {
+  "en": "Feedback and requests — WuWa VR",
+  "t": "反馈与请求 — WuWa VR"
+ },
+ "2c276a65f885945a": {
+  "en": "This is a free, unofficial fan project. Our original independent work uses MIT; each upstream component keeps its own terms.",
+  "t": "这是免费的非官方粉丝项目。我们的原创独立作品使用 MIT 许可；每个上游组件保留各自的条款。"
+ },
+ "2c8cc251eea0e6cb": {
+  "en": "What would you like to send?",
+  "t": "你想发送什么？"
+ },
+ "2c9adc2de40ae989": {
+  "en": "Open launcher step 2 at full size",
+  "t": "查看启动器第 2 步的完整大图"
+ },
+ "2cf835cd9adc29d8": {
+  "en": "<strong>Français</strong>",
+  "t": "<strong>Français</strong>"
+ },
+ "2d77964df6f2a895": {
+  "en": "WuWa VR — WuWa VR",
+  "t": "WuWa VR — WuWa VR"
+ },
+ "2d83f14c54389db9": {
+  "en": "Select and copy the draft below. Nothing has been submitted.",
+  "t": "请选中并复制下方草稿。尚未提交任何内容。"
+ },
+ "2dcc75e494df4b9a": {
+  "en": "<strong>Stereo VR with head tracking</strong>, using the game's own HUD and menus.",
+  "t": "<strong>带头部追踪的立体 VR</strong>，使用游戏自带的 HUD 和菜单。"
+ },
+ "2fb1a4ce7311643c": {
+  "en": "Feedback and requests",
+  "t": "反馈与请求"
+ },
+ "305127f7a0acd0aa": {
+  "en": "Free, unofficial fan project. Not affiliated with Kuro Games.",
+  "t": "免费的非官方粉丝项目。与库洛游戏无关。"
+ },
+ "3229609e15436ec5": {
+  "en": "License",
+  "t": "许可"
+ },
+ "32b93cdc14d6d12d": {
+  "en": "Start your headset software, then <strong>Apply &amp; launch</strong>. Accept the Windows permission prompt and press Play.",
+  "t": "先启动头显软件，然后点击 <strong>Apply &amp; launch</strong>。接受 Windows 权限提示，再点击“开始游戏”。"
+ },
+ "344853c654f53807": {
+  "en": "Sources checked 25 September 2026. Policies may change or differ by region.",
+  "t": "资料查阅于 2026 年 9 月 25 日。政策可能变化，也可能因地区而异。"
+ },
+ "34bf376bcb8d060a": {
+  "en": "To the extent permitted by applicable law, our original work is provided <strong>as is</strong>, without warranties, including fitness for a particular purpose, compatibility, uninterrupted operation or account safety. Use may also cause crashes, lost settings or VR discomfort. Stop if you feel unwell. Authors and contributors do not promise updates, continued maintenance, individual help or compensation for account restrictions. Each component's precise license and warranty terms still apply; see <a href=\"license.html\">licenses</a>.",
+  "t": "在适用法律允许的范围内，我们的原创作品<strong>按原样</strong>提供，不附带任何担保，包括适用于特定用途、兼容性、不间断运行或账号安全。使用还可能导致崩溃、设置丢失或 VR 不适。如感到不适请停止使用。作者和贡献者不承诺更新、持续维护、个人帮助或对账号限制的补偿。各组件的具体许可和担保条款仍然适用；见<a href=\"license.html\">许可</a>。"
+ },
+ "35b3c7892b117e84": {
+  "en": "What happened, or what would help?",
+  "t": "发生了什么，或者什么会有帮助？"
+ },
+ "394a49d9d0a96ce2": {
+  "en": "Optional support — WuWa VR",
+  "t": "自愿支持 — WuWa VR"
+ },
+ "3a5d3924a4183a56": {
+  "en": "Open launcher step 4 at full size",
+  "t": "查看启动器第 4 步的完整大图"
+ },
+ "3a97b562c746072c": {
+  "en": "Account risk &amp; disclaimer",
+  "t": "账号风险与免责声明"
+ },
+ "3af61905fbbcb5e2": {
+  "en": "Build, headset and runtime (optional)",
+  "t": "版本、头显和运行时（可选）"
+ },
+ "3c55c36817efec51": {
+  "en": "<strong>New:</strong> Far trees, props and lighting now match between the eyes, and the Resonators and team-screen reflections are back in place.",
+  "t": "<strong>新内容：</strong>远处的树木、物件和光照现在两眼一致，共鸣者界面和编队界面的倒影也恢复了正确位置。"
+ },
+ "3f661067dc184418": {
+  "en": "Report a bug, suggest a feature or request a language, in whichever language you prefer.",
+  "t": "报告问题、建议功能或申请语言，用你习惯的任何语言都可以。"
+ },
+ "41675778a86f9eab": {
+  "en": "Prepare report",
+  "t": "准备报告"
+ },
+ "41c8a7e50a566867": {
+  "en": "Add a short summary and description first.",
+  "t": "请先填写简短摘要和描述。"
+ },
+ "4439b97fe91af4ee": {
+  "en": "Support the original authors through links on their own pages.",
+  "t": "通过原作者在其页面上提供的链接支持他们。"
+ },
+ "463416e09e88115d": {
+  "en": "Play Wuthering Waves in VR on a PC headset. A free, fan-made mod built on <a href=\"https://uevr.io/\">praydog's UEVR</a>, maintained by ChronoHaxx.",
+  "t": "用 PC VR 头显玩《鸣潮》。这是基于 <a href=\"https://uevr.io/\">praydog 的 UEVR</a> 的免费粉丝自制模组，由 ChronoHaxx 维护。"
+ },
+ "477b4fca0365f6f5": {
+  "en": "<strong>Xbox controls</strong> with an in-VR shortcut sheet and an adjustable HUD.",
+  "t": "<strong>Xbox 手柄操作</strong>，带 VR 内快捷键表和可调整的 HUD。"
+ },
+ "47dc04c4f1b15c27": {
+  "en": "<strong>Optional 6DOF window</strong>, adapted from Elliott Tate's work.",
+  "t": "<strong>可选的 6DOF 窗口</strong>，改编自 Elliott Tate 的作品。"
+ },
+ "4bf66f6132eda903": {
+  "en": "No warranty or promise of support",
+  "t": "不提供担保或支持承诺"
+ },
+ "4c0824e0981f7f0b": {
+  "en": "The WuWa VR website in ten languages.",
+  "t": "WuWa VR 网站提供十种语言。"
+ },
+ "4c3083d4c59130e4": {
+  "en": "Feature or accessibility request",
+  "t": "功能或无障碍请求"
+ },
+ "4ed2589d468400e4": {
+  "en": "Copy report",
+  "t": "复制报告"
+ },
+ "4f289d80c790c38c": {
+  "en": "Your draft: review before sharing",
+  "t": "你的草稿：分享前请检查"
+ },
+ "4f35228a75042b73": {
+  "en": "License and sharing — WuWa VR",
+  "t": "许可与分享 — WuWa VR"
+ },
+ "51264c4ab12bb6b0": {
+  "en": "Report a bug, suggest a feature or request a language.",
+  "t": "报告问题、建议功能或申请语言。"
+ },
+ "52fcc3c8a349fcbf": {
+  "en": "See it in play",
+  "t": "实际效果"
+ },
+ "5442e2b64fa09764": {
+  "en": "GitHub",
+  "t": "GitHub"
+ },
+ "549be9c5511bd002": {
+  "en": "Anti-cheat or future updates may detect or block the modification. Successful tests, cosmetic-only use, avoiding combat or no previously reported ban do <strong>not</strong> establish account safety. We cannot predict enforcement, guarantee account access or restore accounts or purchases after a restriction. Do not use it if you are unwilling to accept that risk. Check the current terms for your region and platform.",
+  "t": "反作弊或未来的更新可能检测或拦截此修改。测试成功、仅作外观用途、避免战斗或此前没有封号报告，都<strong>不</strong>代表账号安全。我们无法预测处罚，无法保证账号可用，也无法在受限后恢复账号或已购内容。如果你不愿承担这种风险，请不要使用。请查看你所在地区和平台的现行条款。"
+ },
+ "54acc2806d4d9274": {
+  "en": "Start here",
+  "t": "从这里开始"
+ },
+ "55cd09ffba77535f": {
+  "en": "Launcher step 4, Start: Apply and launch, Check readiness and Apply without launching buttons, and a Ready message.",
+  "t": "启动器第 4 步，开始：Apply and launch、Check readiness、Apply without launching 按钮和“Ready”提示。"
+ },
+ "5a7ee5acc806ab5a": {
+  "en": "Bug report",
+  "t": "问题报告"
+ },
+ "5b6825d3c67a3589": {
+  "en": "Site",
+  "t": "网站"
+ },
+ "5b7851fb155ec40b": {
+  "en": "This page has moved",
+  "t": "此页面已移动"
+ },
+ "5c9214a743abdf52": {
+  "en": "Choose how you start the game. The official launcher is the tested route; Steam and Epic are untested.",
+  "t": "选择启动游戏的方式。官方启动器是经过测试的方式；Steam 和 Epic 版本未经测试。"
+ },
+ "6147ce4950e6e757": {
+  "en": "Unofficial modification, anti-cheat and account restrictions.",
+  "t": "非官方修改、反作弊与账号限制。"
+ },
+ "61fe6bf27781db5c": {
+  "en": "Share a clip of the current build, crediting the upstream creators and removing personal account details.",
+  "t": "分享当前版本的视频片段，注明上游作者并去除个人账号信息。"
+ },
+ "6622c072aa5b8818": {
+  "en": "What our MIT license covers and what it does not.",
+  "t": "我们的 MIT 许可涵盖什么、不涵盖什么。"
+ },
+ "6cf726d078b3ff76": {
+  "en": "Donations are optional and do not buy fixes, compatibility or support; see <a href=\"support.html\">support expectations</a>.",
+  "t": "捐赠是自愿的，不能换取修复、兼容性或支持；见<a href=\"support.html\">关于支持的说明</a>。"
+ },
+ "6d9af75dcc9d1c83": {
+  "en": "Left and right eye views from a rooftop above the city at dusk.",
+  "t": "黄昏时从城市屋顶看到的左眼与右眼画面。"
+ },
+ "6e925134a57b44dd": {
+  "en": "A community request",
+  "t": "社区请求"
+ },
+ "720d1e621ea5786e": {
+  "en": "Optional support for a spare-time hobby, without promised maintenance.",
+  "t": "对业余爱好项目的自愿支持，不承诺维护。"
+ },
+ "74c14c10ded2e4dd": {
+  "en": "The coast, same capture method.",
+  "t": "海边，相同的截取方式。"
+ },
+ "7510157a498b9124": {
+  "en": "Code &amp; contribute",
+  "t": "代码与贡献"
+ },
+ "77f1ddfb28d7bb99": {
+  "en": "WuWa VR",
+  "t": "WuWa VR"
+ },
+ "77fbc31402bb1682": {
+  "en": "MIT license text",
+  "t": "MIT 许可全文"
+ },
+ "7a6ca68d0aa04a8f": {
+  "en": "Original website and guide work: MIT. Upstream components keep their own terms.",
+  "t": "原创网站与指南内容：MIT。上游组件保留各自的条款。"
+ },
+ "7ad1ed94b7532534": {
+  "en": "Short summary",
+  "t": "简短摘要"
+ },
+ "7d0e8f9f011586d5": {
+  "en": "Translations are machine-assisted drafts; corrections are welcome. <a href=\"feedback.html?kind=language\">Correct a translation or request a language</a>.",
+  "t": "译文由机器辅助生成，欢迎指正。<a href=\"feedback.html?kind=language\">更正翻译或申请新语言</a>。"
+ },
+ "867428e1ae0b1708": {
+  "en": "Your draft is ready. You choose whether to open GitHub and submit it.",
+  "t": "草稿已准备好。由你决定是否打开 GitHub 提交。"
+ },
+ "86cd8b752a7306d3": {
+  "en": "In VR, <kbd>L3</kbd> + <kbd>R3</kbd> opens settings and <kbd>L3</kbd> + <kbd>Menu</kbd> shows the shortcut sheet. <a href=\"guide.html#start\">Full setup, update and removal steps</a>.",
+  "t": "在 VR 中，<kbd>L3</kbd> + <kbd>R3</kbd> 打开设置，<kbd>L3</kbd> + <kbd>Menu</kbd> 显示快捷键表。<a href=\"guide.html#start\">完整的安装、更新与卸载步骤</a>。"
+ },
+ "8827e262b74c7bb8": {
+  "en": "No destination is connected. Copy your draft; nothing has been sent.",
+  "t": "未连接提交目标。请复制草稿；尚未发送任何内容。"
+ },
+ "8bce5579abc97015": {
+  "en": "Launcher screenshots from September 2026; your page may look slightly different.",
+  "t": "启动器截图摄于 2026 年 9 月；你的页面可能略有不同。"
+ },
+ "8c90deabb4b92c70": {
+  "en": "<strong>There is no obligation to donate. Please do not donate if you expect me to support or maintain this mod forever.</strong> This is a spare-time hobby: I cannot promise updates, personal help, a response time or repairs after game updates, and I may pause or stop. Only contribute if you are happy to support the work as it is, with nothing owed in return.",
+  "t": "<strong>你没有任何捐赠义务。如果你期望我永远支持或维护这个模组，请不要捐赠。</strong>这是业余爱好：我无法承诺更新、个人帮助、回复时间或在游戏更新后修复，也可能暂停或停止。只有在你愿意按现状支持这项工作、且不要求任何回报时才进行捐赠。"
+ },
+ "8e106c0b8505a020": {
+  "en": "<a href=\"https://github.com/ChronoHaxx/wuwa-vr/issues\">Search existing issues</a> first.",
+  "t": "请先<a href=\"https://github.com/ChronoHaxx/wuwa-vr/issues\">搜索现有问题</a>。"
+ },
+ "8fa41d59c259d95c": {
+  "en": "Releases",
+  "t": "版本发布"
+ },
+ "924f084e146a0488": {
+  "en": "Open launcher step 3 at full size",
+  "t": "查看启动器第 3 步的完整大图"
+ },
+ "9627fb89ef6f3789": {
+  "en": "Ways to help",
+  "t": "其他帮助方式"
+ },
+ "9ae9df7cd5fb6548": {
+  "en": "Prepare a report here, review it on GitHub, then submit it yourself; this site never posts anything. Submitting needs a GitHub account; copying the draft does not.",
+  "t": "在这里准备报告，在 GitHub 上检查后由你自己提交；本网站不会发布任何内容。提交需要 GitHub 账号，复制草稿则不需要。"
+ },
+ "9cb9dfec0c52530b": {
+  "en": "Reports are public on GitHub. Leave out account IDs, personal paths, passwords and unreviewed logs.",
+  "t": "报告会公开在 GitHub 上。请不要包含账号 ID、个人路径、密码和未检查的日志。"
+ },
+ "9d50cf7e7b111435": {
+  "en": "Forks and improvements are welcome where the licenses allow. Please keep it free and credit the creators. <a href=\"license.html\">License and sharing</a>.",
+  "t": "欢迎在许可允许的范围内分叉和改进。请保持免费并注明原作者。<a href=\"license.html\">许可与分享</a>。"
+ },
+ "9fc30a6663c0d3eb": {
+  "en": "What it does not cover",
+  "t": "不涵盖的内容"
+ },
+ "a2218a9d42735188": {
+  "en": "Downloads stay free, and support never limits access or participation. Our original work has a <a href=\"license.html\">scoped MIT license</a>; upstream code keeps its own terms. Please keep community access free and credit the original creators.",
+  "t": "下载始终免费，支持与否都不会限制访问或参与。我们的原创作品使用<a href=\"license.html\">限定范围的 MIT 许可</a>；上游代码保留各自的条款。请保持社区免费访问，并注明原作者。"
+ },
+ "a440946effa824e1": {
+  "en": "Please keep access free, credit creators, share improvements and avoid paid repacks or paywalled forks. This is a request, not an extra MIT condition: MIT permits commercial use and does not require forks to publish source.",
+  "t": "请保持免费访问、注明作者、分享改进，并避免付费重新打包或付费墙分叉。这是请求，不是额外的 MIT 条件：MIT 允许商业使用，也不要求分叉公开源代码。"
+ },
+ "a669decb8d443518": {
+  "en": "First-person combat in the city. One eye from the headset mirror. Recorded 26 September 2026, Quest Pro / SteamVR mirror, on an earlier build.",
+  "t": "城市中的第一人称战斗。头显镜像的单眼画面。2026 年 9 月 26 日录制，Quest Pro / SteamVR 镜像，使用较早的版本。"
+ },
+ "a6b9effb15bcf340": {
+  "en": "Short clips from headset recordings; nothing autoplays.",
+  "t": "头显录制的短片；不会自动播放。"
+ },
+ "a7b326fc120145be": {
+  "en": "Kuro's <a href=\"https://store.steampowered.com/eula/3513350_eula_0\">Wuthering Waves terms published with the Steam game</a> address unauthorized third-party programs, bypassing technical measures, cheat detection, suspension and termination. These are the publisher's decisions, not permissions this project can grant. The <a href=\"https://wutheringwaves.kurogames.com/p/en/produce.html\">fan-work guidelines</a> exclude software from their definition of covered derivative works; they are not blanket approval of this mod. This page is not legal advice or a determination of how the publisher will enforce its terms.",
+  "t": "库洛随 Steam 版发布的<a href=\"https://store.steampowered.com/eula/3513350_eula_0\">《鸣潮》条款</a>涉及未经授权的第三方程序、规避技术措施、作弊检测、暂停与终止。这些是发行商的决定，不是本项目能够授予的许可。<a href=\"https://wutheringwaves.kurogames.com/p/en/produce.html\">二次创作指引</a>所定义的衍生作品不包括软件；它们不是对本模组的全面认可。本页不是法律意见，也不判断发行商将如何执行其条款。"
+ },
+ "ab1a960e766d144b": {
+  "en": "Page moved — WuWa VR",
+  "t": "页面已移动 — WuWa VR"
+ },
+ "ae739a4df2d1c6f6": {
+  "en": "This page is translated from the English original, which is authoritative where they differ. Parts not yet translated are shown in English.",
+  "t": "本页译自英文原文；如有出入，以英文原文为准。尚未翻译的部分以英文显示。"
+ },
+ "aeecc493b1e04956": {
+  "en": "First-person body animation, viewed from one eye. Xbox-controlled; these hands are character animation. Recorded 26 September 2026, Quest Pro / SteamVR mirror, on an earlier build.",
+  "t": "第一人称身体动画，单眼画面。使用 Xbox 手柄操作；画面中的手是角色动画。2026 年 9 月 26 日录制，Quest Pro / SteamVR 镜像，使用较早的版本。"
+ },
+ "b026e79baa3e5ddf": {
+  "en": "<a class=\"button primary\" href=\"https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-01-1817/WuWa-VR-Launcher.zip\">Download · 1 Oct 18:17 BST · Windows ZIP</a> <a href=\"https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817\">Release notes &amp; source</a>",
+  "t": "<a class=\"button primary\" href=\"https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-01-1817/WuWa-VR-Launcher.zip\">下载 · 1 Oct 18:17 BST · Windows ZIP</a> <a href=\"https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817\">更新说明与源代码</a>"
+ },
+ "b05203cf89b60eb3": {
+  "en": "Known issues",
+  "t": "已知问题"
+ },
+ "b27305161cb3b30a": {
+  "en": "This form needs JavaScript. You can also <a href=\"https://github.com/ChronoHaxx/wuwa-vr/issues/new/choose\">open a GitHub issue</a> directly.",
+  "t": "此表单需要 JavaScript。你也可以直接<a href=\"https://github.com/ChronoHaxx/wuwa-vr/issues/new/choose\">在 GitHub 上提交问题</a>。"
+ },
+ "b2a4d6fee70d4392": {
+  "en": "Language or translation request",
+  "t": "语言或翻译请求"
+ },
+ "b30e3623a88207f5": {
+  "en": "Review on GitHub",
+  "t": "在 GitHub 上检查"
+ },
+ "b55ca256a1f55713": {
+  "en": "The whole site is available in ten languages. The game, UEVR's own menus and some build descriptions stay in their original language.",
+  "t": "整个网站提供十种语言。游戏本身、UEVR 自带的菜单和部分版本说明保持原语言。"
+ },
+ "b564473a4d8695cc": {
+  "en": "<a class=\"button\" href=\"https://ko-fi.com/chronohax\" rel=\"noopener noreferrer\">Support on Ko-fi</a>",
+  "t": "<a class=\"button\" href=\"https://ko-fi.com/chronohax\" rel=\"noopener noreferrer\">在 Ko-fi 上支持</a>"
+ },
+ "b56af3f758d8f4d9": {
+  "en": "You will continue to Ko-fi. This website collects no payment details.",
+  "t": "你将跳转到 Ko-fi。本网站不收集付款信息。"
+ },
+ "bee7c6b62dd978ff": {
+  "en": "Report a reproducible bug with the build name and headset software.",
+  "t": "报告可复现的问题，并附上版本名称和头显软件。"
+ },
+ "bf073fae640ded81": {
+  "en": "Guide",
+  "t": "指南"
+ },
+ "bfac50d6424b5166": {
+  "en": "Credits",
+  "t": "致谢"
+ },
+ "bfb132179b1aefb5": {
+  "en": "Open <strong>WuWa VR Launcher.exe</strong> from the extracted folder. Read the account-risk notice and tick the box.",
+  "t": "从解压后的文件夹中打开 <strong>WuWa VR Launcher.exe</strong>。阅读账号风险说明并勾选确认框。"
+ },
+ "c6cf6a0a326726c4": {
+  "en": "Report copied. Nothing has been submitted.",
+  "t": "报告已复制。尚未提交任何内容。"
+ },
+ "c73ab40b010d0231": {
+  "en": "<strong>Matching eyes</strong>: distant trees, props and lighting, and character-screen reflections, look the same in both eyes.",
+  "t": "<strong>双眼一致</strong>：远处的树木、物件和光照，以及角色界面的倒影，在两眼中看起来相同。"
+ },
+ "c7ec69e87874fe2e": {
+  "en": "Account risk and disclaimer",
+  "t": "账号风险与免责声明"
+ },
+ "c8d7677e19495f21": {
+  "en": "Feedback",
+  "t": "反馈"
+ },
+ "caf54665615c86a9": {
+  "en": "The UEVR backend, native adaptations and patches, community scripts, game code, assets, screenshots and trademarks, and other owners' work. The generated controller illustration is not an official Xbox asset. The mod as a whole is <strong>not</strong> MIT. See <a href=\"credits.html\">component credits</a>; a published download does not change component terms or imply upstream endorsement.",
+  "t": "UEVR 后端、原生适配与补丁、社区脚本、游戏代码、资源、截图和商标，以及其他所有者的作品。生成的手柄插图不是官方 Xbox 素材。整个模组<strong>不是</strong> MIT 许可。见<a href=\"credits.html\">组件致谢</a>；已发布的下载不会改变组件条款，也不代表上游认可。"
+ },
+ "cfe838aa58220601": {
+  "en": "License and sharing",
+  "t": "许可与分享"
+ },
+ "d0700cb699087ac0": {
+  "en": "Prepare a request",
+  "t": "准备请求"
+ },
+ "d34f3e9bc44766c7": {
+  "en": "Player guide",
+  "t": "玩家指南"
+ },
+ "d59ecc3dd1f8e97e": {
+  "en": "Original text in the README, player docs and support, contribution and credit pages; original website HTML, CSS, JavaScript and translations; the abstract mark; and the site generators and checks. Quoted third-party material is excluded. Keep copyright and license notices.",
+  "t": "README、玩家文档以及支持、贡献和致谢页面中的原创文字；原创网站 HTML、CSS、JavaScript 和译文；抽象标志；以及网站生成器和检查工具。引用的第三方内容除外。请保留版权和许可声明。"
+ },
+ "d9e6eb00c7029991": {
+  "en": "I build VR experiments, game mods and small tools because I enjoy using them. Support goes toward a GPU upgrade (more headroom for modded VR and for running open-weight AI models locally, so development depends less on hosted tools) and the time and equipment these projects take. It does not buy priority fixes, deadlines or guaranteed compatibility.",
+  "t": "我制作 VR 实验、游戏模组和小工具，是因为我喜欢使用它们。支持将用于升级显卡（让模组 VR 和本地运行开放权重 AI 模型更宽裕，从而减少开发对云端工具的依赖），以及这些项目所需的时间和设备。它不能换取优先修复、截止日期或兼容性保证。"
+ },
+ "db07be184479f340": {
+  "en": "Languages",
+  "t": "语言"
+ },
+ "db7bbaeab6b6846d": {
+  "en": "Do not disable or bypass anti-cheat or Windows security protections.",
+  "t": "不要禁用或绕过反作弊或 Windows 安全保护。"
+ },
+ "e27553242c45913a": {
+  "en": "Check the selected build. A download contains one build.",
+  "t": "确认所选版本。每个下载只包含一个版本。"
+ },
+ "e32de7d094ec8333": {
+  "en": "How it starts",
+  "t": "如何开始"
+ },
+ "e3361b652baf982e": {
+  "en": "What our MIT license covers",
+  "t": "MIT 许可涵盖的内容"
+ },
+ "e3d998bbadfe5598": {
+  "en": "Left and right eye views of a character beside the coast under a blue sky.",
+  "t": "蓝天下海边角色的左眼与右眼画面。"
+ },
+ "e82fda924490fc3a": {
+  "en": "<strong>First person</strong> with the body visible and the head hidden, plus a comfort mode.",
+  "t": "<strong>第一人称</strong>：显示身体、隐藏头部，并提供舒适模式。"
+ },
+ "e8f82068f4bd655e": {
+  "en": "See the controller guide",
+  "t": "查看手柄指南"
+ },
+ "e9d7974383fdaa12": {
+  "en": "Languages — WuWa VR",
+  "t": "语言 — WuWa VR"
+ },
+ "eaa72d3805fae363": {
+  "en": "Rooftop, left and right eye. OpenXR Simulator, 24 September 2026. The HUD is on a separate layer and is not shown.",
+  "t": "屋顶，左眼与右眼。OpenXR Simulator，2026 年 9 月 24 日。HUD 在单独的图层上，此处未显示。"
+ },
+ "f1d66744f451d761": {
+  "en": "Optional tips: <a href=\"https://ko-fi.com/chronohax\">Ko-fi / ChronoHax</a>. Payments are handled by Ko-fi; this website collects no payment details.",
+  "t": "自愿打赏：<a href=\"https://ko-fi.com/chronohax\">Ko-fi / ChronoHax</a>。付款由 Ko-fi 处理；本网站不收集付款信息。"
+ },
+ "f2816383a64be0dc": {
+  "en": "Optional support",
+  "t": "自愿支持"
+ },
+ "f9ff9c45a882c1c1": {
+  "en": "<strong>Português (Brasil)</strong>",
+  "t": "<strong>Português (Brasil)</strong>"
+ },
+ "fa3060bcad11e9c7": {
+  "en": "<strong>Use at your own risk.</strong> This unofficial mod may be detected or blocked by anti-cheat; account restrictions or a ban are possible. It is not approved by Kuro Games. <a href=\"risk.html\">Read the account-risk notice</a>.",
+  "t": "<strong>使用风险自负。</strong>这个非官方模组可能被反作弊检测或拦截，账号可能受到限制或封禁。它未经库洛游戏批准。<a href=\"risk.html\">阅读账号风险说明</a>。"
+ },
+ "fc2d5757477e6ace": {
+  "en": "For game version 3.7 · about 51 MB · portable, nothing to install",
+  "t": "适用于游戏版本 3.7 · 约 51 MB · 便携版，无需安装"
+ },
+ "fc338f87a058158e": {
+  "en": "Features",
+  "t": "功能"
+ },
+ "fe49b10ef325dc38": {
+  "en": "Built on work by praydog and the UEVR contributors, mirudo2, polar, SannpoKun, Indath, endlessfalls and Elliott Tate. <a href=\"credits.html\">Contributions and licenses</a>.",
+  "t": "基于 praydog 与 UEVR 贡献者、mirudo2、polar、SannpoKun、Indath、endlessfalls 和 Elliott Tate 的工作。<a href=\"credits.html\">贡献与许可</a>。"
+ },
+ "ffcb226e1b4baf7a": {
+  "en": "<strong>Freecam</strong>: fly, drone, plane and acro cameras.",
+  "t": "<strong>自由镜头</strong>：飞行、无人机、飞机和特技镜头。"
+ }
+}

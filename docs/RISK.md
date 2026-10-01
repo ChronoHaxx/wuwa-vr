@@ -37,14 +37,9 @@ unlawful. This disclaimer does not remove rights held by Kuro Games, other
 rights holders or users under applicable law, nor make unauthorized conduct
 permitted. It is not a guarantee of legal protection for the authors.
 
-Do not disable or bypass anti-cheat or Windows security protections. Public
-combined-mod distribution remains pending clarification of upstream rights
-and a tested first-run package.
+Do not disable or bypass anti-cheat or Windows security protections.
 
-## Donations
-
-Donations are optional support for a spare-time hobby, not a purchase of future
-fixes, compatibility or lifetime support. Please do not donate expecting that
-commitment. [Full support expectations](../SUPPORT.md).
+Donations are optional and do not buy fixes, compatibility or support; see
+[support expectations](../SUPPORT.md).
 
 Sources checked 25 September 2026. Policies may change or differ by region.

@@ -17,13 +17,14 @@ bool accepts_factory(const Eye& eye, uintptr_t component, uintptr_t frame,
                      uintptr_t stack, uintptr_t expected_caller, uint64_t index, Read read) {
     if (!eye.active || !eye.main_state || !eye.component || eye.ordinal > 1 ||
         component != eye.component || index != 0 || !expected_caller ||
-        stack > UINTPTR_MAX-0x650 || frame != stack+0x100) return false;
+        stack > UINTPTR_MAX-0x660 || frame != stack+0x100) return false;
     uintptr_t caller{};
     int32_t count{};
-    // 23618480's exact prologue and call-site contract. This is the custom
+    // The factory's exact prologue and call-site contract (3.7: RVA 0x3f89ac0,
+    // return address at frame+0x558, view count at rsp+0x78; was +0x548 / +0x50). This is the custom
     // reflection producer, not an arbitrary SceneCapture using the factory.
-    return read(frame+0x548,caller) && caller==expected_caller &&
-        read(stack+0x50,count) && count==1;
+    return read(frame+0x558,caller) && caller==expected_caller &&
+        read(stack+0x78,count) && count==1;
 }
 
 // Decide only whether to take the existing game's reflected-view refresh.

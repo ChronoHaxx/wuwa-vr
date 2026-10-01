@@ -6,6 +6,7 @@
 #include "../FrameworkConfig.hpp"
 #include "../WindowMode.hpp"
 #include "utility/WuWaTestControl.hpp"
+#include "utility/WuWaClvRefresh.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
 #include "utility/WuWaStereoBasePose.hpp"
 #include <nlohmann/json.hpp>
@@ -124,7 +125,7 @@ nlohmann::json pose_pair_json(const wuwa_pose_pair::Pair& pair, uint64_t now, bo
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
-    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
@@ -477,6 +478,9 @@ void WuWaControlsComponent::on_draw_ui() {
     wuwa_ui::TextWrapped("Input still pauses when WuWa loses focus. Real game menus temporarily restore the game camera and character visibility.");
     wuwa_ui::draw(*m_sync_eye_lod,"Match far-object detail between eyes");
     wuwa_ui::TextWrapped("Fixes distant trees and props that freeze or look simpler in one eye. The game builds the second eye with a default 90 degree field of view, so it switched far objects to cheaper versions sooner.");
+    wuwa_ui::draw(*m_refill_far_lighting,"Match far lighting between eyes");
+    if (wuwa_ui::Button("Refill far lighting now")) wuwa_clv::request();
+    wuwa_ui::TextWrapped("Fixes distant objects that look darker or flatter in one eye. The game's lighting volume fills only the first eye after it refreshes; this refills it once in a frame that renders both eyes, after the game starts, after loading screens and after teleports. Each refill can cause a short hitch.");
     wuwa_ui::draw(*m_recenter_position,"L3 + A also resets headset position (seated)");
     if (wuwa_ui::Button("Reset headset position and direction now")) recenter(true);
     wuwa_ui::TextWrapped("Simulator Home resets only the simulated headset and preview. Use this reset afterwards to align UEVR's origin. It preserves world scale and camera offsets.");

@@ -60,6 +60,7 @@
 #include "../../utility/WuWaLguiRoute.hpp"
 #include "../../utility/WuWaLguiRedirect.hpp"
 #include "../../utility/WuWaShadowPass.hpp"
+#include "../../utility/WuWaClvRefresh.hpp"
 #include "../../utility/WuWaLodProbe.hpp"
 #include "../../utility/WuWaReflectionCapture.hpp"
 #include "../../utility/WuWaStereoIndex.hpp"
@@ -3653,6 +3654,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     // LOD sync fix candidate: the second view takes the first view's LOD distance
     // factor and FOV, so both eyes choose the same far LODs.
     if (prev_count == 2) wuwa_shadow::lod_sync(vr->get_wuwa_controls().sync_eye_lod(), view_family, views[0], views[1], prev_count);
+    // Far lighting fix: count eye pairs so a CLV refill can follow a start, a loading gap or a teleport.
+    if (prev_count == 2) wuwa_clv::on_stereo_frame();
     wuwa_shadow::StateSwapScope state_swap{view_family,
         prev_count == 2 ? views[0] : nullptr, prev_count == 2 ? views[1] : nullptr, prev_count};
     const auto lod_pair = prev_count == 2 ? wuwa_lod_probe::pair(view_family,
@@ -5258,6 +5261,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
     if (wuwa_second_eye::forcing() && !is_full_pass) true_index = 0;
     const auto has_double_precision = g_hook->m_has_double_precision;
     const auto rot_d = (Rotator<double>*)view_rotation;
+    // Far lighting fix: watch the unmodified game camera for teleports (WuWa is single precision).
+    if (!is_full_pass && view_location != nullptr && !has_double_precision && wuwa_test::is_wuwa())
+        wuwa_clv::on_camera(view_location->x, view_location->y, view_location->z);
 
     // Observe the unmodified game pose before AFR reuse or any mod callbacks.
     // Tokens remain tied to this draw object through nested callbacks. Full /

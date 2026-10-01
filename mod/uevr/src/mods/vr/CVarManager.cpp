@@ -18,6 +18,7 @@
 
 #include "CVarManager.hpp"
 #include "utility/WuWaTestControl.hpp"
+#include "utility/WuWaClvRefresh.hpp"
 
 #include <tracy/Tracy.hpp>
 
@@ -94,6 +95,8 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
         execute_console_script(engine, user_script_txt_name.data());
         m_should_execute_console_script = false;
     }
+
+    if (wuwa_test::is_wuwa()) wuwa_clv::tick(VR::get()->get_wuwa_controls().refill_far_lighting());
 
     wuwa_test::process_test_request(Framework::get_persistent_dir(), [this](const wchar_t* name) {
         return std::any_of(m_all_cvars.begin(), m_all_cvars.end(), [name](const auto& cvar) {

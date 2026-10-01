@@ -79,7 +79,7 @@ inline void select_history(safetyhook::Context& c) noexcept {
     const auto last_error=GetLastError();
     try {
         ++history_calls;
-        if (c.rcx==c.r13 && wuwa_reflection_history::accepts_factory(wuwa_reflection_history::current,
+        if (c.rcx==c.r12 && wuwa_reflection_history::accepts_factory(wuwa_reflection_history::current,
             c.rcx,c.rbp,c.rsp,factory_caller,c.rdx,
             [](uintptr_t at,auto& value){return memory::read(at,value);})) {
             // Change only the GetViewState argument, not the loop/view index.
@@ -123,24 +123,24 @@ inline void configure(bool requested) noexcept {
         // Complete archived producer and both projection-helper stages. No
         // unverified address/layout fallback after a game update.
         constexpr std::array<wuwa_code_compatibility::Range,9> ranges{{
-            {0x233f0270,8282,0xa3c5c65db4459455ULL},
-            {0x23601770,236,0x44db14976d87faceULL},
-            {0x23601860,27,0x0e63f3701c79635fULL},
-            {0x23618480,5797,0xfe262f5437002380ULL},
-            {0x245e4360,293,0x36ddae943b7620faULL},
-            {0x233f22d0,1285,0xf02281a212da1994ULL},
-            {0x233f27e0,2853,0x0e6316b8ecade072ULL},
-            {0x24add4b0,188,0xeb241592282b73f8ULL},
-            {0x24add570,5681,0xf2df006451050c75ULL}}};
+            {0x3d85d10,8282,0x6380221725f168ccULL},
+            {0x3f63640,236,0x4f10d39ebbb0f37aULL},
+            {0x3f63730,27,0x0e63f3701c79635fULL},
+            {0x3f89ac0,6334,0xe7be3fff761f3891ULL},
+            {0x4fe58c0,293,0xe0c1800f6ded95c5ULL},
+            {0x3d87d70,1285,0x7d05f5929d6e1c6dULL},
+            {0x3d88280,2853,0x684f2b9cdf6ac940ULL},
+            {0x54e8f00,188,0x3b3e235d5c144105ULL},
+            {0x54e8fc0,5681,0xe81e275647c604a6ULL}}};
         const auto base = wuwa_code_check::verify("Custom reflection capture projection",ranges);
-        factory_caller=base+0x233f1a43;
+        factory_caller=base+0x3d874e3;
         memory::require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
             reinterpret_cast<LPCWSTR>(&callback),&retained_backend) != 0,"Cannot retain reflection capture backend");
-        auto created = safetyhook::MidHook::create(reinterpret_cast<void*>(base+0x233f163d),
+        auto created = safetyhook::MidHook::create(reinterpret_cast<void*>(base+0x3d870dd),
             callback,safetyhook::MidHook::StartDisabled);
         memory::require(created.has_value(),"Cannot create reflection capture projection hook");
         hook = new safetyhook::MidHook(std::move(*created));
-        const std::array<uintptr_t,3> sites{0x23618773,0x233f2b6d,0x233f252f};
+        const std::array<uintptr_t,3> sites{0x3f89dd0,0x3d8860d,0x3d87fcf};
         const std::array<safetyhook::MidHookFn,3> callbacks{select_history,refresh_deferred,refresh_mobile};
         for (size_t i=0;i<sites.size();++i) {
             auto next=safetyhook::MidHook::create(reinterpret_cast<void*>(base+sites[i]),

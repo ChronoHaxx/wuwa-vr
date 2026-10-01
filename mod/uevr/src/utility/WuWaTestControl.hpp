@@ -1,7 +1,9 @@
 #pragma once
 
 #include <array>
+#include <cctype>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
@@ -9,10 +11,12 @@
 #include <nlohmann/json.hpp>
 #include <imgui.h>
 #include <sdk/CVar.hpp>
+#include <sdk/ConsoleManager.hpp>
 #include "WuWaInputTrace.hpp"
 #include "WuWaInputSequenceBridge.hpp"
 #include "WuWaShadowPass.hpp"
 #include "WuWaSecondEyeBuild.hpp"
+#include "WuWaClvRefresh.hpp"
 #include "WuWaMotionTrace.hpp"
 #include "WuWaBooleanCVar.hpp"
 #include "WuWaPlanarCVar.hpp"
@@ -42,7 +46,7 @@ inline Json stereo_candidate_status() {
 }
 enum class CVarStorage { integer, boolean, planar_float, impostor_integer, mesh_cache_integer };
 struct CVarSpec { const char* name; const wchar_t* wide_name; int minimum, maximum; CVarStorage storage{}; };
-inline constexpr std::array<CVarSpec, 20> test_cvars{{
+inline constexpr std::array<CVarSpec, 43> test_cvars{{
     {"r.AmbientOcclusionLevels", L"r.AmbientOcclusionLevels", -1, 4},
     {"r.ShadowQuality", L"r.ShadowQuality", 0, 5},
     {"r.ContactShadows", L"r.ContactShadows", 0, 1},
@@ -71,6 +75,31 @@ inline constexpr std::array<CVarSpec, 20> test_cvars{{
     // expiring comparison regenerates draw commands; it never hides geometry
     // or changes the shipped rendering defaults.
     {"r.MeshDrawCommands.UseCachedCommands", L"r.MeshDrawCommands.UseCachedCommands", 0, 1, CVarStorage::mesh_cache_integer},
+    // Lighting diagnostics (1 Oct, 3.7): far lighting follows the view state. Integer pairs only;
+    // a float CVar fails the range check and is refused before any write.
+    {"r.Shadow.CacheDirectLightShadow", L"r.Shadow.CacheDirectLightShadow", 0, 1},
+    {"r.Shadow.CacheWholeSceneShadows", L"r.Shadow.CacheWholeSceneShadows", 0, 1},
+    {"r.Shadow.EnableCSMStable", L"r.Shadow.EnableCSMStable", 0, 1},
+    {"r.Shadow.UseStaticCSM0Cache", L"r.Shadow.UseStaticCSM0Cache", 0, 1},
+    {"r.Shadow.DirectLightCacheIncludeDFShadow", L"r.Shadow.DirectLightCacheIncludeDFShadow", 0, 1},
+    {"r.Shadow.MaxNumFarShadowCascades", L"r.Shadow.MaxNumFarShadowCascades", 0, 16},
+    {"r.Shadow.ForceCastFarShadow", L"r.Shadow.ForceCastFarShadow", 0, 1},
+    {"r.Shadow.MaxNumDirectLightCSMCacheUpdatesPerLightPerFrame", L"r.Shadow.MaxNumDirectLightCSMCacheUpdatesPerLightPerFrame", -1, 64},
+    {"r.Shadow.CSMMode3EnableUpdateIntervalOverride", L"r.Shadow.CSMMode3EnableUpdateIntervalOverride", 0, 1},
+    {"r.DistanceFieldShadowing", L"r.DistanceFieldShadowing", 0, 1},
+    {"r.DistanceFieldAO.MultiView", L"r.DistanceFieldAO.MultiView", 0, 1},
+    {"r.AOGlobalDistanceField", L"r.AOGlobalDistanceField", 0, 1},
+    {"r.VolumetricFog", L"r.VolumetricFog", 0, 1},
+    {"r.VolumetricFog.TemporalReprojection", L"r.VolumetricFog.TemporalReprojection", 0, 1},
+    {"r.KuroFogRendering", L"r.KuroFogRendering", 0, 4},
+    {"r.Kuro.MobileFog", L"r.Kuro.MobileFog", 0, 1},
+    {"r.SkyAtmosphere", L"r.SkyAtmosphere", 0, 1},
+    {"r.Kuro.LandscapeCapture", L"r.Kuro.LandscapeCapture", 0, 1},
+    {"r.Kuro.DisableGlobalGITransition", L"r.Kuro.DisableGlobalGITransition", 0, 1},
+    {"r.Kuro.GlobalGIRenderQuality", L"r.Kuro.GlobalGIRenderQuality", 0, 8},
+    {"r.KuroVolumetricLight.Enable", L"r.KuroVolumetricLight.Enable", 0, 1},
+    {"r.Kuro.EnableCacheWeatherData", L"r.Kuro.EnableCacheWeatherData", 0, 1},
+    {"r.Kuro.SuperFarFogTickIntervalMax", L"r.Kuro.SuperFarFogTickIntervalMax", 0, 10000},
 }};
 
 struct DataSample { sdk::TConsoleVariableData<int>* data{}; int game{}, render{}; uintptr_t boolean_slot{}, float_slot{}; };
@@ -221,6 +250,41 @@ inline void draw_controls() {
     ImGui::TextWrapped("Shadow tests restore the current Same Pass setting automatically. No quality or profile setting is changed.");
 }
 
+// Diagnostic console lease (1 Oct, 3.7): set one r.* console variable through the engine's
+// console manager for a bounded window, then put the previous value back. For variables the
+// static data lookup cannot find. Runs on the game thread (pre-engine tick), like the console.
+struct ConsoleLease { sdk::IConsoleVariable* var{}; std::string name; std::wstring previous; float applied{}; uint64_t until{}; };
+inline ConsoleLease console_lease{};
+inline sdk::IConsoleVariable* find_console_variable(const std::string& name) {
+    if (name.rfind("r.", 0) != 0 || name.size() > 96) throw std::runtime_error("console tests accept r.* names only");
+    for (const auto c : name) if (!std::isalnum(static_cast<unsigned char>(c)) && c != '.' && c != '_') throw std::runtime_error("invalid name");
+    const auto manager = sdk::FConsoleManager::get();
+    if (manager == nullptr) throw std::runtime_error("console manager unavailable");
+    auto* object = manager->find(std::wstring(name.begin(), name.end()));
+    if (object == nullptr || object->AsCommand() != nullptr) throw std::runtime_error("no such console variable");
+    return static_cast<sdk::IConsoleVariable*>(object);
+}
+inline std::wstring console_value_text(sdk::IConsoleVariable* var) {
+    const auto f = var->GetFloat();
+    const auto i = var->GetInt();
+    if (static_cast<float>(i) == f) return std::to_wstring(i);
+    wchar_t buffer[64]{};
+    swprintf_s(buffer, L"%.9g", f);
+    return buffer;
+}
+inline std::string restore_console() {
+    auto& lease = console_lease;
+    if (lease.var == nullptr) return "inactive";
+    std::string result = "restored";
+    try {
+        if (std::abs(lease.var->GetFloat() - lease.applied) > 1e-6f) result = "restore_conflict_value_changed";
+        else lease.var->Set(lease.previous.c_str());
+    } catch (...) { result = "restore_failed"; }
+    spdlog::info("[WuWaTest] console lease {} restored: {}", lease.name, result);
+    lease = {};
+    return result;
+}
+
 inline std::string restore_graphics() {
     auto& lease = graphics_lease;
     if (lease.spec == nullptr) {
@@ -304,6 +368,9 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
     }
     if (graphics_lease.spec != nullptr && now >= graphics_lease.until) {
         restore_graphics();
+    }
+    if (console_lease.var != nullptr && now >= console_lease.until) {
+        restore_console();
     }
     const auto menu_request = menu_shadow_request.exchange(0);
     if (menu_request == 2) {
@@ -486,6 +553,35 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             wuwa_shadow::set_state_swap(seconds, mode);
             spdlog::info("[WuWaTest] view-state swap window {} s mode {}", seconds, mode_name);
             reply["shadow"] = wuwa_shadow::status();
+        } else if (op == "clv_refresh") {
+            const auto frames = request.value("frames", 1);
+            if (frames > 0) wuwa_clv::request(static_cast<uint32_t>(frames));
+            reply["clv"] = wuwa_clv::status();
+        } else if (op == "console_get") {
+            auto* var = find_console_variable(request.at("name").get<std::string>());
+            reply["int"] = var->GetInt();
+            reply["float"] = var->GetFloat();
+        } else if (op == "console_set") {
+            const auto name = request.at("name").get<std::string>();
+            const auto seconds = request.value("seconds", 0);
+            if (seconds == 0) {
+                reply["restore"] = restore_console();
+            } else {
+                if (seconds < 5 || seconds > 60) throw std::runtime_error("seconds must be 0 or 5..60");
+                if (console_lease.var != nullptr || graphics_lease.spec != nullptr) throw std::runtime_error("another graphics test is active");
+                const auto value = request.at("value").get<double>();
+                if (!std::isfinite(value) || std::abs(value) > 100000.0) throw std::runtime_error("value out of range");
+                auto* var = find_console_variable(name);
+                const auto previous = console_value_text(var);
+                wchar_t text[64]{};
+                swprintf_s(text, L"%.9g", value);
+                var->Set(text);
+                console_lease = {var, name, previous, var->GetFloat(), now + uint64_t(seconds) * 1000};
+                reply["before"] = std::string(previous.begin(), previous.end());
+                reply["after_float"] = console_lease.applied;
+                reply["after_int"] = var->GetInt();
+                spdlog::info("[WuWaTest] console lease {} = {} for {} s (was {})", name, value, seconds, reply["before"].get<std::string>());
+            }
         } else if (op == "restore") {
             if (graphics_lease.spec != nullptr && request.value("lease_id", "") != graphics_lease.id) {
                 throw std::runtime_error("lease id does not match active test");

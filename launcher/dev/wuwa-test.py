@@ -499,6 +499,32 @@ class LiveTest:
             write_json(output / "comparison.json", report)
 
 
+    def console(self, name: str, value: float, output: Path, layer: str | None = None) -> dict:
+        """Set one r.* console variable for a bounded window through the console manager; capture, restore, capture."""
+        layer = self.capture_layer(layer)
+        output.mkdir(parents=True, exist_ok=False)
+        report = {"pid": self.pid, "name": name, "test_value": value, "status": "incomplete", "layer": layer}
+        try:
+            report["baseline"] = self.request("console_get", name=name)
+            self.wait_frames()
+            self.capture(output / "baseline", layer)
+            try:
+                report["begin"] = self.request("console_set", name=name, value=value, seconds=30)
+                self.wait_frames()
+                self.capture(output / "changed", layer)
+            finally:
+                report["restore"] = self.request("console_set", name=name, seconds=0)
+            report["restored_value"] = self.request("console_get", name=name)
+            self.wait_frames()
+            self.capture(output / "restored", layer)
+            report["status"] = "captured_and_restored_visual_review_pending"
+            return report
+        except BaseException as error:
+            report["error"] = str(error)
+            raise
+        finally:
+            write_json(output / "comparison.json", report)
+
     def reflection_values(self) -> dict:
         """Read the three supported values, without beginning a graphics lease."""
         state = self.assert_live()
@@ -931,6 +957,11 @@ def main() -> int:
     graphics.add_argument("--value", type=int, default=0)
     graphics.add_argument("--output", type=Path, required=True)
     graphics.add_argument("--layer", choices=("all", "projection"), help="Default: projection for simulator, all for SteamVR")
+    console = commands.add_parser("console", help="Set one r.* console variable for 30 s via the console manager, capture, restore")
+    console.add_argument("name")
+    console.add_argument("--value", type=float, required=True)
+    console.add_argument("--output", type=Path, required=True)
+    console.add_argument("--layer", choices=("all", "projection"))
     reflections = commands.add_parser("reflections", help="Compare three reflection controls at zero one at a time, restoring each")
     reflections.add_argument("--output", type=Path, required=True)
     reflections.add_argument("--pid", type=int, help="Refuse a different game process")
@@ -966,7 +997,7 @@ def main() -> int:
     lod.add_argument("--output", type=Path, required=True)
     lod.add_argument("--pid", type=int, required=True)
     lod.add_argument("--seconds", type=int, choices=range(1, 31), metavar="1..30", default=8)
-    for command in (capture, graphics, reflections, translucency, stereo, visibility, candidates, shadows, full_views, impostors, lod):
+    for command in (capture, graphics, console, reflections, translucency, stereo, visibility, candidates, shadows, full_views, impostors, lod):
         command.add_argument("--capture-source", choices=("simulator", "steamvr"), default="simulator",
                              help="Select an already running runtime; never switches or starts one")
     bench = commands.add_parser("bench", help="Fix bench: open a timed construct_mode (1..3) or target_swap window and exit")
@@ -1010,6 +1041,8 @@ def main() -> int:
             result = client.capture(args.output, args.layer)
         elif args.command == "graphics":
             result = client.graphics(args.name, args.value, args.output, args.layer)
+        elif args.command == "console":
+            result = client.console(args.name, args.value, args.output, args.layer)
         elif args.command == "reflections":
             result = client.reflections(args.output)
         elif args.command == "translucency":

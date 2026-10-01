@@ -1,7 +1,13 @@
-# Template copied only into the separate, reviewed public-site export.
-# Manual dispatch: pushing a commit does not publish this site automatically.
+# Publishes the site/ folder to GitHub Pages whenever a push to main changes it
+# (review happens in the pull request), or on demand from the Actions tab.
+# Free for this public repository.
 name: Publish reviewed showcase
 on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 permissions:
   contents: read

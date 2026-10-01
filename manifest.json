@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-01T14:26:05.397381+00:00",
+  "updatedAt": "2026-10-01T16:24:26.888820+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -11,7 +11,7 @@
     ".github/ISSUE_TEMPLATE/feature.md": "ecccfd36164a258414339c5d724b0e06638b7250d0ab28b9aecae696d2f9cf5a",
     ".github/ISSUE_TEMPLATE/language.md": "a6f6003e07b6b907d7420d1e5a621f899f291a864a41c0005f2c3c6f433dc457",
     ".github/PULL_REQUEST_TEMPLATE.md": "2d068684174db47334b463da918d64e97d93986b7152af429211ad04f16359c1",
-    ".github/workflows/pages.yml": "1c3f2e1f465e55ccf1e220604c4db3b19e37a2756d7ff6cb59002c72dbcc96fd",
+    ".github/workflows/pages.yml": "023b5ac1bdf741919f47c7b37b6f49647721586daabf3bbb01ac4828122c2674",
     "CONTRIBUTING.md": "7c72cce2abefe55862c6b947e86af9671ca3a4dbf39f49c1e8ec0420fa2ece0e",
     "CREDITS.md": "af631f8043d999094aca960bd3b9e24cefa608156a9f897dd16ddfe99dcc8cdd",
     "LICENSE.md": "bbba0919f9b50d4dcecde74b8ed97e18d3d8aff5316c710a6faf0c63d6519276",

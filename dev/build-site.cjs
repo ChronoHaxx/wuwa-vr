@@ -33,6 +33,8 @@ const modules = [root, process.env.WUWA_NODE_MODULES, path.join(root, 'dev-tools
       if (!page) throw Error(`Unmapped link ${target} in ${file}`);
       return `href="${page}${anchor && !page.includes('#') ? anchor : ''}"`;
     });
+    // Full website URLs (so the Markdown also works on GitHub) become relative, keeping readers in their language.
+    html = html.replace(/href="https:\/\/chronohaxx\.github\.io\/wuwa-vr\/([^"]*)"/g, 'href="$1"');
     html = html.replace(/<table>/g, '<div class="table-scroll"><table>').replace(/<\/table>/g, '</table></div>');
     if (demote) html = html.replace(/<(\/?)h2>/g, '<$1h3>');
     if (controls) html = html.replace(/<tbody>([\s\S]*?)<\/tbody>/g, (_, body) => '<tbody>' + body.replace(/<tr>/g, '<tr data-control-row>') + '</tbody>');

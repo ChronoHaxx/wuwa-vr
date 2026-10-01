@@ -6,6 +6,7 @@
 #include "WuWaViewUbTrace.hpp"
 #include "WuWaMeshBindingSnapshot.hpp"
 #include "WuWaEyeDiff.hpp"
+#include "WuWaRawSnapshot.hpp"
 #include <atomic>
 #include <chrono>
 #include <fstream>
@@ -14,8 +15,8 @@
 namespace wuwa_lod_probe {
 using Json = nlohmann::json;
 namespace memory = wuwa_lgui_probe::detail;
-constexpr uintptr_t site_rva = 0x247c08e3;
-constexpr uintptr_t uniform_site_rva = 0x24adbd0d;
+constexpr uintptr_t site_rva = 0x51c6e43;
+constexpr uintptr_t uniform_site_rva = 0x54e775d;
 constexpr size_t capacity = 8192;
 inline SRWLOCK callbacks = SRWLOCK_INIT;
 inline std::mutex control;
@@ -131,10 +132,49 @@ inline Json eye_diff_json(const wuwa_eye_diff::Sample& s) {
     return {{"type", "eye_pair_diff"}, {"tick_ms", s.id.tick_ms}, {"thread", s.id.thread},
         {"sequence", s.id.sequence},
         {"phase", s.id.phase == 1 ? "before_submissions" : "after_submissions"},
-        {"frames", s.id.frames}, {"views", s.views}, {"states", s.states},
+        {"frames", s.id.frames},
+        {"frames_read_at", s.id.phase == 1 ? "before_first_submission" : "after_submissions"},
+        {"views", s.views}, {"states", s.states},
         {"view_region", eye_diff_region_json(s.view)}, {"state_region", eye_diff_region_json(s.state)},
         {"view_verified_end", wuwa_eye_diff::view_verified_end},
         {"first_is_eye_slot", 0}, {"gpu_binding_proven", false}};
+}
+// Bytes in memory order as lowercase hex; unreadable dwords are 00 and listed as
+// [begin, end) byte ranges. Every dword is present, equal ones included.
+template<class Block> Json raw_block_json(const Block& b) {
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string hex;
+    hex.reserve(size_t(Block::dwords) * 8);
+    Json unreadable = Json::array();
+    uint32_t run = UINT32_MAX;
+    for (uint32_t i = 0; i < Block::dwords; ++i) {
+        for (uint32_t k = 0; k < 4; ++k) {
+            const auto byte = uint8_t(b.words[i] >> (8 * k));
+            hex.push_back(digits[byte >> 4]);
+            hex.push_back(digits[byte & 15]);
+        }
+        const bool ok = b.read_ok(i);
+        if (!ok && run == UINT32_MAX) run = i;
+        if (ok && run != UINT32_MAX) { unreadable.push_back(Json::array({4 * run, 4 * i})); run = UINT32_MAX; }
+    }
+    if (run != UINT32_MAX) unreadable.push_back(Json::array({4 * run, 4 * Block::dwords}));
+    return {{"address", b.address}, {"begin", 0}, {"end", 4 * Block::dwords},
+        {"readable_dwords", b.readable}, {"unreadable", unreadable}, {"bytes_hex", hex}};
+}
+inline Json raw_snapshot_json(const wuwa_raw_snapshot::Snapshot& s) {
+    Json slots = Json::array();
+    for (size_t slot = 0; slot < 2; ++slot)
+        slots.push_back({{"slot", slot}, {"view", raw_block_json(s.views[slot])},
+            {"state", raw_block_json(s.states[slot])}});
+    return {{"type", "eye_pair_raw"}, {"tick_ms", s.id.tick_ms}, {"thread", s.id.thread},
+        {"sequence", s.id.sequence},
+        {"phase", s.id.phase == 1 ? "before_submissions" : "after_submissions"},
+        {"frames", s.id.frames},
+        {"frames_read_at", s.id.phase == 1 ? "before_first_submission" : "after_submissions"},
+        {"raw_ordinal", s.ordinal}, {"slots", slots}, {"equal_values_included", true},
+        {"physical_eye", "unverified; slot order only"},
+        {"object_extent", "unknown; fixed windows from each object's start"},
+        {"gpu_binding_proven", false}};
 }
 struct Record {
     uint64_t tick{}, sequence{};
@@ -171,9 +211,24 @@ struct Probe {
     uint32_t view_drained{};
     wuwa_eye_diff::Ring<> eye_diff_ring;
     wuwa_eye_diff::Sampler eye_diff_sampler;
-    wuwa_eye_diff::Sample eye_diff_scratch; // pair() only, under the exclusive callback lock
+    wuwa_eye_diff::Sample eye_diff_scratch; // pair() only, under pair_guard
     std::atomic<uint64_t> eye_diff_dropped{};
     uint32_t eye_diff_drained{};
+    // pair() outcomes per phase: 0 before, 1 after first submission, 2 after both.
+    struct PairCounts { std::atomic<uint32_t> calls{}, lock_misses{}, invalid{}, rows{}; };
+    std::array<PairCounts, 3> pair_counts{};
+    // Serializes the deferred before-row, eye-diff sampler and scratch between
+    // pair() callers once phases 3 and 2 no longer hold the lock exclusively.
+    std::atomic<bool> pair_guard{};
+    std::atomic<uint32_t> pair_guard_misses{};
+    Record before_row{}; // phase-1 row, emitted once its pair's assigned frame is known
+    // Opt-in raw copies of both eyes (equal values too) at a few eye-diff pairs;
+    // filled by pair() under pair_guard, drained on the control thread.
+    std::atomic<bool> raw_requested{};
+    wuwa_raw_snapshot::Schedule raw_schedule;
+    wuwa_raw_snapshot::Ring<> raw_ring;
+    std::atomic<uint64_t> raw_dropped{};
+    uint32_t raw_drained{};
     wuwa_mesh_binding::Ring<> mesh_ring;
     std::atomic<bool> mesh_requested{};
     std::atomic<uint64_t> mesh_calls{},mesh_filtered{},mesh_invalid{},mesh_dropped{},mesh_lock_misses{};
@@ -225,6 +280,12 @@ struct Probe {
             file << eye_diff_json(eye_diff).dump() << '\n';
             if (!file) throw std::runtime_error("Eye pair diff trace write failed");
             ++eye_diff_drained;
+        }
+        while (raw_ring.consume([&](const wuwa_raw_snapshot::Snapshot& raw) {
+            file << raw_snapshot_json(raw).dump() << '\n';
+        })) {
+            if (!file) throw std::runtime_error("Raw eye snapshot trace write failed");
+            ++raw_drained;
         }
         if (file.is_open()) {
             file.flush();
@@ -388,10 +449,10 @@ inline void install() {
     if (retired) throw std::runtime_error("LOD trace is shut down");
     if (installed) return;
     constexpr std::array<wuwa_code_compatibility::Range, 4> ranges{{
-        {0x247c0240, 2858, 0x3a8267143c763b3cULL},
-        {0x24aca750, 108, 0x76401d3e4ea2cf1aULL},
-        {0x24ac5150, 55, 0xb6a4b49b98b88d6dULL},
-        {0x24ada230, 7113, 0x14e741a3d369e4eaULL}}};
+        {0x51c67a0, 2858, 0x675bb01c74b175e5ULL},
+        {0x54d5ec0, 108, 0x76401d3e4ea2cf1aULL},
+        {0x54d0850, 55, 0x0d64fd0e7b954aeaULL},
+        {0x54e5c80, 7113, 0x4c349782a6fcaae3ULL}}};
     try {
         const auto base = wuwa_code_check::verify("Read-only instanced LOD inputs", ranges);
         if (!owner) owner = new Probe;
@@ -487,47 +548,88 @@ inline void install_mesh_hook() {
     }catch(...){mesh_hook_failed=true;if(mesh_hook){try{(void)mesh_hook->disable();}catch(...){}}throw;}
 }
 
-// Called around the existing synchronous NSF submissions. The two game-view
-// snapshots share a sequence; render records carry the actual family frame.
-// Matching CPU family frames is not proof of a shared GPU/compositor frame.
+// Called around the existing synchronous NSF submissions, in this order:
+// phase 1 before the first submission (no sequence; issues the token and
+// publishes the two eye states the render-thread callbacks match against),
+// phase 3 after the first submission and phase 2 after both, each carrying
+// phase 1's token. Render records carry the actual family frame. Matching CPU
+// family frames is not proof of a shared GPU/compositor frame.
+//
+// Two lifecycle facts from the 28 Sep far capture shape this function:
+// - Before the first submission the family frame is not yet the frame the
+//   renderer assigns, so a phase-1 row is held back and emitted with the first
+//   later snapshot of the same sequence whose frame is on the row interval, and
+//   eye-diff sampling is keyed to the sequence, not the frame.
+// - Only phase 1 writes state the callbacks read, so only phase 1 takes the
+//   callback lock exclusively. Phases 3 and 2 take it shared and verify the
+//   published states instead: after the submissions the render-thread
+//   callbacks hold the shared lock almost continuously, and an exclusive try at
+//   phase 2 produced a row for only 2 of 64 on-interval pairs.
 inline uint64_t pair(const void* family, const void* first, const void* second,
                      uint32_t frame_offset, uint64_t sequence = 0, uint32_t phase = 0) noexcept {
     if (!armed.load(std::memory_order_relaxed)) return 0;
     const auto last_error = GetLastError();
+    const bool publish = !sequence;
+    const uint32_t kind = publish ? 1 : phase == 3 ? 3 : 2;
+    const size_t slot = kind == 1 ? 0 : kind == 3 ? 1 : 2;
     uint64_t token{};
-    if (TryAcquireSRWLockExclusive(&callbacks)) {
+    if (publish ? TryAcquireSRWLockExclusive(&callbacks) : TryAcquireSRWLockShared(&callbacks)) {
         auto* p = owner;
         const auto now = GetTickCount64();
         if (p && now < p->until.load() && first && second && first != second && frame_offset == 0x64) {
+            auto& counts = p->pair_counts[slot];
+            ++counts.calls;
             Record r{}; r.tick = now; r.thread = GetCurrentThreadId(); r.frame_offset = frame_offset;
             auto read = [](uintptr_t at, auto& out) { return memory::read(at, out); };
             r.pair = {wuwa_lod::view(uintptr_t(first), frame_offset, read), wuwa_lod::view(uintptr_t(second), frame_offset, read)};
             const auto& a = r.pair[0]; const auto& b = r.pair[1];
-            if (a.family.valid && b.family.valid && a.family.value == uintptr_t(family) && b.family.value == uintptr_t(family)
+            const bool valid = a.family.valid && b.family.valid && a.family.value == uintptr_t(family) && b.family.value == uintptr_t(family)
                 && a.state.valid && b.state.valid && a.state.value && b.state.value && a.state.value != b.state.value
-                && a.frame.valid && b.frame.valid) {
-                p->states = {a.state.value, b.state.value}; p->frame_offset = frame_offset;
+                && a.frame.valid && b.frame.valid;
+            const bool published = publish || (p->frame_offset == frame_offset &&
+                p->states[0] == a.state.value && p->states[1] == b.state.value);
+            if (valid && published) {
+                if (publish) { p->states = {a.state.value, b.state.value}; p->frame_offset = frame_offset; }
                 token = sequence ? sequence : p->sequence.fetch_add(1) + 1;
-                r.sequence = token; r.phase = phase ? phase : sequence ? 2 : 1;
-                if (a.frame.value % 30 < 4 || b.frame.value % 30 < 4) p->append(r);
-                if (p->eye_diff_sampler.take(r.phase, token, a.frame.value, b.frame.value, p->eye_diff_ring.full())) {
-                    // Same exclusive lock and lease as the pair record above: raw
-                    // guarded reads of the two main views and their view states.
-                    wuwa_eye_diff::sample(p->eye_diff_scratch,
-                        {now, token, r.thread, r.phase, {a.frame.value, b.frame.value}},
-                        a.address, b.address, a.state.value, b.state.value, read);
-                    if (!p->eye_diff_ring.append(p->eye_diff_scratch)) ++p->eye_diff_dropped;
-                }
-            } else ++p->reads_failed;
+                r.sequence = token; r.phase = kind;
+                if (!p->pair_guard.exchange(true, std::memory_order_acquire)) {
+                    if (publish) p->before_row = r;
+                    else if (a.frame.value % 30 < 4 || b.frame.value % 30 < 4) {
+                        if (p->before_row.sequence == token) {
+                            p->append(p->before_row); ++p->pair_counts[0].rows;
+                            p->before_row.sequence = 0;
+                        }
+                        p->append(r); ++counts.rows;
+                    }
+                    if (p->eye_diff_sampler.take(kind, token, p->eye_diff_ring.free_slots())) {
+                        // Same lease as the pair record above: raw guarded reads
+                        // of the two main views and their view states.
+                        wuwa_eye_diff::sample(p->eye_diff_scratch,
+                            {now, token, r.thread, kind, {a.frame.value, b.frame.value}},
+                            a.address, b.address, a.state.value, b.state.value, read);
+                        if (!p->eye_diff_ring.append(p->eye_diff_scratch)) ++p->eye_diff_dropped;
+                        // Opt-in raw copy of the same snapshot: both eyes, every dword.
+                        const auto scheduled = p->eye_diff_sampler.counts().before_taken.load(std::memory_order_relaxed);
+                        if (p->raw_schedule.take(p->raw_requested.load(std::memory_order_relaxed), kind, token,
+                                scheduled ? scheduled - 1 : 0, p->raw_ring.free_slots()) &&
+                            !p->raw_ring.emplace([&](wuwa_raw_snapshot::Snapshot& raw) {
+                                wuwa_raw_snapshot::capture(raw, {now, token, r.thread, kind, {a.frame.value, b.frame.value}},
+                                    p->raw_schedule.ordinal(), a.address, b.address, a.state.value, b.state.value, read);
+                            })) ++p->raw_dropped;
+                    }
+                    p->pair_guard.store(false, std::memory_order_release);
+                } else ++p->pair_guard_misses;
+            } else { ++p->reads_failed; ++counts.invalid; }
         }
-        ReleaseSRWLockExclusive(&callbacks);
-    } else if (owner) ++owner->lock_misses;
+        if (publish) ReleaseSRWLockExclusive(&callbacks); else ReleaseSRWLockShared(&callbacks);
+    } else if (owner) { ++owner->lock_misses; ++owner->pair_counts[slot].lock_misses; }
     SetLastError(last_error);
     return token;
 }
 
 inline Json status_locked() {
     if (!owner) return {{"installed", false}, {"active", false}, {"read_only", true}, {"view_uniforms_supported",true},{"mesh_bindings_supported",true},
+        {"eye_pair_diff_supported",true},{"raw_snapshots_supported",true},
         {"mesh_binding_hook_revision",wuwa_mesh_binding::hook_revision}};
     auto* p = owner; const auto now = GetTickCount64(); const auto until = p->until.load();
     if (until <= now) armed = false;
@@ -536,6 +638,11 @@ inline Json status_locked() {
     const auto view_path=p->view_path.u8string();
     const auto counts=p->view_observer.counts();
     const auto mesh_path=p->mesh_path.u8string();
+    const auto pair_json=[](const Probe::PairCounts& c) -> Json {
+        return {{"calls",c.calls.load()},{"lock_misses",c.lock_misses.load()},
+            {"invalid",c.invalid.load()},{"rows",c.rows.load()}};
+    };
+    const auto& sampled=p->eye_diff_sampler.counts();
     return {{"installed", installed}, {"active", armed.load() && now < p->until.load()}, {"read_only", true},
         {"remaining_ms", until > now ? until - now : 0}, {"path", std::string(path.begin(), path.end())},
         {"written", p->drained}, {"calls", p->calls.load()}, {"dropped", p->dropped.load()},
@@ -547,9 +654,26 @@ inline Json status_locked() {
         {"mesh_bindings_supported",true},
         {"mesh_binding_hook_revision",wuwa_mesh_binding::hook_revision},
         {"eye_pair_diff_supported",true},
+        {"raw_snapshots_supported",true},
+        {"raw_snapshots",{{"requested",p->raw_requested.load()},{"written",p->raw_drained},
+            {"capacity_pairs",wuwa_raw_snapshot::pairs_capacity},
+            {"every_scheduled_pairs",wuwa_raw_snapshot::every_scheduled},
+            {"taken",p->raw_schedule.counts().taken.load()},{"refused",p->raw_schedule.counts().refused.load()},
+            {"orphaned",p->raw_schedule.counts().orphaned.load()},{"dropped",p->raw_dropped.load()},
+            {"truncated",p->raw_ring.truncated()},
+            {"view_bytes",wuwa_raw_snapshot::view_bytes},{"state_bytes",wuwa_raw_snapshot::state_bytes}}},
         {"eye_pair_diff",{{"written",p->eye_diff_drained},{"capacity",wuwa_eye_diff::ring_capacity},
             {"dropped",p->eye_diff_dropped.load()},{"truncated",p->eye_diff_ring.truncated()},
-            {"view_end",wuwa_eye_diff::view_end},{"state_end",wuwa_eye_diff::state_end}}},
+            {"view_end",wuwa_eye_diff::view_end},{"state_end",wuwa_eye_diff::state_end},
+            {"schedule","validated pair sequence"},{"interval_pairs",wuwa_eye_diff::interval_pairs},
+            {"before_seen",sampled.before_seen.load()},{"before_taken",sampled.before_taken.load()},
+            {"after_taken",sampled.after_taken.load()},{"ring_full",sampled.ring_full.load()},
+            {"orphaned",sampled.orphaned.load()}}},
+        {"pairs",{{"before_submissions",pair_json(p->pair_counts[0])},
+            {"after_first_submission",pair_json(p->pair_counts[1])},
+            {"after_submissions",pair_json(p->pair_counts[2])},
+            {"guard_misses",p->pair_guard_misses.load()},
+            {"locking","before: exclusive (publishes eye states); after: shared (verifies them)"}}},
         {"mesh_bindings",{{"requested",p->mesh_requested.load()},{"installed",mesh_hook_installed},
             {"installation_failed",mesh_hook_failed},{"path",std::string(mesh_path.begin(),mesh_path.end())},
             {"written",p->mesh_drained},{"capacity",wuwa_mesh_binding::capacity},
@@ -570,7 +694,8 @@ inline Json status_locked() {
             {"gpu_binding_proven",false}}}};
 }
 inline Json status() { const std::lock_guard lock{control}; return status_locked(); }
-inline Json request(const std::filesystem::path& directory, int seconds, bool view_uniforms=false, bool mesh_bindings=false) {
+inline Json request(const std::filesystem::path& directory, int seconds, bool view_uniforms=false, bool mesh_bindings=false,
+                    bool raw_snapshots=false) {
     if (seconds < 0 || seconds > 30) throw std::runtime_error("LOD trace duration must be 0..30 seconds");
     const std::lock_guard lock{control};
     if (!seconds) {
@@ -596,7 +721,8 @@ inline Json request(const std::filesystem::path& directory, int seconds, bool vi
         {"uniform_site_rva", uniform_site_rva},
         {"uniform_sampling", "CPU pre-tail constants at most 10 Hz per (eye, verified caller RVA, current-matrix source relation); eight fixed contexts per eye; state-frame index unavailable; no GPU readback"},
         {"uniform_snapshot_stage", "pre_tail_24adc060"},
-        {"eye_pair_diff", "raw dword differences between the two main-eye views and their view states; one before/after-submissions pair every 60 family frames; read-only guarded reads, 128 samples maximum, deltas ascending by offset and capped per region; addresses are historical identifiers, never dereference them; view-state extent unknown"},
+        {"eye_pair_diff", "raw dword differences between the two main-eye views and their view states; one before/after-submissions pair every 60 validated NSF pairs (probe sequence, not family frame: the frame read before the first submission is not the frame the renderer assigns); read-only guarded reads, 128 samples maximum, deltas ascending by offset and capped per region; addresses are historical identifiers, never dereference them; view-state extent unknown"},
+        {"raw_snapshots", raw_snapshots ? "requested: both eyes' full view and view-state windows, every dword with a read-validity bit, at every 5th eye-diff pair (3 before/after pairs maximum); slot order only, no physical-eye claim; object extent unknown" : "off"},
         {"coverage", "instanced vertex-factory bindings only; cached draws, static mesh CPU LOD and impostors may not pass here"},
         {"identity", "eye slots from validated main-view states; family frames are CPU identity, not GPU frame proof"}}.dump() << '\n';
     memory::require(file.good(), "Cannot open LOD trace");
@@ -633,6 +759,10 @@ inline Json request(const std::filesystem::path& directory, int seconds, bool vi
         owner->view_ring.reset(); owner->view_drained=0; owner->view_lock_misses=0;
         owner->eye_diff_ring.reset(); owner->eye_diff_sampler.reset();
         owner->eye_diff_drained=0; owner->eye_diff_dropped=0;
+        for (auto& c : owner->pair_counts) { c.calls=0; c.lock_misses=0; c.invalid=0; c.rows=0; }
+        owner->pair_guard_misses=0; owner->before_row.sequence=0;
+        owner->raw_ring.reset(); owner->raw_schedule.reset(); owner->raw_dropped=0; owner->raw_drained=0;
+        owner->raw_requested=raw_snapshots;
         owner->view_requested=view_uniforms;
         owner->mesh_file=std::move(mesh_file);owner->mesh_path=mesh_path;owner->mesh_requested=mesh_bindings;
         owner->mesh_ring.reset();owner->mesh_drained=0;owner->mesh_calls=0;owner->mesh_filtered=0;

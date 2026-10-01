@@ -19,6 +19,8 @@ namespace vrmod {
 // It never obtains Unreal objects from an XInput callback.
 class WuWaControlsComponent : public ModComponent {
 public:
+    bool sync_eye_lod() const { return m_sync_eye_lod->value(); }
+    bool refill_far_lighting() const { return m_refill_far_lighting->value(); }
     WuWaControlsComponent();
     std::string_view get_name() const override { return "WuWaControls"; }
     void on_draw_ui() override;
@@ -100,6 +102,12 @@ private:
     wuwa_video::Client m_video;
     const ModToggle::Ptr m_enabled{ModToggle::create("WuWaControls_Enabled", true)};
     const ModToggle::Ptr m_keep_camera{ModToggle::create("WuWaControls_KeepCameraOnFocusLoss", true)};
+    // Native stereo: give the second eye the first eye's LOD distance factor and FOV so
+    // far foliage and props switch LOD together (the game builds the second eye with 90).
+    const ModToggle::Ptr m_sync_eye_lod{ModToggle::create("WuWaStereo_SyncEyeLod", true)};
+    // Native stereo: refill WuWa's cascade lighting volume in a frame that renders both eyes,
+    // so the second eye's view state also gets far indirect light (see WuWaClvRefresh.hpp).
+    const ModToggle::Ptr m_refill_far_lighting{ModToggle::create("WuWaStereo_RefillFarLighting", true)};
     const ModToggle::Ptr m_recenter_position{ModToggle::create("WuWaControls_RecenterPosition", true)};
     const ModCombo::Ptr m_camera{ModCombo::create("WuWaControls_CameraMode", {"Game camera", "Fixed third person", "Freecam", "First person"}, 0)};
     const ModCombo::Ptr m_mesh{ModCombo::create("WuWaControls_MeshMode", {"Keep entire character visible", "Hide body in first person", "Hide head bones; keep body", "Hide body; keep original shadows", "Hide head bones; full shadow copy"}, 4)};

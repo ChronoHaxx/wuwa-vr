@@ -7,8 +7,8 @@
 namespace wuwa_code_compatibility {
 // Both shipped variants were identified in the working LGUI route. A matching
 // header is only a prerequisite: every requested code range must also match.
-constexpr uint32_t timestamp = 0x6a74963e;
-constexpr std::array<uint32_t, 2> image_sizes{0x3d627000, 0x3d625000};
+constexpr uint32_t timestamp = 0x6aa96d2d;
+constexpr std::array<uint32_t, 2> image_sizes{0xad21000, 0x3d625000};
 struct Identity { uint16_t machine, magic; uint32_t timestamp, size; };
 struct Range { uint32_t rva, size; uint64_t hash; };
 enum class Failure { none, machine, magic, timestamp, image_size, range, unreadable, code };

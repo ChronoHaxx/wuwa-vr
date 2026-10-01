@@ -6,6 +6,7 @@
 #include "../FrameworkConfig.hpp"
 #include "../WindowMode.hpp"
 #include "utility/WuWaTestControl.hpp"
+#include "utility/WuWaClvRefresh.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
 #include "utility/WuWaStereoBasePose.hpp"
 #include <nlohmann/json.hpp>
@@ -124,7 +125,7 @@ nlohmann::json pose_pair_json(const wuwa_pose_pair::Pair& pair, uint64_t now, bo
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
-    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
@@ -323,6 +324,91 @@ void WuWaControlsComponent::on_draw_experiments() {
             wuwa_ui::draw(*m_collision_complex,"Trace mesh triangles when supported");
             wuwa_ui::TextWrapped("Sweeps the camera against surfaces that block the game's Visibility trace. Slides along contact surfaces. Unsupported queries hold movement and report a reason below. Physical headset leaning is not constrained. Starts off; world geometry still needs live verification.");
         }
+        if (wuwa_ui::TreeNode("Stereo freeze fix bench (60-second windows)")) {
+            // Diagnostic windows for the far-foliage freeze in one eye. Each button opens a
+            // 60 s window that expires by itself; nothing is saved to the profile. Verdicts
+            // go to the log with the active mode so the session can be read back afterwards.
+            static constexpr std::array<const char*, 3> labels{
+                "Swap the two eye states",
+                "Both eyes use the right eye's state (views[0])",
+                "Both eyes use the left eye's state (views[1])"};
+            const bool busy = wuwa_shadow::test_active() || wuwa_stereo_order::active(GetTickCount64());
+            const bool can_start = wuwa_shadow::ready() && !wuwa_shadow::faulted.load() && !busy &&
+                !wuwa_shadow::state_swap_active() && !wuwa_shadow::target_swap_active() && !wuwa_shadow::construct_active();
+            ImGui::BeginDisabled(!can_start);
+            for (int i = 0; i < static_cast<int>(labels.size()); ++i) {
+                if (wuwa_ui::Button(labels[i])) {
+                    wuwa_shadow::set_state_swap(60, i);
+                    spdlog::info("[WuWaBench] start mode={} (menu)", wuwa_shadow::swap_mode_names[i]);
+                }
+            }
+            static constexpr std::array<const char*, 4> construct_labels{
+                "Construct left view as primary (pass 2)",
+                "Construct left view as primary, family hidden",
+                "Construct left view with family hidden",
+                "Construct left view with eye index 0"};
+            for (int i = 0; i < 4; ++i) {
+                if (wuwa_ui::Button(construct_labels[i])) {
+                    wuwa_shadow::set_construct(60, i + 1);
+                    spdlog::info("[WuWaBench] start construct mode={} (menu)", wuwa_shadow::construct_mode_names[i + 1]);
+                }
+            }
+            if (wuwa_ui::Button("Sync left eye LOD to right eye (fix candidate)")) {
+                wuwa_shadow::set_lod_sync(60);
+                spdlog::info("[WuWaBench] start lod_sync (menu)");
+            }
+            if (wuwa_ui::Button("Build left view like the first eye (K5)")) {
+                if (wuwa_second_eye::set_window(60)) spdlog::info("[WuWaBench] start second_eye (menu)");
+            }
+            if (wuwa_ui::Button("Swap the eyes' poses and projections (stereo looks inverted)")) {
+                wuwa_shadow::set_eye_swap(60);
+                spdlog::info("[WuWaBench] start eye_swap (menu)");
+            }
+            if (wuwa_ui::Button("Swap the eyes' render targets (stereo looks inverted)")) {
+                wuwa_shadow::set_target_swap(60);
+                spdlog::info("[WuWaBench] start target_swap (menu)");
+            }
+            ImGui::EndDisabled();
+            const bool target_active = wuwa_shadow::target_swap_active() || wuwa_shadow::construct_active() != 0 ||
+                wuwa_shadow::eye_swap_active();
+            const bool active = wuwa_shadow::state_swap_active() || target_active;
+            if (active && wuwa_ui::Button("Stop now")) {
+                wuwa_shadow::set_state_swap(0);
+                wuwa_shadow::set_target_swap(0);
+                wuwa_shadow::set_construct(0, 0);
+                wuwa_shadow::set_eye_swap(0);
+                wuwa_second_eye::set_window(0);
+                wuwa_shadow::set_lod_sync(0);
+                spdlog::info("[WuWaBench] stopped (menu)");
+            }
+            const auto mode = wuwa_shadow::construct_active() ? wuwa_shadow::construct_mode_names[static_cast<size_t>(wuwa_shadow::construct_active())] :
+                wuwa_shadow::eye_swap_active() ? "eye_swap" :
+                wuwa_shadow::target_swap_active() ? "target_swap" :
+                wuwa_shadow::swap_mode_names[static_cast<size_t>(wuwa_shadow::swap_mode.load())];
+            if (target_active) wuwa_ui::Text("Active: %s (targets swapped %llu, constructed %llu)", mode,
+                static_cast<unsigned long long>(wuwa_shadow::target_swap_applied.load()),
+                static_cast<unsigned long long>(wuwa_shadow::construct_applied.load()));
+            else if (active) wuwa_ui::Text("Active: %s, %llu s left, applied %llu, restored %llu", mode,
+                static_cast<unsigned long long>(wuwa_shadow::state_swap_remaining_ms() / 1000),
+                static_cast<unsigned long long>(wuwa_shadow::swap_applied.load()),
+                static_cast<unsigned long long>(wuwa_shadow::swap_restored.load()));
+            else if (wuwa_shadow::faulted.load()) wuwa_ui::TextWrapped("Stopped: a write or restore failed. Restart the game before trying again.");
+            else if (!wuwa_shadow::ready()) wuwa_ui::TextWrapped("Unavailable: the eye pair is not verified yet (or this game build is not supported).");
+            else if (busy) wuwa_ui::TextWrapped("Unavailable while another graphics test runs.");
+            else wuwa_ui::Text("Idle");
+            static constexpr std::array<const char*, 4> verdicts{
+                "Far tree: both eyes sway", "Far tree: left frozen", "Far tree: right frozen", "Visual problem (note it)"};
+            for (size_t i = 0; i < verdicts.size(); ++i) {
+                if (i) ImGui::SameLine();
+                if (wuwa_ui::Button(verdicts[i])) {
+                    spdlog::info("[WuWaBench] verdict=\"{}\" mode={} active={} remaining_ms={} applied={} restored={} skipped={} target_swaps={}",
+                        verdicts[i], mode, active, wuwa_shadow::state_swap_remaining_ms(), wuwa_shadow::swap_applied.load(),
+                        wuwa_shadow::swap_restored.load(), wuwa_shadow::swap_skipped.load(), wuwa_shadow::target_swap_applied.load());
+                }
+            }
+            wuwa_ui::TextWrapped("Stand where the far tree freezes, start a window, close the menu and look, then press what you saw. Each start or stop may cause a one-frame blur.");
+            ImGui::TreePop();
+        }
     wuwa_ui::draw(*m_auto_mouse,"Automatically use mouse in game menus (legacy)");
     wuwa_ui::TextWrapped("These options are optional comparisons. Opening this section does not enable them or change your camera.");
 }
@@ -390,6 +476,11 @@ void WuWaControlsComponent::on_draw_ui() {
         m_camera->value()=m_camera->value()==2 ? 0 : 2;
     wuwa_ui::draw(*m_keep_camera,"Keep camera and head hiding during Alt-Tab / UEVR settings");
     wuwa_ui::TextWrapped("Input still pauses when WuWa loses focus. Real game menus temporarily restore the game camera and character visibility.");
+    wuwa_ui::draw(*m_sync_eye_lod,"Match far-object detail between eyes");
+    wuwa_ui::TextWrapped("Fixes distant trees and props that freeze or look simpler in one eye. The game builds the second eye with a default 90 degree field of view, so it switched far objects to cheaper versions sooner.");
+    wuwa_ui::draw(*m_refill_far_lighting,"Match far lighting between eyes");
+    if (wuwa_ui::Button("Refill far lighting now")) wuwa_clv::request();
+    wuwa_ui::TextWrapped("Fixes distant objects that look darker or flatter in one eye. The game's lighting volume fills only the first eye after it refreshes; this refills it once in a frame that renders both eyes, after the game starts, after loading screens and after teleports. Each refill can cause a short hitch.");
     wuwa_ui::draw(*m_recenter_position,"L3 + A also resets headset position (seated)");
     if (wuwa_ui::Button("Reset headset position and direction now")) recenter(true);
     wuwa_ui::TextWrapped("Simulator Home resets only the simulated headset and preview. Use this reset afterwards to align UEVR's origin. It preserves world scale and camera offsets.");

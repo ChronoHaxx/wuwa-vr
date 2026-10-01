@@ -2,8 +2,10 @@
 // Windows API is used: memory is two fake buffers behind a guarded-reader stub.
 #if __has_include("../../mod/uevr/src/utility/WuWaEyeDiff.hpp")
 #include "../../mod/uevr/src/utility/WuWaEyeDiff.hpp"
+#include "../../mod/uevr/src/utility/WuWaRawSnapshot.hpp"
 #else
 #include "../upstream/UEVR/src/utility/WuWaEyeDiff.hpp"
+#include "../upstream/UEVR/src/utility/WuWaRawSnapshot.hpp"
 #endif
 #include <algorithm>
 #include <cassert>
@@ -146,43 +148,80 @@ void invalid_arguments_read_nothing() {
     assert(m.max_a == 0 && m.max_b == 0);
 }
 
+// Sampler policy. The schedule is keyed to the probe's pair sequence (issued only
+// to validated before-submission snapshots), never to a family frame: see
+// check-eye-diff-json.py for the same policy driven through the verbatim pair().
 void sampler_pairs_before_and_after_of_one_sequence() {
     Sampler s;
-    assert(s.take(1, 7, 120, 5, false));   // either eye's frame on the interval
-    assert(!s.take(3, 7, 120, 120, false)); // mid-pair snapshot never sampled
-    assert(s.take(2, 7, 121, 121, false)); // the matching after-snapshot
-    assert(!s.take(2, 7, 121, 121, false)); // ...exactly once
-    assert(s.take(1, 8, 5, 180, false));
-    assert(!s.take(2, 9, 181, 181, false)); // a different pair is not this pair's partner
-    assert(s.take(2, 8, 181, 181, false));  // ...but the real partner still is
+    assert(s.take(1, 1, 128));   // first validated pair of a capture is on the schedule
+    assert(!s.take(3, 1, 127));  // mid-pair snapshot never sampled
+    assert(s.take(2, 1, 127));   // the matching after-snapshot
+    assert(!s.take(2, 1, 126));  // ...exactly once
+    assert(s.take(1, 61, 126));  // next scheduled pair, 60 sequences later
+    assert(!s.take(2, 62, 125)); // a different pair is not this pair's partner: orphan
+    assert(!s.take(2, 61, 125)); // ...and the orphaned partner is forgotten, not revived
+    const auto& c = s.counts();
+    assert(c.before_taken == 2 && c.after_taken == 1 && c.orphaned == 1);
 }
 
-void sampler_refuses_off_interval_full_ring_and_unsequenced() {
+void sampler_refuses_off_schedule_full_ring_and_unsequenced() {
     Sampler s;
-    assert(!s.take(1, 1, 61, 59, false));  // neither frame on the 60-frame interval
-    assert(!s.take(2, 1, 62, 62, false));  // and so no partner is owed
-    assert(!s.take(1, 0, 60, 60, false));  // no sequence token, no sample
-    assert(!s.take(0, 2, 60, 60, false));
-    assert(!s.take(4, 2, 60, 60, false));
-    assert(!s.take(1, 3, 60, 60, true));   // full ring never starts a pair
-    assert(!s.take(2, 3, 61, 61, false));
-    assert(s.take(1, 4, 60, 60, false));
-    assert(!s.take(2, 4, 61, 61, true));   // ring filled in between: partner dropped, no crash
+    assert(!s.take(1, 2, 128));  // off the 60-pair schedule
+    assert(!s.take(2, 2, 128));  // and so no partner is owed
+    assert(!s.take(1, 0, 128));  // no sequence token (phase 1 failed validation), no sample
+    assert(!s.take(0, 1, 128));
+    assert(!s.take(4, 1, 128));
+    assert(!s.take(1, 61, 1));   // room for the before but not its after: never start a pair
+    assert(!s.take(2, 61, 1));
+    assert(s.take(1, 121, 2));
+    assert(!s.take(2, 121, 0));  // ring filled in between: partner refused, counted, no crash
+    assert(s.counts().ring_full == 2);
+    assert(s.take(1, 181, 128));
     s.reset();
-    assert(!s.take(2, 4, 61, 61, false));  // reset forgets the owed partner
+    assert(!s.take(2, 181, 128)); // reset forgets the owed partner
+    assert(s.counts().before_seen == 0 && s.counts().orphaned == 0); // ...and its counters
 }
 
+// One validated phase 1 per pair; phases 3 and 2 carry the same token. Frames
+// are not an input: the real family-frame lifecycle (unassigned before the first
+// submission, strides) is replayed through pair() in check-eye-diff-json.py.
 void sampler_cadence_over_a_simulated_walk() {
     Sampler s;
     uint32_t before = 0, after = 0;
-    uint64_t sequence = 0;
-    for (uint32_t frame = 0; frame < 600; ++frame) {
-        ++sequence;
-        if (s.take(1, sequence, frame, frame, false)) ++before;
-        if (s.take(3, sequence, frame, frame, false)) assert(false);
-        if (s.take(2, sequence, frame + 1, frame + 1, false)) ++after;
+    for (uint64_t sequence = 1; sequence <= 600; ++sequence) {
+        if (s.take(1, sequence, 128 - before - after)) ++before;
+        if (s.take(3, sequence, 128 - before - after)) assert(false);
+        if (s.take(2, sequence, 128 - before - after)) ++after;
     }
-    assert(before == 10 && after == 10); // one pair per 60 frames, none unpaired
+    assert(before == 10 && after == 10); // one pair per 60 pairs, none unpaired
+    assert(s.counts().before_seen == 600 && s.counts().orphaned == 0);
+}
+
+// Invalid early snapshots never reach the sampler (no token), so they neither
+// consume a sequence nor shift the schedule.
+void invalid_early_snapshots_do_not_shift_the_schedule() {
+    Sampler s;
+    uint64_t sequence = 0;
+    std::vector<uint64_t> scheduled;
+    for (uint32_t i = 0; i < 200; ++i) {
+        const bool valid = i >= 17;                       // first 17 pairs fail validation
+        if (!valid) continue;
+        ++sequence;
+        if (s.take(1, sequence, 128)) scheduled.push_back(sequence);
+        s.take(2, sequence, 128);
+    }
+    assert((scheduled == std::vector<uint64_t>{1, 61, 121, 181})); // 183 valid pairs
+}
+
+void ring_reports_free_slots() {
+    auto ring = std::make_unique<Ring<3>>();
+    auto s = std::make_unique<Sample>();
+    assert(ring->free_slots() == 3);
+    assert(ring->append(*s) && ring->free_slots() == 2);
+    assert(ring->append(*s) && ring->append(*s) && ring->free_slots() == 0);
+    assert(!ring->append(*s) && ring->free_slots() == 0);
+    ring->reset();
+    assert(ring->free_slots() == 3);
 }
 
 void sample_compares_views_and_states_independently() {
@@ -220,6 +259,68 @@ void ring_never_overwrites_and_resets() {
     s->id.sequence = 9;
     assert(ring->append(*s) && ring->pop(*out) && out->id.sequence == 9);
 }
+// Raw snapshots: every dword of both objects, equal ones included, with validity.
+void raw_block_keeps_equal_values_and_marks_unreadable_dwords() {
+    Memory m(0x800);                 // 0x2000 bytes per object; the view window is 0x1e40
+    m.b[3] = 99;                     // one difference; everything else equal
+    m.bad_b[70] = true;              // one unmapped dword inside a chunk
+    auto s = std::make_unique<wuwa_raw_snapshot::Snapshot>();
+    wuwa_raw_snapshot::capture(*s, {5, 61, 7, 1, {1, 1}}, 2, base_a, base_b, 0, base_b, m.reader());
+    const auto& a = s->views[0]; const auto& b = s->views[1];
+    assert(s->id.sequence == 61 && s->id.phase == 1 && s->ordinal == 2);
+    assert(a.readable == a.dwords && b.readable == b.dwords - 1);
+    assert(a.words[0] == 0x1000 && b.words[0] == 0x1000);  // equal values are kept
+    assert(b.words[3] == 99 && a.words[3] == 0x1000 + 3);
+    assert(!b.read_ok(70) && b.words[70] == 0 && b.read_ok(69) && b.read_ok(71));
+    assert(m.max_a <= base_a + wuwa_raw_snapshot::view_bytes && m.max_b <= base_b + 0x2000);
+    assert(s->states[0].address == 0 && s->states[0].readable == 0);  // null object: nothing read
+    assert(s->states[1].readable == 0x800 - 1 && !s->states[1].read_ok(70)); // ends at 0x2000, one hole
+    assert(s->states[1].read_ok(0x7ff) && !s->states[1].read_ok(0x800));
+}
+
+void raw_block_is_fully_reset_on_reuse() {
+    Memory m(0x1000);
+    auto s = std::make_unique<wuwa_raw_snapshot::Snapshot>();
+    wuwa_raw_snapshot::capture(*s, {}, 0, base_a, base_b, base_a, base_b, m.reader());
+    Memory empty(1);
+    empty.bad_a[0] = empty.bad_b[0] = true;
+    wuwa_raw_snapshot::capture(*s, {}, 1, base_a, base_b, base_a, base_b, empty.reader());
+    for (const auto& block : s->views) assert(block.readable == 0 && block.words[5] == 0 && !block.read_ok(5));
+    for (const auto& block : s->states) assert(block.readable == 0 && block.words[0x100] == 0);
+}
+
+void raw_schedule_copies_every_fifth_eye_diff_pair_up_to_its_budget() {
+    wuwa_raw_snapshot::Schedule s;
+    std::vector<uint64_t> taken;
+    for (uint32_t ordinal = 0; ordinal < 20; ++ordinal) {
+        const uint64_t sequence = 1 + 60 * uint64_t(ordinal); // the eye-diff pair's sequence
+        if (s.take(true, 1, sequence, ordinal, 6)) taken.push_back(sequence);
+        if (s.take(true, 2, sequence, ordinal, 6)) taken.push_back(sequence);
+    }
+    assert((taken == std::vector<uint64_t>{1, 1, 301, 301, 601, 601}));
+    assert(s.counts().taken == 6 && s.counts().orphaned == 0 && s.counts().refused == 0);
+    wuwa_raw_snapshot::Schedule off;
+    assert(!off.take(false, 1, 1, 0, 6) && !off.take(true, 1, 0, 0, 6)); // not requested / no sequence
+    wuwa_raw_snapshot::Schedule tight;
+    assert(!tight.take(true, 1, 1, 0, 1) && tight.counts().refused == 1); // never start half a pair
+    assert(tight.take(true, 1, 301, 5, 2) && tight.ordinal() == 0);
+    assert(!tight.take(true, 2, 302, 5, 1) && tight.counts().orphaned == 1); // wrong partner
+    tight.reset();
+    assert(tight.counts().taken == 0 && tight.take(true, 1, 1, 0, 2));
+}
+
+void raw_ring_fills_in_place_and_never_overwrites() {
+    auto ring = std::make_unique<wuwa_raw_snapshot::Ring<2>>();
+    assert(ring->free_slots() == 2);
+    assert(ring->emplace([](wuwa_raw_snapshot::Snapshot& s) { s.id.sequence = 1; }));
+    assert(ring->emplace([](wuwa_raw_snapshot::Snapshot& s) { s.id.sequence = 2; }));
+    assert(!ring->emplace([](wuwa_raw_snapshot::Snapshot&) { assert(false); }) && ring->truncated());
+    std::vector<uint64_t> seen;
+    while (ring->consume([&](const wuwa_raw_snapshot::Snapshot& s) { seen.push_back(s.id.sequence); })) {}
+    assert((seen == std::vector<uint64_t>{1, 2}) && ring->free_slots() == 0);
+    ring->reset();
+    assert(ring->free_slots() == 2 && !ring->truncated() && !ring->consume([](const auto&) { assert(false); }));
+}
 } // namespace
 
 int main() {
@@ -232,8 +333,14 @@ int main() {
     a_reused_region_is_fully_reset();
     invalid_arguments_read_nothing();
     sampler_pairs_before_and_after_of_one_sequence();
-    sampler_refuses_off_interval_full_ring_and_unsequenced();
+    sampler_refuses_off_schedule_full_ring_and_unsequenced();
     sampler_cadence_over_a_simulated_walk();
+    invalid_early_snapshots_do_not_shift_the_schedule();
+    ring_reports_free_slots();
+    raw_block_keeps_equal_values_and_marks_unreadable_dwords();
+    raw_block_is_fully_reset_on_reuse();
+    raw_schedule_copies_every_fifth_eye_diff_pair_up_to_its_budget();
+    raw_ring_fills_in_place_and_never_overwrites();
     sample_compares_views_and_states_independently();
     ring_never_overwrites_and_resets();
     std::cout << "eye diff checks passed\n";

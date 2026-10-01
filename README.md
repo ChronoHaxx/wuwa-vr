@@ -2,12 +2,13 @@
 
 Free, unofficial Wuthering Waves VR mod, built on praydog's UEVR and community work.
 
-**[Download the beta · 1 Oct 11:30 BST · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01)** · [60-second explainer and beginner guide](https://chronohaxx.github.io/wuwa-vr/understanding.html)
+**[Download the beta · 1 Oct 18:17 BST · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817)** · [60-second explainer and beginner guide](https://chronohaxx.github.io/wuwa-vr/understanding.html)
 
-One build, **3.7 + far LOD fix · 1 Oct 11:30 BST**, tested by the owner in the
-headset: the HUD, menus and ultimate-camera fix work on game version 3.7, and
-far trees and props now match between the eyes. Still open: far lighting/fog
-differences between the eyes and the Resonators reflection. The ZIP is about 51 MB.
+One build, **3.7 + reflection + far lighting fix v2 · 1 Oct 18:17 BST**, tested by the owner:
+the HUD, menus and ultimate-camera fix work on game version 3.7; far trees, props
+and far lighting now match between the eyes; Resonators and team-screen
+reflections sit in the right place. Still open: weapon and Echo submenu
+reflections. The ZIP is about 51 MB.
 
 [Watch / guide](https://chronohaxx.github.io/wuwa-vr/) · [Report an issue](https://github.com/ChronoHaxx/wuwa-vr/issues)
 

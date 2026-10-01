@@ -52,6 +52,7 @@ Both eyes need the **same instant of game state**, with deliberately different e
 | 28 Sep afternoon | Reproduced the same tree moving in both eyes nearby, then left-static/right-moving farther away, even during a zero-IPD retreat. | A repeatable distance-dependent failure. Ordinary eye spacing alone does not explain it. |
 | 29–30 Sep | Diagnostic builds swapped view states, render targets, construction pass, eye index and eye pose between the eyes. Game patch 3.7 then broke the HUD; the HUD, menus, ultimate-camera fix and Same Pass were ported to 3.7 by matching the old code's bytes in the new game. | Each test ruled out one cause of the far-tree freeze. The 3.7 HUD, menus and camera fix were confirmed by the owner. |
 | 1 Oct | A full field-by-field diff of the two eye views showed the second eye built with the default 90° FOV, so its LOD distance factor was 1.0 instead of 0.836. The second eye now copies the first eye's LOD factor and FOV before rendering. | **Far foliage/prop mismatch fixed**: measured in the simulator (left-eye canopy motion 2% → 67%) and confirmed in the headset. Still open: far lighting/fog differences between the eyes and the Resonators reflection. |
+| 1 Oct, evening | The Resonators reflection fix was re-verified for 3.7. Far objects were darker in one eye: swapping the eyes' view states moved the problem, and of about 40 render settings only indirect light mattered. WuWa's Cascade Lighting Volume keeps indirect light per view state and a refresh filled only the first eye; the mod now refills it once in a frame that renders both eyes. | **Far lighting and character-screen reflections fixed** (simulator, 1 Oct 18:17 beta). Weapon/Echo submenu reflections deferred. |
 
 ## What works, what remains open
 
@@ -59,9 +60,9 @@ Both eyes need the **same instant of game state**, with deliberately different e
 
 **Headset-confirmed on 28 Sep:** the end-of-ultimate camera mismatch is fixed for the owner’s tested cases. This is user acceptance, not a claim that every character or transition has been exhaustively tested.
 
-**Fixed on 1 Oct (game 3.7):** far trees and props now use the same detail level in both eyes; see the next section for the cause.
+**Fixed on 1 Oct (game 3.7):** far trees and props use the same detail level in both eyes (see the next section), far objects get the same indirect light in both eyes, and the Resonators and team-screen reflections sit in the right place.
 
-**Still open:** far objects lit or fogged differently in each eye (they match up close), the Resonators / team-screen reflection position, and the deferred reflection submenus.
+**Still open:** weapon and Echo submenu reflections, and full-animation first-person aiming.
 
 ## Why a tree looked frozen in one eye
 

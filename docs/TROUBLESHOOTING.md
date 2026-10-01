@@ -1,7 +1,7 @@
 # Known issues and recovery
 
-Status: October 1, 2026. The current public build is **3.7 + far LOD fix ·
-1 Oct 11:30 BST** (beta, game version 3.7). It keeps the controls, HUD and camera
+Status: October 1, 2026. The current public build is **3.7 + reflection + far lighting fix v2 ·
+1 Oct 18:17 BST** (beta, game version 3.7). It keeps the controls, HUD and camera
 features of the earlier builds; the candidate times below refer to the
 checkpoints in [CHECKPOINTS.md](CHECKPOINTS.md). Keep the selected build
 name, timestamp and backend hash with a report. A result against one checkpoint
@@ -22,8 +22,8 @@ does not automatically apply to another.
 | SteamVR periodically stutters | The 3.7 build needs Native Stereo Fix on. On the previous game version the user reproduced stutter with it on; the owner's 1 Oct SteamVR test of the 3.7 build was near perfect apart from a far lighting difference. If it stutters, record the build and headset software. |
 | An older build crashes with menu extraction + Native Stereo Fix | Applies to builds for the previous game version: do not repeat that combination there. The 3.7 build's menu route runs with Native Stereo Fix on. |
 | NPC name or speech bubble visible in one eye | Not seen by the owner in 3.7 testing (1 Oct): NPC names and enemy health labels looked correct. Report it with the build name if it appears. |
-| Resonators / team-screen reflection sits in the wrong place in each eye | Open. The game rebuilds the mirror camera with a centred projection, so in a headset each eye's reflection slides outward and is too large. A per-eye projection fix is ported to 3.7 and in testing. |
-| Far objects look differently lit or fogged in each eye | Open, 3.7. Up close both eyes match. The second eye's view is built with different camera settings; the far trees/props part of this is fixed (LOD), the lighting/fog part is being tested. |
+| Resonators / team-screen reflection sits in the wrong place in each eye | Fixed in the 1 Oct 18:17 beta (per-eye mirror projection ported to 3.7). Weapon and Echo submenus still pause or misplace it; deferred, as the flat game does not rotate the character there. |
+| Far objects look darker or flatter in one eye | Fixed in the 1 Oct 18:17 beta: the game's lighting volume (CLV) is refilled once for both eyes after the game starts, after loading screens and after teleports, with a short hitch. If it recurs, use WuWa Controls → Refill far lighting now and report where. |
 | Iuno hair/head, Mornye leg transparency or Lynae effects absent in one eye | On 27 Sep the owner found Native Stereo Fix on repaired the affected character materials; the 3.7 build runs with it on. Report it with the character and build name if it recurs. |
 | Full head shadow only works after toggling per character | Automatic retries and reused-component recovery are included. The owner reported the 15:39 head-bones/full-shadow mode working; it is the supplied default in 17:30 and later. If it recurs, record the character/build and check the active-copy status. |
 | Buttons unexpectedly move the mouse or HUD | L3 + LB exits manual adjustment; release all controls. The control-recovery candidate has an always-visible amber notice and an Exit mouse mode now button above its settings. |

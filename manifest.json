@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-02T19:28:19.143042+00:00",
+  "updatedAt": "2026-10-02T19:32:23.214788+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -24,7 +24,7 @@
     "dev/check-site.cjs": "2d83de1d2e5ddaa7b4970cfe7a3d17c94d7e43f963f092d34c8c6e0a6a2a912e",
     "dev/check-sums.py": "2250df1664f9dba786ddd6a9357e52100ea7260e7f2eb495699ad27378d318b6",
     "dev/configure-sharing.py": "9ddd3649e4a97bf93376f90ea9817388eac8b4a8f0ef0268e6af3f26c63ef0e0",
-    "dev/package-beta.py": "4b34055cf7700b2ae81c67b30f69983a6829886e4cdc97d3792d6fa71f85429b",
+    "dev/package-beta.py": "97cb4799bd66ad6a36be6957fcac1c63d3a91b7a853ffbdbc2c727494d3a54c9",
     "dev/render-understanding.cjs": "26d151222ab7710eacd496245d4de3d8e0665c07f3952f56e4f268c5618a07ac",
     "dev/site-layout.cjs": "3d2a3fbad6da43b08b41f8cba48882a6cfeb1a32544ecd4305d01d9123d90a2a",
     "dev/test_configure_sharing.py": "8c5e42443e9461c224d35cb2b4b05977b3dd2892121ce6cbc09e15135f3a481c",

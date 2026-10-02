@@ -72,6 +72,8 @@ def main():
     parser.add_argument("--amp", type=float, default=2.0, help="yaw amplitude in degrees")
     parser.add_argument("--hz", type=float, default=3.0)
     parser.add_argument("--seconds", type=float, default=6.0)
+    parser.add_argument("--natural", action="store_true",
+                        help="headset: no sweep; compare off/on twice using your own head movement")
     args = parser.parse_args()
     test = live.LiveTest()
     rect = game_rect()
@@ -79,20 +81,25 @@ def main():
     results = {}
     try:
         # still: no sweep (picture noise floor); bypassed: sweep, steadying off; steady: sweep, on.
-        for label, shaking, bypass in (("still", False, 0), ("bypassed", True, int(args.seconds + 8)),
-                                       ("steady", True, 0)):
-            sweep(shaking, args.amp, args.hz)
+        phases = (("still", False, 0), ("bypassed", True, int(args.seconds + 8)), ("steady", True, 0))
+        if args.natural:   # real head motion varies, so alternate twice and average
+            phases = (("bypassed", False, int(args.seconds + 8)), ("steady", False, 0)) * 2
+        for label, shaking, bypass in phases:
+            if not args.natural:
+                sweep(shaking, args.amp, args.hz)
             test.request("steady_view", bypass_seconds=bypass)
             time.sleep(2.5)
             frames, seconds = capture(rect, args.seconds)
-            results[label], fps = oscillation(frames, seconds)
+            value, fps = oscillation(frames, seconds)
+            results[label] = (results[label] + value) / 2 if label in results else value
             status = test.request("steady_view", bypass_seconds=bypass and 1)["steady"]
-            print(f"{label:9s} oscillation {results[label]:6.2f} px  ({fps:.0f} fps)  status {status}")
+            print(f"{label:9s} oscillation {value:6.2f} px  ({fps:.0f} fps)  status {status}")
     finally:
         sweep(False)
         test.request("steady_view", bypass_seconds=0)
-    shake = results["bypassed"] - results["still"]
-    left = results["steady"] - results["still"]
+    floor = results.get("still", 0.0)
+    shake = results["bypassed"] - floor
+    left = results["steady"] - floor
     print(f"head shake in picture: {shake:.2f} px; left with steady view: {left:.2f} px "
           f"({100 * left / shake if shake > 0 else float('nan'):.0f}%)")
     print("PASS" if shake > 0.5 and left < 0.35 * shake else "CHECK")

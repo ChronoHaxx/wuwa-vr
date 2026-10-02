@@ -5,6 +5,7 @@
 #include <utility/ScopeGuard.hpp>
 #include <utility/Logging.hpp>
 #include <utility/WuWaLguiProbe.hpp>
+#include <utility/WuWaRunMarker.hpp>
 
 #include "Framework.hpp"
 #include "../VR.hpp"
@@ -1030,6 +1031,14 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
         DirectX::Colors::White);
 
     batch->End();
+
+    // WuWa: Start/End run sync square (desktop view only), see utility/WuWaRunMarker.hpp.
+    if (wuwa_run::take_flash()) {
+        const float magenta[]{ 1.0f, 0.0f, 1.0f, 1.0f };
+        const auto size = (LONG)(desc.Height / 10);
+        const D3D12_RECT square{ 0, 0, size, size };
+        command_list->ClearRenderTargetView(backbuffer_ctx.get_rtv(), magenta, 1, &square);
+    }
 
     // Transition backbuffer to D3D12_RESOURCE_STATE_PRESENT
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;

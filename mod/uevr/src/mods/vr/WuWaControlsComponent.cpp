@@ -7,6 +7,7 @@
 #include "../WindowMode.hpp"
 #include "utility/WuWaTestControl.hpp"
 #include "utility/WuWaClvRefresh.hpp"
+#include "utility/WuWaRunMarker.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
 #include "utility/WuWaStereoBasePose.hpp"
 #include <nlohmann/json.hpp>
@@ -455,6 +456,19 @@ void WuWaControlsComponent::on_draw_recording() {
     wuwa_ui::draw(*m_steady_desktop_seconds,"Steadiness (seconds of smoothing)");
     ImGui::EndDisabled();
     wuwa_ui::TextWrapped("Smooths head shake out of the game window, so OBS records a calm, full-resolution view with game audio. The headset image is not changed. The window shows a slightly narrower view so the picture can move inside it.");
+    ImGui::Separator();
+    const bool run_active = wuwa_run::active.load();
+    if (wuwa_ui::Button(run_active ? "End run" : "Start run")) {
+        if (!wuwa_run::mark(profile, !run_active)) wuwa_ui::TextWrapped("Could not write the run marker file.");
+    }
+    const auto since_press = wuwa_run::unix_ms() - wuwa_run::last_ms.load();
+    if (wuwa_run::last_ms.load() != 0 && since_press < 20000) {
+        wuwa_ui::TextWrapped("%s", run_active ? "Run started. Now open the in-game map for 3 seconds."
+                                              : "Run ended. Now open the in-game map, zoomed out, for 3 seconds.");
+    } else if (run_active) {
+        wuwa_ui::TextWrapped("Run in progress: %d min.", static_cast<int>((wuwa_run::unix_ms() - wuwa_run::started_ms.load()) / 60000));
+    }
+    wuwa_ui::TextWrapped("Exercise recordings: start OBS (F9), press Start run, open the in-game map for 3 seconds. At the end: End run, open the map zoomed out, then stop OBS. Each press flashes a magenta square in the desktop view so the video lines up with your route log.");
     ImGui::Separator();
     wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
     if (m_privacy->value()) {

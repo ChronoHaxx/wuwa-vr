@@ -71,3 +71,31 @@ Render writes `edit-<date>-<time>.mp4` (2560×1440, H.264, -14 LUFS for YouTube)
   the picture. Test it per shot: on WuWa's effects-heavy footage it made the shake worse
   about as often as better.
 - `crop`: `sbs-left`/`sbs-right` or any ffmpeg `crop=w:h:x:y`.
+
+## Exercise runs: route card and timelapse (`route.py`)
+
+For treadmill sessions (Reality Runner or similar). Before recording, start
+`launcher\dev\wuwa_route_log.py` (logs position and head rotation 30 times a second). In
+the game, **WuWa controls > Recording > Start run** after OBS starts and **End run** before
+it stops: each press is logged and flashes a magenta square in the game window, which lines
+the video up with the log to within a frame.
+
+```powershell
+python route.py load                      # parse the session's logs (newest game session)
+python route.py summary --run 3 --real-km 1.43 --real-time 32:48 --calories 160
+python route.py sync "E:\OBS Videos\2026-10-02 20-43-58.mkv"
+python route.py timelapse "E:\OBS Videos\2026-10-02 20-43-58.mkv" --run 3 --stills 4
+python route.py timelapse "E:\OBS Videos\2026-10-02 20-43-58.mkv" --run 3 --real-km 1.43 --real-time 32:48 --calories 160
+```
+
+- `summary` writes a Strava-style card (map, distance, moving time, speed, climb; the
+  treadmill's own numbers when given) to `%LOCALAPPDATA%\WuWa VR Launcher\routes\`.
+- `timelapse` writes `<video> timelapse run<N>.mp4` next to the video: summary card, about
+  75 s of run (`--length`), the card again with the treadmill numbers. Frames are spaced
+  mostly by distance, so standing still passes quickly, and UEVR-menu time is skipped.
+- Stabilisation uses the logged head rotation, not the picture: each frame is rotated to a
+  smoothed path, and the 1.4× crop (`--zoom`) hides the edges. Near each frame time it also
+  picks the moment the head was closest to that path. `--fov` is the recording's
+  horizontal field of view (104° measured for the desktop view of this headset).
+- WuWa's on-screen User ID is painted out; `--show-uid` keeps it. `--stills 4` saves four
+  sample frames instead of the video, for a quick check.

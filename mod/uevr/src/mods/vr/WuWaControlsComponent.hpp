@@ -21,6 +21,8 @@ class WuWaControlsComponent : public ModComponent {
 public:
     bool sync_eye_lod() const { return m_sync_eye_lod->value(); }
     bool refill_far_lighting() const { return m_refill_far_lighting->value(); }
+    bool steady_desktop_view() const { return m_steady_desktop->value(); }
+    float steady_desktop_seconds() const { return m_steady_desktop_seconds->value(); }
     WuWaControlsComponent();
     std::string_view get_name() const override { return "WuWaControls"; }
     void on_draw_ui() override;
@@ -99,6 +101,8 @@ private:
     const ModCombo::Ptr m_video_fps{ModCombo::create("WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}, 0)};
     const ModCombo::Ptr m_video_width{ModCombo::create("WuWaRecording_Width", {"720", "1024", "1280"}, 1)};
     const ModToggle::Ptr m_video_telemetry{ModToggle::create("WuWaRecording_Telemetry", true)};
+    const ModToggle::Ptr m_steady_desktop{ModToggle::create("WuWaRecording_SteadyDesktop", true)};
+    const ModSlider::Ptr m_steady_desktop_seconds{ModSlider::create("WuWaRecording_SteadySeconds", 0.05f, 1.0f, 0.35f)};
     wuwa_video::Client m_video;
     const ModToggle::Ptr m_enabled{ModToggle::create("WuWaControls_Enabled", true)};
     const ModToggle::Ptr m_keep_camera{ModToggle::create("WuWaControls_KeepCameraOnFocusLoss", true)};

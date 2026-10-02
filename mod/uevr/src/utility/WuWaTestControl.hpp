@@ -17,6 +17,7 @@
 #include "WuWaShadowPass.hpp"
 #include "WuWaSecondEyeBuild.hpp"
 #include "WuWaClvRefresh.hpp"
+#include "WuWaSteadyView.hpp"
 #include "WuWaMotionTrace.hpp"
 #include "WuWaBooleanCVar.hpp"
 #include "WuWaPlanarCVar.hpp"
@@ -557,6 +558,13 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             const auto frames = request.value("frames", 1);
             if (frames > 0) wuwa_clv::request(static_cast<uint32_t>(frames));
             reply["clv"] = wuwa_clv::status();
+        } else if (op == "steady_view") {
+            const auto seconds = request.value("bypass_seconds", 0);
+            if (seconds < 0 || seconds > 120) throw std::runtime_error("bypass_seconds must be 0..120");
+            wuwa_steady_view::bypass(seconds);
+            reply["steady"] = {{"bypassed", wuwa_steady_view::bypassed()}, {"frames", wuwa_steady_view::frames_steadied.load()},
+                {"dx", wuwa_steady_view::last_dx.load()}, {"dy", wuwa_steady_view::last_dy.load()},
+                {"roll", wuwa_steady_view::last_roll.load()}};
         } else if (op == "console_get") {
             auto* var = find_console_variable(request.at("name").get<std::string>());
             reply["int"] = var->GetInt();

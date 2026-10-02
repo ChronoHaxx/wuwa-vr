@@ -977,11 +977,45 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
     ID3D12DescriptorHeap* game_heaps[] = { m_game_tex.srv_heap->Heap() };
     command_list->SetDescriptorHeaps(1, game_heaps);
 
-    batch->Draw(m_game_tex.get_srv_gpu(), 
-        DirectX::XMUINT2{ (uint32_t)m_backbuffer_size[0], (uint32_t)m_backbuffer_size[1] },
-        dest_rect,
-        &source_rect, 
-        DirectX::Colors::White);
+    const auto& wuwa = vr->get_wuwa_controls();
+    if (wuwa.steady_desktop_view() && !wuwa_steady_view::bypassed() && eye_aspect_ratio <= aspect_ratio) {
+        // WuWa: steady desktop view (utility/WuWaSteadyView.hpp). A slightly narrower crop leaves
+        // a margin; the crop follows the smoothed head pose this frame was rendered with.
+        constexpr float margin = 0.07f; // of the eye width, each side
+        const auto crop_width = eye_width * (1.0f - 2.0f * margin);
+        Vector4f tangents{};
+        {
+            const auto runtime = vr->get_runtime();
+            std::shared_lock _{ runtime->projections_mtx };
+            tangents = runtime->raw_projections[0];
+        }
+        const auto across = std::abs(tangents[0]) + std::abs(tangents[1]);
+        const auto down = std::abs(tangents[2]) + std::abs(tangents[3]);
+        const auto fx = across > 0.01f ? eye_width / across : eye_width / 2.0f;
+        const auto fy = down > 0.01f ? eye_height / down : fx;
+        const auto rotation = glm::quat_cast(vr->get_hmd_rotation(static_cast<uint32_t>(vr->m_render_frame_count)));
+        const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        const auto max_angle = std::atan(eye_width * margin / fx);
+        const auto crop = m_steady_view.update(rotation, now, wuwa.steady_desktop_seconds(), max_angle, fx, fy);
+        const auto margin_y = (eye_height - crop_width / aspect_ratio) / 2.0f;
+        ++wuwa_steady_view::frames_steadied;
+        wuwa_steady_view::last_dx = crop.dx; wuwa_steady_view::last_dy = crop.dy; wuwa_steady_view::last_roll = crop.roll;
+        const RECT eye_rect{ (LONG)source_rect.left, 0, (LONG)(source_rect.left + eye_width), (LONG)eye_height };
+        const DirectX::XMFLOAT2 origin{
+            original_centerw + std::clamp(crop.dx, -eye_width * margin, eye_width * margin),
+            original_centerh + std::clamp(crop.dy, -margin_y, margin_y) };
+        batch->Draw(m_game_tex.get_srv_gpu(),
+            DirectX::XMUINT2{ (uint32_t)m_backbuffer_size[0], (uint32_t)m_backbuffer_size[1] },
+            DirectX::XMFLOAT2{ (float)desc.Width / 2.0f, (float)desc.Height / 2.0f },
+            &eye_rect, DirectX::Colors::White, -crop.roll, origin, (float)desc.Width / crop_width);
+    } else {
+        m_steady_view.reset();
+        batch->Draw(m_game_tex.get_srv_gpu(), 
+            DirectX::XMUINT2{ (uint32_t)m_backbuffer_size[0], (uint32_t)m_backbuffer_size[1] },
+            dest_rect,
+            &source_rect, 
+            DirectX::Colors::White);
+    }
 
     //////
     // UI

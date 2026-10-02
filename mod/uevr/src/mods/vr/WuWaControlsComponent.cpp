@@ -132,7 +132,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
         *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu,
-        *m_video_fps, *m_video_width, *m_video_telemetry,
+        *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};
 }
@@ -449,6 +449,12 @@ void WuWaControlsComponent::on_draw_recording() {
     if (!message.empty()) wuwa_ui::TextWrapped("%s",message.c_str());
     wuwa_ui::TextWrapped("SteamVR and the updated OpenXR Simulator are supported. VDXR capture is not available yet. Video has no audio and stops after five minutes. Actual frame rate depends on the game.");
     wuwa_ui::TextWrapped("Simulator: keep its preview open, choose Both eyes / side-by-side, and turn Full render off. Recording uses the preview size.");
+    ImGui::Separator();
+    wuwa_ui::draw(*m_steady_desktop,"Steady desktop view (for OBS and streaming)");
+    ImGui::BeginDisabled(!m_steady_desktop->value());
+    wuwa_ui::draw(*m_steady_desktop_seconds,"Steadiness (seconds of smoothing)");
+    ImGui::EndDisabled();
+    wuwa_ui::TextWrapped("Smooths head shake out of the game window, so OBS records a calm, full-resolution view with game audio. The headset image is not changed. The window shows a slightly narrower view so the picture can move inside it.");
     ImGui::Separator();
     wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
     if (m_privacy->value()) {

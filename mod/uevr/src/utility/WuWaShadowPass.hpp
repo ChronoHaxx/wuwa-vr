@@ -100,10 +100,14 @@ inline bool write_field(uintptr_t address, uint32_t value) {
 // cheaper, non-animated LODs at a shorter distance. Copy the first view's LOD distance
 // factor and FOV fields into the second view before either submission. 3.7 offsets.
 inline constexpr std::array<uint32_t, 6> lod_sync_offsets{0x2b8, 0x2d0, 0x2d4, 0xca4, 0xca8, 0xfd8};
-inline std::atomic<uint64_t> lod_sync_until{}, lod_sync_applied{}, lod_sync_failed{};
+inline std::atomic<uint64_t> lod_sync_until{}, lod_sync_off_until{}, lod_sync_applied{}, lod_sync_failed{};
 inline bool lod_sync_active() { return GetTickCount64() < lod_sync_until.load(); }
-inline void set_lod_sync(int seconds) {
-    lod_sync_until = seconds > 0 ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
+inline bool lod_sync_bypassed() { return GetTickCount64() < lod_sync_off_until.load(); }
+// Test control: force LOD sync on (enabled) or off for a window; 0 seconds ends either.
+inline void set_lod_sync(int seconds, bool enabled = true) {
+    const auto until = seconds > 0 ? GetTickCount64() + static_cast<uint64_t>(seconds) * 1000 : 0;
+    lod_sync_until = enabled ? until : 0;
+    lod_sync_off_until = enabled ? 0 : until;
 }
 
 inline bool read_pointer(uintptr_t address, uintptr_t& value) {
@@ -217,7 +221,7 @@ inline nlohmann::json status() {
         {"construct_mode", construct_mode_names[static_cast<size_t>(construct_active())]},
         {"construct_applied", construct_applied.load()},
         {"eye_swap_active", eye_swap_active()}, {"eye_swap_applied", eye_swap_applied.load()},
-        {"lod_sync_active", lod_sync_active()}, {"lod_sync_applied", lod_sync_applied.load()},
+        {"lod_sync_active", lod_sync_active()}, {"lod_sync_bypassed", lod_sync_bypassed()}, {"lod_sync_applied", lod_sync_applied.load()},
         {"lod_sync_failed", lod_sync_failed.load()},
         {"state_swap_applied", swap_applied.load()}, {"state_swap_restored", swap_restored.load()},
         {"state_swap_skipped", swap_skipped.load()}};
@@ -366,7 +370,7 @@ private:
 // Copies the LOD inputs of the main pair's first view into the second. Only for the
 // verified main pair (first pass 2, second 3 or 2). Each write is read back.
 inline void lod_sync(bool enabled, const void* family, void* first, void* second, int32_t count) {
-    if ((!enabled && !lod_sync_active()) || !compatible() || faulted.load() || count != 2 || !family || !first || !second) return;
+    if (lod_sync_bypassed() || (!enabled && !lod_sync_active()) || !compatible() || faulted.load() || count != 2 || !family || !first || !second) return;
     const auto a = reinterpret_cast<uintptr_t>(first), b = reinterpret_cast<uintptr_t>(second);
     uint32_t pa{}, pb{};
     if (!checked::read_field(a, 0xc90, pa) || !checked::read_field(b, 0xc90, pb) || pa != 2 || (pb != 3 && pb != 2)) return;

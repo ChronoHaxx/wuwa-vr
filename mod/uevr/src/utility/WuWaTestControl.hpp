@@ -18,6 +18,7 @@
 #include "WuWaSecondEyeBuild.hpp"
 #include "WuWaClvRefresh.hpp"
 #include "WuWaSteadyView.hpp"
+#include "WuWaPerf.hpp"
 #include "WuWaMotionTrace.hpp"
 #include "WuWaBooleanCVar.hpp"
 #include "WuWaPlanarCVar.hpp"
@@ -513,8 +514,9 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         } else if (op == "lod_sync") {
             const auto seconds = request.value("seconds", 0);
             if (seconds < 0 || seconds > 60) throw std::runtime_error("lod_sync needs seconds 0..60");
-            wuwa_shadow::set_lod_sync(seconds);
-            spdlog::info("[WuWaBench] LOD sync for {} s (control)", seconds);
+            const auto enabled = request.value("enabled", true);
+            wuwa_shadow::set_lod_sync(seconds, enabled);
+            spdlog::info("[WuWaBench] LOD sync forced {} for {} s (control)", enabled ? "on" : "off", seconds);
             reply["shadow"] = wuwa_shadow::status();
         } else if (op == "second_eye") {
             const auto seconds = request.value("seconds", 0);
@@ -558,6 +560,18 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             const auto frames = request.value("frames", 1);
             if (frames > 0) wuwa_clv::request(static_cast<uint32_t>(frames));
             reply["clv"] = wuwa_clv::status();
+        } else if (op == "perf") {
+            // Frame-time window: action start opens it, stop closes it and returns the summary.
+            const auto action = request.value("action", std::string{"stop"});
+            if (action == "start") {
+                wuwa_perf::start();
+            } else if (action == "stop") {
+                const auto s = wuwa_perf::stop();
+                reply["perf"] = {{"frames", s.frames}, {"mean_ms", s.mean_ms}, {"p50_ms", s.p50_ms},
+                    {"p90_ms", s.p90_ms}, {"p99_ms", s.p99_ms}, {"max_ms", s.max_ms}};
+            } else {
+                throw std::runtime_error("perf action must be start or stop");
+            }
         } else if (op == "steady_view") {
             const auto seconds = request.value("bypass_seconds", 0);
             if (seconds < 0 || seconds > 120) throw std::runtime_error("bypass_seconds must be 0..120");

@@ -68,6 +68,7 @@
 #include "../../utility/WuWaStereoOrder.hpp"
 #include "../../utility/WuWaStereoBasePose.hpp"
 #include "../../utility/WuWaSecondEyeBuild.hpp"
+#include "../../utility/WuWaPerf.hpp"
 
 #include "FFakeStereoRenderingHook.hpp"
 
@@ -3655,7 +3656,10 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     // factor and FOV, so both eyes choose the same far LODs.
     if (prev_count == 2) wuwa_shadow::lod_sync(vr->get_wuwa_controls().sync_eye_lod(), view_family, views[0], views[1], prev_count);
     // Far lighting fix: count eye pairs so a CLV refill can follow a start, a loading gap or a teleport.
-    if (prev_count == 2) wuwa_clv::on_stereo_frame();
+    if (prev_count == 2) {
+        wuwa_clv::on_stereo_frame();
+        wuwa_perf::on_frame();
+    }
     wuwa_shadow::StateSwapScope state_swap{view_family,
         prev_count == 2 ? views[0] : nullptr, prev_count == 2 ? views[1] : nullptr, prev_count};
     const auto lod_pair = prev_count == 2 ? wuwa_lod_probe::pair(view_family,

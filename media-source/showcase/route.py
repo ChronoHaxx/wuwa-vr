@@ -213,10 +213,12 @@ def summary(cache: Path, run: int | None, title: str, real: dict) -> Path:
     if real.get("calories") is not None:
         tiles.append(("Calories", f"{real['calories']:.0f} kcal"))
     tx, ty = 1270 * SS, 150 * SS
+    pitch = min(112, 680 // len(tiles))                   # keep clear of the elevation profile
+    value_size = 56 if pitch >= 112 else 48
     for i, (label, value) in enumerate(tiles):
-        y = ty + i * 112 * SS
+        y = ty + i * pitch * SS
         draw.text((tx, y), label, font=font("semi", 24 * SS), fill=MUTED)
-        draw.text((tx, y + 30 * SS), value, font=font("bold", 56 * SS), fill=INK)
+        draw.text((tx, y + 28 * SS), value, font=font("bold", value_size * SS), fill=INK)
     # Elevation profile
     px0, py0, px1, py1 = 70 * SS, 880 * SS, 1850 * SS, 1030 * SS
     dist = [0.0]

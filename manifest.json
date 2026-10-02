@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-02T21:24:10.958533+00:00",
+  "updatedAt": "2026-10-02T21:32:42.064066+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -125,7 +125,7 @@
     "media-source/explainer-20260928/src/verify.py": "581d75267b78a5b1c218bca2e609cfde08a971481ffa8b8d3fd5abdd5dc6f51a",
     "media-source/explainer-20260928/transcript.md": "45691831fcea53b6553f86d793e5aac6c13876cc4631938e149cd13a60bee2f6",
     "media-source/showcase/README.md": "0f0536ef655a3ff37a442fc4bbb01fc5e1a68b4a04391dd7342ad8b641f2d7a8",
-    "media-source/showcase/route.py": "5d942910f4416d93cba81c0c7def41960e8c4971854b35f33b55ea17eb541db0",
+    "media-source/showcase/route.py": "ebd4fde802347861247bd834cc5543ab8db21a9e75efad5a7b67b1abc066df28",
     "media-source/showcase/showcase.py": "a1e3743eff7cea701b65bed2575049c5c6ce083d6f478e890996d868f2b8bb90",
     "mod/BUILD.md": "107cb2e80068ade639117a8c5b143fc718b3f4e462856f088ea4784885986b5f",
     "mod/README.md": "c9ced104b074c60aa30e8025af7e3dcca49da4e176543065c5d8d24a080f0bc1",

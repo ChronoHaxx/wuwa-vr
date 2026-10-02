@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-02T19:32:23.214788+00:00",
+  "updatedAt": "2026-10-02T20:48:27.156843+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -25,6 +25,7 @@
     "dev/check-sums.py": "2250df1664f9dba786ddd6a9357e52100ea7260e7f2eb495699ad27378d318b6",
     "dev/configure-sharing.py": "9ddd3649e4a97bf93376f90ea9817388eac8b4a8f0ef0268e6af3f26c63ef0e0",
     "dev/package-beta.py": "97cb4799bd66ad6a36be6957fcac1c63d3a91b7a853ffbdbc2c727494d3a54c9",
+    "dev/package-manual.py": "17241cba4fe9e14c57331141812c11d3aad696437dae3c3b0d6db449d70af710",
     "dev/render-understanding.cjs": "26d151222ab7710eacd496245d4de3d8e0665c07f3952f56e4f268c5618a07ac",
     "dev/site-layout.cjs": "3d2a3fbad6da43b08b41f8cba48882a6cfeb1a32544ecd4305d01d9123d90a2a",
     "dev/test_configure_sharing.py": "8c5e42443e9461c224d35cb2b4b05977b3dd2892121ce6cbc09e15135f3a481c",
@@ -124,6 +125,7 @@
     "media-source/explainer-20260928/src/verify.py": "581d75267b78a5b1c218bca2e609cfde08a971481ffa8b8d3fd5abdd5dc6f51a",
     "media-source/explainer-20260928/transcript.md": "45691831fcea53b6553f86d793e5aac6c13876cc4631938e149cd13a60bee2f6",
     "media-source/showcase/README.md": "58e63ff52c59dd974a196011448775eca217179722886d2b227548c94b5ee284",
+    "media-source/showcase/route.py": "794e2403aaefa52a3e04cfe2fdd1093bc337453b34e50d2f1a45e33baa6a8b08",
     "media-source/showcase/showcase.py": "a1e3743eff7cea701b65bed2575049c5c6ce083d6f478e890996d868f2b8bb90",
     "mod/BUILD.md": "107cb2e80068ade639117a8c5b143fc718b3f4e462856f088ea4784885986b5f",
     "mod/README.md": "c9ced104b074c60aa30e8025af7e3dcca49da4e176543065c5d8d24a080f0bc1",

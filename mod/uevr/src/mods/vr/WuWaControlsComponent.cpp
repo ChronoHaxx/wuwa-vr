@@ -7,12 +7,107 @@
 #include "../WindowMode.hpp"
 #include "utility/WuWaTestControl.hpp"
 #include "utility/WuWaClvRefresh.hpp"
+#include "utility/WuWaRunMarker.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
 #include "utility/WuWaStereoBasePose.hpp"
+#include "utility/WuWaPlaytestControl.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
 #include <cmath>
+
+void wuwa_playtest::draw_controls(const std::filesystem::path& profile) {
+    // This panel is independent of rendering/settings. Opening it only polls
+    // the helper; results are written only by an explicit acknowledged action.
+    static Client client;
+    static std::string displayed_session,submitted_note,submitted_note_id;
+    static std::array<char,2049> draft{};
+    static int selected{};
+    static bool confirm_finish{},review_draft{};
+    client.poll(profile);
+    ImGui::PushID("WuWaPlaytestPanel");
+    wuwa_ui::TextWrapped("Start a developer playtest in the launcher, then save your observations here. Nothing passes automatically.");
+    const auto reply=client.acknowledgement();
+    if (!submitted_note_id.empty() && reply.value("id",std::string{})==submitted_note_id) {
+        if (reply.value("ok",false) && std::string{draft.data()}==submitted_note) {
+            draft.fill('\0');review_draft=false;
+        }
+        submitted_note_id.clear();
+    }
+    const auto message=client.message();
+    if (!message.empty()) {
+        if (client.failed()) wuwa_ui::TextColored(ImVec4{1.0f,0.7f,0.55f,1.0f},"%s",message.c_str());
+        else wuwa_ui::TextWrapped("%s",message.c_str());
+    }
+    if (!client.available()) {
+        wuwa_ui::TextWrapped("No active playtest connection. Keep the launcher running and open Developer playtests to start or resume a session.");
+        const auto error=client.connection_error();
+        if (!error.empty()) wuwa_ui::TextWrapped("%s",error.c_str());
+        if (draft[0]) wuwa_ui::TextWrapped("Your unsent note is retained in this menu until the game closes.");
+        ImGui::PopID();return;
+    }
+    const auto session=client.session();
+    const auto session_id=session.at("id").get<std::string>();
+    if (displayed_session!=session_id) {
+        review_draft=draft[0]!='\0';displayed_session=session_id;selected=0;confirm_finish=false;
+    }
+    const auto& checks=session.at("checks");
+    selected=std::clamp(selected,0,static_cast<int>(checks.size())-1);
+    const auto localized=[](const nlohmann::json& text) {
+        const auto language=wuwa_l10n::language();
+        if (text.contains(language) && text.at(language).is_string()) return text.at(language).get<std::string>();
+        if (language=="zh-Hans" && text.contains("zh") && text.at("zh").is_string()) return text.at("zh").get<std::string>();
+        return text.at("en").get<std::string>();
+    };
+    wuwa_ui::TextWrapped("Selected build: %s",session.at("build_name").get<std::string>().c_str());
+    wuwa_ui::TextWrapped("The selected package is recorded; this is not proof of the DLL loaded by the game.");
+    ImGui::BeginDisabled(client.pending());
+    const auto preview=localized(checks.at(selected).at("title"));
+    if (ImGui::BeginCombo(wuwa_l10n::label("Checklist item").c_str(),preview.c_str())) {
+        for (size_t index=0;index<checks.size();++index) {
+            ImGui::PushID(static_cast<int>(index));
+            const auto label=localized(checks.at(index).at("title"));
+            if (ImGui::Selectable(label.c_str(),selected==static_cast<int>(index))) selected=static_cast<int>(index);
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+    const auto& check=checks.at(selected);
+    const auto item_id=check.at("id").get<std::string>();
+    wuwa_ui::TextWrapped("%s",localized(check.at("instructions")).c_str());
+    const auto status=check.at("status").get<std::string>();
+    const char* status_label=status=="pass" ? "Pass" : status=="fail" ? "Fail" : status=="blocked" ? "Blocked" : "Not tested";
+    wuwa_ui::TextWrapped("Current result: %s",wuwa_l10n::text(status_label).c_str());
+    for (const auto& choice:std::array<std::array<const char*,2>,4>{{
+            {{"Pass","pass"}},{{"Fail","fail"}},{{"Blocked","blocked"}},{{"Not tested","not_tested"}}}}) {
+        if (wuwa_ui::Button(choice[0])) client.submit(profile,session_id,"result",item_id,choice[1]);
+        if (std::string_view{choice[1]}!="not_tested") ImGui::SameLine();
+    }
+    if (review_draft) wuwa_ui::TextWrapped("The session changed. Review your unsent note before adding it to this session.");
+    ImGui::InputTextMultiline(wuwa_l10n::label("Observation").c_str(),draft.data(),draft.size(),ImVec2(-1,90));
+    wuwa_ui::TextWrapped("Use a keyboard for text. Voice notes require explicit microphone consent in the developer web panel.");
+    if (wuwa_ui::Button("Save observation")) {
+        if (client.submit(profile,session_id,"note",item_id,draft.data())) {
+            submitted_note=draft.data();submitted_note_id=client.pending_id();
+        }
+    }
+    ImGui::SameLine();
+    if (wuwa_ui::Button("Discard unsent note")) { draft.fill('\0');review_draft=false; }
+    if (wuwa_ui::Button("Link latest recording")) client.submit(profile,session_id,"link-recording");
+    wuwa_ui::TextWrapped("Linking saves the recording ID only. Review the video and add precise timestamps in the launcher.");
+    ImGui::Separator();
+    wuwa_ui::TextWrapped("Finish only when you are done. Untested checks remain Not tested; no result is inferred from notes.");
+    ImGui::Checkbox(wuwa_l10n::label("I understand that untested checks remain Not tested").c_str(),&confirm_finish);
+    ImGui::BeginDisabled(!confirm_finish || client.voice_busy() || draft[0]!='\0');
+    if (wuwa_ui::Button("Finish playtest")) {
+        if (client.submit(profile,session_id,"finish","","",true)) confirm_finish=false;
+    }
+    ImGui::EndDisabled();
+    if (client.voice_busy()) wuwa_ui::TextWrapped("Stop the voice note or transcription in the launcher before finishing.");
+    if (draft[0]) wuwa_ui::TextWrapped("Save or discard your unsent note before finishing.");
+    ImGui::EndDisabled();
+    ImGui::PopID();
+}
 
 namespace vrmod {
 namespace {
@@ -20,6 +115,8 @@ constexpr const char* sheet[][2] = {
     {"GENERAL", "CAMERA"},
     {"L3 + R3    UEVR menu", "L3 + RB    Game / fixed camera"},
     {"L3 + A     Recenter view / portal", "L3 + Y/X   Fixed / first-person height"},
+    {"L3 + LT / F7   Portal on / off", "L3 + RT    Diorama on / off (10x)"},
+    {"LT + RT, then hold L3 0.8 s: 2D screen", "Release all three before repeating"},
     {"Double L3  Windows screenshot", "LB + LT/RT Fixed camera farther / closer"},
     {"Double R3  Freecam on / off", "Freecam: left stick moves, right looks"},
     {"L3 + B     Show / hide game UI", "Freecam: LT rises, RT boosts speed"},
@@ -125,14 +222,14 @@ nlohmann::json pose_pair_json(const wuwa_pose_pair::Pair& pair, uint64_t now, bo
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
-    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu,
-        *m_video_fps, *m_video_width, *m_video_telemetry,
+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status,
+        *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};
 }
@@ -221,6 +318,12 @@ void WuWaControlsComponent::on_draw_recovery() {
         if (wuwa_ui::Button("Show game UI now"))
             if (const auto value=VR::get()->get_value("VR_EnableGUI")) value->set("true");
     }
+    if (wuwa_ui::Button("Reset HUD aspect")) {
+        m_hud_aspect_status.set("Refresh queued; requires the supplied Comfort script.");
+        m_hud_aspect_request.set("true");
+    }
+    wuwa_ui::TextWrapped("Refreshes the game HUD layout without opening ESC or changing your saved HUD size and position.");
+    wuwa_ui::TextWrapped("%s", m_hud_aspect_status.get().c_str());
     if (wuwa_ui::TreeNode("Restore profile settings")) {
         wuwa_ui::TextWrapped("Restore this build's supplied controls, first-person/freecam settings, camera scale, aiming and HUD layout. Rendering and runtime selection are preserved. Temporary HUD/mouse mode is always turned off. You can undo the reset below.");
         const auto reset=[&](const wuwa_controls::Settings& settings,const char* message) {
@@ -260,10 +363,13 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     if (ImGui::BeginTable("Everyday Xbox shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
         wuwa_ui::TableSetupColumn("Action");
-        for (const auto& row : std::array<std::array<const char*,2>,8>{{
+        for (const auto& row : std::array<std::array<const char*,2>,11>{{
             {{"L3 + R3", "Open / close UEVR settings"}},
             {{"L3 + B", "Show / hide game HUD and menus"}},
             {{"L3 + A", "Recenter headset / portal"}},
+            {{"L3 + LT / F7", "Portal on / off"}},
+            {{"L3 + RT", "Diorama on / off (10x)"}},
+            {{"LT + RT, then hold L3", "2D screen on / off (hold 0.8 s)"}},
             {{"L3 + Menu", "Show / hide shortcut sheet"}},
             {{"L3 + LB, release", "Toggle HUD / mouse adjustment"}},
             {{"L3 + View", "First person on / off"}},
@@ -275,6 +381,9 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         }
         ImGui::EndTable();
     }
+    wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
+    wuwa_ui::TextWrapped("For 2D screen mode, fully hold both triggers first, then hold L3 for 0.8 seconds. Release all three before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
+    wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
     wuwa_ui::draw(*m_sheet,"Show shortcut sheet");
     wuwa_ui::draw(*m_sheet_page,"Shortcut sheet page");
     wuwa_ui::TextWrapped("UI visibility (L3 + B), recenter, UEVR settings and sheet toggle are shown on every page. With the sheet open, hold L3 and tap D-pad left/right to browse all four pages; L3 + D-pad up returns to automatic. These page shortcuts leave the game D-pad unchanged while the sheet is hidden.");
@@ -450,6 +559,25 @@ void WuWaControlsComponent::on_draw_recording() {
     wuwa_ui::TextWrapped("SteamVR and the updated OpenXR Simulator are supported. VDXR capture is not available yet. Video has no audio and stops after five minutes. Actual frame rate depends on the game.");
     wuwa_ui::TextWrapped("Simulator: keep its preview open, choose Both eyes / side-by-side, and turn Full render off. Recording uses the preview size.");
     ImGui::Separator();
+    wuwa_ui::draw(*m_steady_desktop,"Steady desktop view (for OBS and streaming)");
+    ImGui::BeginDisabled(!m_steady_desktop->value());
+    wuwa_ui::draw(*m_steady_desktop_seconds,"Steadiness (seconds of smoothing)");
+    ImGui::EndDisabled();
+    wuwa_ui::TextWrapped("Smooths head shake out of the game window, so OBS records a calm, full-resolution view with game audio. The headset image is not changed. The window shows a slightly narrower view so the picture can move inside it.");
+    ImGui::Separator();
+    const bool run_active = wuwa_run::active.load();
+    if (wuwa_ui::Button(run_active ? "End run" : "Start run")) {
+        if (!wuwa_run::mark(profile, !run_active)) wuwa_ui::TextWrapped("Could not write the run marker file.");
+    }
+    const auto since_press = wuwa_run::unix_ms() - wuwa_run::last_ms.load();
+    if (wuwa_run::last_ms.load() != 0 && since_press < 20000) {
+        wuwa_ui::TextWrapped("%s", run_active ? "Run started. Now open the in-game map for 3 seconds."
+                                              : "Run ended. Now open the in-game map, zoomed out, for 3 seconds.");
+    } else if (run_active) {
+        wuwa_ui::TextWrapped("Run in progress: %d min.", static_cast<int>((wuwa_run::unix_ms() - wuwa_run::started_ms.load()) / 60000));
+    }
+    wuwa_ui::TextWrapped("Exercise recordings: start OBS (F9), press Start run, open the in-game map for 3 seconds. At the end: End run, open the map zoomed out, then stop OBS. Each press flashes a magenta square in the desktop view so the video lines up with your route log.");
+    ImGui::Separator();
     wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
     if (m_privacy->value()) {
         wuwa_ui::TextWrapped("Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.");
@@ -480,7 +608,11 @@ void WuWaControlsComponent::on_draw_ui() {
     wuwa_ui::TextWrapped("Fixes distant trees and props that freeze or look simpler in one eye. The game builds the second eye with a default 90 degree field of view, so it switched far objects to cheaper versions sooner.");
     wuwa_ui::draw(*m_refill_far_lighting,"Match far lighting between eyes");
     if (wuwa_ui::Button("Refill far lighting now")) wuwa_clv::request();
-    wuwa_ui::TextWrapped("Fixes distant objects that look darker or flatter in one eye. The game's lighting volume fills only the first eye after it refreshes; this refills it once in a frame that renders both eyes, after the game starts, after loading screens and after teleports. Each refill can cause a short hitch.");
+    wuwa_ui::TextWrapped("Requests a bounded cascade-lighting-volume refresh after stereo starts or resumes, after detected teleports, or on request. It helped the tested ship/wheel lighting case; it is not a general fix for dark objects or character rims. Each refill can cause a short hitch.");
+    wuwa_ui::draw(m_suppress_npc_rim,"Suppress mismatched NPC rim lighting");
+    wuwa_ui::TextWrapped("Optional workaround, off by default. Removes toon-depth rim lighting from all characters using it, including nearby characters. This hides the observed extra eye contour; it does not repair the underlying stereo cause. Restores the prior value when disabled, in 2D screen mode, or when native VR is inactive.");
+    const auto rim_status = wuwa_rim::status();
+    wuwa_ui::TextWrapped("%s",wuwa_rim::message(rim_status.code));
     wuwa_ui::draw(*m_recenter_position,"L3 + A also resets headset position (seated)");
     if (wuwa_ui::Button("Reset headset position and direction now")) recenter(true);
     wuwa_ui::TextWrapped("Simulator Home resets only the simulated headset and preview. Use this reset afterwards to align UEVR's origin. It preserves world scale and camera offsets.");

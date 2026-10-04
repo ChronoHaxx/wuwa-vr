@@ -1,5 +1,5 @@
 -- Polar's Xbox layout, with frame-driven camera motion and focus-safe input.
--- No actors, view targets or world scale are changed. The optional head-shadow
+-- No actors, view targets or saved world scale are changed. The optional head-shadow
 -- mode owns bounded, non-colliding poseable components and destroys them on exit.
 local api, vr, functions = uevr.api, uevr.params.vr, uevr.params.functions
 local cb = uevr.sdk.callbacks
@@ -451,9 +451,14 @@ end
 cb.on_xinput_get_state(function(_,index,state,result)
     -- New native callback provides a value copy of the result, avoiding a raw
     -- pointer read. A disconnected pad's undefined state must never be consumed.
-    if result~=0 or not state then slots[index]=nil; if selected==index then input=nil; selected=nil end; return end
+    if result~=0 or not state then
+        slots[index]=nil
+        if selected==index then input=nil; selected=nil; actions={} end
+        return
+    end
     local p=copy(state.Gamepad)
-    if not enabled("WuWaControls_Enabled") or not enabled("WuWaControls_Focused") or functions.is_drawing_ui() then
+    if not enabled("WuWaControls_Enabled") or not enabled("WuWaControls_Focused") or
+        enabled("VR_WuWaGamepadPassthrough") or functions.is_drawing_ui() then
         slots={}; actions={}; selected=nil; input=nil; return
     end
     local t=now()
@@ -469,14 +474,18 @@ cb.on_xinput_get_state(function(_,index,state,result)
     if selected~=index then
         if neutral(p) then return end
         if selected~=nil and t-selected_at<1 then return end
-        selected=index
+        actions={}; selected=index
     end
     if not neutral(p) then selected_at=t end
     input={pad=p,at=t}
     local b,previous=p.wButtons,s.previous
     local rising=b & (~previous)
     local l3,r3,lb=has(b,B.L3),has(b,B.R3),has(b,B.LB)
-    if l3 and r3 then s.tap_l=-100; s.tap_r=-100; s.lone_l=false; s.lone_r=false; s.previous=b; input=nil; return end
+    if l3 and r3 then
+        actions.view=nil
+        if s.view_chord then s.view_chord="cancelled" end
+        s.tap_l=-100; s.tap_r=-100; s.lone_l=false; s.lone_r=false; s.previous=b; input=nil; return
+    end
     local adjust=adjusting()
     if s.adjust_seen~=adjust then s.adjust_seen=adjust; s.adjust_wait=true end
     -- Enter/leave only after all controls are released. This also protects
@@ -489,6 +498,54 @@ cb.on_xinput_get_state(function(_,index,state,result)
     if l3 and lb and (previous&(B.L3|B.LB))~=(B.L3|B.LB) and enabled("WuWaControls_MouseAssist") then
         actions.adjust=true; s.adjust_wait=true; s.lone_l=false; s.lone_r=false
         input=nil; zero_pad(state.Gamepad); s.previous=b; return
+    end
+    -- One shared latch for portal (LT), diorama (RT), and a deliberate 2D screen
+    -- hold (both triggers, then L3). Only a fresh two-trigger acquisition can
+    -- select screen: rolling out of a single-trigger gesture never promotes it.
+    -- Reserve both triggers until L3 and both release, including cancelled holds.
+    if s.view_chord or (l3 and (p.bLeftTrigger>=30 or p.bRightTrigger>=30) and not adjust) then
+        local lt,rt=p.bLeftTrigger,p.bRightTrigger
+        if not s.view_chord then
+            s.view_chord=(b==B.L3 and lt>=30 and rt<30) and "portal" or
+                (b==B.L3 and rt>=30 and lt<30) and "diorama" or
+                (b==B.L3 and lt>=30 and rt>=30) and "screen" or "cancelled"
+        end
+        -- UObject/cursor reads stay on the engine tick; it validates queued
+        -- requests against the current menu state before applying them.
+        local menu=game_menu or enabled("WuWaControls_NativeMenu")
+        if (l3 and b~=B.L3) or (s.view_chord~="screen" and lt>=30 and rt>=30) or
+            (s.view_chord=="diorama" and menu) then
+            s.view_chord="cancelled"; actions.view=nil
+        end
+        s.lone_l=false; s.lone_r=false; s.tap_l=-100
+        s.rt=false; s.tap_rt=-100; s.turbo=false
+        local trigger=s.view_chord=="portal" and lt or s.view_chord=="diorama" and rt or 0
+        local fire=l3 and trigger>=180
+        if s.view_chord=="screen" then
+            -- Continuous input is required: a polling pause, clock reversal,
+            -- released modifier or trigger drop cannot finish an old long hold.
+            local interrupted=not l3 or lt<30 or rt<30 or
+                (s.view_hold_at and (lt<180 or rt<180)) or
+                (s.view_sample_at and (t<s.view_sample_at or t-s.view_sample_at>0.25))
+            if interrupted then s.view_chord="cancelled"; actions.view=nil
+            else
+                s.view_sample_at=t
+                if lt>=180 and rt>=180 then
+                    s.view_hold_at=s.view_hold_at or t
+                    fire=t-s.view_hold_at>=0.8
+                end
+            end
+        end
+        if fire and not s.view_fired then
+            actions.view={kind=s.view_chord,slot=index,at=t}; s.view_fired=true
+        end
+        state.Gamepad.wButtons=b & (~B.L3)
+        state.Gamepad.bLeftTrigger=0; state.Gamepad.bRightTrigger=0
+        input=nil; s.previous=b
+        if not l3 and lt<30 and rt<30 then
+            s.view_chord=nil; s.view_fired=false; s.view_hold_at=nil; s.view_sample_at=nil
+        end
+        return
     end
     if has(rising,B.L3) then s.lone_l=(b==B.L3) end
     if has(rising,B.R3) then s.lone_r=(b==B.R3) end
@@ -906,7 +963,7 @@ local function tick(_,delta)
     focused=controls_enabled and enabled("WuWaControls_Focused") and not functions.is_drawing_ui()
     camera_active=controls_enabled and (focused or enabled("WuWaControls_KeepCameraOnFocusLoss"))
     local p=input and t-input.at<=0.25 and input.pad or nil
-    if not focused then
+    if not focused or enabled("VR_WuWaGamepadPassthrough") then
         -- Camera placement/visibility is independent of owning Windows input.
         -- Discard stale axes/chords and require a neutral sample on return.
         slots={}; actions={}; input=nil; selected=nil; p=nil
@@ -933,6 +990,22 @@ local function tick(_,delta)
         end
     end
     if actions.hud then set("VR_EnableGUI",not enabled("VR_EnableGUI")) end
+    -- WindowMode detects the enabled edge and recenters the aperture.
+    local view=actions.view
+    if view and selected==view.slot and slots[view.slot] and t>=view.at and t-view.at<=0.25 and not adjust then
+        if view.kind=="portal" then set("WindowMode_Enabled",not enabled("WindowMode_Enabled"))
+        elseif view.kind=="diorama" and not game_menu then
+            set("WuWaDiorama_Enabled",not enabled("WuWaDiorama_Enabled"))
+        elseif view.kind=="screen" then
+            -- UEVR's actual monoscopic screen mode; no portal, scale or HUD edits.
+            set("VR_2DScreenMode",not enabled("VR_2DScreenMode"))
+        end
+    end
+    if game_menu or adjust then
+        for _,s in pairs(slots) do
+            if s.view_chord and (adjust or s.view_chord=="diorama") then s.view_chord="cancelled" end
+        end
+    end
     if actions.sheet then set("WuWaControls_ShowShortcutSheet",not enabled("WuWaControls_ShowShortcutSheet")) end
     if actions.sheet_auto then
         set("WuWaControls_SheetPage",0)

@@ -21,6 +21,8 @@
 
 #include "Mod.hpp"
 #include "utility/WuWaInputTrace.hpp"
+#include "utility/WuWaDiorama.hpp"
+#include "utility/WuWaSightseeingInput.hpp"
 
 #undef max
 #include <tracy/Tracy.hpp>
@@ -159,7 +161,9 @@ public:
     bool on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param) override;
     void on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state) override;
     void on_xinput_set_state(uint32_t* retval, uint32_t user_index, XINPUT_VIBRATION* vibration) override;
-    void update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_controller);
+    void update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_controller, bool sightseeing = false);
+    int sightseeing_mode() const { return wuwa_test::is_wuwa() ? m_sightseeing_mode.load() : 0; }
+    void stamp_sightseeing_packet(uint32_t result, uint32_t slot, XINPUT_STATE* state);
 
     void on_pre_engine_tick(sdk::UGameEngine* engine, float delta) override;
     void on_pre_calculate_stereo_view_offset(void* stereo_device, const int32_t view_index, Rotator<float>* view_rotation, 
@@ -316,11 +320,13 @@ public:
     }
 
     bool is_using_controllers() const {
+        if (sightseeing_mode() != 0) return false; // Xbox emulation must not enable controller aiming.
         return !wuwa_test::motion_input_muted() && motion_input_has_focus() && (m_controller_test_mode || (m_controllers_allowed->value() &&
         is_hmd_active() && !m_controllers.empty() && (std::chrono::steady_clock::now() - m_last_controller_update) <= std::chrono::seconds((int32_t)m_motion_controls_inactivity_timer->value())));
     }
 
     bool is_using_controllers_within(std::chrono::seconds seconds) const {
+        if (sightseeing_mode() != 0) return false;
         return !wuwa_test::motion_input_muted() && motion_input_has_focus() && m_controllers_allowed->value() && is_hmd_active() && !m_controllers.empty() && (std::chrono::steady_clock::now() - m_last_controller_update) <= seconds;
     }
 
@@ -427,7 +433,18 @@ public:
     }
 
     auto get_world_scale() const {
-        return m_world_scale->value();
+        return m_diorama.effective(m_world_scale->value());
+    }
+
+    // Synthetic SDK value: session-only, shared with the checkbox, never saved.
+    bool is_diorama_enabled() const { return m_diorama.requested(); }
+    void set_diorama_enabled(bool enabled) {
+        m_diorama.request(enabled && wuwa_test::is_wuwa() && !is_using_afr());
+    }
+
+    auto begin_diorama_draw(bool supported) {
+        if (!supported) m_diorama.request(false);
+        return wuwa_diorama::Scale::Draw{m_diorama, m_world_scale->value()};
     }
 
     auto is_stereo_emulation_enabled() const {
@@ -491,7 +508,7 @@ public:
     }
 
     float get_world_to_meters() const {
-        return m_world_to_meters * m_world_scale->value();
+        return m_world_to_meters * get_world_scale();
     }
 
     float get_depth_scale() const {
@@ -1010,6 +1027,7 @@ private:
     const ModSlider::Ptr m_camera_up_offset{ ModSlider::create(generate_name("CameraUpOffset"), -4000.0f, 4000.0f, 0.0f) };
     const ModSlider::Ptr m_camera_fov_distance_multiplier{ ModSlider::create(generate_name("CameraFOVDistanceMultiplier"), 0.00f, 1000.0f, 0.0f) };
     const ModSlider::Ptr m_world_scale{ ModSlider::create(generate_name("WorldScale"), 0.01f, 10.0f, 1.0f) };
+    wuwa_diorama::Scale m_diorama; // Session-only; deliberately absent from m_options.
     const ModSlider::Ptr m_depth_scale{ ModSlider::create(generate_name("DepthScale"), 0.01f, 1.0f, 1.0f) };
 
     const ModToggle::Ptr m_ghosting_fix{ ModToggle::create(generate_name("GhostingFix"), false) };
@@ -1160,6 +1178,7 @@ public:
             *m_show_fps,
             *m_show_statistics,
             *m_controllers_allowed,
+            m_sightseeing_choice,
             *m_focus_on_gamepad_reconnect,
             *m_wuwa_forward_focus,
             *m_wuwa_gamepad_passthrough,
@@ -1189,6 +1208,24 @@ private:
     bool m_stereo_emulation_mode{false}; // not a good config option, just for debugging
     bool m_wait_for_present{true};
     const ModToggle::Ptr m_controllers_allowed{ ModToggle::create(generate_name("ControllersAllowed"), true) };
+    struct SightseeingChoice : ModCombo {
+        SightseeingChoice() : ModCombo{"VR_WuWaSightseeingControllers", {
+            "Off (normal input)", "VR controllers only", "VR + treadmill / Xbox slot 0",
+            "VR + treadmill / Xbox slot 1", "VR + treadmill / Xbox slot 2", "VR + treadmill / Xbox slot 3"}} {}
+        void config_load(const utility::Config&, bool) override { value() = 0; }
+        void config_save(utility::Config&) override {}
+    } m_sightseeing_choice;
+    std::atomic<int32_t> m_sightseeing_mode{0};
+    std::mutex m_sightseeing_mtx;
+    wuwa_sightseeing::Pad m_sightseeing_pad{};
+    uint64_t m_sightseeing_sample_ms{};
+    bool m_sightseeing_valid{};
+    wuwa_sightseeing::Mixer m_sightseeing_mixer;
+    wuwa_sightseeing::PacketCounter m_sightseeing_packets;
+    std::array<bool, 4> m_sightseeing_packet_owned{};
+    void update_sightseeing_sample(bool synced);
+    bool apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* state);
+    void reset_sightseeing();
     const ModToggle::Ptr m_focus_on_gamepad_reconnect{ ModToggle::create(generate_name("FocusOnGamepadReconnect"), true) };
     // Independent live A/B switches. Preserve the accepted build's behavior
     // until the user enables a candidate; neither controls stereo rendering.

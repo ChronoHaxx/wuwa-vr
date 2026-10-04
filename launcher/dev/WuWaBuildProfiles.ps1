@@ -115,6 +115,14 @@ function Get-WuWaPreviousBuildId {
     # Portable packages share user state but have different absolute runtime
     # paths. A matching ID alone is insufficient: verify the old backend too.
     $selected = @($Catalog | Where-Object id -eq $State.selected)
+    if ($selected.Count -eq 0) {
+        # A one-build package can name an exact compatible predecessor without
+        # bundling its runtime. Never inherit settings by a build name alone.
+        $compatible = @($Catalog | ForEach-Object {
+            if ($_.PSObject.Properties['settingsFrom']) { $_.settingsFrom }
+        } | Where-Object { $_.id -eq $State.selected -and $_.sha256 -match '^[a-fA-F0-9]{64}$' })
+        if ($compatible.Count -eq 1) { $selected = $compatible }
+    }
     if ($selected.Count -ne 1) { return '' }
     $backend = Join-Path $Runtime 'UEVRBackend.dll'
     if (Test-Path -LiteralPath $backend -PathType Leaf) {
@@ -259,6 +267,26 @@ function Initialize-WuWaTimingDefault {
     [IO.File]::WriteAllLines($path, [string[]]$lines, [Text.UTF8Encoding]::new($false))
 }
 
+function New-WuWaCompatibleProfile {
+    param([string]$Before, [string]$Supplied, [string]$Destination)
+    # Keep camera, graphics, CVars and personal extra files. Only the release's
+    # named scripts/plugins and its defaults marker are updated. The original
+    # verified snapshot remains immutable for rollback.
+    Copy-WuWaManagedProfile $Before $Destination
+    foreach ($name in @('scripts','plugins','wuwa-profile-defaults.txt')) {
+        $source = Join-Path $Supplied $name
+        if (-not (Test-Path -LiteralPath $source)) { continue }
+        $target = Join-Path $Destination $name
+        if (Test-Path -LiteralPath $source -PathType Container) {
+            New-Item -ItemType Directory -Path $target -Force | Out-Null
+            foreach ($child in @(Get-ChildItem -LiteralPath $source -Force)) {
+                Copy-Item -LiteralPath $child.FullName -Destination $target -Recurse -Force
+            }
+        } else { Copy-Item -LiteralPath $source -Destination $target -Force }
+    }
+    return $Destination
+}
+
 function Select-WuWaBuild {
     param($Context, [string]$Id, [switch]$ResetToSupplied)
     $mutex = [Threading.Mutex]::new($false, 'Local\WuWaVRBuildProfileSwitch')
@@ -280,7 +308,15 @@ function Select-WuWaBuild {
         if (-not $ResetToSupplied -and $saved -and (Test-Path -LiteralPath $saved.Value)) { $source = $saved.Value }
         if (-not (Test-Path -LiteralPath (Join-Path $source 'config.txt'))) { throw 'Target profile is missing.' }
         if (-not $ResetToSupplied -and $state.selected -eq $Id -and $oldRuntime -eq $runtime -and
-            -not (Test-WuWaTimingDefaultNeeded $Context.Profile)) { return [pscustomobject]@{ selected=$Id; changed=$false; backup=$state.lastBackup } }
+            -not (Test-WuWaTimingDefaultNeeded $Context.Profile)) {
+            # Repair state written by older helpers: a past restore is no longer
+            # current evidence once a mod profile is selected again.
+            if ($state.PSObject.Properties['restoredOriginalAt'] -and $state.restoredOriginalAt) {
+                $state.restoredOriginalAt = ''
+                Save-WuWaBuildState $Context $state
+            }
+            return [pscustomobject]@{ selected=$Id; changed=$false; backup=$state.lastBackup }
+        }
         $backup = Join-Path $Context.Backups ((Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0,6))
         $before = Join-Path $backup 'profile'
         # A fresh PC has no UEVR profile or injector settings yet. Record what
@@ -299,6 +335,11 @@ function Select-WuWaBuild {
             # Copy from the verified snapshot, never from the active directory
             # while Set-WuWaManagedProfile is replacing its managed children.
             $source = $before
+        } elseif (-not $ResetToSupplied -and -not ($saved -and (Test-Path -LiteralPath $saved.Value)) -and
+            $oldId -and $build.PSObject.Properties['settingsFrom'] -and
+            @($build.settingsFrom | Where-Object id -eq $oldId).Count -eq 1 -and
+            (Test-Path -LiteralPath (Join-Path $before 'config.txt') -PathType Leaf)) {
+            $source = New-WuWaCompatibleProfile -Before $before -Supplied $source -Destination (Join-Path $backup 'upgraded-profile')
         }
         Assert-WuWaProfileIdle
         try {
@@ -319,6 +360,7 @@ function Select-WuWaBuild {
             $state.selected = $Id
             $state | Add-Member -NotePropertyName selectedRuntime -NotePropertyValue $runtime -Force
             $state | Add-Member -NotePropertyName selectedBackendSha256 -NotePropertyValue $build.sha256 -Force
+            $state | Add-Member -NotePropertyName restoredOriginalAt -NotePropertyValue '' -Force
             $state.lastBackup = $backup
             $state.changedAt = (Get-Date).ToString('o')
             Save-WuWaBuildState $Context $state

@@ -1,17 +1,19 @@
 # Xbox controller reference
 
-This reference describes the gameplay bindings in the current public builds:
-**Camera candidate + trigger controls · 28 Sep 16:27** (experimental) and
-**Stereo, menus and languages · 26 Sep 22:42 BST** (older beta). Neither
-changes the bindings first checked against the **Stereo and camera candidate ·
-26 Sep 20:11 BST**: the 22:42 beta restricted hidden-UI warnings to detected
-menus and made Polar fly the supplied freecam default, and the 28 Sep 16:27
-build added developer trigger-input tooling with automatic input off. Earlier
-candidates contain different subsets of these features. The owner-tested
-**22:37 Camera + acro checkpoint** differs in a few places, listed at the end
-of this page. These
-bindings were checked against the Lua and native shortcut sheet, not assumed
-from the original profile. Physical gamepad passthrough bypasses mod shortcuts.
+These bindings describe public beta
+[beta-2026-10-04-launcher](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher),
+backend **npc-rim-20261004**, for game **3.7**. They were checked against the Lua
+and native shortcut sheet. Portal, diorama, the deliberate 2D-screen hold below
+and **VR → WuWa Controls → Reset HUD aspect** are included; HUD reset does not
+need the game ESC menu. Optional experimental features still need physical
+headset/gamepad acceptance. See the release receipt for package verification.
+
+Historical evidence: backend compilation and synthetic input checks passed for
+the **4 October controller-shortcut source revision**. Portal and diorama
+shortcuts were absent from the published 1 October ZIP; the later
+**screen-mode-20261004** candidate introduced the 2D hold and HUD reset.
+Earlier build differences are recorded at the end of this page. Physical
+gamepad passthrough bypasses mod shortcuts.
 
 **L3 / R3:** click the left / right stick. **View:** two squares. **Menu:** three
 lines. Use gameplay shortcuts with UEVR settings closed. Release controls when
@@ -22,8 +24,11 @@ entering/leaving modes and after returning from Alt-Tab.
 | Input | Action |
 | --- | --- |
 | L3 + R3 | Open/close UEVR settings |
+| Hold both triggers fully, then hold L3 for 0.8 seconds | Toggle 2D screen mode; release all three before repeating. Works in dialogue, with UEVR and adjustment closed |
 | L3 + B | Hide/show game UI, including game menus |
 | L3 + A | Recenter view and enabled portal; position reset is a separate option |
+| Hold L3, then fully squeeze LT; or F7 | Toggle the portal; release controls before repeating |
+| Hold L3, then fully squeeze RT | Toggle the temporary 10× diorama; release controls before repeating |
 | L3 + View | First person on/off |
 | L3 + RB | Game/fixed camera |
 | Double R3 | Freecam on/off |
@@ -39,6 +44,53 @@ entering/leaving modes and after returning from Alt-Tab.
 **LB + Y is not rebound by these shortcuts.** Flight/grapple selection is the
 game's behavior. A visible target highlight alone has not proved first-person
 aim and the game's targeting agree.
+
+## Optional Quest controllers for walking
+
+Open **VR → WuWa Controls → VR controllers for walking (optional) → Walking
+input**. This is an optional OpenXR sightseeing layout, not a tested combat
+layout. It starts **Off (normal input)** each launch. First person remains a
+separate choice in the existing **First person** section; enabling walking
+does not change camera or aim settings, or fix rendering issues.
+
+- **VR controllers only:** emulates Xbox input on **slot 0**. Left stick moves;
+  right stick looks. Use the merge mode instead when keeping treadmill input.
+- **VR + treadmill / Xbox slot 0–3:** choose the connected slot used by your
+  device. **Launcher → Troubleshooting → Controller check** reports Windows
+  XInput slots, but a slot number alone does not identify RealityRunner.
+  Movement stays entirely on the selected device's left stick, including when
+  it is neutral; the VR left stick does not replace it. VR buttons are added,
+  and the VR right stick looks unless the device's right stick is moved beyond
+  its deadzone, when that device keeps control of both look axes.
+
+| Quest control | Xbox input |
+| --- | --- |
+| Right A / B; left X / Y | A / B / X / Y, matching the printed labels |
+| Left / right stick | Left / right stick; left ignored in merge mode |
+| Click left / right stick | L3 / R3 |
+| Left / right trigger | LT / RT |
+| Left / right grip | LB / RB |
+| Left Menu | Start / Menu |
+| Left grip + left Menu | View / Back; consumes LB |
+| Both stick clicks | L3 + R3: open/close UEVR settings |
+
+No Quest system-button or D-pad mapping is added. With menus and HUD/mouse
+adjustment closed, existing **hold L3, then squeeze LT** portal and **hold L3,
+then squeeze RT** diorama shortcuts remain; release all controls before
+repeating. First-person, portal and diorama rules above still apply.
+
+Wake both controllers and focus the game. Release the VR buttons, grips and
+triggers, and center both sticks before input arms. Do this again after a
+focus change, reconnect, mode change, or opening/closing UEVR. Merge also needs
+the selected Windows slot to remain connected. **Physical gamepad passthrough**
+or a conflicting **XInput controller slot** filter blocks VR input. This mode
+does not change drivers, HidHide, RealityRunner, runtime or device settings.
+
+**Headset and RealityRunner acceptance is pending.** Use the grouped checks
+in [the public-beta checklist](https://github.com/ChronoHaxx/wuwa-vr/blob/main/launcher/native/TEST%20THIS.txt), including
+held-input recovery and return to **Off (normal input)**. Off removes this
+optional mapping and restores the normal input path; it does not repair an
+existing Windows controller-visibility problem.
 
 ## HUD/mouse adjustment
 
@@ -122,6 +174,90 @@ game aim. **Try headset aim** selects UEVR Head aim with player control rotation
 These are global UEVR aim settings and change only when selected. Grapple/wing
 behavior still needs comparison in the game.
 
+## Optional temporary menu layout
+
+In the Comfort Lua panel, save a **Menu** layout that you find comfortable,
+then enable **Use saved Menu HUD temporarily**. Close UEVR settings and reopen
+the game menu. When the existing native menu signal recognises it, the mod
+temporarily uses that placement, then restores the prior placement on return
+to gameplay. **Temporarily show hidden UI in game menus** can separately reveal
+a HUD you deliberately hid. Both options start off each Lua session.
+
+Your manual changes take precedence. Unknown menu signals, focus changes and
+manual adjustment suspend the override. A missing saved layout is reported;
+the mod does not choose a new one for you. Menu recognition is incomplete and
+is not a cinematic or subtitle detector. These options do not alter the game
+camera, stereo passes or portal dimensions.
+
+## Optional diorama mode
+
+With UEVR settings and game menus closed, **hold L3, then fully squeeze RT**
+to turn diorama on or off. Release all controls before repeating. Keep LT
+released: **L3 + LT** still toggles the portal, and **F7** remains its keyboard
+shortcut. Leave HUD/mouse adjustment before using the diorama shortcut.
+Physical gamepad passthrough bypasses these controller shortcuts.
+
+The menu control remains **VR → WuWa Controls → Diorama mode (optional) →
+Miniature world (this launch only)**. Diorama temporarily uses the maximum **10× world scale** for
+a miniature view, with the portal on or off. It requires Native Stereo; AFR
+disables it. No new keyboard binding is added.
+
+Turning it off returns to the current normal `VR_WorldScale`. The toggle never
+overwrites that value; intentional normal-scale slider or preset edits remain
+when you turn it off. It starts off each launch, configuration reload and runtime
+reinitialization. Head translations also scale up; use existing **Recenter
+(L3 + A)** if displaced. Camera offsets, portal dimensions, HUD and renderer
+settings are unchanged. The source keeps one scale for both eyes within a draw;
+physical stereo, comfort and return-to-normal acceptance remain pending.
+
+At the next grouped check, confirm that a held squeeze toggles only once and
+that neither release order, returning from Alt-Tab nor closing UEVR replays it.
+Compare both eyes and slow head movement through off/on/off with the portal
+enabled and disabled, then confirm a deliberate
+normal-scale edit survives exit. Record explicit results; no build or physical
+acceptance is implied by these instructions.
+
+**简体中文：** 关闭 UEVR 设置及游戏菜单、退出 HUD／鼠标调整后，**按住 L3，再将 RT
+按到底**，即可切换微缩视角。再次操作前松开所有按键，并保持 LT 松开；**L3 + LT**
+及 **F7** 仍切换空间窗口。手柄直通会绕过这些手柄快捷键。新快捷键属于 10 月 4 日的
+源代码修订；后端编译与模拟输入检查已通过，头显／手柄验证仍待完成。
+
+也可在 **VR → WuWa Controls → Diorama mode (optional) → Miniature world
+(this launch only)** 切换。临时使用最高 **10 倍世界比例**，空间窗口开关均可；仅支持
+Native Stereo，AFR 会禁用，没有新增键盘快捷键。关闭后恢复当前普通
+比例；主动修改普通比例或预设会保留。每次启动、重载配置或运行时重新初始化后关闭。
+头部平移也会放大，偏移时使用现有 **L3 + A 重新居中**。相机偏移、窗口、HUD 和渲染
+设置保持原样。双眼、舒适度、开关往返及普通比例修改后的恢复均待实际头显验证。
+
+## Optional optical hand demo
+
+Under **WuWa Controls → Hand / finger demo**, enable **Show optical hands
+(this launch only)**. This draws a coloured hand/finger skeleton in both eyes,
+over the game, with no scene occlusion, grabbing, collisions or gesture input.
+Xbox gameplay remains unchanged. It is a demonstration, not a replacement
+for the game controller; it starts off every launch.
+
+It requires a runtime that supplies optical hand joints and their source,
+such as a supported Virtual Desktop OpenXR configuration. Controller-based
+simulated fingers are rejected. If support is missing, the control explains
+why it is unavailable. Tracking loss hides the affected hand; stale data is
+not held in place. Quest Pro + Virtual Desktop physical validation is pending.
+
+## Developer playtest notes
+
+Open the **Developer tools** footer link in the desktop launcher, then **Developer
+playtests** in the web tools. Start one local session for the selected build.
+Every result begins **Not tested**; only your explicit verdict changes it.
+The backend menu's **Developer playtest checklist** can record results and
+notes, link the launcher's latest recording, and finish that active session.
+It does not start recording or a microphone automatically.
+
+Voice notes are optional: choose a microphone and confirm each recording in
+the web page. Local transcription requires an existing whisper-cli and model,
+a finished session and idle game/injector. Original audio stays local, and
+transcription does not assign pass/fail. Export the session report and keep
+the build identity and recording timestamp with a reproducible issue.
+
 ## Recover your profile controls
 
 Open **WuWa Controls → Restore profile settings**. **Restore supplied profile
@@ -185,5 +321,6 @@ the features available in that build.
 | No full-animation motion preset or L3 + D-pad Down motion toggle. | Later first-person motion presets and smooth handovers |
 | No **Restore supplied profile controls** or **Undo last controls reset** buttons in UEVR. | Later in-game control recovery |
 
-Choose the candidate if you want these newer controls; it has not yet been
-tested in a headset.
+The current public beta includes the newer controls described above. Earlier
+component checks and accepted rendering fixes do not establish physical-headset
+acceptance for every optional feature; record untested controls as **Not tested**.

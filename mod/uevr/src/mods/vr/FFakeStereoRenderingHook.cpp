@@ -67,7 +67,9 @@
 #include "../../utility/WuWaSceneFrame.hpp"
 #include "../../utility/WuWaStereoOrder.hpp"
 #include "../../utility/WuWaStereoBasePose.hpp"
+#include "../../utility/WuWaDepthScale.hpp"
 #include "../../utility/WuWaSecondEyeBuild.hpp"
+#include "../../utility/WuWaPerf.hpp"
 
 #include "FFakeStereoRenderingHook.hpp"
 
@@ -2510,6 +2512,11 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
     static uint32_t hook_attempts = 0;
     static bool run_anyways = false;
 
+    // Freeze the presentation scale across every eye and nested capture in
+    // this draw. UI requests must never change only one eye's separation.
+    auto diorama_draw = vr->begin_diorama_draw(wuwa_test::is_wuwa() && !vr->is_using_afr());
+    wuwa_depth_scale::Draw depth_draw{wuwa_test::is_wuwa() && !vr->is_using_afr()};
+
     if (hook_attempts < 100 && !g_hook->m_hooked_game_engine_tick && g_hook->m_attempted_hook_game_engine_tick) {
         ZoneScopedN("UGameViewportClient::Draw (hook UGameEngine::Tick)");
         SPDLOG_INFO("Performing alternative UGameEngine::Tick hook for synced AFR.");
@@ -3655,7 +3662,10 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     // factor and FOV, so both eyes choose the same far LODs.
     if (prev_count == 2) wuwa_shadow::lod_sync(vr->get_wuwa_controls().sync_eye_lod(), view_family, views[0], views[1], prev_count);
     // Far lighting fix: count eye pairs so a CLV refill can follow a start, a loading gap or a teleport.
-    if (prev_count == 2) wuwa_clv::on_stereo_frame();
+    if (prev_count == 2) {
+        wuwa_clv::on_stereo_frame();
+        wuwa_perf::on_frame();
+    }
     wuwa_shadow::StateSwapScope state_swap{view_family,
         prev_count == 2 ? views[0] : nullptr, prev_count == 2 ? views[1] : nullptr, prev_count};
     const auto lod_pair = prev_count == 2 ? wuwa_lod_probe::pair(view_family,
@@ -5426,6 +5436,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
     const auto camera_up = quat_converter * (vqi_norm * glm::vec3{0, -camera_up_offset, 0});
 
     const auto world_scale = world_to_meters * vr->get_world_scale();
+    if (!is_full_pass) wuwa_depth_scale::Draw::record(world_scale);
 
     if (has_double_precision) {
         *view_d += camera_forward;

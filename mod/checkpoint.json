@@ -1,11 +1,33 @@
 {
-  "schema": 2,
-  "build": "camera-trial-controls-20260928-r2",
-  "sourceCommit": "02497e870f5f3b2524eed76df5bef16319c98752",
-  "publicReleaseTag": "experimental-2026-09-28-1628",
+  "schema": 3,
+  "build": "npc-rim-20261004",
+  "publicReleaseTag": "beta-2026-10-04-launcher",
+  "launcherVersion": "1.0.0",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "34455e5e2875300faa2741184e7ac38f971c14ce0654e2195843d8ec0c437c87",
-  "frozenPatchSha256": "e858ab099b45aa964e99ddcdd185455007609c39457876b7c90fb27829416af4",
-  "liveAcceptance": "Owner confirmed ultimate-return camera fix in headset on 2026-09-28 for tested cases; foliage remains unresolved; trigger/inventory and closed-game apply/restore acceptance remain pending."
+  "backendSha256": "46a0082f5dde7d667171bdf3d67695ad72b33baa8471b57b2f8923d42e0fb7c8",
+  "frozenPatchSha256": "87aa0d4ecc8fe1632d0ef8d98dd89b01e219c5ced3d1af51f2c7132124bd283b",
+  "sourceReconstructedTree": "d143659465d9b5365a478c7a99d6d10f4ef2856a",
+  "buildCompleted": "2026-10-04T16:20:53+0100",
+  "package": {
+    "file": "WuWa-VR-Launcher.zip",
+    "bytes": 53694230,
+    "sha256": "005bc4a457c7494af39755474593d4451e65d4772d6d1794a597a66b5abbbdc4",
+    "public": true
+  },
+  "liveAcceptance": "Prior ultimate-camera and foliage repairs accepted; 2D brightness owner-confirmed. Optional rim suppression reproduced in two stationary simulator A/B/A cycles, headset acceptance pending. It removes intended character rim too. Automatic cinematic switching is not implemented.",
+  "sourceIdentity": "This commit contains the exact native overlays and reconstructible patch for the backend; source ZIP is paired on the same release.",
+  "launcherInstaller": {
+    "name": "WuWa-VR-Setup.exe",
+    "bytes": 10427885,
+    "sha256": "65d27e9efd9d45a7bf90393cc325bffd8fa35b9ee0dfff6411fecb49df4a5aee"
+  },
+  "launcherVerification": {
+    "componentGroups": 81,
+    "controllerGroups": 10,
+    "updateGroups": 17,
+    "offscreenWpfGroups": 29,
+    "isolatedRealUpdate": "1.0.0 to 1.0.1, restart and uninstall passed; external marker retained",
+    "productionGameLaunch": "not run for this installer release"
+  }
 }

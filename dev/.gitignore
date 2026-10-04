@@ -1,0 +1,4 @@
+# Local build, render and test receipts are private generated artifacts.
+work/
+__pycache__/
+*.pyc

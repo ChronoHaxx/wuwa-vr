@@ -11,6 +11,7 @@ from ctypes import wintypes
 import hashlib
 import html
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -501,25 +502,103 @@ class LiveTest:
 
     def console(self, name: str, value: float, output: Path, layer: str | None = None) -> dict:
         """Set one r.* console variable for a bounded window through the console manager; capture, restore, capture."""
+        if type(value) not in (int, float) or abs(value) > 100000 or not math.isfinite(value):
+            raise ValueError("Console test value must be finite and within -100000..100000")
+        value = float(value)
+
+        def number(sample, key):
+            result = sample.get(key)
+            if type(result) not in (int, float) or not math.isfinite(result):
+                raise RuntimeError(f"Console readback {key} is unavailable or nonfinite")
+            return result
+
+        def matches(actual, expected):
+            # The SDK reports a 32-bit float. Allow its rounding, not a broad
+            # fixed epsilon which could accept a failed zero/small-value write.
+            rounded = struct.unpack("f", struct.pack("f", expected))[0]
+            return math.isclose(actual, rounded, rel_tol=2 ** -23, abs_tol=0)
+
+        def verify(sample, expected, float_key="float", int_key="int", expected_int=None):
+            if not matches(number(sample, float_key), expected):
+                raise RuntimeError(f"Console {float_key} readback differs from requested value {expected}")
+            # Integral requests must survive both getter paths. Fractional
+            # requests may legitimately truncate through GetInt(). Restoration
+            # always compares the independently captured baseline integer too.
+            integer = expected_int if expected_int is not None else (int(expected) if expected.is_integer() else None)
+            if integer is not None and (type(sample.get(int_key)) is not int or sample[int_key] != integer):
+                raise RuntimeError(f"Console {int_key} readback differs from expected value {integer}")
+
         layer = self.capture_layer(layer)
         output.mkdir(parents=True, exist_ok=False)
-        report = {"pid": self.pid, "name": name, "test_value": value, "status": "incomplete", "layer": layer}
+        report = {"pid": self.pid, "name": name, "test_value": value, "status": "incomplete", "layer": layer,
+                  "applied_verified": False, "changed_capture_valid": False, "restoration_verified": False,
+                  "restored_capture_valid": False}
         try:
             report["baseline"] = self.request("console_get", name=name)
+            baseline = float(number(report["baseline"], "float"))
+            baseline_int = report["baseline"].get("int")
+            if type(baseline_int) is not int:
+                raise RuntimeError("Baseline console integer readback is unavailable")
             self.wait_frames()
             self.capture(output / "baseline", layer)
+            if matches(baseline, value) and (not value.is_integer() or baseline_int == int(value)):
+                report["status"] = "already_at_test_value"
+                return report
+            failure = None
             try:
                 report["begin"] = self.request("console_set", name=name, value=value, seconds=30)
+                verify(report["begin"], value, "after_float", "after_int")
+                report["applied_verified"] = True
                 self.wait_frames()
+                report["before_changed_capture"] = self.request("console_get", name=name)
+                verify(report["before_changed_capture"], value)
                 self.capture(output / "changed", layer)
+                report["after_changed_capture"] = self.request("console_get", name=name)
+                verify(report["after_changed_capture"], value)
+                report["changed_capture_valid"] = True
+            except BaseException as error:
+                failure = error
+                report["error"] = str(error)
             finally:
-                report["restore"] = self.request("console_set", name=name, seconds=0)
-            report["restored_value"] = self.request("console_get", name=name)
+                cleanup_errors = []
+                # Even a rejected readback or lost begin response may leave a
+                # live lease. Attempt cleanup, then read the value independently
+                # even if the restore acknowledgement itself failed.
+                try:
+                    report["restore"] = self.request("console_set", name=name, seconds=0)
+                    if report["restore"].get("restore") != "restored":
+                        raise RuntimeError(f"Console restore was not confirmed: {report['restore']}")
+                except BaseException as error:
+                    cleanup_errors.append(str(error))
+                    if failure is None:
+                        failure = error
+                try:
+                    report["restored_value"] = self.request("console_get", name=name)
+                    verify(report["restored_value"], baseline, expected_int=baseline_int)
+                except BaseException as error:
+                    cleanup_errors.append(str(error))
+                    if failure is None:
+                        failure = error
+                report["restoration_verified"] = not cleanup_errors
+                if cleanup_errors:
+                    report["restore_errors"] = cleanup_errors
+            if failure is not None:
+                raise failure
             self.wait_frames()
-            self.capture(output / "restored", layer)
+            try:
+                report["before_restored_capture"] = self.request("console_get", name=name)
+                verify(report["before_restored_capture"], baseline, expected_int=baseline_int)
+                self.capture(output / "restored", layer)
+                report["after_restored_capture"] = self.request("console_get", name=name)
+                verify(report["after_restored_capture"], baseline, expected_int=baseline_int)
+                report["restored_capture_valid"] = True
+            except BaseException:
+                report["restoration_verified"] = False
+                raise
             report["status"] = "captured_and_restored_visual_review_pending"
             return report
         except BaseException as error:
+            report["status"] = "failed"
             report["error"] = str(error)
             raise
         finally:

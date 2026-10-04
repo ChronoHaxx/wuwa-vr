@@ -45,8 +45,12 @@ def main() -> int:
     ap.add_argument("--out", type=Path, required=True, help="new output folder")
     ap.add_argument("--tag", required=True, help="release tag, also the package id")
     ap.add_argument("--notes", type=Path, required=True, help="player notes, written as PLAYTEST.txt")
-    ap.add_argument("--folder-name", default="WuWa VR Launcher")
+    ap.add_argument("--public", action="store_true", help="label an explicitly authorized beta for public delivery; retain component license notices")
+    ap.add_argument("--folder-name", default=None,
+                    help='top folder inside the ZIP; default "WuWa VR <date> <time>" from the tag, so versions extract side by side clearly')
     args = ap.parse_args()
+    if args.public and not args.tag.startswith("beta-"):
+        raise SystemExit("public delivery requires a beta- release tag")
 
     src = args.source.resolve()
     out = args.out.resolve()
@@ -60,6 +64,10 @@ def main() -> int:
     if sha256(runtime / "UEVRBackend.dll") != build["sha256"].lower():
         raise SystemExit("the build's backend does not match its catalog hash")
 
+    if args.folder_name is None:
+        stamp = args.tag.removeprefix("beta-").removeprefix("experimental-")
+        date, _, time = stamp.rpartition("-") if stamp.count("-") == 3 else (stamp, "", "")
+        args.folder_name = f"WuWa VR {date} {time}".strip()
     pkg = out / args.folder_name
     keep_runtime = Path(build["runtime"]).name
     keep_seed = Path(build["seed"]).parts[1]
@@ -82,6 +90,10 @@ def main() -> int:
     created = datetime.now().astimezone().isoformat(timespec="seconds")
     portable = read_json(pkg / "app/portable.json")
     portable.update(packageId=f"wuwa-vr-launcher-{args.tag}", createdAt=created, defaultBuild=build["id"])
+    if args.public:
+        portable["private"] = False
+        portable.pop("publicRedistributionCleared", None)
+        portable["componentNotices"] = "LICENSE.md and notices/ retain each component's terms."
     write_json(pkg / "app/portable.json", portable)
     shutil.copyfile(args.notes, pkg / "PLAYTEST.txt")
 
@@ -90,6 +102,10 @@ def main() -> int:
                     builds=[{"id": build["id"], "name": build["name"], "sha256": build["sha256"],
                              "savedAt": build["savedAt"], "role": "baseline"}],
                     localChanges=[f"One-build beta of {build['id']}, made by dev/package-beta.py."])
+    if args.public:
+        manifest["private"] = False
+        manifest.pop("publicRedistributionCleared", None)
+        manifest["componentNotices"] = "LICENSE.md and notices/ retain each component's terms."
     files = sorted(p for p in pkg.rglob("*") if p.is_file())
     manifest["files"] = {p.relative_to(pkg).as_posix(): sha256(p) for p in files}
     write_json(pkg / "manifest.json", manifest)

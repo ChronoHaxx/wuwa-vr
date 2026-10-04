@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "releases": [
+    {
+      "id": "beta-2026-10-04-launcher",
+      "gameVersion": "3.7",
+      "buildId": "npc-rim-20261004",
+      "channel": "beta",
+      "published": "2026-10-04T15:52:17+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-04-launcher/WuWa-VR-Launcher.zip",
+      "sha256": "005bc4a457c7494af39755474593d4451e65d4772d6d1794a597a66b5abbbdc4",
+      "size": 53694230,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher"
+    },
+    {
+      "id": "beta-2026-10-01-1817",
+      "gameVersion": "3.7",
+      "buildId": "lightfix2-20261001",
+      "channel": "beta",
+      "published": "2026-10-01T18:07:54Z",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-01-1817/WuWa-VR-Launcher.zip",
+      "sha256": "1c040eead4ec30acc6fc0a91de7f4d47bf5c36d91107aa51652b8f5830f262ac",
+      "size": 50737307,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817"
+    }
+  ]
+}

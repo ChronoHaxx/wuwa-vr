@@ -17,6 +17,8 @@
 #include "WuWaShadowPass.hpp"
 #include "WuWaSecondEyeBuild.hpp"
 #include "WuWaClvRefresh.hpp"
+#include "WuWaSteadyView.hpp"
+#include "WuWaPerf.hpp"
 #include "WuWaMotionTrace.hpp"
 #include "WuWaBooleanCVar.hpp"
 #include "WuWaPlanarCVar.hpp"
@@ -29,6 +31,8 @@
 #include "WuWaLodProbe.hpp"
 #include "WuWaSceneFrame.hpp"
 #include "WuWaStereoOrder.hpp"
+#include "WuWaProjectionTest.hpp"
+#include "WuWaRimSuppression.hpp"
 
 namespace wuwa_test {
 // Explicit, expiring requests for one-variable graphics comparisons. This is
@@ -43,6 +47,33 @@ inline Json stereo_candidate_status() {
     const auto now=GetTickCount64();
     return {{"active",stereo_candidate_lease.active(now)}, {"id",stereo_candidate_lease.id()},
         {"values",stereo_candidate_lease.values()}, {"remaining_ms",stereo_candidate_lease.remaining(now)}};
+}
+
+inline Json projection_base_json(const wuwa_projection_test::Base& b) {
+    return {{"horizontal",b.horizontal},{"vertical",b.vertical},{"grow",b.grow},{"screen",b.screen},
+        {"openxr",b.openxr},{"native",b.native},{"ready",b.ready},{"native_fix",b.native_fix}};
+}
+inline Json projection_test_status(uint64_t now) {
+    const auto s = wuwa_projection_test::lease.status(now);
+    Json result{{"active",s.active},{"id",s.id},{"reason",s.reason},{"remaining_ms",s.remaining_ms},
+        {"base",s.base ? projection_base_json(*s.base) : Json(nullptr)},
+        {"effective_horizontal",s.effective_horizontal},{"applied",nullptr},
+        {"applied_matches_effective",false},
+        {"scope","Transient horizontal symmetry; runtime CPU matrices, not a submitted frame or NPC fix"}};
+    if (s.applied) {
+        const auto& a = *s.applied;
+        result["applied"] = {{"sequence",a.sequence},{"at_tick_ms",a.at_ms},
+            {"age_ms",now >= a.at_ms ? Json(now-a.at_ms) : Json(nullptr)},
+            {"base",projection_base_json(a.selection.base)},
+            {"lease_id",a.selection.lease_id},{"epoch",a.selection.epoch},
+            {"key",{{"horizontal",a.key.horizontal},{"vertical",a.key.vertical},
+                {"grow",a.key.grow},{"near_z",a.key.near_z},{"raw_fov",a.key.fov}}},
+            {"matrices_column_major",a.matrices},{"crop_bounds",a.bounds}};
+        result["applied_matches_effective"] = s.base && a.selection.base == *s.base &&
+            a.key.horizontal == s.effective_horizontal &&
+            a.selection.lease_id == (s.active ? s.id : std::string{});
+    }
+    return result;
 }
 enum class CVarStorage { integer, boolean, planar_float, impostor_integer, mesh_cache_integer };
 struct CVarSpec { const char* name; const wchar_t* wide_name; int minimum, maximum; CVarStorage storage{}; };
@@ -333,6 +364,8 @@ inline Json test_status(const Json& camera, const Json& live_options) {
     status["native_submission_order_test"] = wuwa_stereo_order::status();
     status["kuro_water_observation"] = wuwa_water_observation::status();
     status["stereo_candidate_test"] = stereo_candidate_status();
+    status["projection_test"] = projection_test_status(GetTickCount64());
+    status["rim_suppression"] = wuwa_rim::diagnostic_status();
     status["lod_probe"] = wuwa_lod_probe::status();
     status["live_options"] = live_options;
     status["graphics_test_cvars"] = Json::array();
@@ -356,12 +389,15 @@ inline Json test_status(const Json& camera, const Json& live_options) {
     return status;
 }
 
-template<class IsFrozen, class CameraStatus, class OptionsStatus>
-void process_test_request(const std::filesystem::path& directory, IsFrozen is_frozen, CameraStatus camera_status, OptionsStatus options_status) {
+template<class IsFrozen, class CameraStatus, class OptionsStatus, class ProjectionBase>
+void process_test_request(const std::filesystem::path& directory, IsFrozen is_frozen, CameraStatus camera_status, OptionsStatus options_status, ProjectionBase projection_base) {
     if (!is_wuwa()) {
         return;
     }
     const auto now = GetTickCount64();
+    // Observe every game tick, not just the file-poll interval. A later render
+    // boundary also checks independently, so expiration needs no helper client.
+    wuwa_projection_test::lease.select(now, projection_base());
     if(wuwa_input_sequence_bridge::needs_guard_refresh(now)) {
         try { wuwa_input_sequence_bridge::refresh_guards(camera_status()); }
         catch(...) { wuwa_input_sequence_bridge::refresh_guards(Json::object()); }
@@ -378,7 +414,7 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         menu_shadow_result = "Temporary override ended; using current Same Pass setting.";
         spdlog::info("[WuWaTest] menu ended shadow comparison");
     } else if (menu_request == 1) {
-        if (graphics_lease.spec == nullptr && !stereo_candidate_lease.active(now) && !wuwa_stereo_order::active(now) && !wuwa_shadow::test_active() && !wuwa_shadow::state_swap_active() && wuwa_shadow::ready()) {
+        if (graphics_lease.spec == nullptr && !wuwa_projection_test::lease.status(now).active && !stereo_candidate_lease.active(now) && !wuwa_stereo_order::active(now) && !wuwa_shadow::test_active() && !wuwa_shadow::state_swap_active() && wuwa_shadow::ready()) {
             wuwa_shadow::set_test(20, false);
             menu_shadow_result = "20-second comparison started; restores automatically.";
             spdlog::info("[WuWaTest] menu shadow correction off for 20 seconds");
@@ -430,7 +466,50 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         }
         const auto op = request.at("op").get<std::string>();
         reply["op"] = op;
-        if (op == "input_sequence") {
+        // Keep comparison isolation in both directions. Queries, raw observers
+        // and end/restore operations remain available during the lease.
+        const bool starts_timed_graphics =
+            (op == "console_set" || op == "native_submission_order" || op == "stereo_candidates" ||
+             op == "shadow_pass" || op == "construct_mode" || op == "lod_sync" || op == "second_eye" ||
+             op == "eye_swap" || op == "target_swap" || op == "state_swap") && request.value("seconds",0) != 0;
+        if (wuwa_projection_test::lease.status(now).active &&
+            (op == "begin" || starts_timed_graphics ||
+             (op == "clv_refresh" && request.value("frames",1) > 0) ||
+             (op == "steady_view" && request.value("bypass_seconds",0) > 0)))
+            throw std::runtime_error("Projection comparison is active");
+
+        if (op == "projection_test") {
+            for (auto it = request.begin(); it != request.end(); ++it) {
+                const auto& k = it.key();
+                if (k != "version" && k != "pid" && k != "id" && k != "op" && k != "expires_unix_ms" &&
+                    k != "action" && k != "seconds" && k != "expected" && k != "lease_id")
+                    throw std::runtime_error("Unknown projection test field");
+            }
+            const auto action = request.at("action").get<std::string>();
+            const auto current = projection_base();
+            wuwa_projection_test::lease.select(now,current);
+            if (action == "begin") {
+                if (!request.at("seconds").is_number_integer()) throw std::runtime_error("Projection duration must be an integer");
+                const auto& e = request.at("expected");
+                if (!e.is_object() || e.size()!=4 || !e.at("horizontal").is_number_integer() ||
+                    !e.at("vertical").is_number_integer() || !e.at("grow").is_boolean() || !e.at("screen").is_boolean())
+                    throw std::runtime_error("Projection expected baseline needs horizontal, vertical, grow, screen");
+                auto expected = current;
+                expected.horizontal=e.at("horizontal").get<int>(); expected.vertical=e.at("vertical").get<int>();
+                expected.grow=e.at("grow").get<bool>(); expected.screen=e.at("screen").get<bool>();
+                const auto clv = wuwa_clv::status();
+                const bool conflict = wuwa_rim::busy() || clv.value("manual_pending",false) || clv.value("owns_refresh",false) ||
+                    graphics_lease.spec || console_lease.var || stereo_candidate_lease.active(now) ||
+                    wuwa_stereo_order::active(now) || wuwa_shadow::test_active() || wuwa_shadow::state_swap_active() ||
+                    wuwa_shadow::construct_active() || wuwa_shadow::eye_swap_active() || wuwa_shadow::target_swap_active() ||
+                    wuwa_shadow::lod_sync_active() || wuwa_shadow::lod_sync_bypassed() || wuwa_second_eye::active() ||
+                    wuwa_steady_view::bypassed();
+                wuwa_projection_test::lease.begin(now,request.at("seconds").get<int>(),id,current,expected,conflict);
+            } else if (action == "end") {
+                wuwa_projection_test::lease.end(now,request.at("lease_id").get<std::string>());
+            } else if (action != "query") throw std::runtime_error("Projection action must be query, begin or end");
+            reply["projection_test"] = projection_test_status(now);
+        } else if (op == "input_sequence") {
             reply["input_sequence"]=wuwa_input_sequence_bridge::request(request,camera_status());
         } else if (op == "native_submission_order") {
             const auto seconds = request.value("seconds", 0);
@@ -512,8 +591,9 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         } else if (op == "lod_sync") {
             const auto seconds = request.value("seconds", 0);
             if (seconds < 0 || seconds > 60) throw std::runtime_error("lod_sync needs seconds 0..60");
-            wuwa_shadow::set_lod_sync(seconds);
-            spdlog::info("[WuWaBench] LOD sync for {} s (control)", seconds);
+            const auto enabled = request.value("enabled", true);
+            wuwa_shadow::set_lod_sync(seconds, enabled);
+            spdlog::info("[WuWaBench] LOD sync forced {} for {} s (control)", enabled ? "on" : "off", seconds);
             reply["shadow"] = wuwa_shadow::status();
         } else if (op == "second_eye") {
             const auto seconds = request.value("seconds", 0);
@@ -557,6 +637,25 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             const auto frames = request.value("frames", 1);
             if (frames > 0) wuwa_clv::request(static_cast<uint32_t>(frames));
             reply["clv"] = wuwa_clv::status();
+        } else if (op == "perf") {
+            // Frame-time window: action start opens it, stop closes it and returns the summary.
+            const auto action = request.value("action", std::string{"stop"});
+            if (action == "start") {
+                wuwa_perf::start();
+            } else if (action == "stop") {
+                const auto s = wuwa_perf::stop();
+                reply["perf"] = {{"frames", s.frames}, {"mean_ms", s.mean_ms}, {"p50_ms", s.p50_ms},
+                    {"p90_ms", s.p90_ms}, {"p99_ms", s.p99_ms}, {"max_ms", s.max_ms}};
+            } else {
+                throw std::runtime_error("perf action must be start or stop");
+            }
+        } else if (op == "steady_view") {
+            const auto seconds = request.value("bypass_seconds", 0);
+            if (seconds < 0 || seconds > 120) throw std::runtime_error("bypass_seconds must be 0..120");
+            wuwa_steady_view::bypass(seconds);
+            reply["steady"] = {{"bypassed", wuwa_steady_view::bypassed()}, {"frames", wuwa_steady_view::frames_steadied.load()},
+                {"dx", wuwa_steady_view::last_dx.load()}, {"dy", wuwa_steady_view::last_dy.load()},
+                {"roll", wuwa_steady_view::last_roll.load()}};
         } else if (op == "console_get") {
             auto* var = find_console_variable(request.at("name").get<std::string>());
             reply["int"] = var->GetInt();
@@ -564,6 +663,8 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
         } else if (op == "console_set") {
             const auto name = request.at("name").get<std::string>();
             const auto seconds = request.value("seconds", 0);
+            if (seconds != 0 && _stricmp(name.c_str(), wuwa_rim::variable_name) == 0 && wuwa_rim::busy())
+                throw std::runtime_error("Disable the character rim workaround before testing its console variable");
             if (seconds == 0) {
                 reply["restore"] = restore_console();
             } else {

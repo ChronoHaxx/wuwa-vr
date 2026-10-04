@@ -18,6 +18,7 @@
 #include <../../directxtk12-src/Inc/DescriptorHeap.h>
 
 #include "d3d12/CommandContext.hpp"
+#include <utility/WuWaSteadyView.hpp>
 #include "d3d12/TextureContext.hpp"
 #include "../WindowMode.hpp"
 
@@ -72,6 +73,7 @@ private:
 
     std::unique_ptr<DirectX::DX12::GraphicsMemory> m_graphics_memory{};
     std::unique_ptr<DirectX::DX12::SpriteBatch> m_backbuffer_batch{};
+    wuwa_steady_view::Smoother m_steady_view{};
     std::unique_ptr<DirectX::DX12::SpriteBatch> m_game_batch{};
     std::unique_ptr<DirectX::DX12::SpriteBatch> m_ui_batch_alpha_invert{};
 

@@ -1,0 +1,38 @@
+WuWa VR — Public beta 1.0.0 · 4 Oct
+Release: beta-2026-10-04-launcher / backend npc-rim-20261004 / game 3.7
+
+When you choose to test, use this one grouped check. Mark Pass / Fail / Blocked / Not tested explicitly. Simulator observations below do not establish this candidate's physical acceptance.
+
+Run WuWa-VR-Setup.exe once, then use the normal WuWa VR shortcut. This per-user installer does not bundle the VR mod: Step 02 needs internet to download about 54 MB on first install. Follow 01 Game > 02 Install VR > 03 Headset or simulator, then Launch in VR, Windows permission and Play in the official game launcher. Install/select only after exiting the game normally; running DLLs cannot change without restart. For updates, use Step 02 > Versions & updates > Check updates; Update launcher is offered while idle and restarts the app. VR package updates are selected in Step 02. Settings, backups and recordings are preserved.
+
+Fresh-PC installation and Steam/Epic game injection remain unverified. Use the release receipt for build/package test results; this checklist does not establish a pass. Advanced users can extract WuWa-VR-Launcher.zip and use its older web interface. Previous public release: https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817
+
+Evidence already recorded: two repeated simulator A/B/A cycles in one stationary NPC scene used rim width 0.5 -> 0 -> 0.5, with actual values checked around captures. The extra right-eye contour diminished at zero and returned on restoration; ordinary highlights remained. This supports suppression of one rim effect, not an underlying stereo shader repair or general headset acceptance. The player previously confirmed headset 2D brightness in the view-controls build; that correction is retained here.
+
+1. Distant NPC: keep one scene, camera and lighting steady. Press L3 + R3, then VR > WuWa Controls > Suppress mismatched NPC rim lighting. It defaults off; the chosen state can be saved. Compare off -> on -> off, closing UEVR to view each result. Read the status each time. Does the extra right-eye rim reduce and return? Record both eyes separately; movement or weather changes make the comparison inconclusive.
+2. Nearby tradeoff: compare a nearby character too. This removes the toon-depth rim from all characters using it, including intended nearby rim lighting. Decide whether that visual tradeoff is acceptable. It is not a distance-only fix.
+3. Restore and return: with suppression enabled, enter stereoscopic 2D, then return to normal native VR. The prior rim value should restore in 2D and suppression should resume on return. Turn the option off and check that restoration is reported. External edits are preserved. If restoration fails, record the failure; follow the status's off/on retry instruction, which restores the original before reapplying. Do not call a failed restoration a pass.
+4. Relevant view regression: check the retained headset 2D brightness, including an air dash, normal-VR HUD/menu transparency, eye depth direction and return aspect. Toggle 2D by fully holding LT and RT first, then holding L3 for 0.8 seconds; release all three before repeating. Close UEVR and HUD/mouse adjustment; dialogue is supported. If HUD proportions remain wrong, use VR > WuWa Controls > Reset HUD aspect and read its result. It must not change saved HUD size/position. Unsupported LGUI schema must report unavailable.
+5. Relevant input regression only: L3+LT/F7 portal, L3+RT diorama, Xbox movement and optional VR walking should still work. Focus loss/reconnect require release before controls resume. Treadmill merge preserves its left stick; UEVR menus use the VR left stick, not the belt. Walking Off restores existing ControllersAllowed behavior, including legacy VR mapping if already enabled. No complete repeat of earlier feature acceptance is requested.
+
+Projection defaults remain Horizontal/Vertical = Raw / default. The separate timed projection comparison is inactive and cannot start while rim suppression would confound it; it is not part of this grouped check.
+
+Cutscenes remain a known issue: the right-eye scene can disappear or flicker. The player finds manual stereoscopic 2D useful; cutscene switching is not automated. The underlying NPC stereo-lighting cause and Weapon/Echo submenu reflections remain unresolved. Prior main-character-screen reflection and accepted rendering fixes are retained.
+
+简体中文
+公开测试版 1.0.0 · 10 月 4 日
+发布版本 beta-2026-10-04-launcher／后端 npc-rim-20261004／游戏 3.7。
+之后如选择测试，请按以下分组检查，并明确记录通过／失败／受阻／未测试。
+运行 WuWa-VR-Setup.exe 一次，为当前用户安装，再打开普通 WuWa VR 快捷方式。此安装程序不包含 VR 模组；首次在第 02 步安装需要联网下载约 54 MB。按 01 游戏 > 02 安装 VR > 03 头显或模拟器操作，再点击以 VR 模式启动、同意 Windows 授权，并在官方启动器中开始游戏。正常退出游戏后才安装或切换；运行中的 DLL 需重启才会改变。更新入口为第 02 步 > 版本与更新 > 检查更新；空闲时可选择更新启动器，完成后应用重启。VR 包在第 02 步选择更新，设置、备份和录像保留。
+全新电脑安装与 Steam／Epic 游戏版本注入仍未确认。构建及安装包测试以发布记录为准；本表不代表验收通过。进阶用户可完整解压 WuWa-VR-Launcher.zip 使用旧版网页界面；上一个公开版本链接见英文部分。
+
+已有证据：同一固定 NPC 场景的两轮模拟器 A/B/A 比较使用宽度 0.5 -> 0 -> 0.5，并核实各次截图前后的实际值。设零后右眼额外轮廓减弱，恢复后重新出现；其他高光仍在。这支持抑制某项边缘光效果，不代表修复底层立体着色问题或头显验收通过。玩家已确认此前 view-controls 版本的头显二维亮度改善，本版保留该修正。
+
+1. 远处 NPC：固定场景、相机与光照。按 L3 + R3，在 VR > WuWa Controls 选择“抑制不匹配的 NPC 边缘光”。默认关闭，所选状态可以保存。比较关闭 -> 开启 -> 关闭，每次读取状态并关闭 UEVR 观察，分别记录两眼。移动或天气变化会使结果不确定。
+2. 近处取舍：也比较近处角色。本选项移除所有使用该效果的角色的卡通深度边缘光，包括原本应有的近处边缘光；不是只修远处。确认能否接受这项画面取舍。
+3. 恢复与返回：保持抑制开启，进入立体二维，再返回普通原生 VR。二维中应恢复原边缘值，返回后应再次抑制；关闭选项后确认状态报告恢复。外部修改不会被覆盖。若恢复失败，记录失败并按状态提示先关再开，系统会先恢复原值再重新应用，不能把失败记作通过。
+4. 相关视图回归：确认已保留的头显二维亮度（含空中冲刺）、普通 VR 的 HUD／菜单透明度、双眼深度和返回后的比例。二维快捷键：先将 LT 与 RT 按到底，再按住 L3 0.8 秒；重复前松开三者。关闭 UEVR 和 HUD／鼠标调整，对话中可用。HUD 比例未恢复时，使用 VR > WuWa Controls > Reset HUD aspect 并读结果；保存的大小／位置应不变，不支持的 LGUI 结构应报告不可用。
+5. 只做相关输入回归：L3+LT/F7 空间窗口、L3+RT 微缩、Xbox 及可选漫游。失焦／重连后先松开输入；跑步机合并保留设备左摇杆，UEVR 菜单用 VR 左摇杆。关闭漫游恢复 ControllersAllowed 原有行为，若原已开启则恢复旧 VR 映射。不要求重复全部早期验收。
+
+水平／垂直投影默认仍为 Raw / default。独立限时投影对比默认不运行，边缘光抑制会干扰对比时不能启动；不属于本组检查。
+过场右眼缺失／闪烁仍未解决；手动立体二维对玩家有帮助，但不自动切换。NPC 立体光照的底层原因及武器／声骸子菜单反射仍待解决，已接受的渲染修复继续保留。

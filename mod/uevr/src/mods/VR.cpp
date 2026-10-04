@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "utility/WuWaLocalizedUI.hpp"
+#include "utility/WuWaPlaytestControl.hpp"
 #include <fstream>
 
 #include <windows.h>
@@ -27,6 +28,7 @@
 #include "utility/WuWaStereoComparison.hpp"
 
 #include "VR.hpp"
+#include "WindowMode.hpp"
 
 std::shared_ptr<VR>& VR::get() {
     //static std::shared_ptr<VR> instance = std::make_shared<VR>();
@@ -98,6 +100,11 @@ std::optional<std::string> VR::clean_initialize() try {
 std::optional<std::string> VR::initialize_openvr() {
     ZoneScopedN(__FUNCTION__);
 
+    // A recreated runtime may use a different tracking-space origin. Keep the
+    // user's portal settings, but neither anchor nor an old producer override.
+    WindowMode::get()->reset_tracking_presentation();
+    m_diorama.request(false);
+    reset_sightseeing();
     spdlog::info("Attempting to load OpenVR");
 
     m_openvr = std::make_shared<runtimes::OpenVR>();
@@ -246,6 +253,11 @@ std::optional<std::string> VR::initialize_openvr_input() {
 std::optional<std::string> VR::initialize_openxr() {
     ZoneScopedN(__FUNCTION__);
 
+    // Presentation-only: GPU resources remain owned by the existing drained
+    // swapchain/device reset paths, including when session creation fails.
+    WindowMode::get()->reset_tracking_presentation();
+    m_diorama.request(false);
+    reset_sightseeing();
     m_openxr.reset();
     m_openxr = std::make_shared<runtimes::OpenXR>();
 
@@ -278,6 +290,7 @@ std::optional<std::string> VR::initialize_openxr() {
 
     // We may just be restarting OpenXR, so try to find an existing instance first
     if (m_openxr->instance == XR_NULL_HANDLE) {
+        m_openxr->enabled_extensions.clear();
         std::vector<const char*> extensions{};
 
         if (g_framework->is_dx12()) {
@@ -302,7 +315,9 @@ std::optional<std::string> VR::initialize_openxr() {
 
                 const std::unordered_set<std::string> wanted_extensions {
                     XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
-                    XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME
+                    XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME,
+                    XR_EXT_HAND_TRACKING_EXTENSION_NAME,
+                    XR_EXT_HAND_TRACKING_DATA_SOURCE_EXTENSION_NAME
                     // To be seen if we need more!
                 };
 
@@ -450,6 +465,10 @@ std::optional<std::string> VR::initialize_openxr() {
     spdlog::info("[VR] Getting OpenXR system properties");
 
     XrSystemProperties system_properties{XR_TYPE_SYSTEM_PROPERTIES};
+    XrSystemHandTrackingPropertiesEXT hand_properties{XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT};
+    if (m_openxr->enabled_extensions.contains(XR_EXT_HAND_TRACKING_EXTENSION_NAME)) {
+        system_properties.next = &hand_properties;
+    }
     result = xrGetSystemProperties(m_openxr->instance, m_openxr->system, &system_properties);
 
     if (result != XR_SUCCESS) {
@@ -460,6 +479,7 @@ std::optional<std::string> VR::initialize_openxr() {
     }
 
     m_openxr->on_system_properties_acquired(system_properties);
+    m_openxr->initialize_hand_demo(hand_properties.supportsHandTracking == XR_TRUE);
 
     // Step 6: Get the view configuration properties
     m_openxr->update_render_target_size();
@@ -689,8 +709,101 @@ bool VR::on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param) {
     return true;
 }
 
+namespace {
+wuwa_sightseeing::Pad sightseeing_pad(const XINPUT_GAMEPAD& p) {
+    return {p.wButtons, p.bLeftTrigger, p.bRightTrigger,
+        p.sThumbLX, p.sThumbLY, p.sThumbRX, p.sThumbRY};
+}
+XINPUT_GAMEPAD sightseeing_gamepad(const wuwa_sightseeing::Pad& p) {
+    return {p.buttons, p.lt, p.rt, p.lx, p.ly, p.rx, p.ry};
+}
+bool sightseeing_focused() {
+    // Unlike gameplay shortcuts, controller navigation must remain available
+    // while UEVR is open. Its navigation consumer suppresses game delivery.
+    return g_framework->get_window() != nullptr &&
+        GetForegroundWindow() == g_framework->get_window();
+}
+}
+
+void VR::reset_sightseeing() {
+    m_sightseeing_choice.value() = 0;
+    m_sightseeing_mode.store(0);
+    std::scoped_lock lock{m_sightseeing_mtx};
+    m_sightseeing_pad = {};
+    m_sightseeing_sample_ms = 0;
+    m_sightseeing_valid = false;
+    m_sightseeing_mixer.reset();
+    // Keep delivered packet counters through disabling/reinitialization so a
+    // release cannot collide with an unrelated physical driver's packet number.
+}
+
+void VR::update_sightseeing_sample(bool synced) {
+    wuwa_sightseeing::Pad pad{};
+    const auto mode = sightseeing_mode();
+    const bool permitted = mode != 0 && synced && !physical_gamepad_passthrough() &&
+        !wuwa_test::filter_input_slot(gamepad_slot_filter(), wuwa_sightseeing::target_slot(mode)) &&
+        !wuwa_test::motion_input_muted() && sightseeing_focused();
+    const auto runtime = get_runtime();
+    const bool valid = permitted && runtime && runtime->is_openxr() &&
+        m_openxr->read_sightseeing_pad(pad);
+    // Finish runtime queries before taking the mutex used by XInput.
+    std::scoped_lock lock{m_sightseeing_mtx};
+    m_sightseeing_pad = valid ? pad : wuwa_sightseeing::Pad{};
+    m_sightseeing_sample_ms = GetTickCount64();
+    m_sightseeing_valid = valid;
+    if (!valid) m_sightseeing_mixer.reset();
+}
+
+bool VR::apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* state) {
+    const auto mode = sightseeing_mode();
+    if (mode == 0) return false;
+    // Bypass the legacy motion mapper for all slots; only one explicit source
+    // is mixed. Other connected controllers retain their original state.
+    if (!result || !state || slot != wuwa_sightseeing::target_slot(mode)) return true;
+    const bool connected = *result == ERROR_SUCCESS;
+    const auto physical = connected ? sightseeing_pad(state->Gamepad) : wuwa_sightseeing::Pad{};
+    const bool permitted = !physical_gamepad_passthrough() && !wuwa_test::motion_input_muted() &&
+        sightseeing_focused();
+    const bool ui_open = g_framework->is_drawing_ui();
+    {
+        std::scoped_lock lock{m_sightseeing_mtx};
+        const auto mixed = m_sightseeing_mixer.apply(mode, physical, connected, m_sightseeing_pad,
+            permitted && m_sightseeing_valid, m_sightseeing_sample_ms, GetTickCount64(),
+            ui_open);
+        // The VR left stick navigates UEVR even in treadmill mode; walking on
+        // the belt must not scroll this menu. Never send that UI stick to WuWa.
+        const auto delivered = ui_open ? (mixed.vr_active ? m_sightseeing_pad : wuwa_sightseeing::Pad{}) : mixed.pad;
+        state->Gamepad = sightseeing_gamepad(delivered);
+        *result = mixed.connected ? ERROR_SUCCESS : ERROR_DEVICE_NOT_CONNECTED;
+        m_sightseeing_packet_owned[slot] = true;
+    }
+    m_last_xinput_update = std::chrono::steady_clock::now();
+    m_spoofed_gamepad_connection = *result == ERROR_SUCCESS;
+    if (*result == ERROR_SUCCESS) {
+        // Reuse UEVR navigation, but never rotate the treadmill's movement or
+        // apply the legacy controller aiming / D-pad shifting / snap-turn path.
+        update_imgui_state_from_xinput_state(*state, true, true);
+        if (ui_open) state->Gamepad = {}; // Also suppress the poll which closes UEVR.
+    } else {
+        *state = {};
+    }
+    return true;
+}
+
+void VR::stamp_sightseeing_packet(uint32_t result, uint32_t slot, XINPUT_STATE* state) {
+    if (!state || slot >= m_sightseeing_packet_owned.size() || !wuwa_test::is_wuwa()) return;
+    std::scoped_lock lock{m_sightseeing_mtx};
+    if (!m_sightseeing_packet_owned[slot]) return;
+    const bool connected = result == ERROR_SUCCESS;
+    state->dwPacketNumber = m_sightseeing_packets.stamp(slot, connected,
+        connected ? sightseeing_pad(state->Gamepad) : wuwa_sightseeing::Pad{}, state->dwPacketNumber);
+}
+
 void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state) {
     ZoneScopedN(__FUNCTION__);
+
+    // Uses an engine-thread snapshot, never XR or Unreal calls from XInput.
+    if (apply_sightseeing_input(retval, user_index, state)) return;
 
     if (std::chrono::steady_clock::now() - m_last_engine_tick > std::chrono::seconds(1)) {
         SPDLOG_INFO_EVERY_N_SEC(1, "[VR] XInputGetState called, but engine tick hasn't been called in over a second. Is the game loading?");
@@ -1057,7 +1170,7 @@ void VR::on_xinput_set_state(uint32_t* retval, uint32_t user_index, XINPUT_VIBRA
 }
 
 // Allows imgui navigation to work with the controllers
-void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_controller) {
+void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_controller, bool sightseeing) {
     ZoneScopedN(__FUNCTION__);
 
     bool is_using_this_controller = true;
@@ -1065,7 +1178,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
     const auto is_using_vr_controller_recently = is_using_controllers_within(std::chrono::seconds(1));
     const auto is_gamepad = !is_vr_controller;
 
-    if (is_vr_controller && !is_using_vr_controller_recently) {
+    if (!sightseeing && is_vr_controller && !is_using_vr_controller_recently) {
         is_using_this_controller = false;
     } else if (is_gamepad && is_using_vr_controller_recently) { // dont allow gamepad navigation if using vr controllers
         is_using_this_controller = false;
@@ -1105,7 +1218,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
 
     // We need to adjust the stick values based on the selected movement orientation value if the user wants to do this
     // It will either need to be adjusted by the HMD rotation or one of the controllers.
-    if (is_using_this_controller && (state.Gamepad.sThumbLX != 0 || state.Gamepad.sThumbLY != 0) &&
+    if (!sightseeing && is_using_this_controller && (state.Gamepad.sThumbLX != 0 || state.Gamepad.sThumbLY != 0) &&
         m_movement_orientation->value() != VR::AimMethod::GAME && m_movement_orientation->value() != m_aim_method->value()) {
         const auto left_stick_og = glm::vec2((float)state.Gamepad.sThumbLX, (float)state.Gamepad.sThumbLY );
         const auto left_stick_magnitude = glm::clamp(glm::length(left_stick_og), -32767.0f, 32767.0f);
@@ -1610,6 +1723,7 @@ void VR::update_action_states() {
     auto runtime = get_runtime();
 
     if (runtime == nullptr || runtime->wants_reinitialize) {
+        update_sightseeing_sample(false);
         return;
     }
 
@@ -1621,6 +1735,7 @@ void VR::update_action_states() {
     }
 
 
+    bool sightseeing_synced = false;
     if (runtime->is_openvr()) {
         const auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -1643,8 +1758,10 @@ void VR::update_action_states() {
             runtime->wants_reinitialize = true;
         }   
     } else {
-        get_runtime()->update_input();
+        sightseeing_synced = get_runtime()->update_input() == VRRuntime::Error::SUCCESS;
     }
+
+    update_sightseeing_sample(sightseeing_synced);
 
     bool actively_using_controller = false;
 
@@ -1656,7 +1773,7 @@ void VR::update_action_states() {
     const auto reconnect_now = std::chrono::steady_clock::now();
     const auto last_xinput_update_is_late = reconnect_now - m_last_xinput_update >= std::chrono::seconds(2);
     const auto should_be_spoofing = !physical_gamepad_passthrough()
-        && ((actively_using_controller && m_controllers_allowed->value()
+        && ((actively_using_controller && (m_controllers_allowed->value() || sightseeing_mode() != 0)
             && !wuwa_test::motion_input_muted() && motion_input_has_focus()) || get_runtime()->handle_pause);
 
     if (m_spoofed_gamepad_connection && last_xinput_update_is_late && should_be_spoofing) {
@@ -1668,7 +1785,7 @@ void VR::update_action_states() {
     if (!m_spoofed_gamepad_connection && last_xinput_update_is_late && should_be_spoofing
         && reconnect_now - m_last_gamepad_reconnect_attempt >= std::chrono::seconds(2)) {
         m_last_gamepad_reconnect_attempt = reconnect_now;
-        const auto focus_on_reconnect = m_focus_on_gamepad_reconnect->value();
+        const auto focus_on_reconnect = sightseeing_mode() == 0 && m_focus_on_gamepad_reconnect->value();
         spdlog::info("[VR] Attempting to spoof gamepad connection (focus_game={})", focus_on_reconnect);
         g_framework->post_message(WM_DEVICECHANGE, 0, 0);
         // A background game may stop polling XInput. Keep reconnecting without
@@ -1695,7 +1812,7 @@ void VR::update_action_states() {
         once2 = false;
     }
 
-    update_dpad_gestures();
+    if (sightseeing_mode() == 0) update_dpad_gestures();
 }
 
 void VR::update_dpad_gestures() {
@@ -1763,6 +1880,9 @@ void VR::update_dpad_gestures() {
 
 void VR::on_config_load(const utility::Config& cfg, bool set_defaults) {
     ZoneScopedN(__FUNCTION__);
+
+    m_diorama.request(false);
+    reset_sightseeing();
 
     for (IModValue& option : m_options) {
         option.config_load(cfg, set_defaults);
@@ -1982,6 +2102,13 @@ void VR::handle_keybinds() {
 
 void VR::on_frame() {
     ZoneScopedN(__FUNCTION__);
+
+    const auto walking = std::clamp(m_sightseeing_choice.value(), 0, 5);
+    if (m_sightseeing_mode.exchange(walking) != walking) {
+        std::scoped_lock lock{m_sightseeing_mtx};
+        m_sightseeing_mixer.reset();
+        m_sightseeing_valid = false;
+    }
 
     m_cvar_manager->on_frame();
     m_wuwa_controls.on_frame();
@@ -2425,6 +2552,46 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         if (draw_wuwa) {
         m_wuwa_controls.on_draw_language();
         m_wuwa_controls.on_draw_recovery();
+        if (wuwa_ui::CollapsingHeader("VR controllers for walking (optional)")) {
+            if (wuwa_ui::draw(m_sightseeing_choice, "Walking input")) {
+                m_sightseeing_mode.store(m_sightseeing_choice.value());
+                std::scoped_lock lock{m_sightseeing_mtx};
+                m_sightseeing_mixer.reset();
+                m_sightseeing_valid = false;
+            }
+            wuwa_ui::TextWrapped("For sightseeing with Quest controllers through OpenXR. Starts off each launch. Choose First person below if wanted; your camera and aiming settings stay unchanged.");
+            wuwa_ui::TextWrapped("VR controllers only: left stick moves, right stick looks. With treadmill / Xbox: choose its connected XInput slot; movement comes only from that device, while VR buttons and right stick are added. Check the slot in launcher Troubleshooting > Controller check.");
+            wuwa_ui::TextWrapped("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu = Start; left grip + Menu = View. Both stick clicks open UEVR. D-pad actions are not mapped in this walking layout.");
+            wuwa_ui::TextWrapped("Wake both controllers, focus the game, then release buttons and center sticks to arm. After closing UEVR, release them again. Physical gamepad passthrough and a conflicting slot filter block VR input. Choose Off to restore normal input.");
+            if (sightseeing_mode() != 0) {
+                bool fresh{};
+                {
+                    std::scoped_lock lock{m_sightseeing_mtx};
+                    const auto now = GetTickCount64();
+                    fresh = m_sightseeing_valid && now >= m_sightseeing_sample_ms &&
+                        now - m_sightseeing_sample_ms <= wuwa_sightseeing::Mixer::max_age_ms;
+                }
+                wuwa_ui::TextWrapped(fresh ? "VR controller sample received. Release controls to arm; the selected merge slot must also be connected." :
+                    "Waiting for focused OpenXR and both active controllers. No VR movement is being added.");
+            }
+        }
+        if (wuwa_ui::CollapsingHeader("Diorama mode (optional)")) {
+            bool miniature = m_diorama.requested();
+            ImGui::BeginDisabled(is_using_afr());
+            const auto label = wuwa_l10n::label("Miniature world (this launch only)");
+            if (ImGui::Checkbox(label.c_str(), &miniature))
+                set_diorama_enabled(miniature);
+            ImGui::EndDisabled();
+            if (is_using_afr())
+                wuwa_ui::TextWrapped("Diorama needs Native Stereo. Choose it under Stereo rendering compatibility.");
+            wuwa_ui::TextWrapped("Uses the maximum 10x world scale for an action-figure view. Turn off to return to your normal scale. Works with or without the portal window.");
+            wuwa_ui::TextWrapped("Normal scale: %.3fx. Your saved scale and camera presets stay unchanged; intentional scale edits become the new normal value.", m_world_scale->value());
+            wuwa_ui::TextWrapped("Head movement also scales up. Use Recenter if the view feels displaced. Starts off each launch and after reloading settings.");
+        }
+        if (wuwa_ui::CollapsingHeader("Hand / finger demo (optional)")) {
+            if (get_runtime()->is_openxr()) m_openxr->draw_hand_demo();
+            else wuwa_ui::TextWrapped("The hand demo needs OpenXR with optical hand tracking. Xbox gameplay is unchanged.");
+        }
         if (wuwa_ui::CollapsingHeader("Xbox shortcuts", ImGuiTreeNodeFlags_DefaultOpen)) {
             m_wuwa_controls.on_draw_shortcuts();
         }
@@ -2441,6 +2608,8 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         if (wuwa_ui::CollapsingHeader("Recording and privacy")) {
             m_wuwa_controls.on_draw_recording();
         }
+        if (wuwa_ui::CollapsingHeader("Developer playtest checklist"))
+            wuwa_playtest::draw_controls(Framework::get_persistent_dir());
         if (wuwa_ui::CollapsingHeader("Stereo rendering compatibility")) {
             static wuwa_stereo::Comparison comparison;
             const auto current = [&] { return wuwa_stereo::Settings{m_rendering_method->value(),
@@ -2621,6 +2790,10 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         m_synced_afr_method->draw("Synced Sequential Method");
 
         m_world_scale->draw("World Scale");
+        if (m_diorama.requested()) {
+            wuwa_ui::FontScope font;
+            wuwa_ui::TextWrapped("Diorama is on at 10x. This slider edits the normal scale restored when you turn it off in WuWa Controls.");
+        }
         m_depth_scale->draw("Depth Scale");
 
         m_disable_hzbocclusion->draw("Disable HZBOcclusion");

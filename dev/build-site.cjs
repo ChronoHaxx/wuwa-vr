@@ -2,6 +2,11 @@
 const fs=require('node:fs'),path=require('node:path');
 const {shell,escape,languageLinks}=require('./site-layout.cjs');
 const root=path.resolve(__dirname,'..'),site=path.join(root,'site');
+// Refresh the reviewed published pages without regenerating unrelated legacy content.
+if (process.argv.includes('--launcher-release')) {
+  require('./i18n/build-launcher-release.cjs').build().catch(e=>{console.error(e);process.exitCode=1;});
+  return;
+}
 const candidates=[root,process.env.WUWA_NODE_MODULES,path.join(root,'dev-tools/node_modules'),path.join(process.env.USERPROFILE||process.env.HOME||'','.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules')].filter(Boolean);
 (async()=>{
   const {marked}=await import(require('node:url').pathToFileURL(require.resolve('marked',{paths:candidates})).href);
@@ -66,6 +71,7 @@ ${start}
   write('risk.html','Account risk and disclaimer','Unofficial modification, anti-cheat and account restrictions.',`<h1>Account risk and disclaimer</h1><div class="guide-content">${render('docs/RISK.md')}</div>`);
   write('developers.html','Code and contributions','Source map, known rendering problems and ways to contribute to WuWa VR.',`<h1>Code and contributions</h1><nav class="page-links" aria-label="GitHub collaboration"><a data-project-link="code" hidden rel="noopener noreferrer">Browse GitHub</a><a data-project-link="fork" hidden rel="noopener noreferrer">Fork the repository</a><a data-project-link="issues" hidden rel="noopener noreferrer">Search issues</a><a href="feedback.html">Prepare a report</a></nav><p class="notice" data-repository-pending>The public repository has not been connected yet. The source map below explains the current review bundle; feedback drafts can still be copied.</p><div class="guide-content">${render('docs/DEVELOPING.md')}<section id="contributing"><h2>Contributing</h2>${render('CONTRIBUTING.md')}</section></div>`);
   require('./build-community.cjs');
+  await require('./i18n/build-launcher-release.cjs').build();
   console.log('Generated simplified site, visual guide, risk/support pages and local test notes.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 

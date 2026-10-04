@@ -332,6 +332,7 @@ uint32_t XInputHook::get_state_hook_1_4(uint32_t user_index, XINPUT_STATE* state
     if(feed.generated) changed_by|=128;
     if(!filtered && !passthrough) run_input_mods(ret,user_index,state,trace,changed_by);
     if(wuwa) wuwa_input_sequence_bridge::after_mods(feed,ret,state);
+    if(wuwa) VR::get()->stamp_sightseeing_packet(ret,user_index,state);
 
     if (trace) {
         trace_xinput(14, user_index, raw_result, raw, ret, state, changed_by, caller, passthrough, slot_filter);
@@ -383,6 +384,7 @@ uint32_t XInputHook::get_state_hook_1_3(uint32_t user_index, XINPUT_STATE* state
     if(feed.generated) changed_by|=128;
     if(!filtered && !passthrough) run_input_mods(ret,user_index,state,trace,changed_by);
     if(wuwa) wuwa_input_sequence_bridge::after_mods(feed,ret,state);
+    if(wuwa) VR::get()->stamp_sightseeing_packet(ret,user_index,state);
 
     if (trace) {
         trace_xinput(13, user_index, raw_result, raw, ret, state, changed_by, caller, passthrough, slot_filter);

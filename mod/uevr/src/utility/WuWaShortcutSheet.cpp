@@ -265,7 +265,8 @@ void draw(ImDrawList* draw, ImVec2 size, int page, ImFont* font, int flight_styl
     essential(452,"L3 + A","Recenter view / portal");
     essential(832,"L3 + R3","UEVR settings");
     essential(1212,"L3 + Menu","Show / hide this sheet");
-    text(72,794,22,muted,"Sheet open: L3 + D-pad Left/Right = pages   |   L3 + D-pad Up = automatic   |   Release RT before UEVR scrolling.");
+    text(72,779,22,muted,"Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  2D: hold LT + RT, then L3 for 0.8 s.",1458);
+    text(72,810,19,muted,"Sheet: L3 + D-pad Left/Right = pages; Up = automatic   |   UEVR: release RT to scroll.",1458);
     if (adjusting || mouse_active) draw->AddRectFilled(pt(44,842),pt(1556,880),IM_COL32(63,43,8,255),6*s);
     text(64,853,20,(adjusting || mouse_active) ? IM_COL32(255,215,117,255) : muted,
         adjusting ? "HUD / MOUSE ON: gameplay input paused. L3 + LB exits; release all controls. UEVR settings still open with L3 + R3."

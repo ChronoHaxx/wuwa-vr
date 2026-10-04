@@ -18,6 +18,8 @@ namespace pixel_shader1 {
 #include "Framework.hpp"
 #include "../VR.hpp"
 #include "../WindowMode.hpp"
+#include "utility/WuWaHandDemoRenderer.hpp"
+#include "utility/WuWaScreenComposite.hpp"
 
 #include "D3D11Component.hpp"
 
@@ -422,9 +424,10 @@ vr::EVRCompositorError D3D11Component::on_frame(VR* vr) {
 
         float clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
-        // Clear previous frame
+        // The complete scene panel is opaque; keep the projection clear below
+        // and the separate HUD transparent. This changes alpha, not RGB/gamma.
         for (auto& screen : m_2d_screen_tex) {
-            context->ClearRenderTargetView(screen, clear_color);
+            context->ClearRenderTargetView(screen, wuwa_screen_composite::opaque_black.data());
         }
 
         // Render left side to left screen tex
@@ -718,11 +721,17 @@ vr::EVRCompositorError D3D11Component::on_frame(VR* vr) {
                 const auto left_layer = openxr_overlay.generate_slate_layer(runtimes::OpenXR::SwapchainIndex::UI, XrEyeVisibility::XR_EYE_VISIBILITY_LEFT);
                 const auto right_layer = openxr_overlay.generate_slate_layer(runtimes::OpenXR::SwapchainIndex::UI_RIGHT, XrEyeVisibility::XR_EYE_VISIBILITY_RIGHT);
 
+                // Only actual 2D scene panels are opaque (quad or cylinder).
+                // Ordinary HUD/framework layers retain their transparency.
+                constexpr auto alpha_flags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
+                    XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
                 if (left_layer && m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI)) {
+                    left_layer->get().layerFlags &= ~alpha_flags;
                     quad_layers.push_back((XrCompositionLayerBaseHeader*)&left_layer->get());
                 }
 
                 if (right_layer && m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT)) {
+                    right_layer->get().layerFlags &= ~alpha_flags;
                     quad_layers.push_back((XrCompositionLayerBaseHeader*)&right_layer->get());
                 }
             } else if (m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI)) {
@@ -1030,6 +1039,7 @@ void D3D11Component::on_post_present(VR* vr) {
 }
 
 void D3D11Component::on_reset(VR* vr) {
+    wuwa_hand::Renderer::get().reset11();
     m_force_reset = true;
 
     m_backbuffer_rtv.Reset();
@@ -2073,6 +2083,7 @@ std::optional<std::string> D3D11Component::OpenXR::create_swapchains() {
 
 void D3D11Component::OpenXR::destroy_swapchains() {
     std::scoped_lock _{this->mtx};
+    wuwa_hand::Renderer::get().reset11();
 
 	if (this->contexts.empty()) {
         return;
@@ -2202,6 +2213,11 @@ void D3D11Component::OpenXR::copy(uint32_t swapchain_idx, ID3D11Texture2D* resou
                     : (swapchain_idx == left_eye ? WindowMode::Layout::LEFT_EYE : WindowMode::Layout::RIGHT_EYE);
                 WindowMode::get()->draw_d3d11(context.Get(), ctx.textures[texture_index].texture,
                     nullptr, layout);
+                const auto hand_layout=swapchain_idx==double_wide?wuwa_hand::Layout::DoubleWide:
+                    swapchain_idx==left_eye?wuwa_hand::Layout::Left:wuwa_hand::Layout::Right;
+                const auto hand_sample=vr->m_openxr->hand_render_snapshot();
+                if (wuwa_hand::Renderer::get().draw11(context.Get(),ctx.textures[texture_index].texture,
+                    hand_sample,hand_layout)) vr->m_openxr->hand_rendered(hand_sample.frame_generation);
             }
 
             XrSwapchainImageReleaseInfo release_info{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};

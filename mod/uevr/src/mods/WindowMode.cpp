@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <sstream>
 
 #include <d3dcompiler.h>
 #include <imgui.h>
 #include <spdlog/spdlog.h>
 
 #include "VR.hpp"
+#include "../utility/WuWaLocalizedUI.hpp"
 
 #pragma comment(lib, "d3dcompiler")
 
@@ -240,7 +240,7 @@ WindowMode::WindowMode() {
         "D3D11 constant buffers must be 16-byte aligned");
     static_assert(sizeof(Constants) / sizeof(float) <= 64,
         "D3D12 root constants must fit the 64-DWORD root signature limit");
-    m_options = {*m_enabled, *m_lock_aspect, *m_plane_width, *m_plane_height,
+    m_options = {*m_enabled, *m_toggle_key, *m_lock_aspect, *m_plane_width, *m_plane_height,
         *m_anchor_distance, *m_feather, *m_corner_radius, *m_curvature,
         *m_surround_red, *m_surround_green, *m_surround_blue, *m_opacity,
         *m_external_bridge_available};
@@ -249,6 +249,22 @@ WindowMode::WindowMode() {
 WindowMode::~WindowMode() {
     reset_d3d11();
     reset_d3d12();
+}
+
+void WindowMode::on_frame() {
+    // Require release after focus returns or settings close, including rebinds.
+    if (!vrmod::WuWaControlsComponent::game_focused() || g_framework->is_drawing_ui()) {
+        m_toggle_armed = false;
+        return;
+    }
+    if (!m_toggle_key->is_key_down()) {
+        m_toggle_armed = true;
+        return;
+    }
+    if (!m_toggle_armed) return;
+    m_toggle_armed = false;
+    m_enabled->toggle();
+    if (m_enabled->value()) request_recenter();
 }
 
 void WindowMode::on_draw_sidebar_entry(std::string_view entry) {
@@ -261,6 +277,8 @@ void WindowMode::on_draw_sidebar_entry(std::string_view entry) {
     if (m_enabled->draw("Enable Room-Anchored 6DOF Window") && m_enabled->value()) {
         request_recenter();
     }
+    wuwa_ui::draw(*m_toggle_key, "Set portal toggle key");
+    wuwa_ui::TextWrapped("Default: F7. Xbox: hold L3, then squeeze LT. Release both before repeating. Portal size and curvature are preserved; enabling anchors it in front of you.");
     ImGui::Separator();
     ImGui::TextDisabled("Ctrl+click a slider to type an exact value.");
     m_plane_width->draw("Window X Width (meters)");
@@ -306,9 +324,8 @@ void WindowMode::on_draw_sidebar_entry(std::string_view entry) {
         request_recenter();
     }
     {
-        std::scoped_lock lock{m_anchor_mutex};
         ImGui::SameLine();
-        ImGui::TextDisabled(m_anchor_valid ? "anchored" : "waiting for tracking");
+        ImGui::TextDisabled(get_status().anchor_valid ? "anchored" : "waiting for tracking");
     }
     ImGui::Spacing();
     ImGui::TextWrapped("The game remains native stereo and 6DOF. The aperture is fixed at recenter time. Curvature bends that fixed surface toward a cylinder around the recenter origin; it never follows later head movement.");
@@ -318,65 +335,63 @@ void WindowMode::on_draw_sidebar_entry(std::string_view entry) {
 }
 
 void WindowMode::on_device_reset() {
-    invalidate_anchor();
+    reset_tracking_presentation();
     reset_d3d11();
     reset_d3d12();
 }
 
+void WindowMode::reset_tracking_presentation() {
+    std::scoped_lock lock{m_presentation_mutex};
+    m_presentation.reset();
+}
+
 void WindowMode::request_recenter() {
-    m_recenter_requested = true;
+    std::scoped_lock lock{m_presentation_mutex};
+    m_presentation.request_recenter();
 }
 
 void WindowMode::apply_cutscene_comfort_state(std::string_view payload) {
-    std::istringstream stream{std::string{payload}};
-    int version{};
-    int active{};
-    int recenter{};
-    int lock_aspect{};
-    CutsceneComfortState next{};
-    if (!(stream >> version >> active >> recenter >> lock_aspect >>
-            next.width >> next.height >> next.distance >> next.feather >>
-            next.corner_radius >> next.curvature >>
-            next.surround_color.x >> next.surround_color.y >> next.surround_color.z >>
-            next.opacity) || version != 1) {
+    // Parse under the same lock as cleanup: a payload already being parsed
+    // cannot apply after unload/reset has cleared the transient presentation.
+    std::scoped_lock lock{m_presentation_mutex};
+    const auto next = wuwa_window::parse_bridge_state(payload);
+    if (!next) {
         spdlog::warn("[6DOF Window] Ignoring malformed CutsceneComfort bridge state");
         return;
     }
-
-    next.active = active != 0;
-    next.lock_aspect = lock_aspect != 0;
-
-    bool entering{};
-    {
-        std::scoped_lock lock{m_cutscene_comfort_mutex};
-        entering = next.active && !m_cutscene_comfort.active;
-        m_cutscene_comfort = next;
-    }
-
-    if (next.active && (entering || recenter != 0)) {
-        request_recenter();
-    }
+    m_presentation.apply(*next);
 }
 
-bool WindowMode::cutscene_comfort_active() const {
-    std::scoped_lock lock{m_cutscene_comfort_mutex};
-    return m_cutscene_comfort.active;
+void WindowMode::clear_cutscene_comfort_state() {
+    std::scoped_lock lock{m_presentation_mutex};
+    m_presentation.clear_transient();
+}
+
+void WindowMode::suspend_cutscene_comfort(bool suspended) {
+    std::scoped_lock lock{m_presentation_mutex};
+    m_presentation.suspend(suspended);
 }
 
 WindowMode::RenderSettings WindowMode::get_render_settings() const {
+    std::scoped_lock lock{m_presentation_mutex};
+    return get_render_settings_locked();
+}
+
+WindowMode::RenderSettings WindowMode::get_render_settings_locked() const {
     RenderSettings settings{};
     {
-        std::scoped_lock lock{m_cutscene_comfort_mutex};
-        if (m_cutscene_comfort.active) {
-            settings.lock_aspect = m_cutscene_comfort.lock_aspect;
-            settings.width = m_cutscene_comfort.width;
-            settings.height = m_cutscene_comfort.height;
-            settings.distance = m_cutscene_comfort.distance;
-            settings.feather = m_cutscene_comfort.feather;
-            settings.corner_radius = m_cutscene_comfort.corner_radius;
-            settings.curvature = m_cutscene_comfort.curvature;
-            settings.surround_color = m_cutscene_comfort.surround_color;
-            settings.opacity = m_cutscene_comfort.opacity;
+        const auto& bridge = m_presentation.bridge();
+        if (bridge.active) {
+            settings.lock_aspect = bridge.lock_aspect;
+            settings.width = bridge.width;
+            settings.height = bridge.height;
+            settings.distance = bridge.distance;
+            settings.feather = bridge.feather;
+            settings.corner_radius = bridge.corner_radius;
+            settings.curvature = bridge.curvature;
+            settings.surround_color = Vector3f{
+                bridge.surround_color[0], bridge.surround_color[1], bridge.surround_color[2]};
+            settings.opacity = bridge.opacity;
         } else {
             settings.lock_aspect = m_lock_aspect->value();
             settings.width = m_plane_width->value();
@@ -391,26 +406,31 @@ WindowMode::RenderSettings WindowMode::get_render_settings() const {
         }
     }
 
-    settings.width = std::clamp(settings.width, 0.1f, 12.0f);
+    using wuwa_window::finite_clamp;
+    settings.width = finite_clamp(settings.width, 0.1f, 12.0f, 2.4f);
     settings.height = settings.lock_aspect
         ? settings.width * 9.0f / 16.0f
-        : std::clamp(settings.height, 0.1f, 8.0f);
-    settings.distance = std::clamp(settings.distance, 0.25f, 12.0f);
-    settings.feather = std::clamp(settings.feather, 0.0f, 0.5f);
+        : finite_clamp(settings.height, 0.1f, 8.0f, 1.35f);
+    settings.distance = finite_clamp(settings.distance, 0.25f, 12.0f, 2.0f);
+    settings.feather = finite_clamp(settings.feather, 0.0f, 0.5f, 0.10f);
     settings.corner_radius = std::min(
-        std::clamp(settings.corner_radius, 0.0f, 2.0f),
+        finite_clamp(settings.corner_radius, 0.0f, 2.0f, 0.0f),
         std::min(settings.width, settings.height) * 0.5f);
-    settings.curvature = std::clamp(settings.curvature, 0.0f, 1.0f);
-    settings.surround_color = glm::clamp(settings.surround_color, Vector3f{0.0f}, Vector3f{1.0f});
-    settings.opacity = std::clamp(settings.opacity, 0.0f, 1.0f);
+    settings.curvature = finite_clamp(settings.curvature, 0.0f, 1.0f, 0.0f);
+    for (auto i = 0; i < 3; ++i) {
+        settings.surround_color[i] = finite_clamp(settings.surround_color[i], 0.0f, 1.0f, 0.0f);
+    }
+    settings.opacity = finite_clamp(settings.opacity, 0.0f, 1.0f, 1.0f);
     return settings;
 }
 
 WindowMode::Status WindowMode::get_status() const {
-    const auto settings = get_render_settings();
+    std::scoped_lock lock{m_presentation_mutex};
+    const auto settings = get_render_settings_locked();
+    const auto& anchor = m_presentation.selected();
     Status status{};
-    status.enabled = m_enabled->value() || cutscene_comfort_active();
-    status.recenter_pending = m_recenter_requested.load();
+    status.enabled = m_enabled->value() || m_presentation.bridge().active;
+    status.recenter_pending = anchor.recenter_pending;
     status.lock_aspect = settings.lock_aspect;
     status.width = settings.width;
     status.height = settings.height;
@@ -421,45 +441,23 @@ WindowMode::Status WindowMode::get_status() const {
     status.opacity = settings.opacity;
     status.surround_color = settings.surround_color;
 
-    std::scoped_lock lock{m_anchor_mutex};
-    status.anchor_valid = m_anchor_valid;
-    status.anchor_origin = m_anchor_origin;
-    status.anchor_center = m_anchor_origin - m_anchor_back * status.anchor_distance;
-    status.anchor_right = m_anchor_right;
-    status.anchor_up = m_anchor_up;
-    status.anchor_back = m_anchor_back;
+    status.anchor_valid = anchor.valid;
+    status.anchor_origin = anchor.pose.origin;
+    status.anchor_center = anchor.pose.origin - anchor.pose.back * status.anchor_distance;
+    status.anchor_right = anchor.pose.right;
+    status.anchor_up = anchor.pose.up;
+    status.anchor_back = anchor.pose.back;
     return status;
 }
 
-void WindowMode::invalidate_anchor() {
-    std::scoped_lock lock{m_anchor_mutex};
-    m_anchor_valid = false;
-    m_recenter_requested = true;
-}
-
 bool WindowMode::update_enabled_state() {
-    const bool enabled = m_enabled->value() || cutscene_comfort_active();
-    if (!enabled) {
-        if (m_was_enabled.exchange(false)) {
-            invalidate_anchor();
-        }
-        return false;
-    }
-
-    if (!m_was_enabled.exchange(true)) {
-        request_recenter();
-    }
-    return true;
+    std::scoped_lock lock{m_presentation_mutex};
+    return m_presentation.update_enabled(m_enabled->value());
 }
 
 bool WindowMode::build_constants(bool right_eye, Constants& constants) {
-    const auto settings = get_render_settings();
     constants = {};
     constants.eye_origin[3] = 1.0f;
-    constants.surround_color[0] = settings.surround_color.x;
-    constants.surround_color[1] = settings.surround_color.y;
-    constants.surround_color[2] = settings.surround_color.z;
-    constants.surround_color[3] = settings.opacity;
 
     const auto& vr = VR::get();
     if (vr == nullptr || !vr->is_hmd_active()) {
@@ -487,31 +485,32 @@ bool WindowMode::build_constants(bool right_eye, Constants& constants) {
     Vector3f anchor_right{};
     Vector3f anchor_up{};
     Vector3f anchor_back{};
+    RenderSettings settings{};
     {
-        std::scoped_lock lock{m_anchor_mutex};
-        // Consume the request even on the first valid frame. Leaving it set
-        // when m_anchor_valid is false makes the second eye recenter and log
-        // the same plane again because of boolean short-circuiting.
-        const bool recenter_requested = m_recenter_requested.exchange(false);
-        if (!m_anchor_valid || recenter_requested) {
-            m_anchor_right = glm::normalize(hmd_right);
-            m_anchor_up = glm::normalize(hmd_up);
-            m_anchor_back = glm::normalize(hmd_back);
-            m_anchor_origin = hmd_position;
-            m_anchor_valid = true;
-            const auto center = m_anchor_origin - m_anchor_back *
-                settings.distance;
+        std::scoped_lock lock{m_presentation_mutex};
+        if (!m_presentation.update_enabled(m_enabled->value())) return false;
+        settings = get_render_settings_locked();
+        const bool captured = m_presentation.capture(AnchorPose{
+            hmd_position, glm::normalize(hmd_right), glm::normalize(hmd_up), glm::normalize(hmd_back)});
+        const auto& pose = m_presentation.selected().pose;
+        if (captured) {
+            const auto center = pose.origin - pose.back * settings.distance;
             spdlog::info(
-                "[6DOF Window] Anchored room-space aperture origin ({:.3f}, {:.3f}, {:.3f}), center ({:.3f}, {:.3f}, {:.3f})",
-                m_anchor_origin.x, m_anchor_origin.y, m_anchor_origin.z,
+                "[6DOF Window] Anchored {} aperture origin ({:.3f}, {:.3f}, {:.3f}), center ({:.3f}, {:.3f}, {:.3f})",
+                m_presentation.bridge().active ? "transient cutscene" : "room-space",
+                pose.origin.x, pose.origin.y, pose.origin.z,
                 center.x, center.y, center.z);
         }
 
-        anchor_origin = m_anchor_origin;
-        anchor_right = m_anchor_right;
-        anchor_up = m_anchor_up;
-        anchor_back = m_anchor_back;
+        anchor_origin = pose.origin;
+        anchor_right = pose.right;
+        anchor_up = pose.up;
+        anchor_back = pose.back;
     }
+    constants.surround_color[0] = settings.surround_color.x;
+    constants.surround_color[1] = settings.surround_color.y;
+    constants.surround_color[2] = settings.surround_color.z;
+    constants.surround_color[3] = settings.opacity;
 
     const float width = settings.width;
     const float height = settings.height;

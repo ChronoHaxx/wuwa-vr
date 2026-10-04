@@ -3,6 +3,7 @@
 #include "WuWaViewUbTrace.hpp"
 #include <algorithm>
 #include <array>
+#include <type_traits>
 #include <atomic>
 #include <cstdint>
 #include <limits>
@@ -162,7 +163,10 @@ template<class Read> Record snapshot(const Registers& c,uint32_t frame_offset,
 }
 template<size_t Capacity=capacity> class Ring {
     struct Slot {Record record{};std::atomic<bool> ready{};};
-    std::array<Slot,Capacity> slots{};std::atomic<size_t> next{};size_t drained{};
+    // Slot\'s member initializers initialize every field. Avoid MSVC expanding
+    // thousands of nested aggregate initializers at compile time.
+    static_assert(!std::is_trivially_default_constructible_v<Slot>);
+    std::array<Slot,Capacity> slots;std::atomic<size_t> next{};size_t drained{};
     std::atomic<bool> overflow{};
 public:
     bool append(const Record& r) noexcept {

@@ -1,5 +1,5 @@
 -- Live layout controls for the existing UEVR camera and extracted LGUI quad.
--- No gameplay button remapping, Unreal object lookup, or render-path changes.
+-- No gameplay button remapping. HUD aspect refresh uses guarded LGUI reflection.
 local vr = uevr.params.vr
 local log = uevr.params.functions
 local layout_file = "WuWaVR-layouts.json"
@@ -21,7 +21,7 @@ local groups = {
     },
     rendering = {
         {"WindowMode_Enabled", "6DoF portal window (optional)"},
-        {"VR_NativeStereoFix", "Native Stereo Fix (experimental on SteamVR)"},
+        {"VR_NativeStereoFix", "Native Stereo Fix (required for accepted material fixes)"},
     },
     hud = {
         {"UI_X_Offset", "HUD right / left (m)", -10, 10, 0.01},
@@ -197,6 +197,190 @@ local function use_layout(name)
     apply_layout(name, layouts[name])
 end
 
+-- Temporary menu comfort is deliberately opt-in for this Lua session. The
+-- native flag is an expiring LGUI-render observation, NOT a cinematic signal.
+-- Keep this ownership separate from explicit panel edits/bookmark undo.
+local menu_layout_enabled, menu_visibility_enabled = false, false
+local menu_owned, menu_releasing = nil, false
+local menu_wait_clear, menu_clear_time = false, 0
+local menu_status = "Off / 关闭"
+
+local function status_bool(key)
+    local ok, value = pcall(function() return vr:get_mod_value(key) end)
+    if not ok then return nil end
+    if value == "true" or value == "1" then return true end
+    if value == "false" or value == "0" then return false end
+    return nil
+end
+
+-- Companion module is inert until a manual request or an observed 2D transition.
+local hud_refresh = {status = "HUD refresh module unavailable / HUD 刷新模块不可用"}
+function hud_refresh:request() end
+function hud_refresh:tick() end
+function hud_refresh:reset() end
+local hud_ok, hud_module = pcall(require, "wuwa_hud_refresh")
+if hud_ok and type(hud_module) == "table" and type(hud_module.new) == "function" then
+    local ready, instance = pcall(hud_module.new, {api = uevr.api, types = uevr.types,
+        clock = function()
+            local ok, value = pcall(function() return vr:get_mod_value("WuWaControls_Clock") end)
+            return ok and tonumber(value) or nil
+        end})
+    if ready then hud_refresh = instance end
+end
+
+local published_hud_status
+local function publish_hud_status()
+    local status = hud_refresh.status
+    if type(status) ~= "string" or status == published_hud_status then return end
+    local bounded = status
+    if #bounded > 240 then
+        local boundary = utf8.offset(bounded, 0, 241)
+        bounded = bounded:sub(1, (boundary or 241) - 1) .. "..."
+    end
+    -- Older backends do not expose this transient status key.
+    local ok, current = pcall(function() return vr:get_mod_value("WuWaControls_HudAspectStatus") end)
+    if not ok or type(current) ~= "string" or current == "" then return end
+    local written = pcall(function() vr.set_mod_value("WuWaControls_HudAspectStatus", bounded) end)
+    if written then published_hud_status = status end
+end
+
+local function menu_release(reason)
+    menu_status = reason
+    if not menu_owned then menu_releasing = false; return true end
+    menu_releasing = true
+    local remaining = false
+    for key, owned in pairs(menu_owned) do
+        local current = read(key)
+        if current == nil then
+            remaining = true -- An unavailable read is not proof we lost ownership.
+        elseif not equal(current, owned.applied) then
+            menu_owned[key] = nil -- Keep changes made by the user/another feature.
+        elseif write(key, owned.before) then
+            menu_owned[key] = nil
+        else
+            remaining = true -- Retry a failed restore on the next engine tick.
+        end
+    end
+    if not remaining then menu_owned = nil; menu_releasing = false end
+    if remaining then menu_status = "Restore pending; keep this script loaded / 等待恢复，请保留此脚本" end
+    return not remaining
+end
+
+local function menu_enter()
+    local desired, keys = {}, {}
+    if menu_layout_enabled and valid_layout(layouts.Menu) then
+        for _, spec in ipairs(groups.hud) do
+            keys[#keys + 1] = spec[1]
+            desired[spec[1]] = layouts.Menu[spec[1]]
+        end
+    end
+    if menu_visibility_enabled then
+        keys[#keys + 1] = "VR_EnableGUI"
+        desired.VR_EnableGUI = true
+    end
+    if #keys == 0 then
+        menu_status = "Save a Menu HUD first / 请先保存菜单 HUD 布局"
+        menu_wait_clear = true
+        return
+    end
+    -- Read the whole transaction before its first write.
+    local before = {}
+    for _, key in ipairs(keys) do
+        before[key] = read(key)
+        if before[key] == nil then
+            menu_status = "HUD setting unavailable; unchanged / HUD 设置不可用，未修改"
+            menu_wait_clear = true
+            return
+        end
+    end
+    menu_owned = {}
+    for _, key in ipairs(keys) do
+        if not equal(before[key], desired[key]) then
+            -- Track the attempted write as well: a failed read-back can still
+            -- mean the backend accepted the value and needs restoration.
+            menu_owned[key] = {before = before[key], applied = desired[key]}
+            if not write(key, desired[key]) then
+                local actual = read(key)
+                if actual ~= nil then menu_owned[key].applied = actual end
+                menu_wait_clear = true
+                menu_release("Menu HUD apply failed; previous values restored / 应用失败，已尝试恢复")
+                return
+            end
+        end
+    end
+    menu_status = "Temporary menu HUD active / 临时菜单 HUD 已开启"
+    if menu_layout_enabled and not valid_layout(layouts.Menu) then
+        menu_status = "Temporary visibility only; save Menu HUD for placement / 仅临时显示界面，请保存菜单布局"
+    end
+end
+
+local function menu_tick(delta)
+    if menu_releasing then
+        menu_release("Previous HUD restored / 已恢复之前的 HUD")
+        return
+    end
+    if not menu_layout_enabled and not menu_visibility_enabled then
+        menu_release("Off / 关闭")
+        menu_wait_clear, menu_clear_time = false, 0
+        return
+    end
+    local detected = status_bool("WuWaControls_NativeMenu")
+    if detected == nil then
+        menu_wait_clear, menu_clear_time = true, 0
+        menu_release("Native menu signal unavailable; suspended / 菜单信号不可用，已暂停")
+        return
+    end
+    -- The renderer already expires observations after 250 ms. Require another
+    -- 200 ms of known false before leaving/rearming, avoiding a one-tick flicker.
+    if not detected then
+        delta = type(delta) == "number" and delta == delta and math.max(0, math.min(delta, 0.25)) or 0
+        menu_clear_time = menu_clear_time + delta
+        if menu_clear_time >= 0.2 then
+            menu_release("Ready for the next native menu / 等待下次游戏菜单")
+            menu_wait_clear = false
+        end
+        return
+    end
+    menu_clear_time = 0
+    local ui_ok, drawing_ui = pcall(log.is_drawing_ui)
+    if status_bool("WuWaControls_Focused") ~= true or
+        status_bool("WuWaControls_AdjustMode") ~= false or not ui_ok or drawing_ui ~= false then
+        menu_wait_clear = true
+        menu_release("Paused for focus or manual adjustment; reopen the game menu / 焦点或手动调整期间暂停，请重新打开游戏菜单")
+        return
+    end
+    if menu_wait_clear then return end
+    if menu_owned then
+        for key, owned in pairs(menu_owned) do
+            if not equal(read(key), owned.applied) then
+                menu_wait_clear = true
+                menu_release("Manual HUD edit kept; reopen the game menu to resume / 已保留手动修改，重新打开游戏菜单后继续")
+                return
+            end
+        end
+    else
+        menu_enter()
+    end
+end
+
+uevr.sdk.callbacks.on_pre_engine_tick(function(_, delta)
+    -- The native recovery button only posts a transient request; UObject work
+    -- stays on this game-thread callback and never runs from the render UI.
+    if status_bool("WuWaControls_ResetHudAspect") == true then
+        local cleared = pcall(function() vr.set_mod_value("WuWaControls_ResetHudAspect", "false") end)
+        if cleared and status_bool("WuWaControls_ResetHudAspect") == false then hud_refresh:request()
+        else hud_refresh.status = "HUD request could not be acknowledged / 无法确认 HUD 刷新请求" end
+    end
+    hud_refresh:tick(status_bool("VR_2DScreenMode"), delta)
+    publish_hud_status()
+    local ok, err = pcall(menu_tick, delta)
+    if not ok then
+        menu_wait_clear = true
+        menu_release("Temporary menu HUD paused after an error / 临时菜单 HUD 出错后暂停")
+        report("Temporary menu HUD: " .. tostring(err):sub(1, 160), true)
+    end
+end)
+
 local function centered_preset(name, height, distance)
     -- OpenXR's UI_Size is quad HEIGHT; width follows the UI texture aspect.
     -- Preserve the chosen head-follow policy, rather than anchoring implicitly.
@@ -305,11 +489,15 @@ local function draw_group(name)
 end
 
 uevr.sdk.callbacks.on_draw_ui(function()
+    if menu_owned then
+        menu_wait_clear = true
+        menu_release("Manual controls opened; reopen the game menu to resume / 已打开手动控制，请重新打开游戏菜单")
+    end
     imgui.text("WuWa VR comfort controls")
     imgui.text("Changes apply live. UEVR saves current settings on exit.")
     draw_group("rendering")
     imgui.text("These are live switches. Replacing a backend DLL still needs a restart.")
-    imgui.text("NSF off avoids the observed SteamVR stutter; recheck eyes, shadows and menus.")
+    imgui.text("Keep Native Stereo Fix on for materials. The supplied timing fix uses r.OneFrameThreadLag=0.")
     draw_group("input")
     imgui.text("For a physical gamepad, turn motion input off. Head tracking stays on.")
     draw_group("visibility")
@@ -356,7 +544,22 @@ uevr.sdk.callbacks.on_draw_ui(function()
             if imgui.button("Save " .. name .. " HUD") then save_layout(name) end
             if imgui.button("Use " .. name .. " HUD") then use_layout(name) end
         end
+        imgui.text("Temporary menu comfort (opt-in, this Lua session) / 临时菜单舒适设置（仅本次运行）")
+        changed, value = imgui.checkbox("Use saved Menu HUD temporarily / 临时使用已保存的菜单 HUD", menu_layout_enabled)
+        if changed then menu_layout_enabled = value; menu_wait_clear = true; menu_clear_time = 0 end
+        changed, value = imgui.checkbox("Temporarily show hidden UI in game menus / 游戏菜单中临时显示隐藏的界面", menu_visibility_enabled)
+        if changed then menu_visibility_enabled = value; menu_wait_clear = true; menu_clear_time = 0 end
+        imgui.text("Close UEVR, then reopen the game menu. Saved Menu placement is optional; no preset is guessed.")
+        imgui.text("关闭 UEVR 后重新打开游戏菜单。菜单位置使用已保存的布局，不会自动创建预设。")
+        imgui.text("Restores owned HUD values on exit. Manual edits take priority. No camera, portal or rendering changes.")
+        imgui.text("退出后恢复仍由此功能控制的 HUD 设置，保留手动修改。不改变相机、空间窗口或渲染。")
+        imgui.text("Native-menu detection can miss menus; this does not detect cutscenes or guarantee subtitles.")
+        imgui.text("游戏菜单检测可能遗漏；此功能不检测过场，也不能保证字幕显示。")
+        imgui.text("Menu comfort / 菜单舒适设置: " .. menu_status)
     end
+    if imgui.button("Reset HUD aspect / 重置 HUD 比例") then hud_refresh:request() end
+    imgui.text(hud_refresh.status)
+    imgui.text("Refreshes the current HUD without opening Esc or changing its size/distance. / 不打开 Esc，不改变 HUD 大小或距离。")
     if imgui.button("Recenter view and HUD") then
         local ok = pcall(vr.recenter_view)
         report(ok and "View recentered." or "Recenter unavailable.", not ok)
@@ -369,6 +572,9 @@ uevr.sdk.callbacks.on_draw_ui(function()
 end)
 
 uevr.sdk.callbacks.on_script_reset(function()
+    hud_refresh:reset()
+    menu_layout_enabled, menu_visibility_enabled, menu_wait_clear = false, false, true
+    menu_release("Script reset; previous HUD restored / 脚本重置，已尝试恢复之前的 HUD")
     -- Never strand the user with all game menus hidden after unloading this
     -- script. Restore only visibility still owned by this panel.
     if last_written.VR_EnableGUI == false and read("VR_EnableGUI") == false then

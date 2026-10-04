@@ -97,6 +97,15 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
     }
 
     if (wuwa_test::is_wuwa()) wuwa_clv::tick(VR::get()->get_wuwa_controls().refill_far_lighting());
+    if (wuwa_test::is_wuwa()) {
+        const auto vr = VR::get();
+        const auto runtime = vr->get_runtime();
+        const bool eligible = runtime != nullptr && runtime->ready() && vr->is_hmd_active() &&
+            !vr->is_using_afr() && !vr->is_stereo_emulation_enabled() && !vr->is_using_2d_screen();
+        const bool conflict = wuwa_test::console_lease.var != nullptr || wuwa_test::graphics_lease.spec != nullptr ||
+            wuwa_projection_test::lease.status(GetTickCount64()).active;
+        wuwa_rim::tick(vr->get_wuwa_controls().suppress_npc_rim(), eligible, conflict);
+    }
 
     wuwa_test::process_test_request(Framework::get_persistent_dir(), [this](const wchar_t* name) {
         return std::any_of(m_all_cvars.begin(), m_all_cvars.end(), [name](const auto& cvar) {
@@ -140,9 +149,10 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "VR_WuWaFocusedMotionInput", "VR_ControllersAllowed", "VR_FocusOnGamepadReconnect",
                 "VR_WuWaLguiRedirect", "VR_WuWaLguiMenuRedirect", "VR_WuWaNativeFrameTiming", "VR_WuWaWorldLabelsStereo",
                 "VR_WuWaPlanarEyeParameters", "VR_WuWaStereoTranslucency",
-                "VR_WuWaHideKuroReflections", "VR_WuWaStereoBasePose",
+                "VR_WuWaHideKuroReflections", "VR_WuWaStereoBasePose", "WuWaStereo_SuppressNpcRim",
                 "VR_RenderingMethod", "VR_ExtremeCompatibilityMode",
-                "VR_NativeStereoFix", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
+                "VR_NativeStereoFix", "VR_HorizontalProjectionOverride", "VR_VerticalProjectionOverride",
+                "VR_GrowRectangleForProjectionCropping", "VR_2DScreenMode", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
                 "UI_Distance", "UI_Size", "UI_FollowView", "WuWaControls_Enabled",
                 "WuWaControls_MouseAssist", "WuWaControls_AutoMouseMenus", "WuWaControls_AdjustMode", "WuWaControls_WarnHiddenUI",
                 "WuWaControls_CameraMode", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
@@ -158,6 +168,16 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
             if (const auto value = VR::get()->get_value(name)) options[name] = value->get();
         }
         return options;
+    }, [] {
+        const auto vr = VR::get();
+        const auto runtime = vr->get_runtime();
+        return wuwa_projection_test::Base{
+            vr->get_horizontal_projection_override(), vr->get_vertical_projection_override(),
+            vr->should_grow_rectangle_for_projection_cropping(), vr->is_using_2d_screen(),
+            runtime != nullptr && runtime->is_openxr(),
+            !vr->is_using_afr() && !vr->is_stereo_emulation_enabled(),
+            runtime != nullptr && runtime->ready(), vr->is_native_stereo_fix_enabled(),
+            reinterpret_cast<uintptr_t>(runtime)};
     });
 }
 
@@ -236,6 +256,7 @@ void CVarManager::on_frame() {
 
 void CVarManager::on_config_load(const utility::Config& cfg, bool set_defaults) {
     ZoneScopedN(__FUNCTION__);
+    wuwa_projection_test::lease.reset();
 
     for (auto& cvar : m_all_cvars) {
         cvar->load(set_defaults);

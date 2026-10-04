@@ -1,6 +1,7 @@
 #pragma once
 #include "WuWaEyeDiff.hpp"
 #include <array>
+#include <type_traits>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -167,7 +168,10 @@ public:
     }
     bool truncated() const noexcept { return overflow.load(std::memory_order_relaxed); }
 private:
-    std::array<Slot, Capacity> slots{};
+    // Slot\'s member initializers initialize every field. Avoid MSVC expanding
+    // thousands of nested aggregate initializers at compile time.
+    static_assert(!std::is_trivially_default_constructible_v<Slot>);
+    std::array<Slot, Capacity> slots;
     std::atomic<size_t> next{};
     size_t drained{};
     std::atomic<bool> overflow{};

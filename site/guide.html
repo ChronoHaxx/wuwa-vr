@@ -1,120 +1,90 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Visual Xbox controls, setup, comfort and recovery for WuWa VR."><meta name="theme-color" content="#17191c"><title>Player guide — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><aside class="notice"><strong>1 Oct update:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">Beta for game 3.7 · 1 Oct 18:17 BST</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Far trees, props and far lighting now match between the eyes, and the Resonators and team-screen reflections are back in place. Weapon and Echo submenu reflections are deferred.</aside><h1>Player guide</h1><p>Setup for the portable beta, illustrated controls and ways to recover when a setting feels wrong. <a href="languages.html">Getting started in 10 languages</a>.</p><button class="print-button" id="print-guide" type="button" hidden>Print / save this guide</button><div class="guide-grid"><nav class="toc" aria-label="Guide chapters"><a href="#start">Setup</a><a href="#visual-controls">Controller images</a><a href="#controls">All Xbox shortcuts</a><a href="#comfort">HUD and camera comfort</a><a href="#recovery">Problems and recovery</a><a href="#packaging">Portable launcher</a></nav><div class="guide-content"><section id="start"><h2>Setup</h2><p><strong>Account risk:</strong> this unofficial injector may be detected or blocked by
-anti-cheat, and account restrictions or a ban are possible. Use at your own
-risk; there is no publisher approval or account-safety guarantee.
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Visual Xbox controls, setup, comfort and recovery for WuWa VR."><meta name="theme-color" content="#17191c"><title>Player guide — WuWa VR</title><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script></head><body><a class="skip" href="#main">Skip to content</a><header class="header wrap"><a class="wordmark" href="index.html" lang="en" dir="ltr">WuWa VR</a><nav aria-label="Guide"><a href="guide.html">Guide</a><a href="feedback.html">Feedback</a><a href="credits.html">Credits</a><a href="languages.html">Languages</a></nav></header><main class="wrap" id="main"><aside class="notice" data-launcher-release><strong>4 October beta:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher">WuWa VR 1.0.0 · game 3.7</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Windows installer and app updates; optional NPC rim workaround starts off.</aside><h1>Player guide</h1><p>Setup and updates for the installed desktop app. <a href="l/zh-Hans.html">简体中文安装指南</a>. The portable browser launcher remains an advanced fallback.</p><button class="print-button" id="print-guide" type="button" hidden>Print / save this guide</button><div class="guide-grid"><nav class="toc" aria-label="Guide chapters"><a href="#start">Setup</a><a href="#visual-controls">Controller images</a><a href="#controls">All Xbox shortcuts</a><a href="#comfort">HUD and camera comfort</a><a href="#recovery">Problems and recovery</a><a href="#packaging">Portable launcher</a></nav><div class="guide-content"><section id="start"><h2>Install, launch and update</h2><p><strong>Beta for game 3.7 · desktop app 1.0.0.</strong>
+<a href="https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-04-launcher/WuWa-VR-Setup.exe">Download WuWa-VR-Setup.exe</a>
+and run it to install <strong>WuWa VR</strong> for your Windows user. Open <strong>WuWa VR</strong> from
+the Start menu. The small installer does not bundle the VR mod: the first
+<strong>Install VR</strong> needs internet to download about <strong>54 MB</strong>. No separate Python
+installation is needed.
+<a href="https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html">简体中文安装与更新指南</a>.</p>
+<p>You need your own copy of Wuthering Waves, a Windows PC, a PC VR headset/runtime
+and an Xbox/XInput controller connected to the PC. The simulator is an optional
+way to inspect the view without a headset; it does not demonstrate headset behaviour.</p>
+<p><strong>Account risk:</strong> this unofficial mod injects into the game. Anti-cheat may
+restrict or ban an account. It is not approved by Kuro Games.
 <a href="risk.html">Read the risk notice</a> before launching.</p>
-<p><a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">Download the beta ZIP</a> (asset <strong>WuWa-VR-Launcher.zip</strong>), extract it, and open
-<strong>WuWa VR Launcher.exe</strong>. Keep the <code>app</code> and <code>python</code> folders beside it.
-You need your own game, a Windows PC VR headset/runtime, and an Xbox/XInput
-controller connected to the PC. No separate Python installation is needed.</p>
-<h3>Which build?</h3>
-<p>The beta contains one build for <strong>game version 3.7</strong>: <strong>3.7 + reflection + far lighting fix v2 · 1 Oct 18:17 BST</strong>,
-tested by the owner. It ports the HUD, menus, ultimate-camera fix, Same Pass and the Resonators reflection fix to 3.7,
-and makes far trees, props and far lighting match between the eyes. Its profile starts with
-<strong>Native Stereo Fix and Same Pass on</strong>; the fixes depend on them.
-Your saved settings are retained; use <strong>Reset this build</strong> for supplied defaults.</p>
-<p>Earlier packages (<a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/experimental-2026-09-28-1628">28 Sep experimental</a>,
-<a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-09-26-230213">26 Sep beta</a>) were made for the previous game version.</p>
 <h3>Install and launch</h3>
 <ol>
-<li>Extract the whole ZIP to a simple path such as <code>C:/Games/WuWa VR</code>.</li>
-<li>Start your headset software, then open <strong>WuWa VR Launcher.exe</strong>.</li>
-<li>Read the risk notice, choose how you start the game, and click <strong>Apply &amp; launch</strong>.</li>
-<li>Accept Windows&#39; prompt, then press <strong>Play</strong> in the game launcher.</li>
-<li>In game, <strong>L3 + R3</strong> (or Insert) opens UEVR settings. Custom options are under
+<li><strong>01 · Game.</strong> Check the detected official game launcher, or choose its location.</li>
+<li><strong>02 · Install VR.</strong> Read and accept the account-risk notice, then install the
+selected VR version. Existing settings and backups are kept.</li>
+<li><strong>03 · Headset or simulator.</strong> Start your headset software and check the
+displayed runtime, or deliberately choose the simulator. Select <strong>Launch in VR</strong>,
+accept the Windows permission prompt, then press <strong>Play</strong> in the official
+game launcher.</li>
+</ol>
+<p>The installer is unsigned, so Windows may warn. Download from this project&#39;s
+GitHub Releases and compare the published checksum if unsure. Do not disable
+antivirus, SmartScreen or anti-cheat. Game injection asks for Windows permission
+separately from installing the app for your user.</p>
+<p>The standalone official launcher is the tested route. Steam/Epic game injection
+and installation on a fresh PC remain unverified. SteamVR headset support does
+not establish support for the Steam-store game version.</p>
+<p>Choosing a simulator or restoring the headset runtime changes the system OpenXR
+runtime and may ask for Windows permission. Close the game and injector first.
+Opening or updating the app does not automatically select the simulator.</p>
+<h3>Updates</h3>
+<ul>
+<li>Open <strong>02 → Versions &amp; updates → Check updates</strong>.</li>
+<li><strong>Desktop app:</strong> when an update is offered, choose
+<strong>Update launcher</strong>. Close the game and stop recording first; the app updates
+only while idle and restarts afterward.</li>
+<li><strong>VR package:</strong> use the version/update controls in <strong>step 02</strong>, select the newer
+beta and install it. Older installed VR versions remain available for rollback.</li>
+</ul>
+<p>Updating keeps settings, backups, logs and recordings. The manager uses
+<code>%LOCALAPPDATA%\WuWa VR Manager</code>; the existing launcher data stays in
+<code>%LOCALAPPDATA%\WuWa VR Launcher</code>. Do not delete these folders to update.</p>
+<h3>What this beta changes</h3>
+<p>This release uses backend <strong>npc-rim-20261004</strong>. The owner reports that 2D-screen
+brightness and the ultimate camera are corrected. The new NPC rim option still
+needs physical-headset checking.</p>
+<p><strong>VR → WuWa Controls → Suppress mismatched NPC rim lighting</strong> starts <strong>off</strong>.
+It suppresses the toon-rim effect that produced extra bright contours in the
+tested NPC scene. It also removes that intended effect from nearby characters
+that use it. Turning it off restores the prior value if the workaround still
+owns it. The underlying stereo rendering fault is unresolved; this is a
+workaround, not a claim that every NPC or scene is fixed.</p>
+<p>Weapon/Echo submenu reflections and full-animation first-person aiming remain
+open. Keep <strong>Native Stereo</strong>, <strong>Native Stereo Fix</strong> and <strong>Same Pass</strong> on for this
+build&#39;s stereo fixes.</p>
+<h3>First-minute controls and recovery</h3>
+<ul>
+<li><strong>L3 + R3</strong> or Insert opens UEVR settings; custom options are under
 <strong>VR → WuWa Controls</strong>. Close settings before using gameplay shortcuts.</li>
-</ol><ol class="visual-steps"><li><figure><a href="media/launcher-step-1-risk.png" aria-label="Open launcher step 1 at full size"><img src="media/launcher-step-1-risk.png" width="588" height="242" loading="lazy" alt="Launcher step 1, Account risk: the risk notice and a ticked box, I have read the account-risk notice and accept the risk."></a><figcaption>Open <strong>WuWa VR Launcher.exe</strong> from the extracted folder. Read the account-risk notice and tick the box.</figcaption></figure></li><li><figure><a href="media/launcher-step-2-build.png" aria-label="Open launcher step 2 at full size"><img src="media/launcher-step-2-build.png" width="588" height="508" loading="lazy" alt="Earlier launcher example, Choose a build: Camera + acro checkpoint, 24 Sep 22:37 BST, above the Camera binding candidate, 25 Sep 22:49 BST. The current download contains one newer build with its own known-issues note."></a><figcaption>The current download contains one build, for game version 3.7. This earlier screenshot illustrates the build selector.</figcaption></figure></li><li><figure><a href="media/launcher-step-3-game.png" aria-label="Open launcher step 3 at full size"><img src="media/launcher-step-3-game.png" width="588" height="444" loading="lazy" alt="Launcher step 3, How do you start the game: the official launcher is selected; manual Steam/Epic startup is marked experimental, with injection limitations explained."></a><figcaption>Use the standalone official launcher for the previously working route. Steam/Epic startup is experimental: Steam injection previously failed and has not been retested; Epic is untested. The 23:02 package reached gameplay via the standalone launcher on the owner’s PC.</figcaption></figure></li><li><figure><a href="media/launcher-step-4-start.png" aria-label="Open launcher step 4 at full size"><img src="media/launcher-step-4-start.png" width="588" height="325" loading="lazy" alt="Launcher step 4, Start: Apply and launch, Check readiness and Apply without launching buttons, a note about the Windows permission prompt and a Ready message."></a><figcaption>Start your headset software, then <strong>Apply &amp; launch</strong>. Accept the Windows permission prompt and press Play.</figcaption></figure></li></ol><p class="small">Actual renders of the launcher page from the private test package, 25 September 2026, in a sample state. It runs only on your PC; your paths and status will differ.</p>
-<p>The EXE is unsigned; Windows may warn. Download from this project&#39;s GitHub
-Releases and check the published hash if unsure. Do not disable antivirus or
-anti-cheat. Injection needs elevation to match the game.</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Game installation</th>
-<th>Evidence</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Standalone official launcher</td>
-<td>The 23:02 package reached gameplay on the owner&#39;s PC</td>
-</tr>
-<tr>
-<td>Steam game version</td>
-<td>An earlier injection attempt failed; current fixes not retested</td>
-</tr>
-<tr>
-<td>Epic game version</td>
-<td>Untested</td>
-</tr>
-</tbody></table></div>
-<p>SteamVR / Steam Link headset support does not establish Steam-store injection.
-The full latest-build headset check and a clean-PC test remain pending.</p>
-<p><strong>Simulator or headset:</strong> use the two buttons at the top of the launcher with
-WuWa and the injector closed. This changes OpenXR globally, asks for Windows
-permission, and applies next launch. <strong>Use headset</strong> restores the previously
-saved runtime. Opening the launcher itself does not change it.</p>
-<p>The launcher changes your UEVR profile, not game files. Backups are in the
-launcher&#39;s data folder under <code>snapshots</code>.</p>
-<h3>First-minute recovery</h3>
-<p>The candidate&#39;s supplied profile starts with game UI, Xbox shortcuts, Xbox
-mouse shortcuts and the shortcut sheet enabled. The 22:37 build keeps the
-settings it was saved with: game UI and sheet on, Xbox mouse shortcuts off.
-Both start in the game camera; experimental collision is off.</p>
-<ul>
-<li><strong>L3 + B</strong> shows the game UI. A blurred menu with no buttons can simply mean
-the UI is hidden. The candidate also has <strong>Show game UI now</strong> in WuWa Controls.</li>
-<li>Enable <strong>Xbox mouse shortcuts</strong> in WuWa Controls before using mouse/HUD
-adjustment. Leave <strong>Physical gamepad passthrough</strong> off to use the mod&#39;s
-shortcuts; passthrough deliberately bypasses them.</li>
-<li>The linked <strong>26 Sep public beta</strong> supplies <strong>Native Stereo Fix → Enabled</strong>
-off. Newer candidates enable it with a timing correction; use their package
-guide rather than turning it off. <strong>Native Stereo</strong> is a separate rendering
-method setting.</li>
-<li>Start in the ordinary game camera, with the portal and freecam off. Press
-<strong>L3 + A</strong> while sitting comfortably to recenter. Increase HUD size separately
-from world scale.</li>
+<li><strong>L3 + B</strong> shows or hides the game UI. A blurred menu with no buttons can mean
+the UI is hidden. <strong>Show game UI now</strong> is also available in WuWa Controls.</li>
+<li><strong>L3 + A</strong> recenters. <strong>L3 + Menu</strong> shows the shortcut sheet.</li>
+<li>For a squashed HUD after leaving 2D mode, use <strong>Reset HUD aspect</strong> in WuWa Controls.</li>
 </ul>
-<h3>Make it comfortable</h3>
-<p><strong>VR → WuWa Controls</strong> holds the Xbox shortcuts, camera and HUD controls, with
-<strong>Optional experiments and diagnostics</strong> last in the candidate.
-<strong>WindowMode → 6DOF Window</strong> controls the portal.
-<strong>LuaLoader → Script UI → WuWa VR comfort controls</strong> contains extra camera/HUD
-bookmarks and resets.</p>
-<p>For a personal HUD, choose follow-view and adjust panel size and distance
-together. For a portal, enable <strong>Attach HUD to window</strong> and adjust coverage.
-For a stationary panel, turn follow-view off and recenter where you want it.
-The sheet&#39;s feet position uses the recentered tracking origin, not the game
-character&#39;s feet. See <a href="guide.html#comfort">comfort settings</a>.</p>
-<h3>Switch, undo or remove</h3>
-<p>UEVR saves its normal settings when the game exits normally. Close the game
-before switching builds; the launcher refuses while it is running.</p>
-<ul>
-<li><strong>Reset this build</strong> (under Recovery on the launcher page) replaces that
-build&#39;s settings with the ones it was supplied with, after a backup.</li>
-<li><strong>Restore my settings from before WuWa VR</strong> returns your UEVR profile and
-injector choice to how they were before the launcher first changed them. The
-mod&#39;s settings stay in a backup, so applying the build later brings them back.</li>
-<li><strong>To remove everything:</strong> if the simulator is active, use <strong>Use headset</strong>
-first and confirm the displayed runtime no longer points to this package.
-Then restore your settings, choose <strong>Stop launcher</strong>, and delete the WuWa VR
-folder. Delete <code>%LOCALAPPDATA%\WuWa VR Launcher</code> too if
-you no longer need its backups and logs. UEVR&#39;s own log files in its profile
-folder are left for you to inspect or delete.</li>
-<li><strong>Check package files</strong> on the page, or <code>Verify-Package.ps1</code> in the folder,
-confirms that no packaged file is missing or changed.</li>
-</ul>
-<p>Restore checks the backup&#39;s recorded file hashes before changing your active
-settings. If files are missing or changed, it stops and keeps your current
-settings. Backups from older packages without a recorded file inventory are
-kept for manual recovery; they cannot be verified automatically. Keep those
-backups rather than deleting them or treating their presence as proof that
-recovery succeeded.</p>
-<p>In the development workspace, <strong>Start WuWa VR Launcher.cmd</strong> opens the fuller
-diagnostic dashboard instead. It needs Python 3.10+ and is not the player
-package. A private recovery archive is a verified copy of one checkpoint, not
-an installer.</p>
-<p>If something fails, use <a href="guide.html#recovery">troubleshooting</a>. For the next
-candidate, <a href="testing.html#next-test">one short sequence</a> covers the important changes
-without repeated timed tests.</p>
+<p>See the <a href="guide.html#controls">controller guide</a>, <a href="guide.html#comfort">comfort settings</a> and
+<a href="guide.html#recovery">recovery reference</a>. The older browser-launcher instructions
+in that reference apply to the portable fallback.</p>
+<h3>Rollback, repair and removal</h3>
+<p>Close the game, injector and recorder before switching or repairing VR packages.
+Use step 02 to choose an installed older version; repair creates a fresh verified
+copy. Personal settings and recordings are not replaced with package defaults.</p>
+<p>Before removing the app, restore the headset runtime if you selected the bundled
+simulator, and use <strong>Restore my settings from before WuWa VR</strong> in recovery if you
+want to undo the profile changes. Then uninstall <strong>WuWa VR</strong> through Windows.
+Keep the data folders if you want to retain recordings, backups and settings.</p>
+<h3>Portable fallback</h3>
+<p><a href="https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-04-launcher/WuWa-VR-Launcher.zip">WuWa-VR-Launcher.zip</a>
+is an advanced fallback. Extract the whole archive, keep <code>app</code> and <code>python</code>
+together, and open <strong>WuWa VR Launcher.exe</strong>. It uses the older browser interface;
+it does not install or self-update the desktop app. Choose <strong>Apply &amp; launch</strong>,
+accept Windows permission, then press <strong>Play</strong> in the official game launcher.</p>
+<p>The <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">previous 1 October beta</a>
+remains available. <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher">Release notes and checksums</a>
+identify each download. Versions for older game releases may be incompatible.</p>
 </section><section id="visual-controls"><h2>Controller guide</h2><p>Actual renders of the supplied in-VR shortcut sheet, not game screenshots. The new HUD toggle is a candidate awaiting headset checks. Open an image at full size or use the searchable text below.</p><figure><h3>Everyday shortcuts</h3><a href="media/shortcuts-everyday.png" aria-label="Open everyday shortcuts at full size"><img src="media/shortcuts-everyday.png" width="1600" height="900" loading="lazy" alt="Everyday shortcuts. L3 + R3 opens settings; L3 + B shows or hides the game UI; L3 + A recenters; L3 + Menu toggles this sheet."></a><figcaption>L3 + R3 opens settings; L3 + B shows or hides the game UI; L3 + A recenters; L3 + Menu toggles this sheet.</figcaption></figure><figure><h3>Camera controls</h3><a href="media/shortcuts-camera.png" aria-label="Open camera controls at full size"><img src="media/shortcuts-camera.png" width="1600" height="900" loading="lazy" alt="Camera controls. The camera sheet changes with the active movement mode. This image shows Polar fly; the text reference below includes drone, plane and acro."></a><figcaption>The camera sheet changes with the active movement mode. This image shows Polar fly; the text reference below includes drone, plane and acro.</figcaption></figure><figure><h3>HUD and mouse adjustment</h3><a href="media/shortcuts-hud.png" aria-label="Open hud and mouse adjustment at full size"><img src="media/shortcuts-hud.png" width="1600" height="900" loading="lazy" alt="HUD and mouse adjustment. Candidate builds: enable Xbox mouse shortcuts, close UEVR, press L3 + LB once and release. This image shows adjustment ON; press L3 + LB again for normal game controls. The 22:37 build uses the menu cursor or LB + R3 instead."></a><figcaption>Candidate builds: enable Xbox mouse shortcuts, close UEVR, press L3 + LB once and release. This image shows adjustment ON; press L3 + LB again for normal game controls. The 22:37 build uses the menu cursor or LB + R3 instead.</figcaption></figure><figure><h3>Using UEVR settings</h3><a href="media/shortcuts-uevr.png" aria-label="Open using uevr settings at full size"><img src="media/shortcuts-uevr.png" width="1600" height="900" loading="lazy" alt="Using UEVR settings. Open UEVR with L3 + R3 first. Release RT, then use the D-pad and A; the left stick scrolls the focused pane."></a><figcaption>Open UEVR with L3 + R3 first. Release RT, then use the D-pad and A; the left stick scrolls the focused pane.</figcaption></figure></section><section id="controls"><h2>All Xbox shortcuts</h2><div class="control-filter" hidden><label for="control-search">FIND A SHORTCUT</label><input id="control-search" type="search" placeholder="HUD, camera, acro, L3…" autocomplete="off"><button id="clear-search" class="reset-button" type="button">Clear</button></div><p id="control-count" role="status" aria-live="polite"></p><p>This reference describes the current control set. See
 <a href="testing.html#next-test">the included builds and grouped checklist</a> for build-specific
 defaults and acceptance status. Bindings were checked against the Lua and native
@@ -795,4 +765,4 @@ describe each eye separately. Include whether returning to normal camera or
 restoring UI changes the result. Remove account IDs, personal paths and private
 Discord information before posting logs or screenshots. Do not share game
 binaries, memory captures or extracted assets.</p>
-</section><section id="packaging"><h2>Portable launcher</h2><p>Extract the ZIP, then open <strong>WuWa VR Launcher.exe</strong>. It carries its own Python and opens a page served only on your PC. Settings, backups and logs are kept in <code>%LOCALAPPDATA%\WuWa VR Launcher</code>.</p><p>The linked public beta and newer local test packages have separate release records. Use the guide included in your ZIP. Game injection needs Windows permission to match the game; the launcher leaves game files alone. Use headset / Use simulator changes the global OpenXR runtime only when you click it, with the game and injector closed. Use headset restores the previously saved runtime. <a href="credits.html#distribution">Release and distribution notes</a>.</p></section></div></div></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>
+</section><section id="packaging"><h2>Portable fallback</h2><p>The portable ZIP is an advanced fallback: extract the whole archive, keep its app and python folders together, and open <strong>WuWa VR Launcher.exe</strong>. It uses the older browser interface and does not install or self-update the desktop app. The installer is the recommended starting point.</p><div id="release-download"><p><a class="button primary" href="https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-04-launcher/WuWa-VR-Setup.exe">Download beta installer · Windows EXE</a> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher">Release notes & source</a></p><p class="small">1.0.0 beta · WuWa 3.7 · Windows x64</p><p><a href="https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-04-launcher/WuWa-VR-Launcher.zip">Advanced: portable ZIP</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817">Previous beta · 1 October</a></p></div></section></div></div></main><footer class="footer wrap"><p lang="en">Free, unofficial fan project. Not affiliated with Kuro Games.</p><nav aria-label="Project information" lang="en"><a href="developers.html" lang="en">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer" lang="en">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer" lang="en">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav><p class="small" lang="en">Original independent website and guide work: MIT. Upstream components keep their own terms.</p></footer></body></html>

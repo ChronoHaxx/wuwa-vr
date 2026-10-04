@@ -2,6 +2,7 @@
 #include "WuWaCodeCompatibility.hpp"
 #include "WuWaLodSnapshot.hpp"
 #include <array>
+#include <type_traits>
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -99,7 +100,10 @@ public:
     size_t written() const noexcept {return next.load(std::memory_order_relaxed);}
     bool truncated() const noexcept {return truncated_flag.load(std::memory_order_relaxed);}
 private:
-    std::array<Slot,Capacity> slots{};
+    // Slot\'s member initializers initialize every field. Avoid MSVC expanding
+    // thousands of nested aggregate initializers at compile time.
+    static_assert(!std::is_trivially_default_constructible_v<Slot>);
+    std::array<Slot,Capacity> slots;
     std::atomic<size_t> next{};
     size_t drained{};
     std::atomic<bool> truncated_flag{};

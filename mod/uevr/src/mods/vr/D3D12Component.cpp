@@ -5,10 +5,14 @@
 #include <utility/ScopeGuard.hpp>
 #include <utility/Logging.hpp>
 #include <utility/WuWaLguiProbe.hpp>
+#include <utility/WuWaRunMarker.hpp>
 
 #include "Framework.hpp"
 #include "../VR.hpp"
 #include "../WindowMode.hpp"
+#include "utility/WuWaHandDemoRenderer.hpp"
+#include "utility/WuWaScreenEyeOrder.hpp"
+#include "utility/WuWaScreenComposite.hpp"
 
 #include <../../directxtk12-src/Inc/ResourceUploadBatch.h>
 #include <../../directxtk12-src/Inc/RenderTargetState.h>
@@ -322,9 +326,11 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
         draw_spectator_view(commands.cmd_list.Get(), is_right_eye_frame);
 
         if (is_2d_screen && m_game_tex.texture.Get() != nullptr && m_game_tex.srv_heap != nullptr) {
-            // Clear previous frame
+            // The scene-bearing panel must not inherit arbitrary scene alpha.
+            // Preserve encoded RGB and the existing UNORM -> sRGB copy path;
+            // only the complete 2D composite is opaque, not the separate HUD.
             for (auto& screen : m_2d_screen_tex) {
-                commands.clear_rtv(screen, clear_color, ENGINE_SRC_COLOR);
+                commands.clear_rtv(screen, wuwa_screen_composite::opaque_black.data(), ENGINE_SRC_COLOR);
             }
 
             // Render left side to left screen tex
@@ -426,8 +432,11 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 if (is_afr) {
                     m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT, m_2d_screen_tex[0].texture.Get(), draw_2d_view, clear_rt, ENGINE_SRC_COLOR);
                 } else {
-                    m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI, m_2d_screen_tex[0].texture.Get(), draw_2d_view, std::nullopt, ENGINE_SRC_COLOR);
-                    m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT, m_2d_screen_tex[1].texture.Get(), std::nullopt, clear_rt, ENGINE_SRC_COLOR);
+                    const auto sources = wuwa_screen_eye_order::openxr_sources(
+                        vr->is_native_stereo_fix_enabled(), vr->is_native_stereo_fix_swap_eyes_enabled(),
+                        is_actually_afr, m_scene_capture_tex.texture.Get() != nullptr && m_scene_capture_tex.srv_heap != nullptr);
+                    m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI, m_2d_screen_tex[sources[0]].texture.Get(), draw_2d_view, std::nullopt, ENGINE_SRC_COLOR);
+                    m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT, m_2d_screen_tex[sources[1]].texture.Get(), std::nullopt, clear_rt, ENGINE_SRC_COLOR);
                 }
             } else if (ui_target != nullptr) {
                 const auto ui_resource = (ID3D12Resource*)ui_target->get_native_resource();
@@ -702,11 +711,18 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 const auto left_layer = openxr_overlay.generate_slate_layer(runtimes::OpenXR::SwapchainIndex::UI, XrEyeVisibility::XR_EYE_VISIBILITY_LEFT);
                 const auto right_layer = openxr_overlay.generate_slate_layer(runtimes::OpenXR::SwapchainIndex::UI_RIGHT, XrEyeVisibility::XR_EYE_VISIBILITY_RIGHT);
 
+                // These layers contain the complete game scene, not a floating
+                // HUD. Match opaque projection semantics for both quad/cylinder.
+                // The ordinary HUD builder restores its alpha flags next frame.
+                constexpr auto alpha_flags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
+                    XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
                 if (left_layer && m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI)) {
+                    left_layer->get().layerFlags &= ~alpha_flags;
                     quad_layers.push_back((XrCompositionLayerBaseHeader*)&left_layer->get());
                 }
 
                 if (right_layer && m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT)) {
+                    right_layer->get().layerFlags &= ~alpha_flags;
                     quad_layers.push_back((XrCompositionLayerBaseHeader*)&right_layer->get());
                 }
             } else if (m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI)) {
@@ -977,11 +993,45 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
     ID3D12DescriptorHeap* game_heaps[] = { m_game_tex.srv_heap->Heap() };
     command_list->SetDescriptorHeaps(1, game_heaps);
 
-    batch->Draw(m_game_tex.get_srv_gpu(), 
-        DirectX::XMUINT2{ (uint32_t)m_backbuffer_size[0], (uint32_t)m_backbuffer_size[1] },
-        dest_rect,
-        &source_rect, 
-        DirectX::Colors::White);
+    const auto& wuwa = vr->get_wuwa_controls();
+    if (wuwa.steady_desktop_view() && !wuwa_steady_view::bypassed() && eye_aspect_ratio <= aspect_ratio) {
+        // WuWa: steady desktop view (utility/WuWaSteadyView.hpp). A slightly narrower crop leaves
+        // a margin; the crop follows the smoothed head pose this frame was rendered with.
+        constexpr float margin = 0.07f; // of the eye width, each side
+        const auto crop_width = eye_width * (1.0f - 2.0f * margin);
+        Vector4f tangents{};
+        {
+            const auto runtime = vr->get_runtime();
+            std::shared_lock _{ runtime->projections_mtx };
+            tangents = runtime->raw_projections[0];
+        }
+        const auto across = std::abs(tangents[0]) + std::abs(tangents[1]);
+        const auto down = std::abs(tangents[2]) + std::abs(tangents[3]);
+        const auto fx = across > 0.01f ? eye_width / across : eye_width / 2.0f;
+        const auto fy = down > 0.01f ? eye_height / down : fx;
+        const auto rotation = glm::quat_cast(vr->get_hmd_rotation(static_cast<uint32_t>(vr->m_render_frame_count)));
+        const auto now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        const auto max_angle = std::atan(eye_width * margin / fx);
+        const auto crop = m_steady_view.update(rotation, now, wuwa.steady_desktop_seconds(), max_angle, fx, fy);
+        const auto margin_y = (eye_height - crop_width / aspect_ratio) / 2.0f;
+        ++wuwa_steady_view::frames_steadied;
+        wuwa_steady_view::last_dx = crop.dx; wuwa_steady_view::last_dy = crop.dy; wuwa_steady_view::last_roll = crop.roll;
+        const RECT eye_rect{ (LONG)source_rect.left, 0, (LONG)(source_rect.left + eye_width), (LONG)eye_height };
+        const DirectX::XMFLOAT2 origin{
+            original_centerw + std::clamp(crop.dx, -eye_width * margin, eye_width * margin),
+            original_centerh + std::clamp(crop.dy, -margin_y, margin_y) };
+        batch->Draw(m_game_tex.get_srv_gpu(),
+            DirectX::XMUINT2{ (uint32_t)m_backbuffer_size[0], (uint32_t)m_backbuffer_size[1] },
+            DirectX::XMFLOAT2{ (float)desc.Width / 2.0f, (float)desc.Height / 2.0f },
+            &eye_rect, DirectX::Colors::White, -crop.roll, origin, (float)desc.Width / crop_width);
+    } else {
+        m_steady_view.reset();
+        batch->Draw(m_game_tex.get_srv_gpu(), 
+            DirectX::XMUINT2{ (uint32_t)m_backbuffer_size[0], (uint32_t)m_backbuffer_size[1] },
+            dest_rect,
+            &source_rect, 
+            DirectX::Colors::White);
+    }
 
     //////
     // UI
@@ -996,6 +1046,14 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
         DirectX::Colors::White);
 
     batch->End();
+
+    // WuWa: Start/End run sync square (desktop view only), see utility/WuWaRunMarker.hpp.
+    if (wuwa_run::take_flash()) {
+        const float magenta[]{ 1.0f, 0.0f, 1.0f, 1.0f };
+        const auto size = (LONG)(desc.Height / 10);
+        const D3D12_RECT square{ 0, 0, size, size };
+        command_list->ClearRenderTargetView(backbuffer_ctx.get_rtv(), magenta, 1, &square);
+    }
 
     // Transition backbuffer to D3D12_RESOURCE_STATE_PRESENT
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -1124,6 +1182,7 @@ void D3D12Component::on_reset(VR* vr) {
 
     if (runtime->is_openxr() && runtime->loaded) {
         m_openxr.wait_for_all_copies();
+        wuwa_hand::Renderer::get().reset12();
 
         auto& rt_pool = vr->get_render_target_pool_hook();
         ComPtr<ID3D12Resource> scene_depth_tex{rt_pool->get_texture<ID3D12Resource>(L"SceneDepthZ")};
@@ -1712,6 +1771,7 @@ void D3D12Component::OpenXR::destroy_swapchains() {
     spdlog::info("[VR] Destroying swapchains.");
 
     this->wait_for_all_copies();
+    wuwa_hand::Renderer::get().reset12();
 
     for (auto& it : this->contexts) {
         auto& ctx = it.second;
@@ -1877,6 +1937,15 @@ void D3D12Component::OpenXR::copy(
                         ctx.textures[texture_index].texture, texture_ctx->get_rtv(), layout,
                         D3D12_RESOURCE_STATE_RENDER_TARGET, ctx.window_rtv_format)) {
                     texture_ctx->commands.has_commands = true;
+                }
+                const auto hand_layout=swapchain_idx==double_wide?wuwa_hand::Layout::DoubleWide:
+                    swapchain_idx==left_eye?wuwa_hand::Layout::Left:wuwa_hand::Layout::Right;
+                const auto hand_sample=vr->m_openxr->hand_render_snapshot();
+                if (wuwa_hand::Renderer::get().draw12(texture_ctx->commands.cmd_list.Get(),
+                    ctx.textures[texture_index].texture,texture_ctx->get_rtv(),ctx.window_rtv_format,
+                    hand_sample,hand_layout)) {
+                    texture_ctx->commands.has_commands=true;
+                    vr->m_openxr->hand_rendered(hand_sample.frame_generation);
                 }
             }
 

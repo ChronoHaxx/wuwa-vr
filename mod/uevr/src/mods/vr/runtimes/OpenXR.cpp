@@ -1,6 +1,8 @@
 #include <Windows.h>
 #include <TlHelp32.h>
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 
@@ -18,10 +20,104 @@
 
 #include "../../VR.hpp"
 #include "OpenXR.hpp"
+#include "utility/WuWaLocalizedUI.hpp"
 
 using namespace nlohmann;
 
 namespace runtimes {
+void OpenXR::initialize_hand_demo(bool system_supported) {
+    wuwa_hand::Api api{};
+    const bool supported = enabled_extensions.contains(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
+    if (supported) {
+        xrGetInstanceProcAddr(instance, "xrCreateHandTrackerEXT", reinterpret_cast<PFN_xrVoidFunction*>(&api.create));
+        xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT", reinterpret_cast<PFN_xrVoidFunction*>(&api.locate));
+        xrGetInstanceProcAddr(instance, "xrDestroyHandTrackerEXT", reinterpret_cast<PFN_xrVoidFunction*>(&api.destroy));
+    }
+    hand_demo.configure(session, supported && system_supported,
+        enabled_extensions.contains(XR_EXT_HAND_TRACKING_DATA_SOURCE_EXTENSION_NAME), api);
+}
+
+void OpenXR::draw_hand_demo() {
+    auto sample = hand_demo.snapshot();
+    bool enabled = sample.enabled;
+    const auto label = wuwa_l10n::label("Show optical hands (this launch only)");
+    const bool unavailable = sample.state == wuwa_hand::State::Unsupported ||
+        sample.state == wuwa_hand::State::SourceUnavailable;
+    ImGui::BeginDisabled(unavailable);
+    if (ImGui::Checkbox(label.c_str(), &enabled)) { hand_demo.enable(enabled); sample=hand_demo.snapshot(); }
+    ImGui::EndDisabled();
+    wuwa_ui::TextWrapped("Unoccluded hand skeleton demo: hands draw over the game. No grabbing, collisions or gesture controls. Xbox remains gameplay.");
+    if (wuwa_hand::renderer_error.load()!=0)
+        wuwa_ui::TextWrapped("The hand overlay renderer is unavailable. The joint inspector remains available; see the UEVR log for details.");
+    switch (sample.state) {
+    case wuwa_hand::State::Unsupported:
+        wuwa_ui::TextWrapped("This OpenXR runtime or headset does not provide hand tracking."); break;
+    case wuwa_hand::State::SourceUnavailable:
+        wuwa_ui::TextWrapped("This runtime cannot identify optical hands. Controller-derived joints are not shown."); break;
+    case wuwa_hand::State::Off:
+        wuwa_ui::TextWrapped("Hand demo is off. Enable it only when you want to try bare-hand tracking."); break;
+    case wuwa_hand::State::Waiting:
+        wuwa_ui::TextWrapped("Waiting for fresh optical hands. Keep hands visible to the headset and enable tracking forwarding in Virtual Desktop when using VDXR."); break;
+    case wuwa_hand::State::Error:
+        wuwa_ui::TextWrapped("Hand tracking returned an error. Switch the demo off and on to retry.");
+        ImGui::Text("OpenXR: %d", static_cast<int>(sample.result)); break;
+    case wuwa_hand::State::Active:
+        wuwa_ui::TextWrapped("Optical joint data received. Headset alignment and comfort still need a physical check."); break;
+    }
+    if (!wuwa_ui::TreeNode("Joint inspector (left-eye preview)")) return;
+    const auto origin=ImGui::GetCursorScreenPos();
+    const ImVec2 size{ImGui::GetContentRegionAvail().x,180.0f};
+    auto* draw=ImGui::GetWindowDrawList();
+    draw->AddRectFilled(origin,ImVec2(origin.x+size.x,origin.y+size.y),IM_COL32(13,20,27,255),5);
+    if (wuwa_hand::fresh(sample)) for (size_t i=0;i<sample.hands.size();++i) {
+        const auto& hand=sample.hands[i]; if (!hand.optical) continue;
+        for (const auto& bone:wuwa_hand::bones) {
+            const auto& a=hand.joints[bone[0]]; const auto& b=hand.joints[bone[1]];
+            wuwa_hand::Point p{},q{};
+            if (a.valid && b.valid && wuwa_hand::project(a.position,sample.views[0],size.x,size.y,p) &&
+                wuwa_hand::project(b.position,sample.views[0],size.x,size.y,q))
+                draw->AddLine(ImVec2(origin.x+p.x,origin.y+p.y),ImVec2(origin.x+q.x,origin.y+q.y),
+                    i==0?IM_COL32(80,224,200,255):IM_COL32(245,187,88,255),2.0f);
+        }
+    }
+    ImGui::Dummy(size); ImGui::TreePop();
+}
+
+wuwa_hand::Snapshot OpenXR::hand_render_snapshot() {
+    const auto live=hand_demo.snapshot();
+    if (!wuwa_hand::fresh(live)) return {};
+    std::scoped_lock lock(sync_assignment_mtx);
+    if (!frame_began) return {};
+    auto* reserved=hand_submission.peek();
+    if (!reserved) {
+        if (!has_render_frame_count) return {};
+        auto state=pipeline_states[internal_render_frame_count % QUEUE_SIZE];
+        if (!wuwa_hand::fresh(state.hand_snapshot) || state.hand_snapshot.time!=state.pose_time || state.stage_views.size()!=2) return {};
+        state.hand_drawing=true;
+        for(size_t eye=0;eye<2;++eye) {
+            state.hand_snapshot.views[eye]=state.stage_views[eye];
+            for(size_t bound=0;bound<4;++bound) state.hand_snapshot.bounds[eye][bound]=view_bounds[eye][bound];
+        }
+        state.hand_snapshot.frame_generation=hand_submission.generation();
+        reserved=hand_submission.reserve(state);
+    }
+    if (!reserved || !wuwa_hand::fresh(reserved->hand_snapshot)) return {};
+    auto sample=reserved->hand_snapshot;
+    // A newly lost hand must not remain visible in an older queued frame.
+    for (size_t i=0;i<sample.hands.size();++i) if (!live.hands[i].optical) sample.hands[i]={};
+    return sample;
+}
+
+void OpenXR::hand_rendered(uint64_t generation) {
+    std::scoped_lock lock(sync_assignment_mtx);
+    hand_submission.drawn(generation);
+}
+
+void OpenXR::abort_hand_frame() {
+    std::scoped_lock lock(sync_assignment_mtx);
+    hand_submission.abort();
+}
+
 void OpenXR::on_draw_ui() {
     ImGui::SetNextItemOpen(true, ImGuiCond_Once);
     if (ImGui::TreeNode("OpenXR Options")) {
@@ -102,6 +198,7 @@ void OpenXR::on_system_properties_acquired(const XrSystemProperties& system_prop
 }
 
 void OpenXR::on_config_load(const utility::Config& cfg, bool set_defaults) {
+    wuwa_projection_test::lease.reset();
     for (IModValue& option : this->options) {
         option.config_load(cfg, set_defaults);
     }
@@ -114,7 +211,17 @@ void OpenXR::on_config_save(utility::Config& cfg) {
 }
 
 void OpenXR::on_pre_render_game_thread(uint32_t frame_count) {
-    this->pipeline_states[frame_count % OpenXR::QUEUE_SIZE].frame_count = frame_count;
+    std::scoped_lock lock{sync_assignment_mtx};
+    auto& state = this->pipeline_states[frame_count % OpenXR::QUEUE_SIZE];
+    state.frame_count = frame_count;
+    // View offsets have now used actual engine WTM and the draw's frozen scale.
+    // Commit to the family frame here, not a guessed pose-update frame number.
+    state.depth_scale = wuwa_depth_scale::Draw::snapshot();
+    if (wuwa_test::is_wuwa() && !VR::get()->is_using_afr()) {
+        // A missing draw hook is missing evidence, not permission to use the
+        // latest UI scale for an older image.
+        state.depth_scale.required = true;
+    }
 }
 
 VRRuntime::Error OpenXR::synchronize_frame(std::optional<uint32_t> frame_count) {
@@ -206,6 +313,7 @@ VRRuntime::Error OpenXR::update_poses(bool from_view_extensions, uint32_t frame_
     std::scoped_lock _{ this->sync_assignment_mtx };
 
     if (!this->session_ready) {
+        hand_demo.suspend();
         return VRRuntime::Error::SUCCESS;
     }
 
@@ -230,6 +338,11 @@ VRRuntime::Error OpenXR::update_poses(bool from_view_extensions, uint32_t frame_
     }
 
     auto& pipeline_state = this->pipeline_states[frame_count % OpenXR::QUEUE_SIZE];
+    if (pipeline_state.frame_count != frame_count) {
+        // Reused slots cannot retain the previous image's scale. A scoped draw
+        // starts required but unobserved; its family callback fills the sample.
+        pipeline_state.depth_scale = {wuwa_test::is_wuwa() && !vr->is_using_afr(), 0.0f};
+    }
 
     if (pipeline_state.frame_state.predictedDisplayTime <= 1000) {
         pipeline_state.frame_state = this->frame_state;
@@ -280,6 +393,7 @@ VRRuntime::Error OpenXR::update_poses(bool from_view_extensions, uint32_t frame_
 
     if (result != XR_SUCCESS) {
         spdlog::error("[VR] xrLocateViews for view space failed: {}", this->get_result_string(result));
+        hand_demo.suspend();
         return (VRRuntime::Error)result;
     }
 
@@ -292,11 +406,18 @@ VRRuntime::Error OpenXR::update_poses(bool from_view_extensions, uint32_t frame_
 
     if (result != XR_SUCCESS) {
         spdlog::error("[VR] xrLocateViews for stage space failed: {}", this->get_result_string(result));
+        hand_demo.suspend();
         return (VRRuntime::Error)result;
     }
 
     pipeline_state.stage_views = this->stage_views;
     pipeline_state.pose_time = display_time;
+    constexpr auto hand_view_flags = XR_VIEW_STATE_POSITION_VALID_BIT | XR_VIEW_STATE_ORIENTATION_VALID_BIT;
+    if (stage_views.size() == 2 && (stage_view_state.viewStateFlags & hand_view_flags) == hand_view_flags) {
+        hand_demo.update(display_time, stage_space, {stage_views[0],stage_views[1]},
+            session_state == XR_SESSION_STATE_FOCUSED);
+    } else hand_demo.suspend();
+    pipeline_state.hand_snapshot = hand_demo.snapshot();
     //this->frame_state_queue[frame_count % this->frame_state_queue.size()] = this->frame_state;
     
     if (should_enqueue) {
@@ -307,6 +428,7 @@ VRRuntime::Error OpenXR::update_poses(bool from_view_extensions, uint32_t frame_
 
     if (result != XR_SUCCESS) {
         spdlog::error("[VR] xrLocateSpace for view space failed: {}", this->get_result_string(result));
+        hand_demo.suspend();
 
         if (result == XR_ERROR_TIME_INVALID) {
             spdlog::info("[VR] Time: {}", display_time);
@@ -422,6 +544,7 @@ VRRuntime::Error OpenXR::consume_events(std::function<void(void*)> callback) {
         if (bh->type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED) {
             const auto ev = (XrEventDataSessionStateChanged*)&edb;
             this->session_state = ev->state;
+            if (ev->state != XR_SESSION_STATE_FOCUSED) hand_demo.suspend();
 
             spdlog::info("VR: XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED {}", (uint32_t)ev->state);
 
@@ -459,6 +582,7 @@ VRRuntime::Error OpenXR::consume_events(std::function<void(void*)> callback) {
                 }
             }
         } else if (bh->type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING) {
+            hand_demo.suspend();
             this->wants_reset_origin = true;
         }
 
@@ -475,18 +599,21 @@ VRRuntime::Error OpenXR::consume_events(std::function<void(void*)> callback) {
 }
 
 VRRuntime::Error OpenXR::update_matrices(float nearz, float farz) {
+    // xrLocateViews and the once-per-sync gate use sync_assignment_mtx. Acquire
+    // it together with pose_mtx: device reset takes pose_mtx before aborting a
+    // hand frame, so imposing an assignment -> pose lock order could deadlock.
+    std::scoped_lock projection_lock{this->sync_assignment_mtx, this->pose_mtx};
     // exit immediately if we've updated the eye matrices since the last frame sync, so we only do this
     // operation once per sync
     if (!this->should_update_eye_matrices) {
         return VRRuntime::Error::SUCCESS;
     }
 
-    if (!this->session_ready || this->views.empty()) {
+    if (!this->session_ready || this->views.size() < 2) {
         return VRRuntime::Error::SUCCESS;
     }
 
     // always update the pose:
-    std::unique_lock ___{ this->pose_mtx };
     const auto& left_pose = this->views[0].pose;
     const auto& right_pose = this->views[1].pose;
     this->eyes[0] = Matrix4x4f{OpenXR::to_glm(left_pose.orientation)};
@@ -494,15 +621,36 @@ VRRuntime::Error OpenXR::update_matrices(float nearz, float farz) {
     this->eyes[1] = Matrix4x4f{OpenXR::to_glm(right_pose.orientation)};
     this->eyes[1][3] = Vector4f{*(Vector3f*)&right_pose.position, 1.0f};
 
+    // Sample once for the whole pair. Script/config changes need not pass
+    // through the compatibility UI that sets should_recalculate_eye_projections.
+    const auto& vr = VR::get();
+    const wuwa_projection_test::Base projection_base{
+        vr->get_horizontal_projection_override(), vr->get_vertical_projection_override(),
+        vr->should_grow_rectangle_for_projection_cropping(), vr->is_using_2d_screen(),
+        vr->get_runtime() == this, !vr->is_using_afr() && !vr->is_stereo_emulation_enabled(),
+        this->ready(), vr->is_native_stereo_fix_enabled(), reinterpret_cast<uintptr_t>(this)};
+    const auto projection_selection = wuwa_projection_test::lease.select(GetTickCount64(), projection_base);
+    const auto requested = [&] {
+        openxr_projection::Inputs input{};
+        input.horizontal = projection_selection.horizontal;
+        input.vertical = projection_base.vertical;
+        input.grow = projection_base.grow;
+        input.near_z = nearz;
+        for (size_t eye = 0; eye < input.fov.size(); ++eye) {
+            const auto& fov = this->views[eye].fov;
+            input.fov[eye] = {fov.angleLeft, fov.angleRight, fov.angleUp, fov.angleDown};
+        }
+        return input;
+    }();
+
     auto get_mat = [&](int eye) {
-        const auto& vr = VR::get();
         std::array<float, 4> tan_half_fov{};
 
-        if (vr->get_horizontal_projection_override() == VR::HORIZONTAL_PROJECTION_OVERRIDE::HORIZONTAL_SYMMETRIC) {
+        if (requested.horizontal == VR::HORIZONTAL_PROJECTION_OVERRIDE::HORIZONTAL_SYMMETRIC) {
             tan_half_fov[0] = -std::max(std::max(-this->raw_projections[0][0], this->raw_projections[0][1]),
                                         std::max(-this->raw_projections[1][0], this->raw_projections[1][1]));
             tan_half_fov[1] = -tan_half_fov[0];
-        } else if (vr->get_horizontal_projection_override() == VR::HORIZONTAL_PROJECTION_OVERRIDE::HORIZONTAL_MIRROR) {
+        } else if (requested.horizontal == VR::HORIZONTAL_PROJECTION_OVERRIDE::HORIZONTAL_MIRROR) {
             float max_outer = std::max(-this->raw_projections[0][0], this->raw_projections[1][1]);
             float max_inner = std::max(this->raw_projections[0][1], -this->raw_projections[1][0]);
             tan_half_fov[0] = eye == 0 ? -max_outer : -max_inner;
@@ -512,11 +660,11 @@ VRRuntime::Error OpenXR::update_matrices(float nearz, float farz) {
             tan_half_fov[1] = this->raw_projections[eye][1];
         }
 
-        if (vr->get_vertical_projection_override() == VR::VERTICAL_PROJECTION_OVERRIDE::VERTICAL_SYMMETRIC) {
+        if (requested.vertical == VR::VERTICAL_PROJECTION_OVERRIDE::VERTICAL_SYMMETRIC) {
             tan_half_fov[2] = std::max(std::max(this->raw_projections[0][2], -this->raw_projections[0][3]),
                                         std::max(this->raw_projections[1][2], -this->raw_projections[1][3]));
             tan_half_fov[3] = -tan_half_fov[2];
-        } else if (vr->get_vertical_projection_override() == VR::VERTICAL_PROJECTION_OVERRIDE::VERTICAL_MATCHED) {
+        } else if (requested.vertical == VR::VERTICAL_PROJECTION_OVERRIDE::VERTICAL_MATCHED) {
             float max_top = std::max(this->raw_projections[0][2], this->raw_projections[1][2]);
             float max_bottom = std::max(-this->raw_projections[0][3], -this->raw_projections[1][3]);
             tan_half_fov[2] = max_top;
@@ -532,7 +680,7 @@ VRRuntime::Error OpenXR::update_matrices(float nearz, float farz) {
 
         // if we've derived the right eye, we have up to date view bounds for both so adjust the render target if necessary
         if (eye == 1) {
-            if (vr->should_grow_rectangle_for_projection_cropping()) {
+            if (requested.grow) {
                 eye_width_adjustment = 1 / std::max(view_bounds[0][1] - view_bounds[0][0], view_bounds[1][1] - view_bounds[1][0]);
                 eye_height_adjustment = 1 / std::max(view_bounds[0][3] - view_bounds[0][2], view_bounds[1][3] - view_bounds[1][2]);
             } else {
@@ -561,30 +709,44 @@ VRRuntime::Error OpenXR::update_matrices(float nearz, float farz) {
             (2.0f * inv_rl), 0.0f, 0.0f, 0.0f,
             0.0f, (2.0f * inv_tb), 0.0f, 0.0f,
             (sum_rl * -inv_rl), (sum_tb * -inv_tb), 0.0f, 1.0f,
-            0.0f, 0.0f, nearz, 0.0f
+            0.0f, 0.0f, requested.near_z, 0.0f
         };
     };
 
     // if we've not yet derived an eye projection matrix, or we've changed the projection, derive it here
     // Hacky way to check for an uninitialised eye matrix - is there something better, is this necessary?
-    if (this->should_recalculate_eye_projections || this->last_eye_matrix_nearz != nearz || this->projections[0][2][3] == 0) {
+    if (this->projection_cache.needs_update(requested) || this->should_recalculate_eye_projections ||
+        this->projections[0][2][3] == 0) {
         // deriving the texture bounds when modifying projections requires left and right raw projections so get them all before we start:
         std::unique_lock __{this->eyes_mtx};
-        const auto& left_fov = this->views[0].fov;
-        this->raw_projections[0][0] = tan(left_fov.angleLeft);
-        this->raw_projections[0][1] = tan(left_fov.angleRight);
-        this->raw_projections[0][2] = tan(left_fov.angleUp);
-        this->raw_projections[0][3] = tan(left_fov.angleDown);
-        const auto& right_fov = this->views[1].fov;
-        this->raw_projections[1][0] = tan(right_fov.angleLeft);
-        this->raw_projections[1][1] = tan(right_fov.angleRight);
-        this->raw_projections[1][2] = tan(right_fov.angleUp);
-        this->raw_projections[1][3] = tan(right_fov.angleDown);
+        for (size_t eye = 0; eye < requested.fov.size(); ++eye) {
+            for (size_t side = 0; side < requested.fov[eye].size(); ++side) {
+                this->raw_projections[eye][static_cast<int>(side)] = tan(requested.fov[eye][side]);
+            }
+        }
         this->projections[0] = get_mat(0);
         this->projections[1] = get_mat(1);
+        this->projection_cache.commit(requested);
         this->should_recalculate_eye_projections = false;
-        this->last_eye_matrix_nearz = nearz;
+        this->last_eye_matrix_nearz = requested.near_z;
     }
+
+    // Copy under the existing projection locks. Status reads only the helper's
+    // copy, never takes these locks in reverse order. This is CPU matrix state,
+    // not proof that a compositor frame or the game's NPC shader consumed it.
+    wuwa_projection_test::Applied projection_applied{};
+    projection_applied.selection = projection_selection;
+    projection_applied.key = requested;
+    projection_applied.at_ms = GetTickCount64();
+    for (size_t eye = 0; eye < 2; ++eye) {
+        for (size_t column = 0; column < 4; ++column) {
+            for (size_t row = 0; row < 4; ++row)
+                projection_applied.matrices[eye][column * 4 + row] =
+                    projections[eye][static_cast<int>(column)][static_cast<int>(row)];
+            projection_applied.bounds[eye][column] = view_bounds[eye][column];
+        }
+    }
+    wuwa_projection_test::lease.publish(std::move(projection_applied));
     // don't allow the eye matrices to be derived again until after the next frame sync
     this->should_update_eye_matrices = false;
     return VRRuntime::Error::SUCCESS;
@@ -674,7 +836,142 @@ VRRuntime::Error OpenXR::update_input() {
     return VRRuntime::Error::SUCCESS;
 }
 
+bool OpenXR::read_sightseeing_pad(wuwa_sightseeing::Pad& output) {
+    std::scoped_lock _{this->event_mtx};
+    output = {};
+
+    if (!this->ready() || this->session == XR_NULL_HANDLE ||
+        this->action_set.handle == XR_NULL_HANDLE ||
+        this->session_state != XR_SESSION_STATE_FOCUSED ||
+        !this->hands[VRRuntime::Hand::LEFT].active ||
+        !this->hands[VRRuntime::Hand::RIGHT].active ||
+        this->hands[VRRuntime::Hand::LEFT].path == XR_NULL_PATH ||
+        this->hands[VRRuntime::Hand::RIGHT].path == XR_NULL_PATH) {
+        return false;
+    }
+
+    const auto joystick = this->action_set.action_map.find("joystick");
+    if (joystick == this->action_set.action_map.end() || joystick->second == XR_NULL_HANDLE ||
+        !this->action_set.vector2_actions.contains(joystick->second)) {
+        return false;
+    }
+
+    // Action states belong to the successful sync immediately preceding this
+    // call. lastChangeTime is not an age test: an unchanged held stick is valid.
+    // Require both real joystick actions; pose-only/optical hands cannot move.
+    wuwa_sightseeing::Pad sample{};
+    const auto axis = [](float value) {
+        value = std::clamp(value, -1.0f, 1.0f);
+        return static_cast<std::int16_t>(std::abs(value) <= 0.24f ? 0.0f : value * 32767.0f);
+    };
+    for (int hand = VRRuntime::Hand::LEFT; hand <= VRRuntime::Hand::RIGHT; ++hand) {
+        XrActionStateGetInfo info{XR_TYPE_ACTION_STATE_GET_INFO};
+        info.action = joystick->second;
+        info.subactionPath = this->hands[hand].path;
+        XrActionStateVector2f state{XR_TYPE_ACTION_STATE_VECTOR2F};
+        if (xrGetActionStateVector2f(this->session, &info, &state) != XR_SUCCESS ||
+            state.isActive != XR_TRUE || !std::isfinite(state.currentState.x) ||
+            !std::isfinite(state.currentState.y)) {
+            return false;
+        }
+        if (hand == VRRuntime::Hand::LEFT) {
+            sample.lx = axis(state.currentState.x);
+            sample.ly = axis(state.currentState.y);
+        } else {
+            sample.rx = axis(state.currentState.x);
+            sample.ry = axis(state.currentState.y);
+        }
+    }
+
+    // Unsupported/unbound buttons stay released; an actual query failure
+    // invalidates the whole sample. Do not use forced_actions/gesture outputs.
+    const auto pressed = [this](const char* name, VRRuntime::Hand hand, bool& value) {
+        value = false;
+        const auto action = this->action_set.action_map.find(name);
+        if (action == this->action_set.action_map.end() || action->second == XR_NULL_HANDLE) {
+            return true;
+        }
+        XrActionStateGetInfo info{XR_TYPE_ACTION_STATE_GET_INFO};
+        info.action = action->second;
+        info.subactionPath = this->hands[hand].path;
+        if (this->action_set.bool_actions.contains(action->second)) {
+            XrActionStateBoolean state{XR_TYPE_ACTION_STATE_BOOLEAN};
+            if (xrGetActionStateBoolean(this->session, &info, &state) != XR_SUCCESS) {
+                return false;
+            }
+            value = state.isActive == XR_TRUE && state.currentState == XR_TRUE;
+        } else if (this->action_set.float_actions.contains(action->second)) {
+            XrActionStateFloat state{XR_TYPE_ACTION_STATE_FLOAT};
+            if (xrGetActionStateFloat(this->session, &info, &state) != XR_SUCCESS) {
+                return false;
+            }
+            if (state.isActive == XR_TRUE) {
+                if (!std::isfinite(state.currentState)) {
+                    return false;
+                }
+                value = state.currentState > 0.0f;
+            }
+        }
+        return true;
+    };
+
+    // Portable Pad uses XInput bit values. Quest's physical A/B/X/Y labels map
+    // directly; clicks are L3/R3, grips LB/RB, and triggers binary LT/RT.
+    struct ButtonBinding {
+        const char* action;
+        VRRuntime::Hand hand;
+        std::uint16_t bit;
+    };
+    const ButtonBinding buttons[] = {
+        {"abuttonright", VRRuntime::Hand::RIGHT, 0x1000}, // A
+        {"bbuttonright", VRRuntime::Hand::RIGHT, 0x2000}, // B
+        {"abuttonleft", VRRuntime::Hand::LEFT, 0x4000},   // X
+        {"bbuttonleft", VRRuntime::Hand::LEFT, 0x8000},   // Y
+        {"joystickclick", VRRuntime::Hand::LEFT, 0x0040}, // L3
+        {"joystickclick", VRRuntime::Hand::RIGHT, 0x0080}, // R3
+        {"grip", VRRuntime::Hand::LEFT, 0x0100},          // LB
+        {"grip", VRRuntime::Hand::RIGHT, 0x0200},         // RB
+    };
+    for (const auto& binding : buttons) {
+        bool down{};
+        if (!pressed(binding.action, binding.hand, down)) {
+            return false;
+        }
+        if (down) {
+            sample.buttons |= binding.bit;
+        }
+    }
+    bool left_trigger{}, right_trigger{}, menu{};
+    // The existing left systembutton binding is Quest Menu. Never read the
+    // right systembutton (Quest system button), or add/modify runtime bindings.
+    if (!pressed("trigger", VRRuntime::Hand::LEFT, left_trigger) ||
+        !pressed("trigger", VRRuntime::Hand::RIGHT, right_trigger) ||
+        !pressed("systembutton", VRRuntime::Hand::LEFT, menu)) {
+        return false;
+    }
+    sample.lt = left_trigger ? 255 : 0;
+    sample.rt = right_trigger ? 255 : 0;
+    if (menu) {
+        const bool left_grip = (sample.buttons & 0x0100) != 0;
+        sample.buttons |= left_grip ? 0x0020 : 0x0010; // Back or Start
+        if (left_grip) {
+            sample.buttons &= static_cast<std::uint16_t>(~0x0100); // consume LB
+        }
+    }
+
+    output = sample;
+    return true;
+}
+
 void OpenXR::destroy() {
+    abort_hand_frame();
+    hand_demo.reset();
+    {
+        std::scoped_lock lock{sync_assignment_mtx};
+        wuwa_projection_test::lease.reset();
+        projection_cache.reset();
+        should_update_eye_matrices = true;
+    }
     if (!this->loaded) {
         return;
     }
@@ -692,6 +989,7 @@ void OpenXR::destroy() {
     if (this->instance != nullptr && this->ever_submitted) {
         xrDestroyInstance(this->instance);
         this->instance = nullptr;
+        enabled_extensions.clear();
     }
 
     this->session = nullptr;
@@ -705,8 +1003,14 @@ OpenXR::PipelineState OpenXR::get_submit_state() {
     std::scoped_lock __{ this->sync_assignment_mtx };
 
     const auto had_render_frame_count = this->has_render_frame_count;
+    const bool requires_depth_scale = wuwa_test::is_wuwa() && !VR::get()->is_using_afr();
+    last_submit_state.hand_drawing=false;
     if (this->has_render_frame_count) {
         last_submit_state = this->pipeline_states[this->internal_render_frame_count % QUEUE_SIZE];
+        // Keep existing pose selection; an aliased slot cannot establish depth
+        // scale for this rendered image, even if it carries a finite value.
+        last_submit_state.depth_scale = last_submit_state.depth_scale.for_submission(
+            this->internal_render_frame_count, last_submit_state.frame_count, requires_depth_scale);
     } else {
         last_submit_state.stage_views = get_current_stage_view();
         last_submit_state.view_space_location = this->view_space_location;
@@ -715,7 +1019,13 @@ OpenXR::PipelineState OpenXR::get_submit_state() {
         // This fallback may mix current and queued views. Do not report the
         // previous submission's prediction time as if it described these poses.
         last_submit_state.pose_time = 0;
+        // This fallback has no matching rendered image metadata. Scoped WuWa
+        // depth must be omitted; unrelated games and AFR keep their old path.
+        last_submit_state.depth_scale = {requires_depth_scale, 0.0f};
     }
+    // Only a successfully drawn opt-in overlay reserves submission. Newer
+    // enqueues cannot change its poses/FOV after pixels have been written.
+    if (auto reserved=hand_submission.consume()) last_submit_state=std::move(*reserved);
 
     if (wuwa_test::is_wuwa()) {
         SPDLOG_INFO_EVERY_N_SEC(2,
@@ -1697,6 +2007,7 @@ XrResult OpenXR::begin_frame() {
     std::scoped_lock _{sync_mtx};
 
     if (!this->ready() || !this->got_first_poses || !this->frame_synced) {
+        abort_hand_frame();
         //spdlog::info("VR: begin_frame: not ready");
         return XR_ERROR_SESSION_NOT_READY;
     }
@@ -1705,6 +2016,7 @@ XrResult OpenXR::begin_frame() {
         spdlog::info("[VR] begin_frame called while frame already began");
         return XR_SUCCESS;
     }
+    abort_hand_frame();
 
     this->begin_profile();
 
@@ -1723,12 +2035,17 @@ XrResult OpenXR::begin_frame() {
     }
 
     this->frame_began = result == XR_SUCCESS || result == XR_FRAME_DISCARDED; // discarded means endFrame was not called
+    if (frame_began) {
+        std::scoped_lock lock(sync_assignment_mtx);
+        hand_submission.begin();
+    }
 
     return result;
 }
 
 XrResult OpenXR::end_frame(const std::vector<XrCompositionLayerBaseHeader*>& quad_layers, bool has_depth) {
     std::scoped_lock _{sync_mtx};
+    struct HandFrameCleanup { OpenXR* runtime; ~HandFrameCleanup() { runtime->abort_hand_frame(); } } hand_cleanup{this};
 
     if (!this->ready() || !this->got_first_poses || !this->frame_synced) {
         return XR_ERROR_SESSION_NOT_READY;
@@ -1768,6 +2085,10 @@ XrResult OpenXR::end_frame(const std::vector<XrCompositionLayerBaseHeader*>& qua
     }
 
     const auto submit_state = this->get_submit_state();
+    // Skeleton color is unoccluded and has no matching game depth. Supplying
+    // SceneDepthZ for those pixels would mislead depth-assisted reprojection.
+    if (submit_state.hand_drawing) has_depth=false;
+    if (submit_state.depth_scale.required && !submit_state.depth_scale.valid()) has_depth=false;
     const auto& pipelined_stage_views = submit_state.stage_views;
     const auto& pipelined_frame_state = submit_state.frame_state;
 
@@ -1842,18 +2163,19 @@ XrResult OpenXR::end_frame(const std::vector<XrCompositionLayerBaseHeader*>& qua
             projection_layer_views[i].subImage.swapchain = swapchain->handle;
 
             int32_t offset_x = 0, offset_y = 0, extent_x = 0, extent_y = 0;
+            const auto* bounds=submit_state.hand_drawing?submit_state.hand_snapshot.bounds[i].data():view_bounds[i];
             // if we're working with a double-wide texture, use half the view bounds adjustment (as they apply to a single eye)
             int texture_area_width = is_afr ? swapchain->width : swapchain->width / 2;
             if (is_afr || i == 0) {
-                offset_x = view_bounds[i][0] * texture_area_width;
-                extent_x = view_bounds[i][1] * texture_area_width - offset_x;
+                offset_x = bounds[0] * texture_area_width;
+                extent_x = bounds[1] * texture_area_width - offset_x;
             } else {
                 // right eye double-wide
-                offset_x = texture_area_width + view_bounds[i][0] * texture_area_width;
-                extent_x = view_bounds[i][1] * texture_area_width - (offset_x - texture_area_width);
+                offset_x = texture_area_width + bounds[0] * texture_area_width;
+                extent_x = bounds[1] * texture_area_width - (offset_x - texture_area_width);
             }
-            offset_y = view_bounds[i][2] * swapchain->height;
-            extent_y = view_bounds[i][3] * swapchain->height - offset_y;
+            offset_y = bounds[2] * swapchain->height;
+            extent_y = bounds[3] * swapchain->height - offset_y;
             
             // SPDLOG_INFO("image calc for eye {} {}, {}, {}, {}", i, offset_x, extent_x, offset_y, extent_y);
             projection_layer_views[i].subImage.imageRect.offset = {offset_x, offset_y};
@@ -1880,7 +2202,11 @@ XrResult OpenXR::end_frame(const std::vector<XrCompositionLayerBaseHeader*>& qua
                 depth_layers[i].subImage.imageRect.extent = {std::min<int>(get_width(), extent_x), std::min<int>(get_height(), extent_y)};
                 depth_layers[i].minDepth = 0.0f;
                 depth_layers[i].maxDepth = 1.0f;
-                auto wtm = VR::get()->get_world_to_meters();
+                // Queued scene depth belongs to this image, even when the UI
+                // or game thread has already selected a different world scale.
+                auto wtm = submit_state.depth_scale.required
+                    ? submit_state.depth_scale.world_units_per_metre
+                    : VR::get()->get_world_to_meters();
                 if (wtm < 0.0f || wtm == 0.0f) {
                     wtm = 1.0f;
                 }

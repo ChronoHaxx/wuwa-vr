@@ -25,7 +25,7 @@ import subprocess
 import sys
 import threading
 import time
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import urlopen
 import webbrowser
 import winreg
@@ -89,6 +89,27 @@ RECORDING = {"running": False, "stopFile": "", "folder": "", "id": "", "pid": No
 LAST_REQUEST = time.monotonic()
 VERIFY_RESULT: dict = {}
 SERVER = None
+PLAYTEST = None
+PLAYTEST_LOCK = threading.Lock()
+
+
+def playtest_service():
+    """Load optional developer tooling only when explicitly opened."""
+    global PLAYTEST
+    with PLAYTEST_LOCK:
+        if PLAYTEST is None:
+            spec = importlib.util.spec_from_file_location('wuwa_playtest_service', config().app / 'dev/wuwa_playtest_service.py')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            PLAYTEST = module.Service(config().data, status, recording_snapshot)
+        return PLAYTEST
+
+
+def playtest_busy():
+    if PLAYTEST is None:
+        return False
+    state = PLAYTEST.voice.snapshot()
+    return bool(state.get('active') or state.get('transcribing'))
 
 
 def config() -> Config:
@@ -661,6 +682,8 @@ def diagnostics():
 
 
 def begin_job(kind, message, operation, prepare=None):
+    if PLAYTEST is not None and PLAYTEST.voice.snapshot().get('transcribing'):
+        raise ValueError('Finish or cancel local transcription in Developer playtests before starting another operation.')
     with LOCK:
         if JOB["running"]:
             raise ValueError("Another operation is still running.")
@@ -781,6 +804,24 @@ def video_menu_bridge():
     return service.Bridge(config().profile,inspect_game,start_recording,stop_recording,recording_snapshot)
 
 
+def playtest_menu_bridge():
+    # Constructing this adapter does not open devices or write the game profile.
+    # The worker waits for a verified game process before publishing controls.
+    def load(name, filename):
+        spec = importlib.util.spec_from_file_location(name, config().app / 'dev' / filename)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    service = load('wuwa_playtest_menu_bridge', 'wuwa_playtest_bridge.py')
+    live = load('wuwa_playtest_menu_live', 'wuwa-test.py')
+    def inspect_game():
+        client = live.LiveTest(profile=config().profile)
+        return {'pid': client.pid, 'created_ms': round(client.created * 1000)}
+    return service.Bridge(config().profile, inspect_game,
+                          lambda: playtest_service().state(),
+                          lambda action, body: playtest_service().action(action, body))
+
+
 def compare_graphics():
     """One bounded batch in the current scene; the helper restores each lease."""
     spec = importlib.util.spec_from_file_location("wuwa_graphics", config().app / "dev/wuwa-test.py")
@@ -854,6 +895,26 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/":
                 html = (config().app / "dev/wuwa-player.html").read_text(encoding="utf-8").replace("__TOKEN__", TOKEN)
                 return self.reply(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            if path == '/playtest':
+                page = (config().app / 'dev/wuwa-playtest.html').read_text(encoding='utf-8').replace('__TOKEN__', TOKEN)
+                return self.reply(200, page.encode('utf-8'), 'text/html; charset=utf-8')
+            if path in ('/api/playtest', '/api/playtest/report', '/api/playtest/audio'):
+                if self.headers.get('X-WuWa-Token') != TOKEN:
+                    return self.reply(403, {'error': 'Open playtests from this launcher.'})
+                query = parse_qs(urlparse(self.path).query)
+                session_id = query.get('session_id', [None])[0]
+                service = playtest_service()
+                if path == '/api/playtest':
+                    return self.reply(200, service.state(session_id))
+                if not session_id:
+                    raise ValueError('Choose a playtest session.')
+                if path == '/api/playtest/report':
+                    return self.reply(200, service.report(session_id).encode('utf-8'), 'text/html; charset=utf-8')
+                note_id = query.get('note_id', [''])[0]
+                note = service.voice.note(session_id, note_id)
+                if not note.get('wav_file') or note['status'] in ('recording', 'stopping', 'cancelled'):
+                    raise ValueError('This voice note has no completed audio file.')
+                return self.reply(200, service.voice.path_for_note(session_id, note_id).read_bytes(), 'audio/wav')
             if path == "/api/status":
                 return self.reply(200, status())
             if path == '/api/language':
@@ -877,6 +938,8 @@ class Handler(BaseHTTPRequestHandler):
             found = static_file(path)
             if found:
                 return self.reply(200, found[0].read_bytes(), found[1])
+        except (ValueError, KeyError) as error:
+            return self.reply(400, {'error': str(error)})
         except Exception as error:
             log(f"GET {path} failed: {redact(error)}")
             return self.reply(500, {"error": str(error)})
@@ -904,13 +967,14 @@ class Handler(BaseHTTPRequestHandler):
         LAST_REQUEST = time.monotonic()
         try:
             length = int(self.headers.get("Content-Length", 0))
-            if not 0 < length < 8192:
+            path = urlparse(self.path).path
+            limit = 32768 if path.startswith('/api/playtest/') else 8192
+            if not 0 < length < limit:
                 self.drain_rejected_body()
                 raise ValueError("Invalid request size")
             body = json.loads(self.rfile.read(length))
             if not isinstance(body, dict):
                 raise ValueError("Expected an action object")
-            path = urlparse(self.path).path
             immediate = self.post_action(path, body)
             if immediate is None:
                 return self.reply(404, {"error": "Unknown action"})
@@ -922,9 +986,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(500, {"error": str(error)})
 
     def post_action(self, path, body):
+        if path.startswith('/api/playtest/'):
+            return playtest_service().action(path.removeprefix('/api/playtest/'), body)
         if path == '/api/language':
             if not isinstance(body.get('language'),str): raise ValueError('Choose a supported launcher language.')
-            return self.reply(200,launcher_text().language(config().app,config().data,body['language']))
+            return launcher_text().language(config().app,config().data,body['language'])
         if path == "/api/compare-graphics":
             if not any(p['name'].lower() == 'client-win64-shipping.exe' for p in processes()):
                 raise ValueError('Launch WuWa through SteamVR before comparing graphics.')
@@ -1002,6 +1068,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/stop":
             if JOB["running"]:
                 raise ValueError("Wait for the current operation to finish before stopping the launcher.")
+            if playtest_busy():
+                raise ValueError('Stop the voice note or finish transcription before stopping the launcher.')
             threading.Thread(target=stop_server, daemon=True).start()
             return {"ok": True, "message": "Launcher stopped. You can close this tab."}
         return None
@@ -1017,7 +1085,7 @@ def idle_watch():
     """Exit when the page has been closed for a long time and nothing runs."""
     while True:
         time.sleep(30)
-        if JOB["running"] or time.monotonic() - LAST_REQUEST < IDLE_EXIT_SECONDS:
+        if JOB["running"] or playtest_busy() or time.monotonic() - LAST_REQUEST < IDLE_EXIT_SECONDS:
             continue
         try:
             if processes():
@@ -1068,7 +1136,9 @@ def self_check():
     check("package description", info.get("schema") == 1, redact(app / "portable.json"))
     for name in ("dev/wuwa-builds.json", "dev/wuwa-player.html", "dev/wuwa-build.ps1", "dev/WuWaBuildProfiles.ps1",
                  "dev/start-wuwa-build.ps1", "dev/WuWaLaunchLifecycle.ps1", "dev/WuWaOpenXR.ps1", "dev/sim-run.ps1",
-                 "dev/Get-SceneCaptureCheck.ps1", "dev/Get-RunContinuityCheck.ps1", "site/index.html", "site/guide.html"):
+                 "dev/Get-SceneCaptureCheck.ps1", "dev/Get-RunContinuityCheck.ps1", "site/index.html", "site/guide.html",
+                 "dev/wuwa-playtest.html", "dev/wuwa_playtest.py", "dev/wuwa_playtest_service.py",
+                 "dev/wuwa_playtest_bridge.py", "dev/wuwa_voice_notes.py"):
         check("file " + name, (app / name).is_file())
     for build in catalog():
         folder = runtime_folder(build)
@@ -1096,7 +1166,7 @@ def self_check():
 def serve(args):
     global BASE_URL, SERVER
     bridge_stop=threading.Event()
-    bridge_thread=None
+    bridge_threads=[]
     config().data.mkdir(parents=True, exist_ok=True)
     with (config().data / "launcher.lock").open("a+b") as lock:
         lock.seek(0)
@@ -1130,18 +1200,23 @@ def serve(args):
                 if not args.no_open:
                     threading.Timer(0.3, lambda: webbrowser.open(BASE_URL)).start()
                 threading.Thread(target=idle_watch, daemon=True).start()
-                try:
-                    bridge=video_menu_bridge()
-                    bridge_thread=threading.Thread(target=bridge.run,args=(bridge_stop,),daemon=True)
-                    bridge_thread.start()
-                except (OSError,ValueError,ImportError) as error:
-                    log('In-game recording controls unavailable: '+str(error))
+                for label, factory in (('recording', video_menu_bridge), ('playtest', playtest_menu_bridge)):
+                    try:
+                        bridge = factory()
+                        thread = threading.Thread(target=bridge.run, args=(bridge_stop,), daemon=True,
+                                                  name='wuwa-' + label + '-bridge')
+                        thread.start()
+                        bridge_threads.append(thread)
+                    except (OSError, ValueError, ImportError) as error:
+                        log('In-game ' + label + ' controls unavailable: ' + str(error))
                 server.serve_forever(poll_interval=0.25)
                 log("Stopped.")
         finally:
             bridge_stop.set()
-            if bridge_thread is not None:
-                bridge_thread.join(timeout=2)
+            for thread in bridge_threads:
+                thread.join(timeout=2)
+            if PLAYTEST is not None:
+                PLAYTEST.close()
             SERVER = None
             try:
                 receipt = read_json(config().data / "launcher.json")

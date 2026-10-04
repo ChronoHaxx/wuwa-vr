@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <atomic>
 #include <array>
 #include <mutex>
 #include <nlohmann/json_fwd.hpp>
@@ -21,6 +22,9 @@ class WuWaControlsComponent : public ModComponent {
 public:
     bool sync_eye_lod() const { return m_sync_eye_lod->value(); }
     bool refill_far_lighting() const { return m_refill_far_lighting->value(); }
+    bool suppress_npc_rim() const { return m_suppress_npc_rim.requested.load(); }
+    bool steady_desktop_view() const { return m_steady_desktop->value(); }
+    float steady_desktop_seconds() const { return m_steady_desktop_seconds->value(); }
     WuWaControlsComponent();
     std::string_view get_name() const override { return "WuWaControls"; }
     void on_draw_ui() override;
@@ -94,20 +98,57 @@ private:
         void config_save(utility::Config&) override {}
     } m_adjust;
 
+    // One-shot requests and results cross the UI/game-thread boundary; neither
+    // is a player preference or part of profile restoration.
+    struct HudAspectRequest : ModToggle {
+        HudAspectRequest() : ModToggle{"WuWaControls_ResetHudAspect", false} {}
+        std::atomic<bool> pending{false};
+        std::string get() const override { return pending.load() ? "true" : "false"; }
+        void set(const std::string& text) override { pending.store(text=="true" || text=="1"); }
+        void config_load(const utility::Config&, bool) override { pending.store(false); }
+        void config_save(utility::Config&) override {}
+    } m_hud_aspect_request;
+    struct HudAspectStatus : ModString {
+        HudAspectStatus() : ModString{"WuWaControls_HudAspectStatus", "Ready"} {}
+        mutable std::mutex mutex;
+        std::string status{"Ready"};
+        std::string get() const override { std::scoped_lock lock{mutex}; return status; }
+        void set(const std::string& text) override { std::scoped_lock lock{mutex}; status=text.substr(0,512); }
+        void config_load(const utility::Config&, bool) override { set("Ready"); }
+        void config_save(utility::Config&) override {}
+    } m_hud_aspect_status;
+
     // Outside control recovery: resetting camera/input does not reset language.
     const ModString::Ptr m_language{ModString::create("WuWaLocale", "en")};
     const ModCombo::Ptr m_video_fps{ModCombo::create("WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}, 0)};
     const ModCombo::Ptr m_video_width{ModCombo::create("WuWaRecording_Width", {"720", "1024", "1280"}, 1)};
     const ModToggle::Ptr m_video_telemetry{ModToggle::create("WuWaRecording_Telemetry", true)};
+    const ModToggle::Ptr m_steady_desktop{ModToggle::create("WuWaRecording_SteadyDesktop", true)};
+    const ModSlider::Ptr m_steady_desktop_seconds{ModSlider::create("WuWaRecording_SteadySeconds", 0.05f, 1.0f, 0.35f)};
     wuwa_video::Client m_video;
     const ModToggle::Ptr m_enabled{ModToggle::create("WuWaControls_Enabled", true)};
     const ModToggle::Ptr m_keep_camera{ModToggle::create("WuWaControls_KeepCameraOnFocusLoss", true)};
     // Native stereo: give the second eye the first eye's LOD distance factor and FOV so
     // far foliage and props switch LOD together (the game builds the second eye with 90).
     const ModToggle::Ptr m_sync_eye_lod{ModToggle::create("WuWaStereo_SyncEyeLod", true)};
-    // Native stereo: refill WuWa's cascade lighting volume in a frame that renders both eyes,
-    // so the second eye's view state also gets far indirect light (see WuWaClvRefresh.hpp).
+    // Bounded lighting-volume refresh; not a general material or NPC rim repair.
     const ModToggle::Ptr m_refill_far_lighting{ModToggle::create("WuWaStereo_RefillFarLighting", true)};
+    struct RimToggle : ModToggle {
+        RimToggle() : ModToggle{"WuWaStereo_SuppressNpcRim", false} {}
+        std::atomic<bool> requested{false};
+        std::string get() const override { return requested.load() ? "true" : "false"; }
+        void set(const std::string& text) override { requested.store(text == "true" || text == "1"); }
+        void config_load(const utility::Config& cfg, bool defaults) override {
+            requested.store(defaults ? false : cfg.get<bool>(get_config_name()).value_or(false));
+        }
+        void config_save(utility::Config& cfg) override { cfg.set<bool>(get_config_name(), requested.load()); }
+        bool draw(std::string_view name) override {
+            bool value = requested.load();
+            const bool changed = ImGui::Checkbox(name.data(), &value);
+            if (changed) requested.store(value);
+            return changed;
+        }
+    } m_suppress_npc_rim;
     const ModToggle::Ptr m_recenter_position{ModToggle::create("WuWaControls_RecenterPosition", true)};
     const ModCombo::Ptr m_camera{ModCombo::create("WuWaControls_CameraMode", {"Game camera", "Fixed third person", "Freecam", "First person"}, 0)};
     const ModCombo::Ptr m_mesh{ModCombo::create("WuWaControls_MeshMode", {"Keep entire character visible", "Hide body in first person", "Hide head bones; keep body", "Hide body; keep original shadows", "Hide head bones; full shadow copy"}, 4)};

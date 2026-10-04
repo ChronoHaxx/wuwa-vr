@@ -1,6 +1,7 @@
 // Real headless browser checks against only a loopback static copy of site/.
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..'), site=path.join(root,'site');
+const release=JSON.parse(fs.readFileSync(path.join(root,'dev/site-status.json'),'utf8'));
 const modules=process.env.WUWA_NODE_MODULES || path.join(process.env.USERPROFILE||process.env.HOME||'','.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules');
 const {chromium}=require(require.resolve('playwright',{paths:[root,modules]}));
 const output=path.resolve(process.argv[2] || path.join(root,'extracted/presentation-20260925/browser'));
@@ -89,13 +90,16 @@ const server=http.createServer((req,res)=>{
     await page.emulateMedia({media:'screen'});await page.setViewportSize({width:1280,height:900});
     for(const file of ['index.html','guide.html']){
       await page.goto(base+file);
-      const steps=page.locator('.visual-steps img');
-      assert.equal(await steps.count(),4,'Four launcher step pictures expected on '+file);
-      for(const [index,step] of (await steps.all()).entries()){
-        assert.equal(await step.getAttribute('src'),`media/launcher-step-${['1-risk','2-build','3-game','4-start'][index]}.png`,'Launcher steps out of order');
-        await step.evaluate(i=>{i.loading='eager';return i.decode();});
-        assert((await step.getAttribute('alt')).length>60,'Launcher step needs a descriptive alt text');
+      const steps=page.locator(file==='index.html'?'#get-started .launcher-steps > li':'#start > ol:first-of-type > li');
+      assert.equal(await steps.count(),3,'Three installed-launcher steps expected on '+file);
+      for(const [index,label] of ['01 · Game.','02 · Install VR.','03 · Headset or simulator.'].entries()){
+        assert((await steps.nth(index).innerText()).startsWith(label),'Launcher steps out of order on '+file);
       }
+      assert.equal(await page.locator('.visual-steps img').count(),0,'Old browser screenshots must not represent the installed app');
+      const asset=`https://github.com/ChronoHaxx/wuwa-vr/releases/download/${release.tag}/`;
+      assert.equal(await page.locator('#release-download a.primary').getAttribute('href'),asset+release.installer,'Installer must be the primary download');
+      assert.equal(await page.locator('#release-download a').filter({hasText:'Advanced: portable ZIP'}).getAttribute('href'),asset+'WuWa-VR-Launcher.zip','Portable fallback must use the current release');
+      assert((await steps.nth(2).innerText()).includes('Launch in VR'),'Final step must explain launching');
       // Readable type: no visible body text below 14px.
       const small=await page.evaluate(()=>[...document.querySelectorAll('p,li,td,th,figcaption,summary,a,label,button')]
         .filter(e=>e.offsetParent&&e.textContent.trim()&&parseFloat(getComputedStyle(e).fontSize)<14).map(e=>e.textContent.trim().slice(0,40)));
@@ -111,7 +115,7 @@ const server=http.createServer((req,res)=>{
         assert(stop.visible&&stop.outline,`Keyboard stop without visible focus on ${file}: ${JSON.stringify(stop)}`);
       }
     }
-    checks.push('four ordered launcher step pictures with alt text; no text under 14px; keyboard order starts at skip link with visible focus');
+    checks.push('three ordered launcher steps and current installer/portable links; no text under 14px; keyboard order starts at skip link with visible focus');
     assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(output,'verification.json'),JSON.stringify({checkedAt:new Date().toISOString(),basePath:'/wuwa-vr/',checks,errors,scope:'Local browser and static presentation only; no game/headset acceptance.'},null,2));
     console.log(JSON.stringify({passed:checks.length,output,errors}));

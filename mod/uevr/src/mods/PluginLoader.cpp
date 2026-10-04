@@ -1,4 +1,6 @@
 #include <filesystem>
+#include <cstring>
+#include <string_view>
 
 #include <imgui.h>
 #include <spdlog/spdlog.h>
@@ -39,9 +41,14 @@
 #include "UObjectHook.hpp"
 #include "VR.hpp"
 #include "WindowMode.hpp"
+#include "utility/WuWaPluginDispatch.hpp"
 
 #include "Mods.hpp"
 #include "PluginLoader.hpp"
+
+namespace {
+wuwa_plugin::DispatchGate custom_event_dispatch;
+}
 
 UEVR_PluginVersion g_plugin_version{
     UEVR_PLUGIN_VERSION_MAJOR, UEVR_PLUGIN_VERSION_MINOR, UEVR_PLUGIN_VERSION_PATCH};
@@ -1395,6 +1402,16 @@ void set_mod_value(const char* key, const char* value) {
         return;
     }
 
+    // This is deliberately not a ModToggle: saving settings must not persist
+    // the miniature override or replace the player's normal world scale.
+    if (std::string_view{key} == "WuWaDiorama_Enabled") {
+        if (!VR::get()->physical_gamepad_passthrough()) {
+            if (std::string_view{value} == "true") VR::get()->set_diorama_enabled(true);
+            else if (std::string_view{value} == "false") VR::get()->set_diorama_enabled(false);
+        }
+        return;
+    }
+
     auto& mods = g_framework->get_mods()->get_mods();
 
     for (auto& mod : mods) {
@@ -1409,6 +1426,14 @@ void set_mod_value(const char* key, const char* value) {
 
 void get_mod_value(const char* key, char* out_value, unsigned int max_size) {
     if (key == nullptr || out_value == nullptr || max_size == 0) {
+        return;
+    }
+
+    if (std::string_view{key} == "WuWaDiorama_Enabled") {
+        const std::string_view value = VR::get()->is_diorama_enabled() ? "true" : "false";
+        const auto size = std::min<size_t>(value.size(), max_size - 1);
+        memcpy(out_value, value.data(), size);
+        out_value[size] = '\0';
         return;
     }
 
@@ -1877,6 +1902,18 @@ std::optional<std::string> PluginLoader::on_initialize_d3d_thread() {
 }
 
 void PluginLoader::attempt_unload_plugins() {
+    // DllMain/destructors can dispatch while this thread owns the callback
+    // mutex exclusively. Reject them before they can recursively acquire it.
+    wuwa_plugin::DispatchGate::Unload unloading{custom_event_dispatch};
+    if (!unloading) return;
+    // Reject bridge writes while DLL destructors and old Lua reset callbacks
+    // run. The guard also clears transient state on an exceptional unload.
+    auto& window = *WindowMode::get();
+    window.suspend_cutscene_comfort(true);
+    struct ResumeCutsceneBridge {
+        WindowMode& window;
+        ~ResumeCutsceneBridge() { window.suspend_cutscene_comfort(false); }
+    } resume_cutscene_bridge{window};
     {
         std::unique_lock _{m_api_cb_mtx};
 
@@ -2174,16 +2211,20 @@ void PluginLoader::on_post_viewport_client_draw(void* viewport_client, void* vie
 }
 
 void PluginLoader::dispatch_custom_event(const char* event_name, const char* event_data) {
+    const auto ticket = custom_event_dispatch.ticket();
+    if (!custom_event_dispatch.permits(ticket)) return;
+    std::shared_lock _{m_api_cb_mtx};
+    if (!custom_event_dispatch.permits(ticket)) return;
+
     if (event_name != nullptr && event_data != nullptr &&
         std::string_view{event_name} == "WuWaControls.Input.v1") {
         VR::get()->get_wuwa_controls().receive(event_data);
     }
     if (event_name != nullptr && event_data != nullptr &&
         std::string_view{event_name} == "CutsceneComfort.WindowMode.v1") {
-        WindowMode::get()->apply_cutscene_comfort_state(event_data);
+        WindowMode::get()->apply_cutscene_comfort_state(std::string_view{
+            event_data, strnlen_s(event_data, wuwa_window::max_bridge_payload + 1)});
     }
-
-    std::shared_lock _{m_api_cb_mtx};
 
     for (auto&& cb : m_on_custom_event_cbs) {
         try {

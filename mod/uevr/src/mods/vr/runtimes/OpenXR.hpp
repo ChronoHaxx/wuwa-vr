@@ -20,6 +20,11 @@
 #include "Mod.hpp"
 
 #include "VRRuntime.hpp"
+#include "utility/WuWaHandDemo.hpp"
+#include "utility/WuWaDepthScale.hpp"
+#include "utility/WuWaSightseeingInput.hpp"
+#include "utility/OpenXRProjectionPolicy.hpp"
+#include "utility/WuWaProjectionTest.hpp"
 
 namespace runtimes{
 struct OpenXR final : public VRRuntime {
@@ -55,6 +60,12 @@ struct OpenXR final : public VRRuntime {
     }
 
     void on_system_properties_acquired(const XrSystemProperties& props);
+    void initialize_hand_demo(bool system_supported);
+    void draw_hand_demo();
+    wuwa_hand::Snapshot hand_render_snapshot();
+    void hand_rendered(uint64_t generation);
+    void abort_hand_frame();
+    wuwa_hand::Tracking hand_demo;
 
     void on_config_load(const utility::Config& cfg, bool set_defaults) override;
     void on_config_save(utility::Config& cfg) override;
@@ -63,6 +74,9 @@ struct OpenXR final : public VRRuntime {
     void on_device_reset() override {
         std::scoped_lock _{this->sync_mtx};
         std::scoped_lock __{this->pose_mtx};
+        wuwa_projection_test::lease.reset();
+        hand_demo.suspend();
+        abort_hand_frame();
         //stage_view_queue.clear();
         //stage_view_queue_renderthread.clear();
     }
@@ -91,6 +105,10 @@ struct OpenXR final : public VRRuntime {
 
     VRRuntime::Error update_matrices(float nearz, float farz) override;
     VRRuntime::Error update_input() override;
+    // Call immediately after successful update_input on the engine thread. True
+    // means both controller sticks are active in that sync, including neutral;
+    // false always clears output. This does not sync actions or change bindings.
+    bool read_sightseeing_pad(wuwa_sightseeing::Pad& output);
 
     void destroy() override;
     void enqueue_render_poses(uint32_t frame_count) override;
@@ -201,15 +219,24 @@ public:
 
     XrSpaceLocation view_space_location{XR_TYPE_SPACE_LOCATION};
 
-    std::unordered_set<std::string> enabled_extensions{};
+    // The instance can survive a runtime object being recreated. Its enabled
+    // extensions must survive with it, rather than silently losing capability.
+    static inline std::unordered_set<std::string> enabled_extensions{};
 
     std::vector<XrViewConfigurationView> view_configs{};
     std::unordered_map<uint32_t, Swapchain> swapchains{}; // SwapchainIndex -> Swapchain
     std::vector<XrView> views{};
     std::vector<XrView> stage_views{};
 
+    // Protected by sync_assignment_mtx with the source views. Settings are
+    // sampled once; UI dirty notifications are not the cache's identity.
+    openxr_projection::Cache projection_cache{};
+
     //std::deque<std::vector<XrView>> stage_view_queue{};
     struct PipelineState {
+        wuwa_hand::Snapshot hand_snapshot{};
+        wuwa_depth_scale::Snapshot depth_scale{};
+        bool hand_drawing{};
         XrFrameState frame_state{XR_TYPE_FRAME_STATE};
         XrSpaceLocation view_space_location{XR_TYPE_SPACE_LOCATION};
         std::vector<XrView> stage_views{};
@@ -219,6 +246,7 @@ public:
         uint32_t frame_count{0}; // Updated on game thread prior to rendering
         uint32_t prev_frame_count{0}; // Updated right after xrWaitFrame is called
     };
+    wuwa_hand::FrameReservation<PipelineState> hand_submission;
     /*std::array<std::vector<XrView>, 3> stage_view_queue{};
     std::array<XrSpaceLocation, 3> view_space_location_queue{};
     std::array<XrFrameState, 3> frame_state_queue{};*/

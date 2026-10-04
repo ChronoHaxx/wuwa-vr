@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -12,6 +11,7 @@
 #include <wrl/client.h>
 
 #include "Mod.hpp"
+#include "../utility/WuWaWindowPresentation.hpp"
 
 // A comfort mode that keeps UEVR's normal stereo scene and positional
 // tracking, then masks the outside of a rectangle anchored in tracking space.
@@ -56,9 +56,14 @@ public:
     }
 
     void on_draw_sidebar_entry(std::string_view entry) override;
+    void on_frame() override;
     void on_device_reset() override;
+    // Invalidate tracking-space state without releasing graphics resources.
+    void reset_tracking_presentation();
     void request_recenter();
     void apply_cutscene_comfort_state(std::string_view payload);
+    void clear_cutscene_comfort_state();
+    void suspend_cutscene_comfort(bool suspended);
     Status get_status() const;
 
     // These are called on UEVR's final color targets, after the stereo scene
@@ -104,17 +109,11 @@ private:
         float opacity{1.0f};
     };
 
-    struct CutsceneComfortState {
-        bool active{};
-        bool lock_aspect{};
-        float width{2.4f};
-        float height{1.35f};
-        float distance{2.0f};
-        float feather{0.10f};
-        float corner_radius{};
-        float curvature{};
-        Vector3f surround_color{};
-        float opacity{};
+    struct AnchorPose {
+        Vector3f origin{};
+        Vector3f right{1.0f, 0.0f, 0.0f};
+        Vector3f up{0.0f, 1.0f, 0.0f};
+        Vector3f back{0.0f, 0.0f, 1.0f};
     };
 
     bool ensure_d3d11_objects(ID3D11Device* device);
@@ -122,14 +121,16 @@ private:
     bool ensure_d3d12_objects(ID3D12Device* device, DXGI_FORMAT format);
     bool build_constants(bool right_eye, Constants& constants);
     bool update_enabled_state();
-    bool cutscene_comfort_active() const;
     RenderSettings get_render_settings() const;
-    void invalidate_anchor();
+    // The caller holds m_presentation_mutex so settings and anchor agree.
+    RenderSettings get_render_settings_locked() const;
 
     void reset_d3d11();
     void reset_d3d12();
 
     const ModToggle::Ptr m_enabled{ModToggle::create(generate_name("Enabled"), false)};
+    const ModKey::Ptr m_toggle_key{ModKey::create(generate_name("ToggleKey"), VK_F7)};
+    bool m_toggle_armed{false};
     const ModToggle::Ptr m_lock_aspect{ModToggle::create(generate_name("LockAspect"), false)};
     const ModSlider::Ptr m_plane_width{ModSlider::create(generate_name("PlaneWidth"), 0.1f, 12.0f, 2.4f)};
     const ModSlider::Ptr m_plane_height{ModSlider::create(generate_name("PlaneHeight"), 0.1f, 8.0f, 1.35f)};
@@ -146,17 +147,8 @@ private:
     // normal WindowMode configuration.
     const ModToggle::Ptr m_external_bridge_available{ModToggle::create(generate_name("ExternalBridgeAvailable"), true)};
 
-    mutable std::mutex m_cutscene_comfort_mutex{};
-    CutsceneComfortState m_cutscene_comfort{};
-
-    mutable std::mutex m_anchor_mutex{};
-    bool m_anchor_valid{false};
-    Vector3f m_anchor_origin{};
-    Vector3f m_anchor_right{1.0f, 0.0f, 0.0f};
-    Vector3f m_anchor_up{0.0f, 1.0f, 0.0f};
-    Vector3f m_anchor_back{0.0f, 0.0f, 1.0f};
-    std::atomic_bool m_recenter_requested{true};
-    std::atomic_bool m_was_enabled{false};
+    mutable std::mutex m_presentation_mutex{};
+    wuwa_window::PresentationState<AnchorPose> m_presentation{};
 
     ComPtr<ID3D11Device> m_d3d11_device{};
     ComPtr<ID3D11VertexShader> m_d3d11_vs{};

@@ -186,7 +186,10 @@ struct Record {
 };
 struct Slot { Record data{}; std::atomic<bool> ready{}; };
 struct Probe {
-    std::array<Slot, capacity> slots{};
+    // Slot\'s member initializers initialize every field. Avoid MSVC expanding
+    // thousands of nested aggregate initializers at compile time.
+    static_assert(!std::is_trivially_default_constructible_v<Slot>);
+    std::array<Slot, capacity> slots;
     std::atomic<uint32_t> next{}, calls{}, dropped{}, reads_failed{}, lock_misses{};
     std::array<std::atomic<uint32_t>, 2> per_eye{};
     wuwa_lod::ProducerSampler uniform_sampler{};

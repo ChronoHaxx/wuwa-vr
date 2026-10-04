@@ -42,11 +42,13 @@ Opening or updating the app does not automatically select the simulator.
 ## Updates
 
 - Open **02 → Versions & updates → Check updates**.
-- **Desktop app:** when an update is offered, choose
-  **Update launcher**. Close the game and stop recording first; the app updates
-  only while idle and restarts afterward.
-- **VR package:** use the version/update controls in **step 02**, select the newer
-  beta and install it. Older installed VR versions remain available for rollback.
+- **Desktop app:** choose **Update launcher** to download and verify the update;
+  this does not restart the app. When it is ready, close the game and injector,
+  stop recording and finish other operations, then choose **Restart to update**
+  and confirm. Installing or updating the desktop app preserves your selected VR package.
+- **VR package:** in **step 02**, choose **beta-2026-10-04-launcher** and install it,
+  or select it if already installed, to use **npc-rim-20261004** (formerly the
+  private NPC-rim candidate). Older installed VR versions remain available for rollback.
 
 Updating keeps settings, backups, logs and recordings. The manager uses
 `%LOCALAPPDATA%\WuWa VR Manager`; the existing launcher data stays in

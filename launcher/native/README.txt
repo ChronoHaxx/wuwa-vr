@@ -22,10 +22,14 @@ about 54 MB, so an internet connection is required.
 
 Returning players: use the main Launch in VR button with saved choices.
 Windows permission and Play in the official game launcher may still be required.
-Updates: Step 02 > Versions & updates > Check updates. Choose Update launcher
-when offered; close the game and stop recording first. The launcher updates only
-while idle and restarts afterward. To update the VR mod, select its newer version
-in Step 02 and install. Settings, backups, logs and recordings are preserved.
+Updates: Step 02 > Versions & updates > Check updates. Update launcher downloads
+and verifies the desktop app update; it does not restart the app. When ready,
+close the game and injector, stop recording and finish other operations, then
+choose Restart to update and confirm. Installing or updating the desktop app
+preserves your selected VR package. In Step 02 choose beta-2026-10-04-launcher
+and install it, or select it if already installed, to use npc-rim-20261004
+(formerly the private NPC-rim candidate).
+Settings, backups, logs and recordings are preserved.
 Do not delete the WuWa VR Manager or WuWa VR Launcher folders in LocalAppData.
 There are no Setup/Record/Help tabs. The footer's Developer tools link opens the
 original web tools for recording, playtests and advanced settings for this exact
@@ -173,9 +177,11 @@ Optional support: https://ko-fi.com/chronohax
 
 之后使用已保存的选项，点击“以 VR 模式启动”即可进入启动流程。
 仍可能需要 Windows 授权和在官方启动器内点击开始。
-更新：第 02 步 > 版本与更新 > 检查更新。出现提示后选择“更新启动器”。
-请先关闭游戏并停止录制；仅在空闲时更新，完成后应用会重启。
-更新 VR 模组则在第 02 步选择较新版本并安装。设置、备份、日志和录像会保留；
+更新：第 02 步 > 版本与更新 > 检查更新。“更新启动器”下载并校验桌面应用更新，
+此时不会重启。更新就绪后，关闭游戏和注入器、停止录制并完成其他操作，
+再选择“重启并更新”并确认。安装或更新桌面应用会保留当前选择的 VR 包。
+在第 02 步选择 beta-2026-10-04-launcher 并安装（已安装时直接选用），
+即可使用 npc-rim-20261004（原私测 NPC 轮廓光候选版）。设置、备份、日志和录像会保留；
 不要删除 LocalAppData 中的 WuWa VR Manager 或 WuWa VR Launcher 文件夹。
 不再提供“设置／录制／帮助”标签页。底部“开发工具”链接打开同一安装包的
 原版网页工具，共用设置、录像、测试和调试功能。录制支持 SteamVR 和内置模拟器；

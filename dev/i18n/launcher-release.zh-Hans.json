@@ -13,7 +13,7 @@
   "controls": "在游戏中，<kbd>L3 + R3</kbd> 打开 UEVR 设置。自定义选项位于 <strong>VR → WuWa Controls</strong>。<kbd>L3 + A</kbd> 重置视角中心，<kbd>L3 + B</kbd> 显示或隐藏游戏界面。",
   "guide": "完整设置、更新与恢复步骤（英文）",
   "updatesTitle": "启动器与 VR 包分别更新",
-  "updates": "打开<strong>第 02 步 → 版本与更新 → 检查更新</strong>。<strong>启动器：</strong>出现提示后选择 <strong>Update launcher（更新启动器）</strong>。请先关闭游戏并停止录制；应用仅在空闲时更新，完成后重新启动。<strong>VR 包：</strong>在第 02 步选择较新的测试版并安装。设置、备份、日志和录像保留在原有数据文件夹中，旧 VR 包仍可用于回退。",
+  "updates": "打开<strong>第 02 步 → 版本与更新 → 检查更新</strong>。<strong>桌面应用：</strong>选择 <strong>Update launcher（更新启动器）</strong>以下载并校验更新；此时不会重启应用。更新就绪后，关闭游戏和注入器，停止录制并完成其他操作，再选择 <strong>Restart to update（重启并更新）</strong>并确认。安装或更新桌面应用会保留当前选择的 VR 包。<strong>VR 包：</strong>在第 02 步选择 <strong>beta-2026-10-04-launcher</strong> 并安装（已安装时直接选用），即可使用 <strong>npc-rim-20261004</strong>（原私测 NPC 轮廓光候选版）。设置、备份、日志和录像保留在原有数据文件夹中，旧 VR 包仍可用于回退。",
   "runtime": "选择模拟器或恢复头显运行时会更改系统 OpenXR 运行时，可能需要 Windows 权限确认。请先关闭游戏和注入器。仅打开或更新应用不会自动切换到模拟器。",
   "betaTitle": "本测试版的变化",
   "accepted": "项目作者已报告 2D 屏幕亮度和大招镜头得到修正。新增的 NPC 轮廓光选项仍待实体头显验证，也尚未确认全新电脑上的安装体验。",

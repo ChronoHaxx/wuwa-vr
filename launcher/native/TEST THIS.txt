@@ -3,7 +3,7 @@ Release: beta-2026-10-04-launcher / backend npc-rim-20261004 / game 3.7
 
 When you choose to test, use this one grouped check. Mark Pass / Fail / Blocked / Not tested explicitly. Simulator observations below do not establish this candidate's physical acceptance.
 
-Run WuWa-VR-Setup.exe once, then use the normal WuWa VR shortcut. This per-user installer does not bundle the VR mod: Step 02 needs internet to download about 54 MB on first install. Follow 01 Game > 02 Install VR > 03 Headset or simulator, then Launch in VR, Windows permission and Play in the official game launcher. Install/select only after exiting the game normally; running DLLs cannot change without restart. For updates, use Step 02 > Versions & updates > Check updates; Update launcher is offered while idle and restarts the app. VR package updates are selected in Step 02. Settings, backups and recordings are preserved.
+Run WuWa-VR-Setup.exe once, then use the normal WuWa VR shortcut. This per-user installer does not bundle the VR mod: Step 02 needs internet to download about 54 MB on first install. Follow 01 Game > 02 Install VR > 03 Headset or simulator, then Launch in VR, Windows permission and Play in the official game launcher. Install/select only after exiting the game normally; running DLLs cannot change without restart. For updates, use Step 02 > Versions & updates > Check updates. Update launcher downloads and verifies the desktop app update without restarting. When ready, close the game and injector, stop recording and finish other operations, then choose Restart to update and confirm. Installing or updating the desktop app preserves your selected VR package. In Step 02 choose beta-2026-10-04-launcher and install it, or select it if already installed, to use npc-rim-20261004 (formerly the private NPC-rim candidate). Settings, backups and recordings are preserved.
 
 Fresh-PC installation and Steam/Epic game injection remain unverified. Use the release receipt for build/package test results; this checklist does not establish a pass. Advanced users can extract WuWa-VR-Launcher.zip and use its older web interface. Previous public release: https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817
 
@@ -23,7 +23,7 @@ Cutscenes remain a known issue: the right-eye scene can disappear or flicker. Th
 公开测试版 1.0.0 · 10 月 4 日
 发布版本 beta-2026-10-04-launcher／后端 npc-rim-20261004／游戏 3.7。
 之后如选择测试，请按以下分组检查，并明确记录通过／失败／受阻／未测试。
-运行 WuWa-VR-Setup.exe 一次，为当前用户安装，再打开普通 WuWa VR 快捷方式。此安装程序不包含 VR 模组；首次在第 02 步安装需要联网下载约 54 MB。按 01 游戏 > 02 安装 VR > 03 头显或模拟器操作，再点击以 VR 模式启动、同意 Windows 授权，并在官方启动器中开始游戏。正常退出游戏后才安装或切换；运行中的 DLL 需重启才会改变。更新入口为第 02 步 > 版本与更新 > 检查更新；空闲时可选择更新启动器，完成后应用重启。VR 包在第 02 步选择更新，设置、备份和录像保留。
+运行 WuWa-VR-Setup.exe 一次，为当前用户安装，再打开普通 WuWa VR 快捷方式。此安装程序不包含 VR 模组；首次在第 02 步安装需要联网下载约 54 MB。按 01 游戏 > 02 安装 VR > 03 头显或模拟器操作，再点击以 VR 模式启动、同意 Windows 授权，并在官方启动器中开始游戏。正常退出游戏后才安装或切换；运行中的 DLL 需重启才会改变。更新入口为第 02 步 > 版本与更新 > 检查更新。“更新启动器”下载并校验桌面应用更新，此时不会重启。更新就绪后，关闭游戏和注入器，停止录制并完成其他操作，再选择“重启并更新”并确认。安装或更新桌面应用会保留当前选择的 VR 包。在第 02 步选择 beta-2026-10-04-launcher 并安装（已安装时直接选用），即可使用 npc-rim-20261004（原私测 NPC 轮廓光候选版）；设置、备份和录像保留。
 全新电脑安装与 Steam／Epic 游戏版本注入仍未确认。构建及安装包测试以发布记录为准；本表不代表验收通过。进阶用户可完整解压 WuWa-VR-Launcher.zip 使用旧版网页界面；上一个公开版本链接见英文部分。
 
 已有证据：同一固定 NPC 场景的两轮模拟器 A/B/A 比较使用宽度 0.5 -> 0 -> 0.5，并核实各次截图前后的实际值。设零后右眼额外轮廓减弱，恢复后重新出现；其他高光仍在。这支持抑制某项边缘光效果，不代表修复底层立体着色问题或头显验收通过。玩家已确认此前 view-controls 版本的头显二维亮度改善，本版保留该修正。

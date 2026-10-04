@@ -229,7 +229,8 @@ def main():
     remote = next((x for x in existing if x['tag_name'] == a.tag), None)
     if remote is None:
         run('gh', 'release', 'create', a.tag, '--repo', REPO, '--target', commit, '--draft', '--prerelease', '--title', 'WuWa VR beta - installer ' + assets[0]['Version'], '--notes-file', str(a.notes))
-        remote = json.loads(run('gh', 'api', 'repos/' + REPO + '/releases/tags/' + a.tag))
+        created = json.loads(run('gh', 'api', 'repos/' + REPO + '/releases?per_page=100'))
+        remote = next(x for x in created if x['tag_name'] == a.tag)
     verify_release_target(remote, a.tag, commit)
     uploaded = {x['name']: x for x in remote['assets']}
     require(set(uploaded).issubset(x['name'] for x in records), 'Unexpected draft assets')
@@ -239,7 +240,7 @@ def main():
         else:
             print('Uploading ' + item['name'], flush=True)
             run('gh', 'release', 'upload', a.tag, str(output / item['name']), '--repo', REPO)
-    remote = json.loads(run('gh', 'api', 'repos/' + REPO + '/releases/tags/' + a.tag))
+    remote = json.loads(run('gh', 'api', 'repos/' + REPO + '/releases/' + str(remote['id'])))
     verify_release_target(remote, a.tag, commit)
     actual = {x['name']: x for x in remote['assets']}
     require(set(actual) == {x['name'] for x in records}, 'Release asset inventory mismatch')
@@ -247,7 +248,7 @@ def main():
         require(actual[item['name']]['size'] == item['size'] and actual[item['name']].get('digest') == 'sha256:' + item['sha256'], 'Remote asset mismatch: ' + item['name'])
     run('gh', 'release', 'edit', a.tag, '--repo', REPO, '--draft=false', '--prerelease', '--latest=false')
     require(remote_tag_commit(a.tag) == commit, 'Published tag does not resolve to the reviewed source commit')
-    plan['published_release'] = json.loads(run('gh', 'api', 'repos/' + REPO + '/releases/tags/' + a.tag))['html_url']
+    plan['published_release'] = json.loads(run('gh', 'api', 'repos/' + REPO + '/releases/' + str(remote['id'])))['html_url']
     (output / 'published.json').write_text(json.dumps(plan, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(plan, indent=2))
 

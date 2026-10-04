@@ -17,7 +17,7 @@ function downloads(t) {
 }
 function steps(t) { return `<p>${t.install}</p><ol class="steps launcher-steps">${t.steps.map(s => `<li>${s}</li>`).join('')}</ol>`; }
 function details(t, heading = 'h2') {
-  return `<section id="launcher-updates"><${heading}>${t.updatesTitle}</${heading}><p>${t.updates}</p><p>${t.runtime}</p></section><section id="launcher-beta"><${heading}>${t.betaTitle}</${heading}><p>${t.accepted}</p><p>${t.rim}</p><p>${t.limits}</p></section>`;
+  return `<section id="launcher-updates"><${heading}>${t.updatesTitle}</${heading}><p>${t.updates}</p><p>${t.runtime}</p></section><section id="launcher-beta"><${heading}>${t.betaTitle}</${heading}><p>${t.accepted}</p><p>${t.rim}</p><p>${t.limits}</p><p>${t.cutscenes}</p></section>`;
 }
 function banner(text) {
   const value = `<aside class="notice" data-launcher-release><strong>4 October beta:</strong> <a href="${release}">WuWa VR ${status.appVersion} · game ${status.game}</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Windows installer and app updates; optional NPC rim workaround starts off.</aside>`;
@@ -27,6 +27,29 @@ async function build() {
   const candidates = [root, process.env.WUWA_NODE_MODULES,
     path.join(process.env.USERPROFILE || process.env.HOME || '', '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules')].filter(Boolean);
   const {marked} = await import(require('node:url').pathToFileURL(require.resolve('marked', {paths: candidates})).href);
+  const links = {'START-HERE.md': 'guide.html#start', 'RISK.md': 'risk.html',
+    'TROUBLESHOOTING.md': 'guide.html#recovery', 'CONTROLS.md': 'guide.html#controls',
+    'COMFORT.md': 'guide.html#comfort', 'CHECKPOINTS.md': 'testing.html#checkpoints',
+    'LICENSE.md': 'license.html', 'SUPPORT.md': 'support.html'};
+  function render(file, controls = false) {
+    let html = marked.parse(fs.readFileSync(path.join(root, file), 'utf8').replace(/^# .+\r?\n/, ''), {gfm: true});
+    html = html.replace(/href="([^"#]+\.md)(#[^"]*)?"/g, (match, target, anchor) => {
+      if (/^https?:/.test(target)) return match;
+      const page = links[path.basename(target)]; if (!page) throw Error(`Unmapped guide link in ${file}: ${target}`);
+      return `href="${page}${anchor && !page.includes('#') ? anchor : ''}"`;
+    }).replace(/<(\/?)h2>/g, '<$1h3>')
+      .replace(/<table>/g, '<div class="table-scroll"><table>').replace(/<\/table>/g, '</table></div>');
+    if (controls) {
+      let context = '';
+      html = html.replace(/<(h[3-6])(?:\s[^>]*)?>([\s\S]*?)<\/\1>|<tbody>([\s\S]*?)<\/tbody>/g,
+        (match, heading, text, body) => {
+          // Markdown already escapes entities; preserve them in this attribute.
+          if (heading) { context = text.replace(/<[^>]*>/g, '').replace(/"/g, '&quot;'); return match; }
+          return '<tbody>' + body.replace(/<tr>/g, `<tr data-control-row data-context="${context}">`) + '</tbody>';
+        });
+    }
+    return html;
+  }
   const update = (name, transform) => {
     const file = path.join(site, name), old = fs.readFileSync(file, 'utf8'), next = transform(old);
     if (old !== next) fs.writeFileSync(file, next);
@@ -41,19 +64,22 @@ async function build() {
   });
   update('guide.html', text => {
     text = banner(text);
-    let setup = marked.parse(fs.readFileSync(path.join(root, 'docs/START-HERE.md'), 'utf8').replace(/^# .+\r?\n/, ''), {gfm: true});
-    const links = {'RISK.md': 'risk.html', 'TROUBLESHOOTING.md': 'guide.html#recovery', 'CONTROLS.md': 'guide.html#controls', 'COMFORT.md': 'guide.html#comfort'};
-    setup = setup.replace(/href="([^"#]+\.md)(#[^"]*)?"/g, (match, file, anchor) => {
-      if (/^https?:/.test(file)) return match;
-      const target = links[path.basename(file)]; if (!target) throw Error(`Unmapped setup link: ${file}`);
-      return `href="${target}${anchor && !target.includes('#') ? anchor : ''}"`;
-    }).replace(/<(\/?)h2>/g, '<$1h3>');
+    const setup = render('docs/START-HERE.md');
     text = replace(text, /<section id="start">[\s\S]*?<\/section>/, `<section id="start"><h2>Install, launch and update</h2>${setup}</section>`, 'guide setup');
+    // Keep the existing accessible search UI while refreshing the actual reference.
+    const filter = /<div class="control-filter"[\s\S]*?<p id="control-count"[^>]*><\/p>/.exec(text);
+    if (!filter) throw Error('Missing guide controls filter');
+    text = replace(text, /<section id="controls">[\s\S]*?<\/section>/,
+      `<section id="controls"><h2>All Xbox shortcuts</h2>${filter[0]}${render('docs/CONTROLS.md', true)}</section>`, 'guide controls');
+    text = replace(text, /<section id="recovery">[\s\S]*?<\/section>/,
+      `<section id="recovery"><h2>Problems and recovery</h2><p>${locales.en.cutscenes}</p>${render('docs/TROUBLESHOOTING.md')}</section>`, 'guide recovery');
     text = replace(text, /(<h1>Player guide<\/h1>)<p>[\s\S]*?<\/p>/,
       '<h1>Player guide</h1><p>Setup and updates for the installed desktop app. <a href="l/zh-Hans.html">简体中文安装指南</a>. The portable browser launcher remains an advanced fallback.</p>', 'guide intro');
     return replace(text, /<section id="packaging">[\s\S]*?<\/section>/,
       `<section id="packaging"><h2>Portable fallback</h2><p>${locales.en.portable}</p>${downloads(locales.en)}</section>`, 'portable section');
   });
+  update('risk.html', text => replace(text, /<div class="guide-content">[\s\S]*?<\/div>/,
+    `<div class="guide-content">${render('docs/RISK.md')}</div>`, 'risk notice'));
   // Refresh current-download references without rewriting historical technical notes.
   update('developers.html', banner);
   update('understanding.html', text => replace(text,

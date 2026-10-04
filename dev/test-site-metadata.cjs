@@ -47,6 +47,46 @@ function verify() {
       [metadata.baseUrl + 'media/feature-portal.jpg']);
   }
 }
+function verifyReleaseSections() {
+  const guide = fs.readFileSync(path.join(site, 'guide.html'), 'utf8');
+  const controls = /<section id="controls">([\s\S]*?)<\/section>/.exec(guide)[1];
+  const recovery = /<section id="recovery">([\s\S]*?)<\/section>/.exec(guide)[1];
+  assert(controls.includes('Fixture: current controls source.'));
+  assert(recovery.includes('Fixture: current recovery source.'));
+  for (const text of ['Toggle 2D screen mode', 'Toggle the temporary 10× diorama', 'Optional Quest controllers for walking']) {
+    assert(controls.includes(text), 'Current control missing: ' + text);
+  }
+  assert.equal((controls.match(/id="control-search"/g) || []).length, 1);
+  assert.equal((controls.match(/id="control-count"/g) || []).length, 1);
+  const bodies = [...controls.matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)];
+  assert(bodies.length > 0);
+  for (const [, body] of bodies) assert(!/<tr>/.test(body), 'Unsearchable control row');
+  assert((controls.match(/<tr data-control-row(?:\s[^>]*)?>/g) || []).length > 30);
+  const questRows = [...controls.matchAll(/<tr data-control-row data-context="([^"]*)">([\s\S]*?)<\/tr>/g)]
+    .filter(([, context]) => context.toLowerCase().includes('quest')).map(([, , body]) => body);
+  assert(questRows.some(row => row.includes('Right A / B')) && questRows.some(row => row.includes('Left Menu')),
+    'Quest heading must remain searchable through each mapping row context');
+  assert(recovery.includes('npc-rim-20261004') && recovery.includes('advanced portable fallback'));
+  assert(recovery.includes('Cutscenes can still lose the right-eye scene or flicker'));
+  for (const file of ['index.html', 'l/en.html', 'l/zh-Hans.html']) {
+    const html = fs.readFileSync(path.join(site, file), 'utf8');
+    assert(html.includes(file.includes('zh-Hans') ? '不提供自动过场切换' : 'automatic cutscene switching is not provided'), file);
+  }
+  const risk = fs.readFileSync(path.join(site, 'risk.html'), 'utf8');
+  assert(!risk.includes('combined-mod distribution remains pending'));
+  assert(risk.includes('Publication does not change') && risk.includes('Account restrictions'));
+  for (const [name, html] of [['guide.html', guide], ['risk.html', risk]]) {
+    for (const [, href] of html.matchAll(/href="([^"]*)"/g)) {
+      if (/^(https?:|mailto:)/.test(href)) continue;
+      const url = new URL(href, 'https://fixture.invalid/' + name);
+      const target = path.join(site, decodeURIComponent(url.pathname));
+      assert(fs.existsSync(target), `Broken local guide link: ${name} ${href}`);
+      if (url.hash) assert(fs.readFileSync(target, 'utf8').includes(`id="${decodeURIComponent(url.hash.slice(1))}"`),
+        `Missing guide anchor: ${name} ${href}`);
+      assert(!/\.md(?:#|$)/.test(href), 'Unmapped local Markdown link');
+    }
+  }
+}
 try {
   // Copy only generator inputs. Videos are existence-only fixtures: generators
   // do not decode media, and copying large recordings would add no coverage.
@@ -81,8 +121,12 @@ try {
   assert.throws(() => metadata.updateHtml('google3ebe097a88f39e29.html', '<head><title>x</title><meta name="description" content="x"></head>'), /Not a public content page/);
   checks.push('stale/duplicate owned metadata replaced; verification page rejected');
 
+  fs.appendFileSync(path.join(fixture, 'docs/CONTROLS.md'), '\n\nFixture: current controls source.\n');
+  fs.appendFileSync(path.join(fixture, 'docs/TROUBLESHOOTING.md'), '\n\nFixture: current recovery source.\n');
   generate('--launcher-release');
   verify();
+  verifyReleaseSections();
+  checks.push('scoped current controls/recovery ingestion, searchable tables, EN/zh cutscene limits, risk notice and local links');
   const scoped = snapshot();
   for (const file of protectedFiles) assert.equal(scoped[file], before[file]);
   generate('--launcher-release');
@@ -91,6 +135,7 @@ try {
 
   generate();
   verify();
+  verifyReleaseSections();
   const full = snapshot();
   for (const file of protectedFiles) assert.equal(full[file], before[file]);
   generate();

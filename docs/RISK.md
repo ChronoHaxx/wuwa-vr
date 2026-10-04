@@ -37,9 +37,12 @@ unlawful. This disclaimer does not remove rights held by Kuro Games, other
 rights holders or users under applicable law, nor make unauthorized conduct
 permitted. It is not a guarantee of legal protection for the authors.
 
-Do not disable or bypass anti-cheat or Windows security protections. Public
-combined-mod distribution remains pending clarification of upstream rights
-and a tested first-run package.
+Do not disable or bypass anti-cheat or Windows security protections. A public
+beta installer, VR package and matching source are available on the project's
+[release page](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher).
+Publication does not change any component's licence terms, establish legal
+clearance or imply publisher approval. Fresh-PC installation and broader
+headset/client compatibility remain unverified.
 
 ## Donations
 

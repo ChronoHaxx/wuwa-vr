@@ -1,11 +1,18 @@
 # Known issues and recovery
 
-Status: October 1, 2026. The current public build is **3.7 + reflection + far lighting fix v2 ·
-1 Oct 18:17 BST** (beta, game version 3.7). It keeps the controls, HUD and camera
-features of the earlier builds; the candidate times below refer to the
-checkpoints in [CHECKPOINTS.md](CHECKPOINTS.md). Keep the selected build
-name, timestamp and backend hash with a report. A result against one checkpoint
-does not automatically apply to another.
+Status: 4 October 2026. The current public release is
+[beta-2026-10-04-launcher](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher):
+desktop app **1.0.0**, backend **npc-rim-20261004**, for game **3.7**.
+Fresh-PC installation and the new optional features' physical-headset acceptance
+remain pending; a published package is not proof of those checks.
+
+The dated observations below retain their original checkpoint scope. References
+to **WuWa VR Launcher.exe**, a browser dashboard or **Apply & launch** describe
+the advanced portable fallback, not the installed desktop app. Start with the
+[current setup and recovery steps](START-HERE.md) for that app. Candidate times
+refer to the checkpoints in [CHECKPOINTS.md](CHECKPOINTS.md). Keep the selected
+build name, timestamp and backend hash with a report; a result against one
+checkpoint does not automatically apply to another.
 
 | Symptom | What to do / current finding |
 | --- | --- |

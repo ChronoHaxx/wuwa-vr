@@ -81,6 +81,8 @@ async function build() {
       return text.replace('<section id="start">', note + '<section id="start">');
     });
   }
+  // Both full generation and this scoped refresh end here; keep one metadata policy.
+  require('../site-metadata.cjs').apply(site);
   console.log('Refreshed installer download, setup and updates in English/Simplified Chinese; preserved existing site and other locales.');
 }
 module.exports = {build};

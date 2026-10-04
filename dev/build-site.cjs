@@ -2,6 +2,11 @@
 const fs=require('node:fs'),path=require('node:path');
 const {shell,escape,languageLinks}=require('./site-layout.cjs');
 const root=path.resolve(__dirname,'..'),site=path.join(root,'site');
+// Head-only maintenance preserves the published shell/body and protected files.
+if (process.argv.includes('--metadata-only')) {
+  console.log(`Refreshed metadata for ${require('./site-metadata.cjs').apply(site)} public content pages.`);
+  return;
+}
 // Refresh the reviewed published pages without regenerating unrelated legacy content.
 if (process.argv.includes('--launcher-release')) {
   require('./i18n/build-launcher-release.cjs').build().catch(e=>{console.error(e);process.exitCode=1;});

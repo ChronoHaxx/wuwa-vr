@@ -116,7 +116,7 @@ constexpr const char* sheet[][2] = {
     {"L3 + R3    UEVR menu", "L3 + RB    Game / fixed camera"},
     {"L3 + A     Recenter view / portal", "L3 + Y/X   Fixed / first-person height"},
     {"L3 + LT / F7   Portal on / off", "L3 + RT    Diorama on / off (10x)"},
-    {"LT + RT, then hold L3 0.8 s: 2D screen", "Release all three before repeating"},
+    {"LT + RT, then hold L3 0.8 s: stereo screen", "LT + RT, then click R3: mono theatre"},
     {"Double L3  Windows screenshot", "LB + LT/RT Fixed camera farther / closer"},
     {"Double R3  Freecam on / off", "Freecam: left stick moves, right looks"},
     {"L3 + B     Show / hide game UI", "Freecam: LT rises, RT boosts speed"},
@@ -221,6 +221,94 @@ nlohmann::json pose_pair_json(const wuwa_pose_pair::Pair& pair, uint64_t now, bo
 }
 }
 
+bool WuWaControlsComponent::auto_cinema_active() const {
+    return auto_cinema_presentation() != wuwa_auto_cinema::Presentation::none;
+}
+wuwa_auto_cinema::Presentation WuWaControlsComponent::auto_cinema_presentation() const {
+    return m_cinema_presentation.load();
+}
+void WuWaControlsComponent::advance_auto_cinema(bool runtime_ready) {
+    std::scoped_lock lock{m_cinema_mutex};
+    // Apply expiry on a game-frame boundary, never independently between eye
+    // getter calls. A fully stalled game thread holds its last presentation
+    // until the next tick; that tick releases a stale producer before rendering.
+    if (!runtime_ready) m_cinema_lease.invalidate();
+    m_cinema_presentation.store(m_cinema_lease.presentation(GetTickCount64()));
+}
+std::string WuWaControlsComponent::auto_cinema_status() const {
+    std::scoped_lock lock{m_cinema_mutex};
+    const auto now = GetTickCount64();
+    const auto state = m_cinema_presentation.load() != wuwa_auto_cinema::Presentation::none && !m_cinema_lease.active(now) ?
+        "Automatic lease expired; restoration waits for the next game tick" : m_cinema_lease.state(now);
+    return std::string{state} + ". " + m_cinema_signal +
+        " [detection " + std::to_string(static_cast<int>(std::round(m_cinema_detection_ms))) + " ms]";
+}
+void WuWaControlsComponent::reset_auto_cinema() {
+    std::scoped_lock lock{m_cinema_mutex};
+    m_cinema_lease.reset();
+    m_cinema_presentation.store(wuwa_auto_cinema::Presentation::none);
+    m_cinema_signal = "Detector has not reported";
+    m_cinema_detection_ms = 0;
+}
+void WuWaControlsComponent::override_auto_cinema() {
+    std::scoped_lock lock{m_cinema_mutex};
+    m_cinema_lease.manual();
+    m_cinema_presentation.store(wuwa_auto_cinema::Presentation::none);
+}
+std::string WuWaControlsComponent::CinemaValue::get() const {
+    if (kind == 1) return "lease-v1";
+    if (kind == 2) return owner.auto_cinema_status();
+    if (kind == 3) return VR::get()->is_using_mono_theatre() ? "true" : "false";
+    if (kind == 4 || kind == 5) return "effective-v1";
+    if (kind == 6) return VR::get()->is_using_2d_screen() ? "true" : "false";
+    std::scoped_lock lock{owner.m_cinema_mutex};
+    return std::to_string(owner.m_cinema_lease.generation());
+}
+void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
+    if (kind == 4 || kind == 5) {
+        if (text == "toggle") {
+            if (kind == 4) VR::get()->set_mono_theatre_manually(!VR::get()->is_using_mono_theatre());
+            else VR::get()->set_stereo_screen_manually(!VR::get()->is_using_2d_screen());
+        }
+        return;
+    }
+    if (kind > 1 || text.size() > 512) return;
+    try {
+        if (kind == 0) {
+            std::scoped_lock lock{owner.m_cinema_mutex};
+            if (text == "start") owner.m_cinema_lease.start();
+            else if (text.starts_with("stop:")) {
+                size_t consumed{};
+                const auto generation = std::stoull(text.substr(5), &consumed);
+                if (consumed == text.size() - 5) owner.m_cinema_lease.stop(generation);
+            }
+            return;
+        }
+        const auto sample = nlohmann::json::parse(text);
+        if (!sample.is_object() || sample.value("version", 0) != 1) return;
+        const auto token = sample.value("generation", std::string{});
+        if (token.empty() || token.size() > 20 || token.find_first_not_of("0123456789") != std::string::npos) return;
+        const auto generation = std::stoull(token);
+        const auto world = sample.value("world", std::string{});
+        const auto active = sample.value("active", -1), hold = sample.value("hold", -1), known = sample.value("known", -1);
+        const auto detail = sample.value("detail", std::string{});
+        const auto elapsed = sample.value("elapsed_ms", 0.0);
+        if (world.empty() || world.size() > 32 || world.find_first_not_of("0123456789") != std::string::npos ||
+            active < 0 || active > 3 || hold < 0 || hold > 3 || known < 0 || known > 3 ||
+            detail.size() > 240 || !std::isfinite(elapsed) || elapsed < 0 || elapsed > 50) return;
+        std::scoped_lock lock{owner.m_cinema_mutex};
+        if (!VR::get()->is_auto_cinema_enabled()) return;
+        const auto presentation = ((active & wuwa_auto_cinema::movie) ||
+                (hold & owner.m_cinema_lease.seen_sources() & wuwa_auto_cinema::movie)) ?
+            wuwa_auto_cinema::Presentation::mono_theatre : VR::get()->auto_story_presentation();
+        if (owner.m_cinema_lease.sample(generation, world, static_cast<uint8_t>(active),
+                static_cast<uint8_t>(hold), static_cast<uint8_t>(known), presentation, GetTickCount64())) {
+            owner.m_cinema_signal = detail;
+            owner.m_cinema_detection_ms = elapsed;
+        }
+    } catch (const std::exception&) { /* malformed or obsolete producer: expire naturally */ }
+}
+
 WuWaControlsComponent::WuWaControlsComponent() {
     m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
@@ -229,12 +317,14 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
         *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status,
+        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};
 }
 
 void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_defaults) {
+    reset_auto_cinema();
     ModComponent::on_config_load(cfg,set_defaults);
     if (wuwa_test::is_wuwa())
         wuwa_l10n::request(m_language->value(), Framework::get_persistent_dir("wuwa-languages"));
@@ -363,13 +453,14 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     if (ImGui::BeginTable("Everyday Xbox shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
         wuwa_ui::TableSetupColumn("Action");
-        for (const auto& row : std::array<std::array<const char*,2>,11>{{
+        for (const auto& row : std::array<std::array<const char*,2>,12>{{
             {{"L3 + R3", "Open / close UEVR settings"}},
             {{"L3 + B", "Show / hide game HUD and menus"}},
             {{"L3 + A", "Recenter headset / portal"}},
             {{"L3 + LT / F7", "Portal on / off"}},
             {{"L3 + RT", "Diorama on / off (10x)"}},
-            {{"LT + RT, then hold L3", "2D screen on / off (hold 0.8 s)"}},
+            {{"LT + RT, then hold L3", "Stereo screen on / off (hold 0.8 s)"}},
+            {{"LT + RT, then click R3", "Mono theatre on / off (no stereo depth)"}},
             {{"L3 + Menu", "Show / hide shortcut sheet"}},
             {{"L3 + LB, release", "Toggle HUD / mouse adjustment"}},
             {{"L3 + View", "First person on / off"}},
@@ -382,7 +473,8 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         ImGui::EndTable();
     }
     wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
-    wuwa_ui::TextWrapped("For 2D screen mode, fully hold both triggers first, then hold L3 for 0.8 seconds. Release all three before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
+    wuwa_ui::TextWrapped("Fully hold both triggers first: hold L3 for 0.8 seconds for the stereo screen, or click R3 for mono theatre with no stereo depth. Release all controls and center the sticks before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
+    wuwa_ui::TextWrapped("Mono theatre preserves your stereo-screen choice. Turning mono off returns to that choice; it does not change your portal or world scale. This source candidate still needs headset verification.");
     wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
     wuwa_ui::draw(*m_sheet,"Show shortcut sheet");
     wuwa_ui::draw(*m_sheet_page,"Shortcut sheet page");

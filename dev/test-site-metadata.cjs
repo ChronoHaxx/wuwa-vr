@@ -53,7 +53,7 @@ function verifyReleaseSections() {
   const recovery = /<section id="recovery">([\s\S]*?)<\/section>/.exec(guide)[1];
   assert(controls.includes('Fixture: current controls source.'));
   assert(recovery.includes('Fixture: current recovery source.'));
-  for (const text of ['Toggle 2D screen mode', 'Toggle the temporary 10× diorama', 'Optional Quest controllers for walking']) {
+  for (const text of ['Toggle mono theatre', 'Toggle stereoscopic screen', 'Toggle the temporary 10× diorama', 'Optional Quest controllers for walking']) {
     assert(controls.includes(text), 'Current control missing: ' + text);
   }
   assert.equal((controls.match(/id="control-search"/g) || []).length, 1);
@@ -66,11 +66,12 @@ function verifyReleaseSections() {
     .filter(([, context]) => context.toLowerCase().includes('quest')).map(([, , body]) => body);
   assert(questRows.some(row => row.includes('Right A / B')) && questRows.some(row => row.includes('Left Menu')),
     'Quest heading must remain searchable through each mapping row context');
-  assert(recovery.includes('npc-rim-20261004') && recovery.includes('advanced portable fallback'));
-  assert(recovery.includes('Cutscenes can still lose the right-eye scene or flicker'));
+  assert(recovery.includes('cinematic-20261004') && recovery.includes('advanced portable fallback'));
+  assert(recovery.includes('prerendered movie switching has not been tested'));
+  assert(recovery.includes('Headset comfort') && recovery.includes('Reset HUD aspect'));
   for (const file of ['index.html', 'l/en.html', 'l/zh-Hans.html']) {
     const html = fs.readFileSync(path.join(site, file), 'utf8');
-    assert(html.includes(file.includes('zh-Hans') ? '不提供自动过场切换' : 'automatic cutscene switching is not provided'), file);
+    assert(html.includes(file.includes('zh-Hans') ? '预渲染影片也未测试' : 'prerendered movie has not been tested'), file);
   }
   const risk = fs.readFileSync(path.join(site, 'risk.html'), 'utf8');
   assert(!risk.includes('combined-mod distribution remains pending'));

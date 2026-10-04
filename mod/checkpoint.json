@@ -1,33 +1,48 @@
 {
   "schema": 3,
-  "build": "npc-rim-20261004",
-  "publicReleaseTag": "beta-2026-10-04-launcher",
-  "launcherVersion": "1.0.0",
+  "build": "cinematic-20261004",
+  "publicReleaseTag": "beta-2026-10-04-cinematic",
+  "launcherVersion": "1.0.1",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "46a0082f5dde7d667171bdf3d67695ad72b33baa8471b57b2f8923d42e0fb7c8",
-  "frozenPatchSha256": "87aa0d4ecc8fe1632d0ef8d98dd89b01e219c5ced3d1af51f2c7132124bd283b",
-  "sourceReconstructedTree": "d143659465d9b5365a478c7a99d6d10f4ef2856a",
-  "buildCompleted": "2026-10-04T16:20:53+0100",
+  "backendSha256": "f9e050db26937edc0e8f59d55d7f0c7efbb3d01c28c2b13f737ad65d241e29f1",
+  "frozenPatchSha256": "d4ae518377c955642159970664a9f1d3bab2a605688900232adc4f489f013116",
+  "sourceReconstructedTree": "14d4a495e1c6534bd814c0d062a4c69373ef11ce",
+  "buildCompleted": "2026-10-04T22:17:53+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 53694230,
-    "sha256": "005bc4a457c7494af39755474593d4451e65d4772d6d1794a597a66b5abbbdc4",
+    "bytes": 54167862,
+    "sha256": "b0470b66bfa39a8c97e39e8181efc79118e8a646bd52732917b83e4a419d789a",
     "public": true
   },
-  "liveAcceptance": "Prior ultimate-camera and foliage repairs accepted; 2D brightness owner-confirmed. Optional rim suppression reproduced in two stationary simulator A/B/A cycles, headset acceptance pending. It removes intended character rim too. Automatic cinematic switching is not implemented.",
+  "liveAcceptance": "Owner accepted cinematic framing in simulator quest replay on screen-comfort-r1. Same framing algorithm, now default ON. Physical headset comfort remains pending. Automatic cinematic detection was unavailable because of delayed Lua require; loader repaired and offline-tested, actual story/movie recognition unverified and OFF by default. Long scene/dialogue loading, unsupported HUD refresh and flat-menu background movement remain open.",
   "sourceIdentity": "This commit contains the exact native overlays and reconstructible patch for the backend; source ZIP is paired on the same release.",
+  "simulatorEvidence": {
+    "recording": "20261004-220346-570bc86d",
+    "publishedVideo": false,
+    "note": "68-second simulator capture: sampled cinematic shots have matching letterbox; motion sidecar incomplete after preview stopped."
+  },
   "launcherInstaller": {
     "name": "WuWa-VR-Setup.exe",
-    "bytes": 10427885,
-    "sha256": "65d27e9efd9d45a7bf90393cc325bffd8fa35b9ee0dfff6411fecb49df4a5aee"
+    "bytes": 10429579,
+    "sha256": "e14a7013e7c80cbcc7e73c41d000cd8f0cdd8306bdc100ad1207c4bc6d7fe638"
   },
   "launcherVerification": {
-    "componentGroups": 81,
-    "controllerGroups": 10,
-    "updateGroups": 17,
-    "offscreenWpfGroups": 29,
-    "isolatedRealUpdate": "1.0.0 to 1.0.1, restart and uninstall passed; external marker retained",
+    "componentTests": "passed",
+    "controllerTests": "passed",
+    "updateTests": "passed with local SDK and mocked installed state",
+    "offscreenWpf": "passed; no window or game launched",
+    "exactReleasePayloadInstall": "passed with compiled 1.0.1 assembly in isolated store",
+    "productionAppUpdate": "not run for this release",
     "productionGameLaunch": "not run for this installer release"
+  },
+  "cinematicVerification": {
+    "nativeBuild": "passed; one worker",
+    "luaAutoCinemaGroups": 13,
+    "luaHudGroups": 18,
+    "luaMenuGroups": 10,
+    "defaultFraming": true,
+    "defaultAutomaticSwitching": false,
+    "headsetAcceptance": "pending"
   }
 }

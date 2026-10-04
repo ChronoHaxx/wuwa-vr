@@ -35,10 +35,11 @@ struct CommandContext {
         UINT rect_count = 0, const D3D12_RECT* rects = nullptr);
     void clear_rtv(TextureContext& tex, const float* color, D3D12_RESOURCE_STATES dst_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
         UINT rect_count = 0, const D3D12_RECT* rects = nullptr);
-    void execute();
+    // True only if this recording was successfully submitted to the queue.
+    bool execute();
 
     bool ready() const {
-        return this->cmd_list != nullptr && this->cmd_allocator != nullptr && this->fence != nullptr;
+        return !this->waiting_for_fence && this->cmd_list != nullptr && this->cmd_allocator != nullptr && this->fence != nullptr;
     }
 
     ComPtr<ID3D12CommandAllocator> cmd_allocator{};
@@ -51,7 +52,11 @@ struct CommandContext {
 
     bool waiting_for_fence{false};
     bool has_commands{false};
+    bool recording_rejected{false};
 
     std::wstring internal_name{L"CommandContext object"};
+
+private:
+    bool recreate_recording();
 };
 }

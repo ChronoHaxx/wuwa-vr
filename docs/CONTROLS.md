@@ -1,12 +1,13 @@
 # Xbox controller reference
 
 These bindings describe public beta
-[beta-2026-10-04-launcher](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher),
-backend **npc-rim-20261004**, for game **3.7**. They were checked against the Lua
-and native shortcut sheet. Portal, diorama, the deliberate 2D-screen hold below
-and **VR → WuWa Controls → Reset HUD aspect** are included; HUD reset does not
-need the game ESC menu. Optional experimental features still need physical
-headset/gamepad acceptance. See the release receipt for package verification.
+[beta-2026-10-04-cinematic](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic),
+backend **cinematic-20261004**, for game **3.7**. They were checked against the Lua
+and native shortcut sheet. Manual mono theatre and the separate stereo-screen
+hold are available alongside portal and diorama. **Reset HUD aspect** does not
+send ESC, but its schema-dependent refresh can remain unavailable. Cinematic
+framing is on by default and confirmed in the owner's simulator replay; headset
+comfort and optional input features still need physical acceptance.
 
 Historical evidence: backend compilation and synthetic input checks passed for
 the **4 October controller-shortcut source revision**. Portal and diorama
@@ -24,7 +25,8 @@ entering/leaving modes and after returning from Alt-Tab.
 | Input | Action |
 | --- | --- |
 | L3 + R3 | Open/close UEVR settings |
-| Hold both triggers fully, then hold L3 for 0.8 seconds | Toggle 2D screen mode; release all three before repeating. Works in dialogue, with UEVR and adjustment closed |
+| Fully hold LT + RT first, then click R3 | Toggle mono theatre: one scene and HUD shown identically to both eyes; useful for problematic menus/cinematics |
+| Fully hold LT + RT first, then hold L3 for 0.8 seconds | Toggle stereoscopic screen, retaining scene depth; release all controls before repeating. Works in dialogue, with UEVR and adjustment closed |
 | L3 + B | Hide/show game UI, including game menus |
 | L3 + A | Recenter view and enabled portal; position reset is a separate option |
 | Hold L3, then fully squeeze LT; or F7 | Toggle the portal; release controls before repeating |
@@ -40,6 +42,11 @@ entering/leaving modes and after returning from Alt-Tab.
 | L3 + LB, then release | Toggle HUD/mouse adjustment; Xbox mouse shortcuts must be enabled |
 | LB + R3 | Original utility assist: V; hold 0.8 seconds for the Tab wheel |
 | Hold RB | Full speed when optional Polar walk is enabled |
+
+The two screen shortcuts are manual. Release all controls between toggles, with
+UEVR and HUD/mouse adjustment closed. Automatic cinema is experimental, **off
+by default**, and did not activate for the latest reported in-engine scene;
+prerendered movie switching is untested. Do not rely on it to switch for you.
 
 **LB + Y is not rebound by these shortcuts.** Flight/grapple selection is the
 game's behavior. A visible target highlight alone has not proved first-person

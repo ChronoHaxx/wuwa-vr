@@ -1,8 +1,8 @@
 {
-  "tag": "beta-2026-10-04-launcher",
-  "previousTag": "beta-2026-10-01-1817",
+  "tag": "beta-2026-10-04-cinematic",
+  "previousTag": "beta-2026-10-04-launcher",
   "game": "3.7",
-  "appVersion": "1.0.0",
-  "buildId": "npc-rim-20261004",
+  "appVersion": "1.0.1",
+  "buildId": "cinematic-20261004",
   "installer": "WuWa-VR-Setup.exe"
 }

@@ -648,7 +648,31 @@ public:
     }
 
     bool is_using_2d_screen() const {
-        return m_2d_screen_mode->value();
+        const auto automatic = m_auto_cinema->value() ? m_wuwa_controls.auto_cinema_presentation() : wuwa_auto_cinema::Presentation::none;
+        return wuwa_auto_cinema::resolve(m_2d_screen_mode->value(), m_mono_theatre_mode->value(), automatic).screen;
+    }
+
+    bool is_using_mono_theatre() const {
+        const auto automatic = m_auto_cinema->value() ? m_wuwa_controls.auto_cinema_presentation() : wuwa_auto_cinema::Presentation::none;
+        return wuwa_auto_cinema::resolve(m_2d_screen_mode->value(), m_mono_theatre_mode->value(), automatic).mono;
+    }
+
+    bool is_auto_cinema_enabled() const { return m_auto_cinema->value(); }
+    wuwa_auto_cinema::Presentation auto_story_presentation() const {
+        const auto mode = m_auto_story_presentation->value();
+        return mode >= 0 && mode <= 2 ? static_cast<wuwa_auto_cinema::Presentation>(mode) : wuwa_auto_cinema::Presentation::none;
+    }
+    void set_mono_theatre_manually(bool enabled) {
+        m_wuwa_controls.override_auto_cinema();
+        m_mono_theatre_mode->value() = enabled;
+    }
+    void set_stereo_screen_manually(bool enabled) {
+        m_wuwa_controls.override_auto_cinema();
+        wuwa_auto_cinema::manual_screen(m_2d_screen_mode->value(), m_mono_theatre_mode->value(), enabled);
+    }
+
+    bool is_cinematic_framing_fix_enabled() const {
+        return m_cinematic_framing_fix->value();
     }
 
     bool is_roomscale_enabled() const {
@@ -973,6 +997,10 @@ private:
     const ModToggle::Ptr m_decoupled_pitch_ui_adjust{ ModToggle::create(generate_name("DecoupledPitchUIAdjust"), true) };
     const ModToggle::Ptr m_load_blueprint_code{ ModToggle::create(generate_name("LoadBlueprintCode"), false, true) };
     const ModToggle::Ptr m_2d_screen_mode{ ModToggle::create(generate_name("2DScreenMode"), false) };
+    const ModToggle::Ptr m_mono_theatre_mode{ ModToggle::create(generate_name("MonoTheatreMode"), false) };
+    const ModToggle::Ptr m_auto_cinema{ ModToggle::create(generate_name("AutoCinema"), false) };
+    const ModCombo::Ptr m_auto_story_presentation{ModCombo::create(generate_name("AutoStoryPresentation"), {"Keep immersive", "Stereo screen", "Mono theatre"}, 1)};
+    const ModToggle::Ptr m_cinematic_framing_fix{ ModToggle::create(generate_name("CinematicFramingFix"), true) };
     const ModToggle::Ptr m_roomscale_movement{ ModToggle::create(generate_name("RoomscaleMovement"), false) };
     const ModToggle::Ptr m_roomscale_sweep{ ModToggle::create(generate_name("RoomscaleMovementSweep"), true) };
     const ModToggle::Ptr m_swap_controllers{ ModToggle::create(generate_name("SwapControllerInputs"), false) };
@@ -1128,6 +1156,10 @@ public:
             *m_decoupled_pitch_ui_adjust,
             *m_load_blueprint_code,
             *m_2d_screen_mode,
+        *m_mono_theatre_mode,
+        *m_auto_cinema,
+        *m_auto_story_presentation,
+        *m_cinematic_framing_fix,
             *m_roomscale_movement,
             *m_roomscale_sweep,
             *m_swap_controllers,

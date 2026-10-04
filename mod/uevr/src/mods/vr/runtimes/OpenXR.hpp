@@ -151,7 +151,7 @@ public:
     std::optional<std::string> initialize_actions(const std::string& json_string);
 
     XrResult begin_frame();
-    XrResult end_frame(const std::vector<XrCompositionLayerBaseHeader*>& quad_layers, bool has_depth = false);
+    XrResult end_frame(const std::vector<XrCompositionLayerBaseHeader*>& quad_layers, bool has_depth = false, bool mono_theatre = false);
 
     void begin_profile() {
         if (!this->profile_calls) {

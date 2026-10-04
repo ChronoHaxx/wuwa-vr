@@ -13,6 +13,7 @@
 #include "utility/WuWaVideoBridge.hpp"
 #include "utility/WuWaMenuSignals.hpp"
 #include "utility/WuWaPosePair.hpp"
+#include "utility/WuWaAutoCinema.hpp"
 
 namespace vrmod {
 
@@ -54,8 +55,37 @@ public:
     Matrix4x4f floor_transform() const;
     float floor_width() const { return m_sheet_width->value(); }
     static bool game_focused();
+    bool auto_cinema_active() const;
+    wuwa_auto_cinema::Presentation auto_cinema_presentation() const;
+    void advance_auto_cinema(bool runtime_ready);
+    std::string auto_cinema_status() const;
+    void reset_auto_cinema();
+    void override_auto_cinema();
 
 private:
+    mutable std::mutex m_cinema_mutex;
+    wuwa_auto_cinema::Lease m_cinema_lease;
+    std::atomic<wuwa_auto_cinema::Presentation> m_cinema_presentation{wuwa_auto_cinema::Presentation::none};
+    std::string m_cinema_signal{"Detector has not reported"};
+    double m_cinema_detection_ms{};
+    // Transient protocol: generation fences old Lua callbacks; native expiry
+    // restores the base view even if Lua stops running without reset callbacks.
+    struct CinemaValue : ModString {
+        WuWaControlsComponent& owner;
+        int kind;
+        CinemaValue(WuWaControlsComponent& owner_, int kind_, const char* name)
+            : ModString{name, ""}, owner{owner_}, kind{kind_} {}
+        std::string get() const override;
+        void set(const std::string&) override;
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    } m_cinema_producer{*this, 0, "WuWaControls_AutoCinemaProducer"},
+      m_cinema_sample{*this, 1, "WuWaControls_AutoCinemaSample"},
+      m_cinema_status{*this, 2, "WuWaControls_AutoCinemaStatus"},
+      m_effective_mono{*this, 3, "WuWaControls_EffectiveMonoTheatre"},
+      m_toggle_mono{*this, 4, "WuWaControls_ToggleMonoTheatre"},
+      m_toggle_screen{*this, 5, "WuWaControls_ToggleStereoScreen"},
+      m_effective_screen{*this, 6, "WuWaControls_EffectiveScreen"};
     struct FocusValue : ModToggle {
         FocusValue() : ModToggle{"WuWaControls_Focused", false} {}
         std::string get() const override { return game_focused() ? "true" : "false"; }

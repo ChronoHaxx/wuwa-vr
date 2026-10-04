@@ -1,27 +1,47 @@
 # WuWa VR: how it works, how we got here, what comes next
 
-Updated 28 September 2026. This is a beginner's map of the project and an honest handoff, not a claim that stereo rendering is finished.
+Updated 4 October 2026. This is a beginner's map of the project and an evidence-based
+handoff. Confirmed improvements do not mean every rendering path is finished.
 
-## Start here tonight
+## Start with the current beta
 
-The **28 Sep 16:28 BST experimental package** includes the portable launcher EXE, its runtime folders, the older 26 Sep beta and a newer camera/diagnostic candidate. Extract the whole ZIP; the EXE needs its adjacent folders. You do not need to install Python.
+Use **desktop app 1.0.1**, public release **beta-2026-10-04-cinematic**, backend
+**cinematic-20261004**, for game **3.7**. Install **WuWa-VR-Setup.exe**, open WuWa VR,
+then follow Game → Install VR → Headset or simulator. Updating the desktop app
+preserves the selected VR package: choose the cinematic package in step 02 too.
+Close the game/injector before installing or switching packages. A loaded DLL
+cannot change until the game restarts.
 
-1. Finish and close any existing game/injector session before applying a profile.
-2. Open **WuWa VR Launcher.exe**, read the account-risk notice, then select **Camera candidate + trigger controls · 28 Sep 16:27**. The package initially selects the older beta: explicitly choose this candidate to test the new work.
-3. Select your headset runtime or the bundled simulator. Start your headset software first. Use the standalone official WuWa launcher; Steam/Epic injection is still unverified.
-4. Apply and launch; accept Windows' permission prompt, then press Play and enter gameplay.
-5. Keep the supplied settings for the first comparison. Open the in-game shortcut sheet for the authoritative bindings; restore the supplied profile through the launcher if settings become confusing.
+Cinematic framing is **on by default**. The owner confirmed the simulator replay
+on the private **screen-comfort-r1** build; sampled frames from the latest
+68-second recording show matching letterbox heights across both eyes. **Headset
+comfort remains pending.** The correction retains the game's letterbox and
+separate eye views; it does not provide a free-look camera for every cinematic.
 
-The new native DLL passed compilation and input-policy tests. The actual packaged EXE passed integrity, startup and refusal-to-overwrite-a-running-game checks. **This exact candidate still needs live trigger/inventory and closed-game apply/restore acceptance.** It adds testing tools; it does not contain a new foliage repair. It also carries the morning's same-draw camera-base candidate aimed at ultimate-transition desync; the project owner **confirmed on 28 September that the end-of-ultimate camera mismatch is fixed in headset testing for the cases tested**. The public download is an experimental checkpoint, not a stable release. The build label is 16:27; the ZIP was packaged at 16:28.
+Manual recovery remains available: fully hold **LT + RT first**, then **click R3**
+for **mono theatre** (the same scene and HUD in both eyes), or **hold L3 for
+0.8 seconds** for a **stereoscopic screen**. Release everything before repeating;
+close UEVR and HUD/mouse adjustment. Automatic cinema is **experimental and off**
+by default. It did not activate for the latest reported in-engine scene; a real
+prerendered movie has not been tested. Long scene/dialogue stalls, HUD refresh
+and flat-menu background motion remain open. Manual mono theatre is a menu
+workaround, not a demonstrated fix for those loading stalls.
 
-Unofficial injection carries anti-cheat/account-ban risk. This project is not approved by Kuro Games. Read the included risk and component-license notices. The website/independent guide's MIT license does not relicense UEVR or the whole bundle. Donations are optional and do not buy guaranteed support or future compatibility.
+Earlier foliage, far indirect-lighting, main Resonators reflection, ultimate
+camera and 2D-brightness corrections are retained. NPC rim suppression is an
+optional tradeoff, not a repair of the underlying stereo lighting fault.
+Steam/Epic injection and a fresh-PC installation remain unverified.
+
+Unofficial injection carries anti-cheat/account-ban risk. This project is not
+approved by Kuro Games. The website and independent guide's MIT licence does
+not relicense UEVR or the whole bundle. Donations remain optional.
 
 ## A two-minute mental picture
 
 WuWa creates a normal game world and camera. **UEVR** intercepts parts of Unreal's rendering so a VR runtime can receive two eye views plus headset tracking. Our changes adapt WuWa's unusual rendering paths, extract its real UI, and add camera/controller conveniences.
 
 ```text
-Portable launcher --> apply selected profile --> injector --> WuWa + UEVRBackend.dll
+Desktop app / portable tools --> selected profile --> injector --> WuWa + UEVRBackend.dll
                                                           |
                          Lua: camera, body, controls <-----+
                                                           |
@@ -32,7 +52,7 @@ Portable launcher --> apply selected profile --> injector --> WuWa + UEVRBackend
                               optional recorder --> video + diagnostic sidecars
 ```
 
-The browser dashboard is a **local controller for installed software**. A website alone cannot inject the DLL into the game. OpenXR is an interface; the simulator and headset runtimes are implementations of that interface. Switching a runtime does not rebuild the mod. A downloaded DLL cannot replace code already loaded into a running game: a restart is necessary.
+The compact desktop app handles installation, package updates and launch. Its Developer tools link opens the browser dashboard, a **local controller for installed software**. A website alone cannot inject the DLL into the game. OpenXR is an interface; the simulator and headset runtimes are implementations of that interface. Switching a runtime does not rebuild the mod. A downloaded DLL cannot replace code already loaded into a running game: a restart is necessary.
 
 Both eyes need the **same instant of game state**, with deliberately different eye positions and projections for depth. Copying one eye's finished image into the other would hide disagreement but destroy proper stereo. The goal is consistent scene decisions with correct separate eye views.
 
@@ -54,6 +74,9 @@ Both eyes need the **same instant of game state**, with deliberately different e
 | 1 Oct | A full field-by-field diff of the two eye views showed the second eye built with the default 90° FOV, so its LOD distance factor was 1.0 instead of 0.836. The second eye now copies the first eye's LOD factor and FOV before rendering. | **Far foliage/prop mismatch fixed**: measured in the simulator (left-eye canopy motion 2% → 67%) and confirmed in the headset. Still open: far lighting/fog differences between the eyes and the Resonators reflection. |
 | 1 Oct, evening | The Resonators reflection fix was re-verified for 3.7. Far objects were darker in one eye: swapping the eyes' view states moved the problem, and of about 40 render settings only indirect light mattered. WuWa's Cascade Lighting Volume keeps indirect light per view state and a refresh filled only the first eye; the mod now refills it once in a frame that renders both eyes. | **Far lighting and character-screen reflections fixed** (simulator, 1 Oct 18:17 beta). Weapon/Echo submenu reflections deferred. |
 
+| 4 Oct, earlier | Published a compact desktop installer with separate launcher/package updates, retained brightness and camera repairs, and an optional NPC rim-suppression control. | The NPC control removes one effect, including intended nearby rim light. The underlying lighting fault remains open. |
+| 4 Oct, cinematic update | Compared normal immersive VR, stereoscopic screen and mono theatre. Shared the primary eye's authored framing and independent native aspect metadata with the secondary eye, preserving per-eye optical matrices. | Owner-confirmed simulator replay on private screen-comfort-r1; sampled latest 68-second recording has matching letterbox heights. Defaults on; headset comfort pending. Automatic switching, loading stalls and HUD/menu recovery remain separate open work. |
+
 ## What works, what remains open
 
 **Observed improvements:** usable real-game UI in several screens; first-person tracking during sprint/grapple/flight reported much better; hidden head with a full character shadow reported working; recovery controls; Native Stereo Fix repairing the reported one-eye character materials; main Resonators reflection improvement. The simulator recordings and those user reports have different scopes—neither proves every headset, character or menu.
@@ -62,7 +85,14 @@ Both eyes need the **same instant of game state**, with deliberately different e
 
 **Fixed on 1 Oct (game 3.7):** far trees and props use the same detail level in both eyes (see the next section), far objects get the same indirect light in both eyes, and the Resonators and team-screen reflections sit in the right place.
 
-**Still open:** weapon and Echo submenu reflections, and full-animation first-person aiming.
+**Confirmed in the 4 Oct simulator replay:** cinematic letterbox agreement for the
+reported scene. Mono theatre and stereoscopic screen remain separate manual modes;
+this is not all-scene or headset-comfort acceptance.
+
+**Still open:** distant NPC rim/specular lighting, weapon and Echo submenu
+reflections, some VFX, full-animation first-person aiming, long scene/dialogue
+stalls, HUD-aspect refresh and moving backgrounds behind flat menus. Automatic
+cinema defaults off and remains unverified, including actual prerendered movies.
 
 ## Why a tree looked frozen in one eye
 
@@ -70,7 +100,7 @@ Both eyes need the **same instant of game state**, with deliberately different e
 
 A distant tree may use a cheaper mesh, a flat impostor, different shader code, or a distance-based wind cutoff. Wind often moves vertices in the shader; the object's CPU transform can stay still. Therefore a static object transform does not prove a frozen animation clock.
 
-The affected tree stays frozen on the left while its neighbor moves in both eyes. Moving closer makes that same target move in both; retreating restores the asymmetry. Setting the eye-position separation to zero throughout the retreat did not prevent it. Recorded main-eye projection scales also match. **A different mesh/shader path or different final shader inputs is a stronger lead than simply “the eyes are six centimetres apart.”** This is a hypothesis, not a confirmed root cause.
+The affected tree stays frozen on the left while its neighbor moves in both eyes. Moving closer makes that same target move in both; retreating restores the asymmetry. Setting the eye-position separation to zero throughout the retreat did not prevent it. Recorded main-eye projection scales also match. **A different mesh/shader path or different final shader inputs is a stronger lead than simply “the eyes are six centimetres apart.”** That was the working hypothesis before the 1 October LOD-factor finding above.
 
 Two render-side candidates were found in retained near/far traces. The strongest uses different vertex-factory/shader groups per eye far away, matching groups nearby. It has **not** been matched to the visible tree. Its pointer is valid only as evidence from that recorded process; it is not a permanent asset ID or a UObject to dereference later.
 

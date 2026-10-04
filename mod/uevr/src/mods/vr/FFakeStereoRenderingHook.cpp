@@ -70,6 +70,8 @@
 #include "../../utility/WuWaDepthScale.hpp"
 #include "../../utility/WuWaSecondEyeBuild.hpp"
 #include "../../utility/WuWaPerf.hpp"
+#include "../../utility/WuWaMonoNativeProjection.hpp"
+#include "../../utility/WuWaCinematicMetadata.hpp"
 
 #include "FFakeStereoRenderingHook.hpp"
 
@@ -84,6 +86,461 @@ namespace {
 std::atomic<uint64_t> pose_draw_sequence{};
 thread_local wuwa_pose_pair::Draw* current_pose_draw{};
 thread_local wuwa_stereo_base_pose::Pair* current_stereo_base{};
+using MonoProjection = sdk::FSceneViewProjectionDataT<float>;
+static_assert(offsetof(MonoProjection, view_rect) == 0x90);
+static_assert(offsetof(MonoProjection, constrained_view_rect) == 0xa0);
+safetyhook::InlineHook mono_projection_hook{};
+safetyhook::MidHook authored_camera_hook{};
+uintptr_t discovered_projection_data{};
+uintptr_t native_constrained_rect{};
+thread_local bool inside_mono_native_projection{};
+struct AuthoredCamera {
+    bool captured{}, constrained{};
+    float aspect{}, fov{};
+    wuwa_mono_native::Rect full{}, crop{};
+};
+struct ProjectionCall {
+    void* player{};
+    sdk::FViewport* viewport{};
+    int32_t pass{};
+    MonoProjection* output{};
+    AuthoredCamera camera{};
+};
+thread_local ProjectionCall* current_projection_call{};
+struct InitAspectObservation {
+    wuwa_cinematic_metadata::Aspect before{}, after{};
+    bool read{}, after_read{}, shared{};
+};
+struct MonoDraw {
+    bool enabled{}, framing{};
+    sdk::FViewport* viewport{};
+    struct Output {
+        MonoProjection* address{};
+        MonoProjection value{};
+        AuthoredCamera camera{};
+        int32_t pass{};
+        bool mono{};
+    };
+    std::array<Output, 2> outputs{};
+    void* primary_player{};
+    AuthoredCamera primary_camera{};
+    std::array<AuthoredCamera, 2> authored_cameras{}; // Raw decisions before paired framing; diagnostics only.
+    std::array<InitAspectObservation, 2> init_aspects{};
+    const void* primary_family{};
+    bool primary_constructed{}, primary_applied{};
+};
+thread_local MonoDraw* current_mono_draw{};
+class MonoDrawScope {
+public:
+    MonoDrawScope() noexcept : previous{current_mono_draw} { current_mono_draw = &draw; }
+    void begin(sdk::FViewport* viewport, bool enabled, bool framing) noexcept {
+        draw.viewport = viewport; draw.enabled = enabled && !previous;
+        draw.framing = framing && !previous;
+    }
+    ~MonoDrawScope() { current_mono_draw = previous; }
+private:
+    MonoDraw* previous{};
+    MonoDraw draw{};
+};
+bool mono_projection_refused{};
+void refuse_cinematic_pair(const char* why) noexcept {
+    ++wuwa_cinematic_framing::refused_pairs;
+    wuwa_cinematic_framing::current_status = wuwa_cinematic_framing::Status::refused;
+    SPDLOG_WARNING_EVERY_N_SEC(5, "[WuWaCinematicFraming] Pair refused: {}", why);
+}
+void capture_authored_camera(safetyhook::Context& context) noexcept {
+    auto call = current_projection_call;
+    if (!call || !current_mono_draw || !current_mono_draw->framing || inside_mono_native_projection ||
+        context.rsi != reinterpret_cast<uintptr_t>(call->output) ||
+        context.r14 != reinterpret_cast<uintptr_t>(call->player) ||
+        context.r15 != reinterpret_cast<uintptr_t>(call->viewport) ||
+        int32_t(context.r12) != call->pass || context.rbp > UINTPTR_MAX - 0x105) return;
+    auto& camera = call->camera;
+    uint8_t flags{}, projection_mode{};
+    // Exact stack fields are proved by the guarded complete GetProjectionData
+    // function and native FMinimalViewInfo projection builder, not an SDK guess.
+    if (!wuwa_code_check::memory::read(context.rbp + 0x100, flags) ||
+        !wuwa_code_check::memory::read(context.rbp + 0x104, projection_mode) || projection_mode != 0 ||
+        !wuwa_code_check::memory::read(context.rbp + 0xfc, camera.aspect) ||
+        !wuwa_code_check::memory::read(context.rbp + 0xe8, camera.fov) ||
+        !std::isfinite(camera.aspect) || camera.aspect <= 0.01f || camera.aspect > 100.0f ||
+        !std::isfinite(camera.fov) || camera.fov <= 0 || camera.fov >= 180) return;
+    std::copy_n(call->output->view_rect, 4, camera.full.begin());
+    if (!wuwa_mono_native::valid(camera.full)) return;
+    camera.crop = camera.full;
+    camera.constrained = (flags & 1) != 0;
+    if (camera.constrained) {
+        // Reuse only the native rectangle utility. It reads viewport dimensions
+        // and pixel aspect; it does not recalculate or advance the camera.
+        using GetRect = wuwa_mono_native::Rect* (*)(sdk::FViewport*, wuwa_mono_native::Rect*, float,
+            const wuwa_mono_native::Rect*);
+        reinterpret_cast<GetRect>(native_constrained_rect)(call->viewport, &camera.crop, camera.aspect, &camera.full);
+        if (!wuwa_mono_native::map_relative(camera.full, camera.crop, camera.full)) return;
+    }
+    camera.captured = true;
+    ++wuwa_cinematic_framing::authored_views;
+}
+bool native_mono_output(MonoProjection* data, uint32_t pass) noexcept {
+    if (!current_mono_draw || !current_mono_draw->enabled) return false;
+    for (auto& output : current_mono_draw->outputs) {
+        if (!output.mono || output.address != data || output.pass != int32_t(pass)) continue;
+        output.address = nullptr; // A result belongs to exactly one constructor.
+        if (memcmp(&output.value.view_origin, &data->view_origin, sizeof(data->view_origin)) ||
+            memcmp(&output.value.view_rotation_matrix, &data->view_rotation_matrix, sizeof(data->view_rotation_matrix)) ||
+            memcmp(&output.value.projection_matrix, &data->projection_matrix, sizeof(data->projection_matrix)) ||
+            memcmp(output.value.view_rect, data->view_rect, sizeof(data->view_rect)) ||
+            memcmp(output.value.constrained_view_rect, data->constrained_view_rect, sizeof(data->constrained_view_rect))) {
+            wuwa_mono_native::current_status = wuwa_mono_native::Status::refused;
+            return false;
+        }
+        wuwa_mono_native::current_status = wuwa_mono_native::Status::ready;
+        return true;
+    }
+    return false;
+}
+std::optional<MonoDraw::Output> authored_stereo_output(MonoProjection* data, const void* family, uint32_t pass) noexcept {
+    if (!current_mono_draw || !current_mono_draw->framing) return std::nullopt;
+    auto& draw = *current_mono_draw;
+    for (auto& output : draw.outputs) {
+        if (output.mono || output.address != data || output.pass != int32_t(pass) || !output.camera.captured) continue;
+        const auto captured = output;
+        output.address = nullptr;
+        if (captured.pass == 2) {
+            draw.primary_family = family; draw.primary_constructed = true;
+        } else if (!draw.primary_constructed || !draw.primary_applied || draw.primary_family != family) {
+            refuse_cinematic_pair("scene family changed or secondary arrived first"); return std::nullopt;
+        }
+        return captured;
+    }
+    return std::nullopt;
+}
+bool apply_authored_stereo_crop(MonoProjection* data, const MonoDraw::Output& captured) noexcept {
+    wuwa_mono_native::Rect full{}, old_crop{};
+    std::copy_n(data->view_rect, 4, full.begin());
+    std::copy_n(data->constrained_view_rect, 4, old_crop.begin());
+    const auto crop = wuwa_mono_native::map_relative(captured.camera.full, captured.camera.crop, full);
+    if (!crop) { refuse_cinematic_pair("invalid authored viewport mapping"); return false; }
+    const auto transform = wuwa_mono_native::crop_transform(old_crop, *crop);
+    if (!transform) { refuse_cinematic_pair("invalid current eye viewport"); return false; }
+    if (*crop != old_crop) {
+        auto matrix = data->projection_matrix;
+        for (size_t column = 0; column < 4; ++column) {
+            matrix[column][0] = float(transform->x_scale * data->projection_matrix[column][0] +
+                transform->x_offset * data->projection_matrix[column][3]);
+            matrix[column][1] = float(transform->y_scale * data->projection_matrix[column][1] +
+                transform->y_offset * data->projection_matrix[column][3]);
+            if (!std::isfinite(matrix[column][0]) || !std::isfinite(matrix[column][1])) {
+                refuse_cinematic_pair("non-finite crop projection"); return false;
+            }
+        }
+        data->projection_matrix = matrix;
+        std::copy(crop->begin(), crop->end(), data->constrained_view_rect);
+        ++wuwa_cinematic_framing::cropped_views;
+    }
+    wuwa_cinematic_framing::current_status = captured.camera.constrained ?
+        wuwa_cinematic_framing::Status::ready : wuwa_cinematic_framing::Status::waiting;
+    return true;
+}
+// Verified Windows x64 ABI: LocalPlayer, Viewport, raw pass, projection data,
+// and the fifth integer argument. Return AL is a bool, not a projection pointer.
+bool mono_get_projection_data(void* player, sdk::FViewport* viewport, int32_t pass,
+    MonoProjection* output, int32_t view_index) {
+    const bool eligible = current_mono_draw && (current_mono_draw->enabled || current_mono_draw->framing) &&
+        !mono_projection_refused && !inside_mono_native_projection && !current_projection_call && output &&
+        viewport == current_mono_draw->viewport && (pass == 2 || pass == 3);
+    if (!eligible) return mono_projection_hook.call<bool>(player, viewport, pass, output, view_index);
+
+    ProjectionCall call{player, viewport, pass, output};
+    const auto previous = current_projection_call;
+    current_projection_call = &call;
+    utility::ScopeGuard call_scope{[previous] { current_projection_call = previous; }};
+    if (!current_mono_draw->enabled) {
+        auto& draw = *current_mono_draw;
+        if (pass == 2) {
+            draw.outputs = {}; draw.primary_constructed = false; draw.primary_applied = false;
+            draw.primary_camera = {}; draw.primary_player = nullptr; draw.authored_cameras = {};
+            draw.init_aspects = {};
+        }
+        const bool ok = mono_projection_hook.call<bool>(player, viewport, pass, output, view_index);
+        if (!ok) return false;
+        draw.authored_cameras[size_t(pass - 2)] = call.camera;
+        if (pass == 2) {
+            if (!call.camera.captured) return ok;
+            draw.primary_player = player; draw.primary_camera = call.camera;
+        } else {
+            if (draw.primary_player != player || !draw.primary_camera.captured) {
+                refuse_cinematic_pair("no matching primary player in this draw"); return ok;
+            }
+            const bool framing_differs = !call.camera.captured ||
+                draw.primary_camera.constrained != call.camera.constrained ||
+                ((draw.primary_camera.constrained || call.camera.constrained) &&
+                    std::abs(draw.primary_camera.aspect - call.camera.aspect) > 0.0001f) ||
+                draw.primary_camera.full != call.camera.full || draw.primary_camera.crop != call.camera.crop;
+            const bool fov_differs = std::abs(draw.primary_camera.fov - call.camera.fov) > 0.001f;
+            if (framing_differs || fov_differs) ++wuwa_cinematic_framing::differing_camera_decisions;
+            // The secondary camera can report its fallback FOV even when both
+            // authored crops are identical. Do not describe FOV alone as a crop failure.
+            if (framing_differs) {
+                SPDLOG_WARNING_EVERY_N_SEC(5, "[WuWaCinematicFraming] Authored constraint/crop decisions differ; sharing primary framing with both eyes (raw values in WuWaFramingPair samples)");
+            }
+            // Primary was already constructed. Carry its decision (including
+            // explicit FULL/no constraint) to the second eye, never half-apply
+            // a crop by refusing only the second member of this same pair.
+            call.camera = draw.primary_camera;
+        }
+        draw.outputs[size_t(pass - 2)] = {output, *output, call.camera, pass, false};
+        return ok;
+    }
+
+    inside_mono_native_projection = true;
+    utility::ScopeGuard native_scope{[] { inside_mono_native_projection = false; }};
+    // FULL is only the projection request. The caller's actual render passes
+    // remain 2/3, as required by WuWa's native-stereo scene construction.
+    const bool ok = mono_projection_hook.call<bool>(player, viewport, int32_t{0}, output, view_index);
+    if (!ok) return false;
+    auto vr = VR::get();
+    wuwa_mono_native::Rect full{}, constrained{};
+    std::copy_n(output->view_rect, 4, full.begin());
+    std::copy_n(output->constrained_view_rect, 4, constrained.begin());
+    const auto mapped = wuwa_mono_native::fit(full, constrained, vr->get_hmd_width(), vr->get_hmd_height());
+    if (!mapped) {
+        mono_projection_refused = true;
+        current_mono_draw->enabled = false;
+        current_mono_draw->outputs = {};
+        wuwa_mono_native::current_status = wuwa_mono_native::Status::refused;
+        SPDLOG_ERROR("[WuWaMonoNative] Invalid native viewport; returning compatibility projection");
+        // Fail back to the established per-eye projection instead of removing
+        // the scene view. The re-query is exceptional and disables this route
+        // for the session; native suppression must be off before that call.
+        inside_mono_native_projection = false;
+        return mono_projection_hook.call<bool>(player, viewport, pass, output, view_index);
+    }
+    std::copy(mapped->full.begin(), mapped->full.end(), output->view_rect);
+    std::copy(mapped->constrained.begin(), mapped->constrained.end(), output->constrained_view_rect);
+    current_mono_draw->outputs[size_t(pass - 2)] = {output, *output, {}, pass, true};
+    SPDLOG_INFO_ONCE("[WuWaMonoNative] Authored FULL projection mapped to one eye; render passes remain 2/3");
+    return true;
+}
+bool ensure_mono_projection_hook(bool bootstrap_ready) noexcept {
+    if (mono_projection_refused) return false;
+    if (mono_projection_hook) return true;
+    if (!bootstrap_ready) return false;
+    // Current 3.7 GetProjectionData, native FMinimalViewInfo projection builder,
+    // IsStereoEnabled helper, and eye-pass helper. All bytes must match the
+    // running executable; archived disassembly by itself is not authority.
+    constexpr std::array<wuwa_code_compatibility::Range, 5> ranges{{
+        {0x526ec20, 0xc7a, 0xffc0a799b1500b68ULL},
+        {0x4eba2a0, 0x782, 0xccf4387d201f0e1bULL},
+        {0x56699d0, 0x44, 0xd2e1723937fd68dcULL},
+        {0x55d5220, 0x22, 0xeedafe479dcc76d1ULL},
+        {0x5634f40, 0x19a, 0x5518bf98bae86ccfULL}}};
+    try {
+        const auto target = wuwa_code_check::verify("Mono authored camera", ranges) + 0x526ec20;
+        if (discovered_projection_data && discovered_projection_data != target)
+            throw std::runtime_error("Discovered GetProjectionData differs from verified native-camera route");
+        mono_projection_hook = safetyhook::create_inline(reinterpret_cast<void*>(target),
+            &mono_get_projection_data, safetyhook::InlineHook::StartDisabled);
+        if (!mono_projection_hook) throw std::runtime_error("Could not create native-camera hook");
+        native_constrained_rect = target - 0x526ec20 + 0x5634f40;
+        authored_camera_hook = safetyhook::create_mid(reinterpret_cast<void*>(target + 0x299),
+            &capture_authored_camera, safetyhook::MidHook::StartDisabled);
+        if (!authored_camera_hook || !authored_camera_hook.enable() || !mono_projection_hook.enable())
+            throw std::runtime_error("Could not enable native-camera hooks");
+        return true;
+    } catch (const std::exception& e) {
+        SPDLOG_WARN("[WuWaMonoNative] {}", e.what());
+    } catch (...) {
+        SPDLOG_WARN("[WuWaMonoNative] Native-camera hook unavailable");
+    }
+    mono_projection_refused = true;
+    mono_projection_hook = {}; authored_camera_hook = {};
+    wuwa_mono_native::current_status = wuwa_mono_native::Status::refused;
+    return false;
+}
+bool cinematic_metadata_layout_verified() noexcept {
+    static const bool verified = []() noexcept {
+        constexpr std::array<wuwa_code_compatibility::Range, 4> ranges{{
+            // CalcSceneView: platform switch + authored POV constrain/aspect -> init tail.
+            {0x5267278, 0x49, 0x9e850968f841dabbULL},
+            // Ctor loads init+289/+28c, then stores completed view+2d9/+2dc.
+            {0x54cc129, 0x5b, 0x79d0dbf2636663bcULL},
+            {0x54cc557, 0x4a, 0xa3c547b54c5d0cc1ULL},
+            // Native LGUI independently aspect-fits its draw rect from these fields.
+            {0x4101dad, 0xfa, 0xad4bf4d4da5ee74bULL}}};
+        try {
+            if (!wuwa_shadow::compatible()) return false;
+            wuwa_code_check::verify("Cinematic native aspect metadata", ranges);
+            return true;
+        } catch (const std::exception& e) {
+            SPDLOG_WARN("[WuWaCinematicFraming] Native aspect metadata unavailable: {}", e.what());
+        } catch (...) {}
+        return false;
+    }();
+    return verified;
+}
+bool read_init_aspect(const void* data, wuwa_cinematic_metadata::Aspect& out) noexcept {
+    const auto base = reinterpret_cast<uintptr_t>(data);
+    return wuwa_code_check::memory::read_field(base, 0x289, out.constrained) &&
+        wuwa_code_check::memory::read_field(base, 0x28c, out.ratio);
+}
+void share_cinematic_metadata(MonoProjection* data, const void* family, int32_t pass, bool crop_applied) noexcept {
+    auto draw = current_mono_draw;
+    if (!draw || !draw->framing || (pass != 2 && pass != 3) || !cinematic_metadata_layout_verified()) return;
+    auto& observation = draw->init_aspects[size_t(pass - 2)];
+    observation = {};
+    observation.read = read_init_aspect(data, observation.before);
+    observation.after = observation.before; observation.after_read = observation.read;
+    if (pass == 2 || !crop_applied) return;
+    const auto& primary = draw->init_aspects[0];
+    const auto desired = wuwa_cinematic_metadata::shared(primary.after, observation.before,
+        primary.after_read && observation.read && draw->primary_constructed && draw->primary_applied &&
+        draw->primary_family == family);
+    if (!desired) { refuse_cinematic_pair("native aspect metadata or same-family pair invalid"); return; }
+    if (*desired == observation.before) { observation.shared = true; return; }
+    const auto base = reinterpret_cast<uintptr_t>(data);
+    if (!base || base > UINTPTR_MAX - 0x290 ||
+        !wuwa_shadow::writable_span(base + 0x289, sizeof(desired->constrained)) ||
+        !wuwa_shadow::writable_span(base + 0x28c, sizeof(desired->ratio))) {
+        refuse_cinematic_pair("native aspect metadata is not writable"); return;
+    }
+    // Only these two proven init fields change. Optical matrices, stereo pass,
+    // poses and histories remain per-eye. No camera object or global flag is changed.
+    const bool wrote = wuwa_code_check::memory::guarded_copy(reinterpret_cast<void*>(base + 0x28c), &desired->ratio, sizeof(desired->ratio)) &&
+        wuwa_code_check::memory::guarded_copy(reinterpret_cast<void*>(base + 0x289), &desired->constrained, sizeof(desired->constrained));
+    observation.after_read = read_init_aspect(data, observation.after);
+    observation.shared = wrote && observation.after_read && observation.after == *desired;
+    if (!observation.shared) {
+        // Keep the original init on a failed/partial write; never guess a replacement.
+        const bool restored_ratio = wuwa_code_check::memory::guarded_copy(reinterpret_cast<void*>(base + 0x28c),
+            &observation.before.ratio, sizeof(observation.before.ratio));
+        const bool restored_flag = wuwa_code_check::memory::guarded_copy(reinterpret_cast<void*>(base + 0x289),
+            &observation.before.constrained, sizeof(observation.before.constrained));
+        observation.after_read = read_init_aspect(data, observation.after);
+        refuse_cinematic_pair(restored_ratio && restored_flag && observation.after_read && observation.after == observation.before ?
+            "native aspect metadata write rejected; original restored" : "native aspect metadata restore failed");
+    }
+}
+// Read-only, bounded submission evidence. Unlike WuWaFraming's constructor
+// input, these are completed FSceneViews after the game's SetupView callbacks.
+// No pointers survive this stack scope, and diagnostic refusal never changes rendering.
+bool completed_framing_layout_verified() noexcept {
+    static const bool verified = []() noexcept {
+        constexpr std::array<wuwa_code_compatibility::Range, 2> ranges{{
+            // Native ctor: init+a0 -> view+2f8; init+90 -> view+308.
+            {0x54cb78c, 0x26, 0x6c76cc153e6a992bULL},
+            // Native ctor: init+50..8f projection -> view+c20..c5f.
+            {0x54cb814, 0x41, 0xe89e328ae132e02aULL}}};
+        try {
+            if (!wuwa_shadow::compatible()) return false; // Family and both pass-field proofs.
+            wuwa_code_check::verify("Read-only completed cinematic views", ranges);
+            return true;
+        } catch (const std::exception& e) {
+            SPDLOG_WARN("[WuWaFramingPair] Diagnostic unavailable: {}", e.what());
+        } catch (...) {}
+        return false;
+    }();
+    return verified;
+}
+class CompletedFramingPair {
+public:
+    CompletedFramingPair(bool enabled, const void* family, const void* first, const void* second,
+        uint64_t runtime_frame, uint32_t width, uint32_t height, bool swap_eyes, bool screen) noexcept
+        : family{family}, views{first, second} {
+        if (!enabled || !family || !first || !second || first == second) return;
+        const auto last_error = GetLastError();
+        utility::ScopeGuard preserve_error{[last_error] { SetLastError(last_error); }};
+        try {
+            static std::atomic<uint64_t> next_sample{}, sequence{};
+            const auto now = GetTickCount64();
+            auto next = next_sample.load(std::memory_order_relaxed);
+            if (now < next || !next_sample.compare_exchange_strong(next, now + 2000, std::memory_order_relaxed)) return;
+            if (!completed_framing_layout_verified()) return;
+            id = ++sequence;
+            metadata = {{"pair", id}, {"tick_ms", now}, {"thread", GetCurrentThreadId()},
+                {"runtime_frame", runtime_frame}, {"game_frame", g_frame_count},
+                {"family", address(family)}, {"expected_eye_extent", {width, height}},
+                {"swap_eyes", swap_eyes}, {"screen", screen}};
+            // Saved original decisions explain whether the older warning was
+            // merely the secondary's fallback FOV. Only correlate this exact family.
+            const auto draw = current_mono_draw;
+            const bool matched = draw && draw->framing && draw->primary_family == family;
+            metadata["authored_family_match"] = matched;
+            if (matched) {
+                metadata["primary_crop_applied"] = draw->primary_applied;
+                metadata["init_aspects"] = nlohmann::json::array();
+                for (const auto& observation : draw->init_aspects) {
+                    metadata["init_aspects"].push_back({{"read", observation.read}, {"after_read", observation.after_read},
+                        {"shared", observation.shared}, {"before_289", observation.before.constrained},
+                        {"before_28c", observation.before.ratio}, {"after_289", observation.after.constrained},
+                        {"after_28c", observation.after.ratio}});
+                }
+                metadata["authored"] = nlohmann::json::array();
+                for (const auto& c : draw->authored_cameras) {
+                    metadata["authored"].push_back({{"captured", c.captured}, {"constrained", c.constrained},
+                        {"aspect", c.aspect}, {"fov", c.fov}, {"full", c.full}, {"crop", c.crop}});
+                }
+            }
+            active = true;
+        } catch (...) { active = false; }
+    }
+    void sample(const char* stage, unsigned active_eye, const void* target) const noexcept {
+        if (!active) return;
+        const auto last_error = GetLastError();
+        utility::ScopeGuard preserve_error{[last_error] { SetLastError(last_error); }};
+        try {
+            auto report = metadata;
+            report["stage"] = stage;
+            report["active_logical_eye"] = active_eye; // 0 = primary game target, 1 = secondary capture.
+            report["active_target"] = address(target);
+            report["views"] = {observe(views[0]), observe(views[1])};
+            SPDLOG_INFO("[WuWaFramingPair] {}", report.dump());
+        } catch (...) {} // Observation must never prevent either submission.
+    }
+private:
+    static std::string address(const void* p) { return fmt::format("{:x}", reinterpret_cast<uintptr_t>(p)); }
+    nlohmann::json observe(const void* view) const {
+        const auto base = reinterpret_cast<uintptr_t>(view);
+        uintptr_t actual_family{};
+        const bool family_read = wuwa_code_check::memory::read_field(base, 0, actual_family);
+        nlohmann::json r{{"address", address(view)}, {"family_read", family_read},
+            {"family_match", family_read && actual_family == reinterpret_cast<uintptr_t>(family)}};
+        if (!family_read || actual_family != reinterpret_cast<uintptr_t>(family)) return r;
+        if (cinematic_metadata_layout_verified()) {
+            wuwa_cinematic_metadata::Aspect aspect{};
+            const bool flag_ok = wuwa_code_check::memory::read_field(base, 0x2d9, aspect.constrained);
+            const bool ratio_ok = wuwa_code_check::memory::read_field(base, 0x2dc, aspect.ratio);
+            r["aspect_read_ok"] = {{"constraint_2d9", flag_ok}, {"ratio_2dc", ratio_ok}};
+            if (flag_ok) r["constraint_2d9"] = aspect.constrained;
+            if (ratio_ok) r["ratio_2dc"] = aspect.ratio;
+            if (flag_ok && ratio_ok) r["aspect_valid"] = wuwa_cinematic_metadata::valid(aspect);
+        }
+        wuwa_mono_native::Rect crop{}, full{};
+        std::array<float, 16> projection{};
+        uint32_t pass_1a0{}, pass_c90{};
+        const bool crop_ok = wuwa_code_check::memory::read_field(base, 0x2f8, crop);
+        const bool full_ok = wuwa_code_check::memory::read_field(base, 0x308, full);
+        const bool projection_ok = wuwa_code_check::memory::read_field(base, 0xc20, projection);
+        const bool pass_a_ok = wuwa_code_check::memory::read_field(base, 0x1a0, pass_1a0);
+        const bool pass_b_ok = wuwa_code_check::memory::read_field(base, 0xc90, pass_c90);
+        r["read_ok"] = {{"crop_2f8", crop_ok}, {"full_308", full_ok}, {"projection_c20", projection_ok},
+            {"pass_1a0", pass_a_ok}, {"pass_c90", pass_b_ok}};
+        if (crop_ok) r["crop_2f8"] = crop;
+        if (full_ok) r["full_308"] = full;
+        if (crop_ok && full_ok) r["rects_valid"] = wuwa_mono_native::map_relative(full, crop, full).has_value();
+        if (pass_a_ok) r["pass_1a0"] = pass_1a0;
+        if (pass_b_ok) r["pass_c90"] = pass_c90;
+        if (projection_ok) {
+            r["projection_c20"] = projection; // Proven ctor copy; not claimed to be a final GPU constant buffer.
+            r["projection_finite"] = std::all_of(projection.begin(), projection.end(), [](float v) { return std::isfinite(v); });
+        }
+        return r;
+    }
+    const void* family{};
+    std::array<const void*, 2> views{};
+    uint64_t id{};
+    bool active{};
+    nlohmann::json metadata;
+};
 uintptr_t stereo_base_callsite() noexcept {
     static const uintptr_t site=[]() noexcept -> uintptr_t {
         // Native GetProjectionData supplies raw pass 2/3 and the game pose to
@@ -2464,6 +2921,7 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
     ZoneScopedN(__FUNCTION__);
     PoseDrawScope pose_scope;
     StereoBaseDrawScope stereo_base_scope;
+    MonoDrawScope mono_draw_scope;
 
     // UI compatibility mode
     // Tries to redirect calls to GetRenderTargetTexture to point towards our UI
@@ -2508,6 +2966,21 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
         call_orig();
         return;
     }
+
+    const bool mono_requested = wuwa_test::is_wuwa() && vr->is_using_mono_theatre();
+    const bool framing_requested = wuwa_test::is_wuwa() && !mono_requested && vr->is_cinematic_framing_fix_enabled();
+    if (!mono_requested) wuwa_mono_native::current_status = wuwa_mono_native::Status::not_requested;
+    else if (wuwa_mono_native::status() == wuwa_mono_native::Status::not_requested)
+        wuwa_mono_native::current_status = wuwa_mono_native::Status::pending;
+    if (!framing_requested) wuwa_cinematic_framing::current_status = wuwa_cinematic_framing::Status::off;
+    else if (wuwa_cinematic_framing::current_status == wuwa_cinematic_framing::Status::off)
+        wuwa_cinematic_framing::current_status = wuwa_cinematic_framing::Status::waiting;
+    const bool projection_route = (mono_requested || framing_requested) && !vr->is_using_afr() && !g_hook->m_has_double_precision &&
+        ensure_mono_projection_hook(g_hook->m_fixed_localplayer_view_count &&
+            !g_hook->m_get_projection_data_pre_hook && !g_hook->m_calculate_stereo_projection_matrix_post_hook);
+    if (mono_projection_refused && framing_requested)
+        wuwa_cinematic_framing::current_status = wuwa_cinematic_framing::Status::refused;
+    mono_draw_scope.begin(viewport, projection_route && mono_requested, projection_route && framing_requested);
 
     static uint32_t hook_attempts = 0;
     static bool run_anyways = false;
@@ -3195,7 +3668,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
 
     const auto true_index = vr->is_using_afr() ? (g_frame_count + last_index) % 2 : last_index;
 
-    if (vr->is_splitscreen_compatibility_enabled() || vr->is_sceneview_compatibility_enabled()) {
+    const auto incoming_rect = is_ue5 ? init_options_ue5->view_rect : init_options->view_rect;
+    const auto incoming_constraint = is_ue5 ? init_options_ue5->constrained_view_rect : init_options->constrained_view_rect;
+    const wuwa_mono_native::Rect constructor_input_rect{incoming_rect[0], incoming_rect[1], incoming_rect[2], incoming_rect[3]};
+    const wuwa_mono_native::Rect constructor_input_constraint{incoming_constraint[0], incoming_constraint[1], incoming_constraint[2], incoming_constraint[3]};
+    const bool authored_mono = !is_ue5 && native_mono_output(init_options, init_options->get_stereo_pass());
+    const auto authored_stereo = !is_ue5 ? authored_stereo_output(init_options, init_options->get_view_family(), init_options->get_stereo_pass()) : std::nullopt;
+    if (!authored_mono && (vr->is_splitscreen_compatibility_enabled() || vr->is_sceneview_compatibility_enabled())) {
         int32_t w = vr->get_hmd_width();
         int32_t h = vr->get_hmd_height();
 
@@ -3269,6 +3748,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
         }
     }
 
+    // This is deliberately after the compatibility rewrite: neither it nor a
+    // second eye's camera decision may silently erase the frozen pair framing.
+    if (authored_stereo) {
+        const bool applied = apply_authored_stereo_crop(init_options, *authored_stereo);
+        if (authored_stereo->pass == 2 && current_mono_draw) current_mono_draw->primary_applied = applied;
+        share_cinematic_metadata(init_options, init_options->get_view_family(), authored_stereo->pass, applied);
+    }
+
     const auto init_options_stereo_pass = init_options->get_stereo_pass();
 
     // Wuthering Waves renders its game HUD through the LGUI scene-view extension rather than
@@ -3285,6 +3772,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
         !vr->is_using_afr() && (diagnostic_count <= 12 || diagnostic_count % 181 == 1);
 
     if (should_log_native_sceneview) {
+        const auto final_constraint = is_ue5 ? init_options_ue5->constrained_view_rect : init_options->constrained_view_rect;
+        SPDLOG_INFO("[WuWaFraming] frame={} pass={} mono_native={} stereo_candidate={} input_full=({},{},{},{}) input_crop=({},{},{},{}) final_crop=({},{},{},{})",
+            g_frame_count, init_options_stereo_pass, authored_mono, authored_stereo.has_value(),
+            constructor_input_rect[0], constructor_input_rect[1], constructor_input_rect[2], constructor_input_rect[3],
+            constructor_input_constraint[0], constructor_input_constraint[1], constructor_input_constraint[2], constructor_input_constraint[3],
+            final_constraint[0], final_constraint[1], final_constraint[2], final_constraint[3]);
         SPDLOG_INFO(
             "[WuWaDiag] native sceneview pre: frame={} eye={} call={} stereo_pass={} rect=({},{})->({},{}) "
             "view_family={} scene_state={} native_stereo_fix={} same_pass={}",
@@ -3674,6 +4167,11 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
         prev_count == 2 ? views[0] : nullptr, prev_count == 2 ? views[1] : nullptr, prev_count};
     const bool is_wuwa = wuwa_test::is_wuwa();
     wuwa_scene_frame::Pair scene_frame{view_family,is_wuwa && prev_count == 2};
+    CompletedFramingPair framing_pair{is_wuwa && prev_count == 2 &&
+        vr->is_cinematic_framing_fix_enabled() && !vr->is_using_mono_theatre(), view_family,
+        prev_count == 2 ? views[0] : nullptr, prev_count == 2 ? views[1] : nullptr,
+        vr->get_runtime()->internal_frame_count, vr->get_hmd_width(), vr->get_hmd_height(),
+        vr->is_native_stereo_fix_swap_eyes_enabled(), vr->is_using_2d_screen()};
     bool wants_swap = false;
     if (views.count > 1) {
         views.count = 1;
@@ -3759,7 +4257,9 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
         {
             wuwa_reflection_capture::EyeScope reflection_eye{views[0], 1, true};
             wuwa_shadow::PassScope shadow_pass{view_family, views[1], views[0], prev_count, true};
+            framing_pair.sample("before_first_reversed", 1, rtfrt);
             g_hook->m_render_module_begin_render_viewfamily_hook.unsafe_call<void>(render_module, canvas, view_family_candidate);
+            framing_pair.sample("after_first_reversed", 1, rtfrt);
         }
         if (lod_pair) wuwa_lod_probe::pair(view_family, views[1], views[0],
             SceneViewExtensionAnalyzer::frame_count_offset, lod_pair, 3);
@@ -3770,7 +4270,9 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
         view_family->set_render_target(view_family_target);
         {
             wuwa_reflection_capture::EyeScope reflection_eye{views[0], 0, true};
+            framing_pair.sample("before_second_reversed", 0, view_family_target);
             g_hook->m_render_module_begin_render_viewfamily_hook.unsafe_call<void>(render_module, canvas, view_family_candidate);
+            framing_pair.sample("after_second_reversed", 0, view_family_target);
         }
         scene_frame.finish();
         ++wuwa_stereo_order::applied;
@@ -3789,7 +4291,9 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     }
     {
         wuwa_reflection_capture::EyeScope reflection_eye{wants_swap ? views[0] : nullptr,0,wants_swap};
+        framing_pair.sample("before_first", 0, swap_targets ? rtfrt : view_family_target);
         g_hook->m_render_module_begin_render_viewfamily_hook.unsafe_call<void>(render_module, canvas, view_family_candidate);
+        framing_pair.sample("after_first", 0, swap_targets ? rtfrt : view_family_target);
     }
     if (lod_pair) wuwa_lod_probe::pair(view_family, views[0], views[1],
         SceneViewExtensionAnalyzer::frame_count_offset, lod_pair, 3);
@@ -3834,7 +4338,9 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
                 shadow_pass.emplace(view_family, views[1], views[0], prev_count,
                     vr->is_native_stereo_fix_same_pass_enabled());
             }
+            framing_pair.sample("before_second", 1, swap_targets ? original_target : rtfrt);
             g_hook->m_render_module_begin_render_viewfamily_hook.unsafe_call<void>(render_module, canvas, view_family_candidate);
+            framing_pair.sample("after_second", 1, swap_targets ? original_target : rtfrt);
         }
         scene_frame.finish();
 
@@ -5100,6 +5606,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
         g_hook->set_should_recreate_textures(true);
         return true;
     }
+    // Do not disable global stereo: XR render targets, two scene states and
+    // compositor submission remain alive. This affects only native projection.
+    if (inside_mono_native_projection) return false;
     
     /*if (g_hook->m_analyzing_view_extensions) {
         const auto now = std::chrono::high_resolution_clock::now();
@@ -5175,6 +5684,10 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
         return;
     }
 
+    // The native builder owns this viewport; its checked result is fitted into
+    // one eye by mono_get_projection_data after the engine finishes.
+    if (inside_mono_native_projection) return;
+
     static wuwa_stereo::EyeIndexConvention rect_index{};
     rect_index.observe(index, wuwa_test::is_wuwa());
 
@@ -5235,6 +5748,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
     if (!g_framework->is_game_data_intialized()) {
         return;
     }
+
+    // GetProjectionData can request an XR camera offset even for FULL if the
+    // engine separately permits head tracking. Preserve its authored game pose
+    // before any Lua callback, camera offset, HMD translation or IPD is applied.
+    if (inside_mono_native_projection) return;
 
     auto vr = VR::get();
     //std::scoped_lock _{vr->get_vr_mutex()};
@@ -6044,6 +6562,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
 
             if (get_projection_data) {
                 SPDLOG_INFO("Successfully found GetProjectionData at {:x}", *get_projection_data);
+                discovered_projection_data = *get_projection_data;
 
                 g_hook->m_hooked_alternative_localplayer_scan = true;
 

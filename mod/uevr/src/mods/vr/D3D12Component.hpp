@@ -27,6 +27,7 @@ class VR;
 namespace vrmod {
 class D3D12Component {
 public:
+    bool is_mono_openvr_ready() const { return m_mono_openvr_ready; }
     D3D12Component() 
         : m_openvr{this}
     {
@@ -109,8 +110,17 @@ private:
             return ctx;
         }
 
-        void copy_left(ID3D12Resource* src, D3D12_RESOURCE_STATES src_state = D3D12_RESOURCE_STATE_PRESENT) {
+        void copy_left(ID3D12Resource* src, D3D12_RESOURCE_STATES src_state = D3D12_RESOURCE_STATE_PRESENT,
+                bool mono_theatre = false) {
             auto& ctx = this->acquire_left();
+            if (mono_theatre) {
+                // The scene panel is already complete. Submit black behind it
+                // even if the UI copy was unavailable; never sample/clear its source.
+                constexpr float black[]{0.0f, 0.0f, 0.0f, 1.0f};
+                ctx.commands.clear_rtv(ctx, black, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                ctx.commands.execute();
+                return;
+            }
             //ctx.commands.copy(src, ctx.texture.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             // Copy the left half of the backbuffer to the left eye texture.
             D3D12_BOX src_box{};
@@ -126,8 +136,17 @@ private:
             ctx.commands.execute();
         }
 
-        void copy_right(ID3D12Resource* src, D3D12_RESOURCE_STATES src_state = D3D12_RESOURCE_STATE_PRESENT) {
+        void copy_right(ID3D12Resource* src, D3D12_RESOURCE_STATES src_state = D3D12_RESOURCE_STATE_PRESENT,
+                bool mono_theatre = false) {
             auto& ctx = this->acquire_right();
+            if (mono_theatre) {
+                // The scene panel is already complete. Submit black behind it
+                // even if the UI copy was unavailable; never sample/clear its source.
+                constexpr float black[]{0.0f, 0.0f, 0.0f, 1.0f};
+                ctx.commands.clear_rtv(ctx, black, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                ctx.commands.execute();
+                return;
+            }
             //ctx.commands.copy(src, ctx.texture.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             // Copy the right half of the backbuffer to the right eye texture.
             D3D12_BOX src_box{};
@@ -144,8 +163,17 @@ private:
         }
         
         // For AFR
-        void copy_left_to_right(ID3D12Resource* src, D3D12_RESOURCE_STATES src_state = D3D12_RESOURCE_STATE_PRESENT) {
+        void copy_left_to_right(ID3D12Resource* src, D3D12_RESOURCE_STATES src_state = D3D12_RESOURCE_STATE_PRESENT,
+                bool mono_theatre = false) {
             auto& ctx = this->acquire_right();
+            if (mono_theatre) {
+                // The scene panel is already complete. Submit black behind it
+                // even if the UI copy was unavailable; never sample/clear its source.
+                constexpr float black[]{0.0f, 0.0f, 0.0f, 1.0f};
+                ctx.commands.clear_rtv(ctx, black, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                ctx.commands.execute();
+                return;
+            }
             //ctx.commands.copy(src, ctx.texture.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             // Copy the right half of the backbuffer to the right eye texture.
             D3D12_BOX src_box{};
@@ -229,6 +257,8 @@ private:
     uint32_t m_last_rendered_frame{0};
     bool m_force_reset{true};
     bool m_last_afr_state{false};
+    int m_last_presentation_mode{-1};
+    bool m_mono_openvr_ready{false};
     bool m_submitted_left_eye{false};
 };
 } // namespace vrmod

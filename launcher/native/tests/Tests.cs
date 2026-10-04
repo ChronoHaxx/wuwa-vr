@@ -26,12 +26,14 @@ class Tests
     { return new Release { id = id, buildId = "test-build", channel = "beta", gameVersion = "3.7", published = "2026-10-03T00:00:00Z", url = "https://github.com/ChronoHaxx/wuwa-vr/releases/download/" + id + "/WuWa-VR-Launcher.zip", notesUrl = "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/" + id, size = new FileInfo(file).Length, sha256 = RepoClient.Hash(file) }; }
     static Release Candidate(string file)
     { var r = Release("candidate-test", file); r.channel = "candidate"; r.created = r.published; r.published = null; r.url = null; r.notesUrl = null; return r; }
-    static string MakePackage(string id, string extra = null, bool badManifest = false)
+    static string MakePackage(string id, string extra = null, bool badManifest = false,
+        string manifestId = null, string portableId = null, string manifestBuild = "test-build",
+        string portableBuild = "test-build", bool flat = false, string portableText = null)
     {
         var values = new Dictionary<string, byte[]> {
             { "python/pythonw.exe", Encoding.UTF8.GetBytes("test fixture; never execute") },
             { "app/dev/wuwa_player.py", Encoding.UTF8.GetBytes("# test fixture") },
-            { "app/portable.json", Encoding.UTF8.GetBytes(Json.Write(new { packageId = "wuwa-vr-launcher-" + id, defaultBuild = "test-build" })) },
+            { "app/portable.json", Encoding.UTF8.GetBytes(portableText ?? Json.Write(new { packageId = portableId ?? "wuwa-vr-launcher-" + id, defaultBuild = portableBuild })) },
             { "app/dev/wuwa-builds.json", Encoding.UTF8.GetBytes("{}") },
             { "data.bin", Enumerable.Range(0, 24000).Select(x => (byte)(x * 13)).ToArray() }
         };
@@ -42,13 +44,90 @@ class Tests
         }
         if (badManifest) hashes["app/dev/wuwa_player.py"] = new string('0', 64);
         var file = Path.Combine(root, Guid.NewGuid().ToString("N") + ".zip");
+        var prefix = flat ? "" : "WuWa VR/";
         using (var zip = ZipFile.Open(file, ZipArchiveMode.Create))
         {
-            foreach (var item in values) using (var s = zip.CreateEntry("WuWa VR/" + item.Key, CompressionLevel.NoCompression).Open()) s.Write(item.Value, 0, item.Value.Length);
-            using (var s = new StreamWriter(zip.CreateEntry("WuWa VR/manifest.json").Open())) s.Write(Json.Write(new PackageManifest { files = hashes, packageId = "wuwa-vr-launcher-" + id }));
+            foreach (var item in values) using (var s = zip.CreateEntry(prefix + item.Key, CompressionLevel.NoCompression).Open()) s.Write(item.Value, 0, item.Value.Length);
+            using (var s = new StreamWriter(zip.CreateEntry(prefix + "manifest.json").Open())) s.Write(Json.Write(new { files = hashes, packageId = manifestId ?? "wuwa-vr-launcher-" + id, defaultBuild = manifestBuild }));
             if (extra != null) using (var s = new StreamWriter(zip.CreateEntry(extra).Open())) s.Write("untrusted");
         }
         return file;
+    }
+    static void ArchiveIdentityTests(PackageStore store, string archive, Release release)
+    {
+        var before = Json.Write(store.State);
+        var receipt = File.ReadAllBytes(Path.Combine(store.Root, "manager.json"));
+        var inventory = Directory.GetFileSystemEntries(store.Root, "*", SearchOption.AllDirectories).OrderBy(x => x).ToArray();
+        Action unchanged = () =>
+        {
+            AssertPromotionUnchanged(store, before);
+            Assert(receipt.SequenceEqual(File.ReadAllBytes(Path.Combine(store.Root, "manager.json"))), "identity preflight rewrote the installed receipt");
+            Assert(inventory.SequenceEqual(Directory.GetFileSystemEntries(store.Root, "*", SearchOption.AllDirectories).OrderBy(x => x)), "identity preflight created or removed installed files");
+            Assert(Directory.GetDirectories(root, "identity-*").Length == 0, "identity preflight extracted metadata");
+        };
+        Test("identity preflight accepts both single-folder and flat portable archives without extraction", () =>
+        {
+            PackageStore.VerifyArchiveIdentity(archive, release, CancellationToken.None);
+            var flat = MakePackage("test-flat", flat: true);
+            PackageStore.VerifyArchiveIdentity(flat, Release("test-flat", flat), CancellationToken.None);
+            unchanged();
+        });
+        Test("fully rehashed wrong package or build identities fail before any installed state changes", () =>
+        {
+            var wrong = new[] {
+                MakePackage("test-v2", manifestId: "wuwa-vr-launcher-private-name"),
+                MakePackage("test-v2", portableId: "wuwa-vr-launcher-private-name"),
+                MakePackage("test-v2", manifestBuild: "another-build"),
+                MakePackage("test-v2", portableBuild: "another-build")
+            };
+            foreach (var file in wrong)
+            {
+                var r = Release("test-v2", file); // Every catalog and per-file hash matches the bad identity's bytes.
+                Reject(() => PackageStore.VerifyArchiveIdentity(file, r, CancellationToken.None), "valid hashes concealed an identity mismatch");
+                unchanged();
+                Reject(() => store.Install(file, r, CancellationToken.None), "full install accepted an identity mismatch");
+                unchanged();
+            }
+        });
+        Test("identity preflight rejects ambiguous roots and noncanonical or duplicate ZIP paths", () =>
+        {
+            foreach (var extra in new[] { "manifest.json", "other/manifest.json", "WuWa VR/APP/PORTABLE.JSON",
+                "WuWa VR/app", "WuWa VR/../outside.txt", "WuWa VR\\duplicate.txt", "loose-file.txt" })
+            {
+                var file = MakePackage("test-v2", extra);
+                Reject(() => PackageStore.VerifyArchiveIdentity(file, Release("test-v2", file), CancellationToken.None), "ambiguous package accepted: " + extra);
+                unchanged();
+            }
+        });
+        Test("identity preflight rejects malformed and oversized portable metadata", () =>
+        {
+            foreach (var text in new[] { "null", "{broken", new string(' ', 65537) })
+            {
+                var file = MakePackage("test-v2", portableText: text);
+                Reject(() => PackageStore.VerifyArchiveIdentity(file, Release("test-v2", file), CancellationToken.None), "invalid identity metadata accepted");
+                unchanged();
+            }
+        });
+        Test("identity preflight validates catalog and archive integrity before opening metadata", () =>
+        {
+            var wrongSize = Release(release.id, archive); wrongSize.size++;
+            Reject(() => PackageStore.VerifyArchiveIdentity(archive, wrongSize, CancellationToken.None), "wrong archive size accepted");
+            var wrongHash = Release(release.id, archive); wrongHash.sha256 = new string('0', 64);
+            Reject(() => PackageStore.VerifyArchiveIdentity(archive, wrongHash, CancellationToken.None), "wrong archive hash accepted");
+            var wrongRelease = Release(release.id, archive); wrongRelease.id = "../invalid";
+            Reject(() => PackageStore.VerifyArchiveIdentity(archive, wrongRelease, CancellationToken.None), "invalid release accepted");
+            unchanged();
+        });
+        Test("cancelled identity preflight does not alter the current package", () =>
+        {
+            using (var cancel = new CancellationTokenSource())
+            {
+                cancel.Cancel();
+                try { PackageStore.VerifyArchiveIdentity(archive, release, cancel.Token); throw new Exception("preflight cancellation ignored"); }
+                catch (OperationCanceledException) { }
+            }
+            unchanged();
+        });
     }
     sealed class FixtureHttp : HttpMessageHandler
     {
@@ -886,6 +965,7 @@ class Tests
             });
             var store = new PackageStore(Path.Combine(root, "installed")); Installed first = null, second = null;
             Test("fresh install with per-file verification", () => { first = store.Install(zip, release, CancellationToken.None); Assert(store.Selected.folder == first.folder, "selection failed"); PackageStore.Verify(store.Folder(first), release, CancellationToken.None); });
+            ArchiveIdentityTests(store, zip, release);
             PromotionTests(zip, release);
             Test("failed update leaves current selection intact", () =>
             {

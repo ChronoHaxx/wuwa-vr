@@ -30,4 +30,5 @@ read-only errors and `pairs` iteration; the isolated optimized compile peaked at
 `dev/test_lua_enum.cpp`. Keep both repairs when reconstructing the source.
 Forward application and source comparison passed; this is not a fresh-PC
 build guarantee. Test in a separate profile, with the game closed when copying
-the three Lua scripts and language catalogs. Use the release for ordinary play.
+all supplied Lua scripts (including the companion modules) and language catalogs.
+Use the release for ordinary play.

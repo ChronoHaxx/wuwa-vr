@@ -1,8 +1,8 @@
 # Known issues and recovery
 
 Status: 4 October 2026. The current public release is
-[beta-2026-10-04-launcher](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher):
-desktop app **1.0.0**, backend **npc-rim-20261004**, for game **3.7**.
+[beta-2026-10-04-cinematic](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic):
+desktop app **1.0.1**, backend **cinematic-20261004**, for game **3.7**.
 Fresh-PC installation and the new optional features' physical-headset acceptance
 remain pending; a published package is not proof of those checks.
 
@@ -16,6 +16,11 @@ checkpoint does not automatically apply to another.
 
 | Symptom | What to do / current finding |
 | --- | --- |
+| Unequal cinematic letterbox heights in immersive VR | Cinematic framing is on by default in this release. The owner confirmed the simulator replay of private screen-comfort-r1, and sampled frames from the latest 68-second recording match across eyes. Headset comfort and other scenes remain pending. Keep a manual screen shortcut available if another scene differs. |
+| Need a manual screen for a cutscene or menu | Fully hold LT + RT first, then click R3 for mono theatre (same scene and HUD for both eyes), or hold L3 for 0.8 seconds for a stereo screen. Close UEVR and HUD/mouse adjustment; release all controls before repeating. |
+| Automatic cinema does not switch | It is experimental and off by default. It did not activate for the latest reported in-engine scene; prerendered movie switching has not been tested. Use the manual shortcut rather than assuming automatic detection works. |
+| Long scene or dialogue loading; a flat menu background moves with the headset | Both remain open. Manual mono theatre can help with the moving menu background; it is not an established loading-stall fix. Include the scene, mode and duration in a report. |
+| HUD squashes after returning from a screen mode | Try VR → WuWa Controls → Reset HUD aspect and read the result; unsupported schema can still prevent refresh. Opening/closing ESC has helped when available. Do not assume the reset succeeded because the button was pressed. |
 | Nothing opens after double-clicking WuWa VR Launcher.exe | Wait a few seconds and check your browser for a new tab. Running the EXE again reopens the existing page. If a message says a file is missing, extract the whole ZIP again to a normal folder. Logs: `%LOCALAPPDATA%\WuWa VR Launcher\logs`. |
 | "Windows protected your PC" | The launcher is new and unsigned, so SmartScreen does not recognise it. Continue only if the ZIP came directly from the project owner. Do not disable SmartScreen, antivirus or anti-cheat. |
 | Apply reports a missing or changed build file | Choose **Check package files**. Extract a fresh copy of the ZIP if any file is missing or changed; security software may have quarantined a DLL. |

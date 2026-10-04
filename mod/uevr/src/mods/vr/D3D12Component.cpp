@@ -31,13 +31,29 @@ constexpr auto ENGINE_SRC_COLOR = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
 
 namespace vrmod {
 vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
-    if (m_force_reset || m_last_afr_state != vr->is_using_afr()) {
+    const auto is_2d_screen = vr->is_using_2d_screen();
+    const auto is_mono_theatre = vr->is_using_mono_theatre();
+    const int presentation_mode = is_mono_theatre ? 2 : is_2d_screen ? 1 : 0;
+    // Track presentation separately from texture dimensions: switching stereo
+    // screen <-> mono does not resize either one.
+    const bool presentation_changed = m_last_presentation_mode != presentation_mode;
+    if (m_force_reset || m_last_afr_state != vr->is_using_afr() || presentation_changed) {
         if (!setup()) {
             SPDLOG_ERROR_EVERY_N_SEC(1, "[D3D12 VR] Could not set up, trying again next frame");
             m_force_reset = true;
             return vr::VRCompositorError_None;
         }
 
+        if (presentation_changed) {
+            // A prior HUD/stereo image is not a valid first mono image. Keep
+            // the layer hidden until copy() successfully releases a new image.
+            std::scoped_lock lock{m_openxr.mtx};
+            for (const auto index : {runtimes::OpenXR::SwapchainIndex::UI, runtimes::OpenXR::SwapchainIndex::UI_RIGHT}) {
+                const auto it = m_openxr.contexts.find(static_cast<uint32_t>(index));
+                if (it != m_openxr.contexts.end()) it->second.ever_acquired = false;
+            }
+        }
+        m_last_presentation_mode = presentation_mode;
         m_last_afr_state = vr->is_using_afr();
     }
 
@@ -197,7 +213,19 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
 
     // We need to render the scene capture texture to the right side of the double wide texture
     auto pre_render = [&](d3d12::CommandContext& commands, ID3D12Resource* render_target) {
-        if (render_target == nullptr) {
+        if (render_target == nullptr || !m_game_tex.texture || !m_scene_capture_tex.texture) {
+            commands.recording_rejected = true;
+            return;
+        }
+        const auto target_desc = render_target->GetDesc();
+        const auto game_desc = m_game_tex.texture->GetDesc();
+        const auto capture_desc = m_scene_capture_tex.texture->GetDesc();
+        if (target_desc.Width != m_backbuffer_size[0] || target_desc.Height != m_backbuffer_size[1] ||
+            game_desc.Width != target_desc.Width || game_desc.Height != target_desc.Height ||
+            capture_desc.Width != target_desc.Width / 2 || capture_desc.Height != target_desc.Height) {
+            commands.recording_rejected = true;
+            SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferring stereo copy until engine and XR extents agree: game={}x{} capture={}x{} XR={}x{}",
+                game_desc.Width, game_desc.Height, capture_desc.Width, capture_desc.Height, target_desc.Width, target_desc.Height);
             return;
         }
 
@@ -303,9 +331,22 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
     }
 
     const float clear_color[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    const auto is_2d_screen = vr->is_using_2d_screen();
+    const bool composite_hud = !is_mono_theatre || vr->is_gui_enabled();
+    const auto game_source_desc = m_game_tex.texture ? m_game_tex.texture->GetDesc() : D3D12_RESOURCE_DESC{};
+    const bool screen_source_ready = m_game_tex.texture.Get() != nullptr && m_game_tex.srv_heap != nullptr &&
+        m_2d_screen_tex[0].texture.Get() != nullptr && m_2d_screen_tex[0].rtv_heap != nullptr &&
+        game_source_desc.Width == uint64_t(vr->get_hmd_width()) * (vr->is_extreme_compatibility_mode_enabled() ? 1 : 2) &&
+        game_source_desc.Height == vr->get_hmd_height() &&
+        game_source_desc.Width == m_backbuffer_size[0] && game_source_desc.Height == m_backbuffer_size[1];
+    const bool mono_source_ready = screen_source_ready;
 
     auto draw_2d_view = [&](d3d12::CommandContext& commands, ID3D12Resource* render_target) {
+        // Pose-frame identity is not image identity (for example movie/Slate
+        // updates), so compose once per present rather than suppressing it.
+        if (is_2d_screen && !screen_source_ready) {
+            commands.recording_rejected = true;
+            return;
+        }
         if (ui_should_invert_alpha && m_game_ui_tex.texture.Get() != nullptr && m_game_ui_tex.srv_heap != nullptr) {
             d3d12::render_srv_to_rtv(m_ui_batch_alpha_invert.get(), commands.cmd_list.Get(), m_game_ui_tex, m_game_ui_tex, std::nullopt, ENGINE_SRC_COLOR, ENGINE_SRC_COLOR);
         }
@@ -329,11 +370,13 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
             // The scene-bearing panel must not inherit arbitrary scene alpha.
             // Preserve encoded RGB and the existing UNORM -> sRGB copy path;
             // only the complete 2D composite is opaque, not the separate HUD.
-            for (auto& screen : m_2d_screen_tex) {
-                commands.clear_rtv(screen, wuwa_screen_composite::opaque_black.data(), ENGINE_SRC_COLOR);
+            for (std::size_t i = 0; i != (is_mono_theatre ? 1U : m_2d_screen_tex.size()); ++i) {
+                commands.clear_rtv(m_2d_screen_tex[i], wuwa_screen_composite::opaque_black.data(), ENGINE_SRC_COLOR);
             }
 
-            // Render left side to left screen tex
+            // The primary game pass is complete even when the secondary capture
+            // lacks cinematic content. Mono deliberately uses this source for
+            // BOTH eyes, irrespective of NSF SwapEyes; it is not an eye reorder.
             d3d12::render_srv_to_rtv(
                 m_game_batch.get(),
                 commands.cmd_list.Get(),
@@ -344,7 +387,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 ENGINE_SRC_COLOR
             );
 
-            if (m_game_ui_tex.texture.Get() != nullptr && m_game_ui_tex.srv_heap != nullptr) {
+            if (composite_hud && m_game_ui_tex.texture.Get() != nullptr && m_game_ui_tex.srv_heap != nullptr) {
                 d3d12::render_srv_to_rtv(
                     m_game_batch.get(),
                     commands.cmd_list.Get(),
@@ -355,7 +398,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 );
             }
 
-            if (!is_afr) {
+            if (!is_afr && !is_mono_theatre) {
                 // Render right side to right screen tex
                 if (m_scene_capture_tex.texture.Get() != nullptr) {
                     d3d12::render_srv_to_rtv(
@@ -426,17 +469,45 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
 
         clear_rt(m_openvr.ui_tex.commands);
         m_openvr.ui_tex.commands.execute();
+        if (is_mono_theatre && mono_source_ready) {
+            m_mono_openvr_ready = true;
+        }
     } else if (runtime->is_openxr() && runtime->ready() && vr->m_openxr->frame_began) {
         if (is_right_eye_frame) {
-            if (is_2d_screen) {
+            if (is_mono_theatre) {
+                // draw_2d_view inverts HUD alpha and clears source textures:
+                // call it ONCE, then share the resulting UI layer with both eyes.
+                if (mono_source_ready) {
+                    m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI, m_2d_screen_tex[0].texture.Get(), draw_2d_view, clear_rt, ENGINE_SRC_COLOR);
+                }
+            } else if (is_2d_screen) {
                 if (is_afr) {
                     m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT, m_2d_screen_tex[0].texture.Get(), draw_2d_view, clear_rt, ENGINE_SRC_COLOR);
                 } else {
                     const auto sources = wuwa_screen_eye_order::openxr_sources(
                         vr->is_native_stereo_fix_enabled(), vr->is_native_stereo_fix_swap_eyes_enabled(),
                         is_actually_afr, m_scene_capture_tex.texture.Get() != nullptr && m_scene_capture_tex.srv_heap != nullptr);
+                    {
+                        // This path composes a fresh simultaneous pair. Early
+                        // acquire/wait/release failures must not inherit an
+                        // earlier successful pair's readiness. AFR is separate.
+                        std::scoped_lock lock{m_openxr.mtx};
+                        for (const auto index : {runtimes::OpenXR::SwapchainIndex::UI, runtimes::OpenXR::SwapchainIndex::UI_RIGHT}) {
+                            const auto it = m_openxr.contexts.find((uint32_t)index);
+                            if (it != m_openxr.contexts.end()) it->second.ever_acquired = false;
+                        }
+                    }
                     m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI, m_2d_screen_tex[sources[0]].texture.Get(), draw_2d_view, std::nullopt, ENGINE_SRC_COLOR);
-                    m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT, m_2d_screen_tex[sources[1]].texture.Get(), std::nullopt, clear_rt, ENGINE_SRC_COLOR);
+                    if (m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI)) {
+                        m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT, m_2d_screen_tex[sources[1]].texture.Get(), std::nullopt, clear_rt, ENGINE_SRC_COLOR);
+                    } else {
+                        // The first copy owns composition of BOTH panels. If
+                        // it was rejected, the second panel is from an older
+                        // frame/generation and must not be published alone.
+                        std::scoped_lock lock{m_openxr.mtx};
+                        const auto it = m_openxr.contexts.find((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT);
+                        if (it != m_openxr.contexts.end()) it->second.ever_acquired = false;
+                    }
                 }
             } else if (ui_target != nullptr) {
                 const auto ui_resource = (ID3D12Resource*)ui_target->get_native_resource();
@@ -453,13 +524,16 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
             if (fw_rt && g_framework->is_drawing_anything()) {
                 m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::FRAMEWORK_UI, g_framework->get_rendertarget_d3d12().Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             }
-        } else if (is_2d_screen) {
+        } else if (is_2d_screen && (!is_mono_theatre ||
+                (mono_source_ready))) {
             m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::UI, m_2d_screen_tex[0].texture.Get(), draw_2d_view, clear_rt, ENGINE_SRC_COLOR);
-        } else if (m_game_ui_tex.commands.ready()) {
+        } else {
             m_game_ui_tex.commands.wait(INFINITE);
-            draw_2d_view(m_game_ui_tex.commands, nullptr);
-            clear_rt(m_game_ui_tex.commands);
-            m_game_ui_tex.commands.execute();
+            if (m_game_ui_tex.commands.ready()) {
+                draw_2d_view(m_game_ui_tex.commands, nullptr);
+                clear_rt(m_game_ui_tex.commands);
+                m_game_ui_tex.commands.execute();
+            }
         }
     }
 
@@ -471,7 +545,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
 
     ComPtr<ID3D12Resource> scene_depth_tex{};
 
-    if (vr->is_depth_enabled() && runtime->is_depth_allowed()) {
+    if (!is_mono_theatre && vr->is_depth_enabled() && runtime->is_depth_allowed()) {
         auto& rt_pool = vr->get_render_target_pool_hook();
         scene_depth_tex = rt_pool->get_texture<ID3D12Resource>(L"SceneDepthZ");
 
@@ -498,7 +572,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
         m_submitted_left_eye = true;
 
         // OpenXR texture
-        if (runtime->is_openxr() && vr->m_openxr->ready()) {
+        if (!is_mono_theatre && runtime->is_openxr() && vr->m_openxr->ready()) {
             D3D12_BOX src_box{};
             src_box.left = 0;
             src_box.top = 0;
@@ -522,7 +596,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
         // OpenVR texture
         // Copy the back buffer to the left eye texture
         if (runtime->is_openvr()) {
-            m_openvr.copy_left(backbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+            m_openvr.copy_left(backbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, is_mono_theatre);
 
             auto openvr = vr->get_runtime<runtimes::OpenVR>();
             const auto submit_pose = openvr->get_pose_for_submit();
@@ -552,7 +626,9 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
         }};
 
         // OpenXR texture
-        if (runtime->is_openxr() && vr->m_openxr->ready()) {
+        // Mono submits only the composed panel. Copying the unused projection
+        // target during a resize can mix the old engine and new XR extents.
+        if (!is_mono_theatre && runtime->is_openxr() && vr->m_openxr->ready()) {
             if (is_actually_afr && !is_afr && !m_submitted_left_eye) {
                 D3D12_BOX src_box{};
                 src_box.left = 0;
@@ -628,7 +704,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
             const auto submit_pose = openvr->get_pose_for_submit();
 
             if (!is_afr) {
-                m_openvr.copy_left(backbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+                m_openvr.copy_left(backbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, is_mono_theatre);
 
                 vr::D3D12TextureData_t left {
                     m_openvr.get_left().texture.Get(),
@@ -652,12 +728,12 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
 
             if (!is_afr) {
                 if (m_scene_capture_tex.texture.Get() == nullptr) {
-                    m_openvr.copy_right(backbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+                    m_openvr.copy_right(backbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, is_mono_theatre);
                 } else {
-                    m_openvr.copy_left_to_right(m_scene_capture_tex.texture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+                    m_openvr.copy_left_to_right(m_scene_capture_tex.texture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, is_mono_theatre);
                 }
             } else {
-                m_openvr.copy_left_to_right(backbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+                m_openvr.copy_left_to_right(backbuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, is_mono_theatre);
             }
 
             vr::D3D12TextureData_t right {
@@ -707,7 +783,18 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
 
             auto& openxr_overlay = vr->get_overlay_component().get_openxr();
 
-            if (vr->m_2d_screen_mode->value()) {
+            if (is_mono_theatre) {
+                if (m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI)) {
+                    const auto scene_layer = openxr_overlay.generate_slate_layer(
+                        runtimes::OpenXR::SwapchainIndex::UI, XrEyeVisibility::XR_EYE_VISIBILITY_BOTH);
+                    if (scene_layer) {
+                        constexpr auto alpha_flags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
+                            XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
+                        scene_layer->get().layerFlags &= ~alpha_flags;
+                        quad_layers.push_back(&scene_layer->get());
+                    }
+                }
+            } else if (is_2d_screen) {
                 const auto left_layer = openxr_overlay.generate_slate_layer(runtimes::OpenXR::SwapchainIndex::UI, XrEyeVisibility::XR_EYE_VISIBILITY_LEFT);
                 const auto right_layer = openxr_overlay.generate_slate_layer(runtimes::OpenXR::SwapchainIndex::UI_RIGHT, XrEyeVisibility::XR_EYE_VISIBILITY_RIGHT);
 
@@ -716,12 +803,12 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 // The ordinary HUD builder restores its alpha flags next frame.
                 constexpr auto alpha_flags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT |
                     XR_COMPOSITION_LAYER_UNPREMULTIPLIED_ALPHA_BIT;
-                if (left_layer && m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI)) {
+                const bool screen_pair_ready = left_layer && right_layer &&
+                    m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI) &&
+                    m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT);
+                if (screen_pair_ready) {
                     left_layer->get().layerFlags &= ~alpha_flags;
                     quad_layers.push_back((XrCompositionLayerBaseHeader*)&left_layer->get());
-                }
-
-                if (right_layer && m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI_RIGHT)) {
                     right_layer->get().layerFlags &= ~alpha_flags;
                     quad_layers.push_back((XrCompositionLayerBaseHeader*)&right_layer->get());
                 }
@@ -740,7 +827,12 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 }
             }
 
-            auto result = vr->m_openxr->end_frame(quad_layers, scene_depth_tex.Get() != nullptr);
+            const bool world_ready = is_actually_afr ?
+                m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::AFR_LEFT_EYE) &&
+                m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::AFR_RIGHT_EYE) :
+                m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::DOUBLE_WIDE);
+            const bool omit_world = is_mono_theatre || !world_ready;
+            auto result = vr->m_openxr->end_frame(quad_layers, scene_depth_tex.Get() != nullptr && !omit_world, omit_world);
 
             if (result == XR_ERROR_LAYER_INVALID) {
                 spdlog::info("[VR] Attempting to correct invalid layer");
@@ -748,7 +840,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 m_openxr.wait_for_all_copies();
 
                 spdlog::info("[VR] Calling xrEndFrame again");
-                result = vr->m_openxr->end_frame(quad_layers);
+                result = vr->m_openxr->end_frame(quad_layers, false, omit_world);
             }
 
             vr->m_openxr->needs_pose_update = true;
@@ -1143,6 +1235,7 @@ void D3D12Component::on_post_present(VR* vr) {
 }
 
 void D3D12Component::on_reset(VR* vr) {
+    m_mono_openvr_ready = false;
     m_force_reset = true;
 
     auto runtime = vr->get_runtime();
@@ -1862,6 +1955,16 @@ void D3D12Component::OpenXR::copy(
     const auto& swapchain = vr->m_openxr->swapchains[swapchain_idx];
     auto& ctx = this->contexts[swapchain_idx];
 
+    // AFR/region submissions fill an entire runtime eye. A grow transition
+    // might be within bounds yet still copy an obsolete smaller viewport.
+    if (resource && src_box && (src_box->right < src_box->left || src_box->bottom < src_box->top ||
+        uint64_t(src_box->right) - src_box->left != swapchain.width ||
+        uint64_t(src_box->bottom) - src_box->top != swapchain.height)) {
+        ctx.ever_acquired = false;
+        SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferring region submission until source and XR extent agree ({})", swapchain_idx);
+        return;
+    }
+
     XrSwapchainImageAcquireInfo acquire_info{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
 
     uint32_t texture_index{};
@@ -1895,6 +1998,16 @@ void D3D12Component::OpenXR::copy(
         } else {
             auto& texture_ctx = ctx.texture_contexts[texture_index];
             texture_ctx->commands.wait(INFINITE);
+
+            if (!texture_ctx->commands.ready()) {
+                XrSwapchainImageReleaseInfo release_info{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+                const auto release_result = xrReleaseSwapchainImage(swapchain.handle, &release_info);
+                if (release_result == XR_SUCCESS) ctx.num_textures_acquired--;
+                else spdlog::error("[VR] Failed to release image after command-context failure: {}",
+                    vr->m_openxr->get_result_string(release_result));
+                ctx.ever_acquired = false;
+                return;
+            }
 
             if (pre_commands) {
                 (*pre_commands)(texture_ctx->commands, ctx.textures[texture_index].texture);
@@ -1933,7 +2046,7 @@ void D3D12Component::OpenXR::copy(
             if (swapchain_idx == double_wide || swapchain_idx == left_eye || swapchain_idx == right_eye) {
                 const auto layout = swapchain_idx == double_wide ? WindowMode::Layout::DOUBLE_WIDE
                     : (swapchain_idx == left_eye ? WindowMode::Layout::LEFT_EYE : WindowMode::Layout::RIGHT_EYE);
-                if (WindowMode::get()->draw_d3d12(texture_ctx->commands.cmd_list.Get(),
+                if (!vr->is_using_mono_theatre() && WindowMode::get()->draw_d3d12(texture_ctx->commands.cmd_list.Get(),
                         ctx.textures[texture_index].texture, texture_ctx->get_rtv(), layout,
                         D3D12_RESOURCE_STATE_RENDER_TARGET, ctx.window_rtv_format)) {
                     texture_ctx->commands.has_commands = true;
@@ -1949,7 +2062,7 @@ void D3D12Component::OpenXR::copy(
                 }
             }
 
-            texture_ctx->commands.execute();
+            const bool submitted = texture_ctx->commands.execute();
 
             XrSwapchainImageReleaseInfo release_info{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
             auto result = xrReleaseSwapchainImage(swapchain.handle, &release_info);
@@ -1978,7 +2091,10 @@ void D3D12Component::OpenXR::copy(
             }
 
             ctx.num_textures_acquired--;
-            ctx.ever_acquired = true;
+            // Releasing an acquired XR image does not prove that valid GPU
+            // work reached it. A rejected/failed recording hides this layer
+            // until a later successful copy instead of submitting stale data.
+            ctx.ever_acquired = submitted;
         }
     }
 }

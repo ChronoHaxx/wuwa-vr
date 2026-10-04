@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using System.Threading;
 
 namespace WuWaVR.Manager
@@ -35,6 +36,87 @@ namespace WuWaVR.Manager
             var old = State.selected; var oldPrevious = State.previous;
             State.previous = old; State.selected = item.folder;
             try { Save(); } catch { State.selected = old; State.previous = oldPrevious; throw; }
+        }
+        // Cheap read-only preflight before stopping the working helper. Full
+        // extraction, file verification and promotion still run during Install.
+        public static void VerifyArchiveIdentity(string archive, Release release, CancellationToken cancel)
+        {
+            cancel.ThrowIfCancellationRequested();
+            release.Validate();
+            if (new FileInfo(archive).Length != release.size || RepoClient.Hash(archive) != release.sha256.ToLowerInvariant())
+                throw new InvalidDataException("Archive integrity check failed.");
+            cancel.ThrowIfCancellationRequested();
+            using (var zip = ZipFile.OpenRead(archive))
+            {
+                if (zip.Entries.Count > 20000) throw new InvalidDataException("Too many package entries.");
+                var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);
+                var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                // Reuse the installer's Windows path policy without creating a
+                // directory or resolving paths against any installed package.
+                var validationRoot = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(archive)), "identity-" + Guid.NewGuid().ToString("N"));
+                foreach (var entry in zip.Entries)
+                {
+                    cancel.ThrowIfCancellationRequested();
+                    if (entry.FullName.Contains("\\")) throw new InvalidDataException("Noncanonical package path.");
+                    var name = entry.FullName.EndsWith("/") ? entry.FullName.Substring(0, entry.FullName.Length - 1) : entry.FullName;
+                    Paths.Inside(validationRoot, name);
+                    if ((entry.ExternalAttributes >> 16 & 0xF000) == 0xA000) throw new InvalidDataException("Package contains a symbolic link.");
+                    if (entries.ContainsKey(name)) throw new InvalidDataException("Duplicate package entry.");
+                    entries.Add(name, entry);
+                    if (entry.FullName.EndsWith("/")) directories.Add(name);
+                }
+                foreach (var name in entries.Keys)
+                {
+                    var parent = name;
+                    while (parent.LastIndexOf('/') >= 0)
+                    {
+                        parent = parent.Substring(0, parent.LastIndexOf('/'));
+                        if (entries.ContainsKey(parent) && !directories.Contains(parent))
+                            throw new InvalidDataException("Package file conflicts with a directory.");
+                    }
+                }
+                var manifests = entries.Keys.Where(name => !directories.Contains(name) &&
+                    (name.Equals("manifest.json", StringComparison.OrdinalIgnoreCase) ||
+                     (name.Count(ch => ch == '/') == 1 && name.EndsWith("/manifest.json", StringComparison.OrdinalIgnoreCase)))).ToArray();
+                if (manifests.Length != 1) throw new InvalidDataException("Ambiguous portable package root.");
+                var prefix = manifests[0].Substring(0, manifests[0].Length - "manifest.json".Length);
+                if (prefix.Length != 0 && entries.Keys.Any(name => !name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                    !(directories.Contains(name) && name.Equals(prefix.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))))
+                    throw new InvalidDataException("Not a single-root portable package.");
+                ZipArchiveEntry portable;
+                if (!entries.TryGetValue(prefix + "app/portable.json", out portable) || directories.Contains(prefix + "app/portable.json"))
+                    throw new InvalidDataException("Portable package identity is missing.");
+                RequireIdentity(ReadIdentity(entries[manifests[0]], 8 * 1024 * 1024, cancel),
+                    ReadIdentity(portable, 64 * 1024, cancel), release);
+            }
+        }
+        static Dictionary<string, object> ReadIdentity(ZipArchiveEntry entry, int limit, CancellationToken cancel)
+        {
+            if (entry.Length < 1 || entry.Length > limit) throw new InvalidDataException("Package identity metadata is too large or empty.");
+            using (var source = entry.Open())
+            using (var buffer = new MemoryStream())
+            {
+                var bytes = new byte[8192]; int count;
+                while ((count = source.Read(bytes, 0, bytes.Length)) > 0)
+                {
+                    cancel.ThrowIfCancellationRequested();
+                    if (buffer.Length + count > limit || buffer.Length + count > entry.Length)
+                        throw new InvalidDataException("Package identity metadata exceeds its declared size.");
+                    buffer.Write(bytes, 0, count);
+                }
+                if (buffer.Length != entry.Length) throw new InvalidDataException("Truncated package identity metadata.");
+                try { return Json.Read<Dictionary<string, object>>(new UTF8Encoding(false, true).GetString(buffer.ToArray()).TrimStart('\uFEFF')); }
+                catch (Exception error) when (error is ArgumentException || error is InvalidOperationException)
+                { throw new InvalidDataException("Invalid package identity metadata.", error); }
+            }
+        }
+        static void RequireIdentity(Dictionary<string, object> manifest, Dictionary<string, object> portable, Release release)
+        {
+            var expected = "wuwa-vr-launcher-" + release.id;
+            if (manifest == null || portable == null ||
+                Json.Text(manifest, "packageId") != expected || Json.Text(portable, "packageId") != expected ||
+                Json.Text(manifest, "defaultBuild") != release.buildId || Json.Text(portable, "defaultBuild") != release.buildId)
+                throw new InvalidDataException("Package identity does not match selected release.");
         }
         public Installed Install(string archive, Release release, CancellationToken cancel)
         {
@@ -117,7 +199,8 @@ namespace WuWaVR.Manager
         }
         public static void Verify(string package, Release release, CancellationToken cancel)
         {
-            var manifest = Json.Read<PackageManifest>(File.ReadAllText(Paths.Inside(package, "manifest.json")));
+            var manifestText = File.ReadAllText(Paths.Inside(package, "manifest.json"));
+            var manifest = Json.Read<PackageManifest>(manifestText);
             if (manifest == null || manifest.files == null || manifest.files.Count == 0 || manifest.files.Count > 20000)
                 throw new InvalidDataException("Invalid package manifest.");
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -132,8 +215,7 @@ namespace WuWaVR.Manager
             foreach (var required in new[] { "python/pythonw.exe", "app/dev/wuwa_player.py", "app/portable.json", "app/dev/wuwa-builds.json" })
                 if (!names.Contains(required)) throw new InvalidDataException("Required package file is not covered by the manifest: " + required);
             var info = Json.Read<Dictionary<string, object>>(File.ReadAllText(Paths.Inside(package, "app/portable.json")));
-            if (Json.Text(info, "defaultBuild") != release.buildId || Json.Text(info, "packageId") != "wuwa-vr-launcher-" + release.id)
-                throw new InvalidDataException("Package identity does not match selected release.");
+            RequireIdentity(Json.Read<Dictionary<string, object>>(manifestText), info, release);
             // Refuse unmanifested executable payloads; only generated receipts are exempt in an already-used package.
             foreach (var path in Directory.EnumerateFiles(package, "*", SearchOption.AllDirectories))
             {

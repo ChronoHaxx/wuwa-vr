@@ -9,12 +9,9 @@ web interface; it does not install or self-update the desktop app.
 
 Use **01 Game → 02 Install VR → 03 Headset or simulator**, then **Launch in VR**,
 Windows permission and **Play** in the official game launcher. For updates, use
-**02 → Versions & updates → Check updates**. **Update launcher** downloads and
-verifies the desktop update; **Restart to update** applies it after confirming
-the app is idle. Updating the desktop app preserves the selected VR package.
-In step 02, choose **beta-2026-10-04-launcher** and install or select it to use
-**npc-rim-20261004**, formerly **candidate-20261004-npc-rim-r1**. Settings,
-backups, logs and recordings are preserved.
+**02 → Versions & updates → Check updates**. **Update launcher** applies a
+launcher update only while idle and restarts the app. VR package updates remain
+separate in step 02. Settings, backups, logs and recordings are preserved.
 
 The new NPC rim option starts off and removes intended nearby toon-rim lighting
 too. Its underlying stereo fault remains unresolved and headset checking is

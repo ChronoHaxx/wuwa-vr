@@ -218,7 +218,92 @@ test("Comfort button/native request run only on tick and publish changed status"
     cb.on_pre_engine_tick(nil, 0.1); assert(#f.writes == 4)
     assert(values.WuWaControls_HudAspectStatus:find("HUD layout refreshed", 1, true))
     for _, entry in ipairs(writes) do assert(#entry[2] <= 256 and utf8.len(entry[2])) end
+    -- Mono overlays an existing stereo-screen choice without changing it.
+    -- Both directions must refresh even when the effective screen stays true.
+    values.VR_2DScreenMode = "true"
+    cb.on_pre_engine_tick(nil, 0.1); cb.on_pre_engine_tick(nil, 0.1)
+    assert(#f.writes == 6)
+    values.VR_MonoTheatreMode = "true"
+    cb.on_pre_engine_tick(nil, 0.1); cb.on_pre_engine_tick(nil, 0.1)
+    assert(#f.writes == 8 and values.VR_2DScreenMode == "true")
+    values.VR_MonoTheatreMode = "false"
+    cb.on_pre_engine_tick(nil, 0.1); cb.on_pre_engine_tick(nil, 0.1)
+    assert(#f.writes == 10 and values.VR_2DScreenMode == "true")
     values.WuWaControls_ResetHudAspect = "true"; cb.on_pre_engine_tick(nil, 0.1)
-    cb.on_script_reset(); cb.on_pre_engine_tick(nil, 0.1); assert(#f.writes == 4)
+    cb.on_script_reset(); cb.on_pre_engine_tick(nil, 0.1); assert(#f.writes == 10)
+end)
+test("unavailable Comfort helper explains repeated native reset clicks without idle status writes", function()
+    local old_loaded, old_preload = package.loaded.wuwa_hud_refresh, package.preload.wuwa_hud_refresh
+    local comfort = module_path:gsub("wuwa_hud_refresh.lua$", "01_WuWaVR_Comfort.lua")
+    for _, phase in ipairs({"load", "initialization"}) do
+        local marker = "fixture HUD " .. phase .. " failure"
+        local cb, errors, status_writes = {}, {}, 0
+        local values = {VR_2DScreenMode = "false", WuWaControls_ResetHudAspect = "false", WuWaControls_HudAspectStatus = "Ready"}
+        uevr = {api = {}, types = {}, params = {vr = {
+            get_mod_value = function(_, key) return values[key] end,
+            set_mod_value = function(key, value)
+                assert(key == "WuWaControls_ResetHudAspect" or key == "WuWaControls_HudAspectStatus")
+                if key == "WuWaControls_HudAspectStatus" then status_writes = status_writes + 1 end
+                values[key] = value
+            end,
+        }, functions = {log_info = function() end, log_error = function(error) errors[#errors + 1] = error end}},
+            sdk = {callbacks = setmetatable({}, {__index = function(_, key) return function(fn) cb[key] = fn end end})}}
+        json = nil
+        if phase == "load" then
+            package.loaded.wuwa_hud_refresh = nil
+            package.preload.wuwa_hud_refresh = function() error(marker) end
+        else
+            package.loaded.wuwa_hud_refresh = {new = function() error(marker) end}
+        end
+        assert(loadfile(comfort))()
+        cb.on_pre_engine_tick(nil, 0.1)
+        local failure = values.WuWaControls_HudAspectStatus
+        assert(failure:find("module unavailable", 1, true) and failure:find(marker, 1, true))
+        assert(#errors == 1 and errors[1]:find(marker, 1, true))
+        for _ = 1, 3 do
+            local before = status_writes
+            for _ = 1, 12 do cb.on_pre_engine_tick(nil, 0.1) end
+            assert(status_writes == before, "unchanged native status was written every frame")
+            values.WuWaControls_HudAspectStatus = "Refresh queued; requires the supplied Comfort script."
+            values.WuWaControls_ResetHudAspect = "true"
+            cb.on_pre_engine_tick(nil, 0.1)
+            assert(values.WuWaControls_ResetHudAspect == "false")
+            assert(values.WuWaControls_HudAspectStatus == failure and status_writes == before + 1,
+                "unchanged module failure left the native button queued")
+        end
+        assert(#errors == 1, "module failure was logged repeatedly")
+    end
+    package.loaded.wuwa_hud_refresh, package.preload.wuwa_hud_refresh = old_loaded, old_preload
+end)
+test("unsupported HUD saves one read-only audit without repeated idle or reset work", function()
+    local old_module, old_json = package.loaded.wuwa_hud_schema, json
+    local audits, saves, saved = 0, 0, nil
+    package.loaded.wuwa_hud_schema = function()
+        audits = audits + 1
+        return {status = "complete", scalers = {}}
+    end
+    json = {dump_file = function(path, report)
+        assert(path:find("diagnostics/hud-schema-auto-", 1, true) == 1)
+        saves, saved = saves + 1, report; return true
+    end, load_file = function() return saved end}
+    local f = fixture(); f.active = false
+    f:manual()
+    assert(audits == 1 and saves == 1 and #f.writes == 0 and f.state.schema_report)
+    assert(f.state.status:find("HUD refresh unavailable", 1, true))
+    for _ = 1, 10 do f:tick() end
+    f:manual(); f.state:reset(); f:manual()
+    assert(audits == 1 and saves == 1 and #f.writes == 0)
+    package.loaded.wuwa_hud_schema, json = old_module, old_json
+end)
+test("audit failure cannot turn a rejected HUD request into success or repeated work", function()
+    local old_module, old_json = package.loaded.wuwa_hud_schema, json
+    local audits = 0
+    package.loaded.wuwa_hud_schema = function() audits = audits + 1; error("audit fixture failure") end
+    json = {dump_file = function() error("must not write") end}
+    local f = fixture(); f.active = false
+    f:manual(); f:manual()
+    assert(audits == 1 and #f.writes == 0 and not f.state.schema_report)
+    assert(f.state.status:find("HUD refresh unavailable", 1, true))
+    package.loaded.wuwa_hud_schema, json = old_module, old_json
 end)
 print("HUD refresh tests passed: " .. count)

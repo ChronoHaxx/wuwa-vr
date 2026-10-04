@@ -1,13 +1,21 @@
 # Mod source — 4 October 2026 public beta
 
 This source matches public release
-[beta-2026-10-04-launcher](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher),
-backend **npc-rim-20261004**, for game **3.7**. It retains the existing rendering
+[beta-2026-10-04-cinematic](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic),
+backend **cinematic-20261004**, for game **3.7**. It retains the existing rendering
 changes and includes portal, diorama and 2D-screen shortcuts, HUD recovery, and
 optional walking, optical-hand and menu-comfort features. See the
 [controller reference](../docs/CONTROLS.md) for controls and their limits.
 Optional experimental features still need physical-headset acceptance; public
 availability does not establish acceptance for every scene or device.
+
+Cinematic framing now defaults on: the user confirmed matching letterboxing
+in an immersive simulator quest replay. Headset comfort and other scenes remain
+unverified. Mono theatre is available with LT + RT, then R3. Automatic cinematic
+switching stays off and unverified; its delayed Lua module-loading failure is
+repaired, but neither story recognition nor prerecorded playback is accepted.
+Long dialogue loading, unsupported HUD refresh and selective flat-menu handling
+remain open. The source includes transition-copy guards and bounded diagnostics.
 
 `uevr/` and `uesdk/` are changed-file overlays for the pinned upstreams.
 Historical evidence: the 3 October reconstruction refresh passed forward

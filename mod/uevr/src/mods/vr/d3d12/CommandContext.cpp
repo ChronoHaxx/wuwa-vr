@@ -1,10 +1,30 @@
 #include <spdlog/spdlog.h>
 #include <utility/String.hpp>
+#include <utility/Logging.hpp>
 
 #include "Framework.hpp"
 
 #include "TextureContext.hpp"
 #include "CommandContext.hpp"
+#include "../../../utility/WuWaCopyBounds.hpp"
+
+namespace {
+wuwa_copy_bounds::Texture copy_layout(ID3D12Resource* resource) {
+    const auto d = resource->GetDesc();
+    return {uint32_t(d.Dimension), d.Width, d.Height, d.DepthOrArraySize, d.MipLevels,
+        d.SampleDesc.Count, d.SampleDesc.Quality, uint32_t(d.Format)};
+}
+bool region_valid(ID3D12Resource* src, ID3D12Resource* dst, const D3D12_BOX* box,
+    UINT x = 0, UINT y = 0, UINT z = 0) {
+    if (!src || !dst || src == dst) return false;
+    const auto s = copy_layout(src), d = copy_layout(dst);
+    if (!box && s.width > UINT32_MAX) return false;
+    const wuwa_copy_bounds::Box b = box ? wuwa_copy_bounds::Box{box->left, box->top, box->front,
+        box->right, box->bottom, box->back} : wuwa_copy_bounds::Box{0, 0, 0, uint32_t(s.width), s.height,
+        s.dimension == 4 ? s.depth_or_array : 1U};
+    return wuwa_copy_bounds::region(s, d, b, {x, y, z});
+}
+}
 
 namespace d3d12 {
 bool CommandContext::setup(const wchar_t* name) {
@@ -18,6 +38,8 @@ bool CommandContext::setup(const wchar_t* name) {
     this->cmd_allocator.Reset();
     this->cmd_list.Reset();
     this->fence.Reset();
+    this->has_commands = false;
+    this->recording_rejected = false;
 
     if (FAILED(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&this->cmd_allocator)))) {
         spdlog::error("[VR] Failed to create command allocator for {}", utility::narrow(name));
@@ -57,31 +79,94 @@ void CommandContext::reset() {
     CloseHandle(this->fence_event);
     this->fence_event = 0;
     this->waiting_for_fence = false;
+    this->has_commands = false;
+    this->recording_rejected = false;
+}
+
+// A failed Close permanently invalidates that command-list object. Recreate
+// only this unsubmitted recording; retain completed fence/event bookkeeping.
+bool CommandContext::recreate_recording() {
+    if (this->waiting_for_fence || (this->fence && this->fence->GetCompletedValue() < this->fence_value)) {
+        // Never discard an allocator which may still be used by the GPU.
+        this->recording_rejected = true;
+        return false;
+    }
+    this->cmd_list.Reset();
+    this->cmd_allocator.Reset();
+    this->has_commands = false;
+    this->recording_rejected = false;
+    auto device = g_framework->get_d3d12_hook()->get_device();
+    if (FAILED(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&this->cmd_allocator))) ||
+        FAILED(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, this->cmd_allocator.Get(), nullptr,
+            IID_PPV_ARGS(&this->cmd_list)))) {
+        this->recording_rejected = true;
+        spdlog::error("[VR] Failed to recreate discarded command list ({})", utility::narrow(this->internal_name));
+        return false;
+    }
+    this->cmd_allocator->SetName(this->internal_name.c_str());
+    this->cmd_list->SetName(this->internal_name.c_str());
+    return true;
 }
 
 void CommandContext::wait(uint32_t ms) {
     std::scoped_lock _{this->mtx};
 
-	if (this->fence_event && this->waiting_for_fence) {
-        WaitForSingleObject(this->fence_event, ms);
-        ResetEvent(this->fence_event);
-        this->waiting_for_fence = false;
-        if (FAILED(this->cmd_allocator->Reset())) {
-            spdlog::error("[VR] Failed to reset command allocator for {}", utility::narrow(this->internal_name));
-        }
-
-        if (FAILED(this->cmd_list->Reset(this->cmd_allocator.Get(), nullptr))) {
-            spdlog::error("[VR] Failed to reset command list for {}", utility::narrow(this->internal_name));
-        }
-        this->has_commands = false;
+    if (!this->cmd_list && !this->waiting_for_fence && this->fence) {
+        this->recreate_recording();
     }
+
+    if (!this->waiting_for_fence) return;
+    if (!this->fence || !this->fence_event) {
+        SPDLOG_ERROR_EVERY_N_SEC(2, "[VR] Pending command fence is unavailable ({})", utility::narrow(this->internal_name));
+        return;
+    }
+
+    auto completed = this->fence->GetCompletedValue();
+    if (completed != UINT64_MAX && completed < this->fence_value) {
+        const auto wait_started = GetTickCount64();
+        const auto result = WaitForSingleObject(this->fence_event, ms);
+        const auto waited_ms = GetTickCount64() - wait_started;
+        completed = this->fence->GetCompletedValue();
+        if (waited_ms > 250) {
+            SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Slow GPU fence wait ({}) elapsed_ms={} requested_timeout_ms={} target_fence={} completed_fence={} result={}",
+                utility::narrow(this->internal_name), waited_ms, ms, this->fence_value, completed, result);
+        }
+        if (result != WAIT_OBJECT_0 && completed < this->fence_value) {
+            SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferring command reuse: fence wait incomplete ({}) result={} timeout_ms={}",
+                utility::narrow(this->internal_name), result, ms);
+            return;
+        }
+    }
+    // UINT64_MAX signals device removal, not successful GPU completion. A
+    // timeout/stale event must never release or reset an in-flight allocator.
+    if (completed == UINT64_MAX || completed < this->fence_value) {
+        SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferring command reuse: fence is not complete ({})", utility::narrow(this->internal_name));
+        return;
+    }
+
+    ResetEvent(this->fence_event);
+    this->waiting_for_fence = false;
+    if (FAILED(this->cmd_allocator->Reset())) {
+        spdlog::error("[VR] Failed to reset command allocator for {}", utility::narrow(this->internal_name));
+        this->recreate_recording();
+        return;
+    }
+    if (FAILED(this->cmd_list->Reset(this->cmd_allocator.Get(), nullptr))) {
+        spdlog::error("[VR] Failed to reset command list for {}", utility::narrow(this->internal_name));
+        this->recreate_recording();
+        return;
+    }
+    this->has_commands = false;
+    this->recording_rejected = false;
 }
 
 void CommandContext::copy(ID3D12Resource* src, ID3D12Resource* dst, D3D12_RESOURCE_STATES src_state, D3D12_RESOURCE_STATES dst_state) {
     std::scoped_lock _{this->mtx};
 
-    if (src == nullptr || dst == nullptr) {
-        spdlog::error("[VR] nullptr passed to copy");
+    if (!this->ready() || src == nullptr || dst == nullptr || src == dst ||
+        !wuwa_copy_bounds::whole(copy_layout(src), copy_layout(dst))) {
+        this->recording_rejected = true;
+        SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferred incompatible whole-resource copy ({})", utility::narrow(this->internal_name));
         return;
     }
 
@@ -129,8 +214,9 @@ void CommandContext::copy(ID3D12Resource* src, ID3D12Resource* dst, D3D12_RESOUR
 void CommandContext::copy_region(ID3D12Resource* src, ID3D12Resource* dst, D3D12_BOX* src_box, D3D12_RESOURCE_STATES src_state, D3D12_RESOURCE_STATES dst_state) {
     std::scoped_lock _{this->mtx};
 
-    if (src == nullptr || dst == nullptr) {
-        spdlog::error("[VR] nullptr passed to copy_region");
+    if (!this->ready() || !region_valid(src, dst, src_box)) {
+        this->recording_rejected = true;
+        SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferred out-of-bounds/incompatible region copy ({})", utility::narrow(this->internal_name));
         return;
     }
 
@@ -188,8 +274,9 @@ void CommandContext::copy_region(ID3D12Resource* src, ID3D12Resource* dst, D3D12
 void CommandContext::copy_region(ID3D12Resource* src, ID3D12Resource* dst, D3D12_BOX* src_box, UINT dst_x, UINT dst_y, UINT dst_z, D3D12_RESOURCE_STATES src_state, D3D12_RESOURCE_STATES dst_state) {
     std::scoped_lock _{this->mtx};
 
-    if (src == nullptr || dst == nullptr) {
-        spdlog::error("[VR] nullptr passed to copy_region");
+    if (!this->ready() || !region_valid(src, dst, src_box, dst_x, dst_y, dst_z)) {
+        this->recording_rejected = true;
+        SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferred out-of-bounds/incompatible offset copy ({})", utility::narrow(this->internal_name));
         return;
     }
 
@@ -251,8 +338,14 @@ void CommandContext::copy_region_stereo(ID3D12Resource* srcleft, ID3D12Resource*
     D3D12_RESOURCE_STATES src_state,
     D3D12_RESOURCE_STATES dst_state)
 {
-    if (srcleft == nullptr || srcright == nullptr || dst == nullptr) {
-        spdlog::error("[VR] nullptr passed to copy_region_stereo");
+    std::scoped_lock _{this->mtx};
+    // Validate BOTH regions before recording either barrier/copy. In a mode
+    // transition the new XR target may precede the resized engine resources.
+    if (!this->ready() || srcleft == srcright ||
+        !region_valid(srcleft, dst, srcleft_box, dstleft_x, dstleft_y, dstleft_z) ||
+        !region_valid(srcright, dst, srcright_box, dstright_x, dstright_y, dstright_z)) {
+        this->recording_rejected = true;
+        SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferred out-of-bounds/incompatible stereo copy ({})", utility::narrow(this->internal_name));
         return;
     }
 
@@ -290,8 +383,9 @@ void CommandContext::copy_region_stereo(ID3D12Resource* srcleft, ID3D12Resource*
 void CommandContext::clear_rtv(ID3D12Resource* dst, D3D12_CPU_DESCRIPTOR_HANDLE rtv, const float* color, D3D12_RESOURCE_STATES dst_state, UINT rect_count, const D3D12_RECT* rects) {
     std::scoped_lock _{this->mtx};
 
-    if (dst == nullptr) {
-        spdlog::error("[VR] nullptr passed to clear_rtv");
+    if (!this->ready() || dst == nullptr) {
+        this->recording_rejected = true;
+        SPDLOG_WARNING_EVERY_N_SEC(2, "[VR] Deferred clear: resource or command context is not ready ({})", utility::narrow(this->internal_name));
         return;
     }
 
@@ -333,13 +427,24 @@ void CommandContext::clear_rtv(d3d12::TextureContext& tex, const float* color, D
     this->clear_rtv(tex.texture.Get(), tex.get_rtv(), color, dst_state, rect_count, rects);
 }
 
-void CommandContext::execute() {
+bool CommandContext::execute() {
     std::scoped_lock _{this->mtx};
+
+    if (this->waiting_for_fence) return false;
+
+    if (this->recording_rejected) {
+        this->recreate_recording();
+        return false;
+    }
+    if (!this->cmd_list) return false;
     
     if (this->has_commands) {
-        if (FAILED(this->cmd_list->Close())) {
-            spdlog::error("[VR] Failed to close command list. ({})", utility::narrow(this->internal_name));
-            return;
+        const auto close_result = this->cmd_list->Close();
+        if (FAILED(close_result)) {
+            spdlog::error("[VR] Failed to close command list; discarding recording. ({}) HRESULT={:08x}",
+                utility::narrow(this->internal_name), uint32_t(close_result));
+            this->recreate_recording();
+            return false;
         }
         
         auto command_queue = g_framework->get_d3d12_hook()->get_command_queue();
@@ -349,6 +454,8 @@ void CommandContext::execute() {
         this->fence->SetEventOnCompletion(this->fence_value, this->fence_event);
         this->waiting_for_fence = true;
         this->has_commands = false;
+        return true;
     }
+    return false;
 }
 }

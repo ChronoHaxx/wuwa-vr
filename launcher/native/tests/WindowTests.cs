@@ -268,7 +268,7 @@ public static class WindowTests
             using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
             {
                 foreach (var item in files) using (var output = zip.CreateEntry("WuWa VR/" + item.Key).Open()) output.Write(item.Value, 0, item.Value.Length);
-                using (var output = new StreamWriter(zip.CreateEntry("WuWa VR/manifest.json").Open())) output.Write(Json.Write(new PackageManifest { packageId = "wuwa-vr-launcher-" + id, files = hashes }));
+                using (var output = new StreamWriter(zip.CreateEntry("WuWa VR/manifest.json").Open())) output.Write(Json.Write(new { packageId = "wuwa-vr-launcher-" + id, defaultBuild = build, files = hashes }));
             }
             var release = new Release { id = id, buildId = build, channel = "candidate", gameVersion = "3.7", created = "2026-10-03T00:00:00Z", size = new FileInfo(archive).Length, sha256 = RepoClient.Hash(archive) };
             Directory.CreateDirectory(Store.Cache); File.Copy(archive, Path.Combine(Store.Cache, release.sha256 + ".zip"));
@@ -764,6 +764,38 @@ public static class WindowTests
                     "backend diagnostic failure bypassed redaction or claimed a complete report");
                 Offscreen(w);
                 Console.WriteLine("PASS WINDOW general copied diagnostics redact native details/backend/errors while preserving useful status (fake HTTP/clipboard)");
+            }
+            foreach (bool wrongBuild in new[] { false, true }) using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w);
+                var release = Json.Read<Release>(Json.Write(f.A.release));
+                // The archive really is intact: only the selected release identity
+                // differs. Keep its exact bytes, size and checksum in the cache.
+                if (wrongBuild) release.buildId += "-wrong"; else release.id += "-wrong";
+                release.Validate();
+                var choices = Field<ComboBox>(w, "releases"); choices.Items.Add(release); choices.SelectedItem = release;
+                Field<CheckBox>(w, "compatible").IsChecked = true;
+                var bridge = Field<LauncherBridge>(w, "bridge"); var address = bridge.Address;
+                string priorState = Json.Write(f.Store.State);
+                string priorDiskState = File.ReadAllText(Path.Combine(f.Store.Root, "manager.json"));
+                int priorWrites = f.Http.Writes.Count;
+                Click(w, Field<Button>(w, "launchButton"));
+                Check(Field<TextBox>(w, "details").Text.Contains("Package identity does not match selected release") &&
+                    Field<Expander>(w, "feedbackPanel").IsExpanded, "mismatched intact archive did not show its identity rejection");
+                Check(f.Http.Stops == 0 && !f.Http.Writes.Skip(priorWrites).Any() && f.Http.Launches == 0 && f.Downloads.Requests == 0,
+                    "identity rejection stopped the working helper, wrote to it, launched or downloaded");
+                Check(f.Store.Selected.folder == f.B.folder && Json.Write(f.Store.State) == priorState &&
+                    File.ReadAllText(Path.Combine(f.Store.Root, "manager.json")) == priorDiskState,
+                    "identity rejection changed the selected package, rollback state or persisted settings");
+                Check(Field<bool>(w, "connectionReady") && bridge.Address == address && address != null,
+                    "identity rejection disconnected the existing helper");
+                // Returning to the retained package must need no repair/reconnect.
+                choices.SelectedItem = f.B.release;
+                Check(Field<Button>(w, "launchButton").IsEnabled &&
+                    Convert.ToString(Field<Button>(w, "launchButton").Content) == new Strings()["launch"],
+                    "identity rejection stranded the existing package instead of retaining Launch");
+                Console.WriteLine("PASS WINDOW intact cached archive with wrong " + (wrongBuild ? "build" : "release") +
+                    " identity is rejected before helper stop and retains selected package/connection (fake HTTP only)");
             }
             using (var f = new Fixture(root))
             {

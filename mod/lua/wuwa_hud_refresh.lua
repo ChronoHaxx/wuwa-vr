@@ -132,6 +132,30 @@ function M.new(env)
         end
         return true, "HUD layout refreshed (" .. refreshed .. "); check the headset / HUD 已刷新，请在头显中确认"
     end
+    local function save_schema_once(self)
+        if self.schema_audited then return end
+        self.schema_audited = true
+        -- Only after the explicit/transition refresh already warmed both exact
+        -- class lookups. One bounded, read-only report per Lua session; never
+        -- probe repeatedly on idle ticks or weaken a rejected setter signature.
+        local ok, result = pcall(function()
+            local collect = require("wuwa_hud_schema")
+            if type(collect) ~= "function" or not json or not json.dump_file then return nil end
+            local report = collect({api = api, types = env.types})
+            report.trigger = "unsupported-hud-refresh"
+            local clock = env.clock and env.clock() or 0
+            local tag = tostring(clock):gsub("[^%w_-]", "-"):sub(1, 48)
+            local path = "diagnostics/hud-schema-auto-" .. tag .. ".json"
+            if json.dump_file(path, report, 4) == false then return nil end
+            local saved = json.load_file(path)
+            if type(saved) ~= "table" or saved.trigger ~= report.trigger or saved.status ~= report.status then return nil end
+            return path
+        end)
+        if ok and type(result) == "string" then
+            self.schema_report = result
+            self.status = self.status .. "; diagnostic saved / 已保存诊断"
+        end
+    end
     function s:request()
         self.pending = {manual = true, age = 0, ticks = 0, stable = 0}
         self.status = "HUD refresh queued / HUD 刷新已排队"
@@ -198,6 +222,7 @@ function M.new(env)
             self.pending = nil
             local ok, message = refresh(context)
             self.status = ok and message or ("HUD refresh unavailable: " .. message .. " / HUD 刷新未完成")
+            if not ok and message == "No active HUD with the supported LGUI schema" then save_schema_once(self) end
         end
     end
     function s:tick(mode, delta)

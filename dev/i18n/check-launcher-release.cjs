@@ -5,7 +5,8 @@ const root = path.resolve(__dirname, '../..'), site = path.join(root, 'site');
 const modules = process.env.WUWA_NODE_MODULES || path.join(process.env.USERPROFILE || '', '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules');
 const {chromium} = require(require.resolve('playwright', {paths: [root, modules]}));
 const out = path.resolve(process.argv[2] || path.join(root, 'dev/i18n/work/launcher-release'));
-const tag = JSON.parse(fs.readFileSync(path.join(root, 'dev/site-status.json'), 'utf8')).tag;
+const release = JSON.parse(fs.readFileSync(path.join(root, 'dev/site-status.json'), 'utf8'));
+const {tag} = release;
 const server = http.createServer((req, res) => {
   const file = path.resolve(site, '.' + decodeURIComponent(new URL(req.url, 'http://localhost').pathname));
   if (!file.startsWith(site + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end(); }
@@ -35,11 +36,13 @@ const server = http.createServer((req, res) => {
         if (name === 'guide.html') assert.equal(await page.getByRole('link', {name: 'Download WuWa-VR-Setup.exe', exact: true}).getAttribute('href'), expected);
         else assert.equal(await primary.getAttribute('href'), expected);
         assert(await page.locator(`a[href$="/${tag}/WuWa-VR-Launcher.zip"]`).count() > 0);
-        assert(await page.locator('a[href$="/tag/beta-2026-10-01-1817"]').count() > 0);
+        assert(await page.locator(`a[href$="/tag/${release.previousTag}"]`).count() > 0);
         assert.equal(await page.locator('.visual-steps img').count(), 0, 'Obsolete launcher screenshots remain');
         assert.equal(await page.locator(name === 'index.html' ? '#get-started ol li' : '#start > ol:first-of-type > li').count(), 3);
         const text = await page.locator('main').innerText();
-        assert(text.includes('1.0.0') && text.includes('3.7'));
+        assert(text.includes(release.appVersion) && text.includes(release.game));
+        assert(text.includes(name.includes('zh-Hans') ? '默认关闭' : 'off by default'));
+        assert(text.includes(name.includes('zh-Hans') ? '预渲染' : 'prerendered'));
         assert(text.includes(name.includes('zh-Hans') ? '底层双眼渲染问题尚未解决' : 'underlying stereo rendering fault is unresolved'));
         for (const href of await page.locator('a[href]').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))) {
           if (/^(https?:|mailto:)/.test(href)) continue;

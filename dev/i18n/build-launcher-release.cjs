@@ -20,7 +20,7 @@ function details(t, heading = 'h2') {
   return `<section id="launcher-updates"><${heading}>${t.updatesTitle}</${heading}><p>${t.updates}</p><p>${t.runtime}</p></section><section id="launcher-beta"><${heading}>${t.betaTitle}</${heading}><p>${t.accepted}</p><p>${t.rim}</p><p>${t.limits}</p><p>${t.cutscenes}</p></section>`;
 }
 function banner(text) {
-  const value = `<aside class="notice" data-launcher-release><strong>4 October beta:</strong> <a href="${release}">WuWa VR ${status.appVersion} · game ${status.game}</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Windows installer and app updates; optional NPC rim workaround starts off.</aside>`;
+  const value = `<aside class="notice" data-launcher-release><strong>4 October beta:</strong> <a href="${release}">WuWa VR ${status.appVersion} · game ${status.game}</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Cinematic framing update; manual mono and stereo screens. Simulator replay confirmed; headset comfort pending.</aside>`;
   return text.replace(/(<main[^>]+id="main"[^>]*>)\s*(?:<aside class="notice"(?: data-launcher-release)?>([\s\S]*?)<\/aside>)?/, (_, main) => main + value);
 }
 async function build() {
@@ -56,6 +56,7 @@ async function build() {
   };
   update('index.html', text => {
     text = banner(text);
+    text = text.replace(/<section><h2>Known problems<\/h2>[\s\S]*?<\/section>/, `<section><h2>Known problems</h2><p>${locales.en.limits}</p><p>Native Stereo Fix and Same Pass remain on in this build. <a href="guide.html#recovery">Recovery steps</a>.</p></section>`);
     text = replace(text, /<div id="release-download">[\s\S]*?<\/div>|<p><a class="button primary"[^>]*>Download[\s\S]*?<\/p><p class="small">[\s\S]*?<\/p>/, downloads(locales.en), 'home download');
     text = replace(text, /<section id="get-started">[\s\S]*?<\/section>/,
       `<section id="get-started"><h2>${locales.en.start}</h2>${steps(locales.en)}<p>${locales.en.controls}</p><a href="guide.html#start">${locales.en.guide}</a></section>`, 'home steps');
@@ -82,13 +83,24 @@ async function build() {
     `<div class="guide-content">${render('docs/RISK.md')}</div>`, 'risk notice'));
   // Refresh current-download references without rewriting historical technical notes.
   update('developers.html', banner);
-  update('understanding.html', text => replace(text,
+  update('understanding.html', text => {
+    let body = render('docs/UNDERSTANDING-WUWA-VR.md');
+    const headings = [];
+    body = body.replace(/<h3>(.*?)<\/h3>/g, (_, title) => {
+      const id = title.toLowerCase().replace(/<[^>]*>/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      headings.push([id, title]); return `<h2 id="${id}">${title}</h2>`;
+    });
+    text = replace(text, /<article class="guide-content">[\s\S]*?<\/article>/, `<article class="guide-content">${body}</article>`, 'explainer article');
+    text = replace(text, /<details open><summary>Jump to a section<\/summary>[\s\S]*?<\/details>/, `<details open><summary>Jump to a section</summary><ul>${headings.map(([id, title]) => `<li><a href="#${id}">${title}</a></li>`).join('')}</ul></details>`, 'explainer contents');
+    text = text.replace('60 seconds · silent, with visible captions', 'Archive explainer · 28 September 2026 · silent, with visible captions');
+    return replace(text,
     /<a class="button primary" href="https:\/\/github\.com\/ChronoHaxx\/wuwa-vr\/releases\/(?:tag|download)\/[^\"]+">(?:Beta download|Download beta installer)[\s\S]*?<\/a>/,
-    `<a class="button primary" href="${asset(status.installer)}">Download beta installer · ${status.appVersion} · game ${status.game}</a>`, 'explainer download'));
+    `<a class="button primary" href="${asset(status.installer)}">Download beta installer · ${status.appVersion} · game ${status.game}</a>`, 'explainer download');
+  });
   update('credits.html', text => replace(text, /<section id="distribution">[\s\S]*?<\/section>/,
-    `<section id="distribution"><h2>Distribution status</h2><p><a href="${release}">The 4 October public beta</a> provides <a href="${asset(status.installer)}">WuWa-VR-Setup.exe</a> for desktop app ${status.appVersion}, plus the advanced <a href="${asset('WuWa-VR-Launcher.zip')}">portable ZIP</a>, matching source and checksums. The thin installer downloads the separate VR mod on first installation.</p><p>Backend <strong>${status.buildId}</strong> targets game ${status.game}. The owner confirmed the retained 2D-brightness and ultimate-camera improvements; the new optional NPC rim workaround starts off and still needs physical-headset checking. It also removes intended nearby rim lighting, and the underlying stereo fault remains unresolved.</p><p>Keep native source, profiles, component notices and hashes paired. Publication does not change upstream licence terms or imply endorsement. Preserve older releases for rollback and keep this experimental release labelled beta.</p></section>`, 'distribution release'));
+    `<section id="distribution"><h2>Distribution status</h2><p><a href="${release}">The 4 October public beta</a> provides <a href="${asset(status.installer)}">WuWa-VR-Setup.exe</a> for desktop app ${status.appVersion}, plus the advanced <a href="${asset('WuWa-VR-Launcher.zip')}">portable ZIP</a>, matching source and checksums. The thin installer downloads the separate VR mod on first installation.</p><p>Backend <strong>${status.buildId}</strong> targets game ${status.game}. ${locales.en.accepted}</p><p>${locales.en.limits}</p><p>${locales.en.cutscenes}</p><p>The optional NPC rim workaround remains off by default and also removes intended nearby rim lighting; the underlying stereo fault remains unresolved.</p><p>Keep native source, profiles, component notices and hashes paired. Publication does not change upstream licence terms or imply endorsement. Preserve older releases for rollback and keep this experimental release labelled beta.</p></section>`, 'distribution release'));
   update('testing.html', text => replace(text, /<section id="checkpoints">[\s\S]*?<\/section>/,
-    `<section id="checkpoints"><h2>Checkpoint identities</h2><p><a href="${release}">4 Oct launcher beta ${status.appVersion} (game ${status.game}): files, source and checksums</a>, backend <strong>${status.buildId}</strong>. See its release receipt for current build and package checks; the new NPC rim toggle still needs physical-headset checking. <a href="${repo}/releases/tag/${status.previousTag}">Previous 1 Oct beta</a> and <a href="${repo}/releases/tag/beta-2026-09-26-230213">26 Sep beta</a> remain historical checkpoints. Keep the build name, timestamp and backend hash with a report.</p></section>`, 'test checkpoints'));
+    `<section id="checkpoints"><h2>Checkpoint identities</h2><p><a href="${release}">4 Oct cinematic beta ${status.appVersion} (game ${status.game}): files, source and checksums</a>, backend <strong>${status.buildId}</strong>. The owner confirmed the simulator replay on private screen-comfort-r1; sampled frames in the latest 68-second recording show matching letterbox heights. Headset comfort remains pending. Automatic cinema stays off and unverified. See the release receipt for build/package checks. <a href="${repo}/releases/tag/${status.previousTag}">Previous 4 Oct launcher beta</a> and <a href="${repo}/releases/tag/beta-2026-09-26-230213">26 Sep beta</a> remain historical checkpoints. Keep the build name, timestamp and backend hash with a report.</p></section>`, 'test checkpoints'));
   for (const [code, t] of Object.entries(locales)) {
     update(`l/${code}.html`, text => {
       text = replace(text, /<section id="start">[\s\S]*?<\/section>/,

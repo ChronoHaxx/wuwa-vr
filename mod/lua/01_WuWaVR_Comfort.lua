@@ -213,25 +213,69 @@ local function status_bool(key)
     return nil
 end
 
+-- Native owns the short-lived presentation lease; the optional helper only
+-- reports exact reflected movie/story signals from the game thread.
+local auto_cinema = {tick = function() end, reset = function() end}
+local cinema_attempted = false
+-- UEVR adds this script's directory to package.path only while executing its
+-- top-level chunk, then restores it before callbacks. Resolve the inert helper
+-- now; its factory and all reflection/native work still wait for explicit ON.
+-- Autoloading the helper as a standalone script does not populate require's cache.
+local cinema_ok, cinema_module = pcall(require, "wuwa_auto_cinema")
+local function cinema_tick()
+    if not cinema_attempted and status_bool("VR_AutoCinema") == true then
+        cinema_attempted = true
+        if cinema_ok and type(cinema_module) == "table" and type(cinema_module.new) == "function" then
+            local ready, instance = pcall(cinema_module.new, {api = uevr.api, types = uevr.types,
+                get = function(key) return vr:get_mod_value(key) end,
+                set = function(key, value) vr.set_mod_value(key, value) end,
+                encode = function(value) return json.dump_string(value) end,
+                log = function(text) log.log_info(text) end})
+            if ready and type(instance) == "table" and type(instance.tick) == "function" and type(instance.reset) == "function" then
+                auto_cinema = instance
+            else
+                log.log_error("WuWaCinema: optional detector initialization failed: " ..
+                    (ready and "invalid helper instance" or tostring(instance)))
+            end
+        else
+            log.log_error("WuWaCinema: optional detector module unavailable: " ..
+                (cinema_ok and ("invalid helper module (" .. type(cinema_module) .. ")") or tostring(cinema_module)))
+        end
+    end
+    auto_cinema:tick()
+end
+
 -- Companion module is inert until a manual request or an observed 2D transition.
 local hud_refresh = {status = "HUD refresh module unavailable / HUD 刷新模块不可用"}
 function hud_refresh:request() end
 function hud_refresh:tick() end
 function hud_refresh:reset() end
 local hud_ok, hud_module = pcall(require, "wuwa_hud_refresh")
+local hud_load_error
 if hud_ok and type(hud_module) == "table" and type(hud_module.new) == "function" then
     local ready, instance = pcall(hud_module.new, {api = uevr.api, types = uevr.types,
         clock = function()
             local ok, value = pcall(function() return vr:get_mod_value("WuWaControls_Clock") end)
             return ok and tonumber(value) or nil
         end})
-    if ready then hud_refresh = instance end
+    if ready and type(instance) == "table" and type(instance.status) == "string"
+        and type(instance.request) == "function" and type(instance.tick) == "function"
+        and type(instance.reset) == "function" then
+        hud_refresh = instance
+    else
+        hud_load_error = ready and "invalid helper instance" or tostring(instance)
+    end
+else
+    hud_load_error = hud_ok and "invalid helper module" or tostring(hud_module)
+end
+if hud_load_error then
+    hud_refresh.status = "HUD refresh module unavailable / HUD 刷新模块不可用: " .. hud_load_error
+    log.log_error("WuWaComfort HUD module: " .. hud_load_error)
 end
 
-local published_hud_status
 local function publish_hud_status()
     local status = hud_refresh.status
-    if type(status) ~= "string" or status == published_hud_status then return end
+    if type(status) ~= "string" then return end
     local bounded = status
     if #bounded > 240 then
         local boundary = utf8.offset(bounded, 0, 241)
@@ -240,8 +284,11 @@ local function publish_hud_status()
     -- Older backends do not expose this transient status key.
     local ok, current = pcall(function() return vr:get_mod_value("WuWaControls_HudAspectStatus") end)
     if not ok or type(current) ~= "string" or current == "" then return end
-    local written = pcall(function() vr.set_mod_value("WuWaControls_HudAspectStatus", bounded) end)
-    if written then published_hud_status = status end
+    -- The native button replaces its status with "queued" before Lua handles
+    -- the request. Republish unchanged failures too; otherwise a missing
+    -- companion can appear queued forever. Matching readback stays write-free.
+    if current == bounded then return end
+    pcall(function() vr.set_mod_value("WuWaControls_HudAspectStatus", bounded) end)
 end
 
 local function menu_release(reason)
@@ -363,7 +410,9 @@ local function menu_tick(delta)
     end
 end
 
+local last_mono_theatre = nil
 uevr.sdk.callbacks.on_pre_engine_tick(function(_, delta)
+    cinema_tick()
     -- The native recovery button only posts a transient request; UObject work
     -- stays on this game-thread callback and never runs from the render UI.
     if status_bool("WuWaControls_ResetHudAspect") == true then
@@ -371,7 +420,15 @@ uevr.sdk.callbacks.on_pre_engine_tick(function(_, delta)
         if cleared and status_bool("WuWaControls_ResetHudAspect") == false then hud_refresh:request()
         else hud_refresh.status = "HUD request could not be acknowledged / 无法确认 HUD 刷新请求" end
     end
-    hud_refresh:tick(status_bool("VR_2DScreenMode"), delta)
+    local mono = status_bool("WuWaControls_EffectiveMonoTheatre")
+    if mono == nil then mono = status_bool("VR_MonoTheatreMode") == true end
+    -- Stereo screen -> mono can keep the same target dimensions. Refresh its
+    -- canvas too; no ESC/menu input is needed, including during dialogue.
+    if last_mono_theatre ~= nil and mono ~= last_mono_theatre then hud_refresh:request() end
+    last_mono_theatre = mono
+    local screen = status_bool("WuWaControls_EffectiveScreen")
+    if screen == nil then screen = status_bool("VR_2DScreenMode") end
+    hud_refresh:tick(mono or screen, delta)
     publish_hud_status()
     local ok, err = pcall(menu_tick, delta)
     if not ok then
@@ -572,7 +629,9 @@ uevr.sdk.callbacks.on_draw_ui(function()
 end)
 
 uevr.sdk.callbacks.on_script_reset(function()
+    auto_cinema:reset()
     hud_refresh:reset()
+    last_mono_theatre = nil
     menu_layout_enabled, menu_visibility_enabled, menu_wait_clear = false, false, true
     menu_release("Script reset; previous HUD restored / 脚本重置，已尝试恢复之前的 HUD")
     -- Never strand the user with all game menus hidden after unloading this

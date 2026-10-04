@@ -2043,7 +2043,7 @@ XrResult OpenXR::begin_frame() {
     return result;
 }
 
-XrResult OpenXR::end_frame(const std::vector<XrCompositionLayerBaseHeader*>& quad_layers, bool has_depth) {
+XrResult OpenXR::end_frame(const std::vector<XrCompositionLayerBaseHeader*>& quad_layers, bool has_depth, bool mono_theatre) {
     std::scoped_lock _{sync_mtx};
     struct HandFrameCleanup { OpenXR* runtime; ~HandFrameCleanup() { runtime->abort_hand_frame(); } } hand_cleanup{this};
 
@@ -2239,8 +2239,13 @@ XrResult OpenXR::end_frame(const std::vector<XrCompositionLayerBaseHeader*>& qua
             layers.push_back((XrCompositionLayerBaseHeader*)&dummy_projection_layer);
         }
 
-        for (auto& l : projection_layer_cache) {
-            layers.push_back((XrCompositionLayerBaseHeader*)&l);
+        // A theatre frame is solely its opaque shared panel. A failed UI
+        // acquire must not reveal uncleared stereo scenery behind it. Retain
+        // the transparent VD timing layer above, but never the game layer.
+        if (!mono_theatre) {
+            for (auto& l : projection_layer_cache) {
+                layers.push_back((XrCompositionLayerBaseHeader*)&l);
+            }
         }
 
         for (auto& l : quad_layers) {   

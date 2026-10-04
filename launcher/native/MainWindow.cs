@@ -752,6 +752,9 @@ namespace WuWaVR.Manager
             operationText.Text = text["preparingPackage"];
             var archive = await repo.Download(release, store.Cache, new Progress<double>(v => { progress.Value = v; operationText.Text = text["download"] + " " + (int)(v * 100) + "%"; }), c,
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "packages"));
+            // Reject a mismatched release before stopping the working helper.
+            // Full extraction/file verification still happens inside Install.
+            await Task.Run(() => PackageStore.VerifyArchiveIdentity(archive, release, c), c);
             await PreparePackageChange(c);
             operationText.Text = text["verifying"]; progress.IsIndeterminate = true;
             await Task.Run(() => store.Install(archive, release, c), c);

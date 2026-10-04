@@ -1,5 +1,5 @@
-WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.0
-Release: beta-2026-10-04-launcher / backend npc-rim-20261004 / game 3.7
+WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.1
+Release: beta-2026-10-04-cinematic / backend cinematic-20261004 / game 3.7
 
 Run WuWa-VR-Setup.exe once to install for your Windows user, then open the
 normal WuWa VR shortcut from the Start menu. No separate Python install is needed.
@@ -26,8 +26,8 @@ Updates: Step 02 > Versions & updates > Check updates. Update launcher downloads
 and verifies the desktop app update; it does not restart the app. When ready,
 close the game and injector, stop recording and finish other operations, then
 choose Restart to update and confirm. Installing or updating the desktop app
-preserves your selected VR package. In Step 02 choose beta-2026-10-04-launcher
-and install it, or select it if already installed, to use npc-rim-20261004
+preserves your selected VR package. In Step 02 choose beta-2026-10-04-cinematic
+and install it, or select it if already installed, to use cinematic-20261004
 (formerly the private NPC-rim candidate).
 Settings, backups, logs and recordings are preserved.
 Do not delete the WuWa VR Manager or WuWa VR Launcher folders in LocalAppData.
@@ -56,15 +56,20 @@ Advanced portable fallback: download WuWa-VR-Launcher.zip from the same release,
 extract the whole ZIP and open WuWa VR Launcher.exe. Keep its app and python
 folders together. This uses the older web interface and does not self-update
 the desktop app. Release downloads and previous versions:
-https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher
+https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic
 https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817
 
-NPC rim lighting workaround · 4 Oct public beta
-Desktop app 1.0.0 uses backend npc-rim-20261004. The owner confirmed headset
-2D brightness and ultimate-camera improvements in earlier builds; this beta
-retains those corrections. The new NPC rim toggle still needs headset checking.
-Fresh-PC installation and Steam/Epic game injection remain unverified. Release
-test results belong in the release receipt; this guide does not establish a pass.
+Cinematic framing · 4 October public beta
+App 1.0.1 / backend cinematic-20261004 / game 3.7.
+Cinematic framing defaults on. The owner confirmed the simulator replay on
+private screen-comfort-r1; sampled frames in the latest 68-second recording show
+matching letterbox heights. Headset comfort remains pending. This retains the
+game's authored letterbox, not an unrestricted immersive cinematic camera.
+Accepted foliage, far indirect-lighting, main Resonators reflection, ultimate
+camera and headset 2D-brightness corrections are retained.
+Long scene/dialogue stalls, HUD-aspect refresh and moving flat-menu backgrounds
+remain open. Manual mono theatre is a menu workaround, not a loading-stall fix.
+Fresh-PC installation and Steam/Epic injection remain unverified.
 
 OPTIONAL NPC RIM WORKAROUND: press L3 + R3 to open UEVR, then choose
 VR > WuWa Controls > Suppress mismatched NPC rim lighting. Default off; your
@@ -95,12 +100,16 @@ WuWa Controls, off each launch. It draws an optical skeleton over the scene; no
 grabbing, collisions or gesture gameplay. Supported optical OpenXR tracking is
 required. Quest Pro + Virtual Desktop physical validation remains pending.
 
-2D screen: fully hold LT and RT first, then hold L3 for 0.8 seconds. Release all
-three before repeating; close UEVR and HUD/mouse adjustment. Dialogue is supported.
-After leaving 2D, if HUD proportions are wrong, use VR > WuWa Controls > Reset HUD
-aspect and read its result. It does not send ESC or change saved HUD size/position.
-Cutscenes can still lose the right-eye scene or flicker. Manual stereoscopic 2D
-has been useful to the player; automatic cutscene switching is not provided.
+MANUAL SCREEN MODES: fully hold LT + RT first, then click R3 for mono theatre
+(the same scene and HUD for both eyes), or hold L3 for 0.8 seconds for a stereo
+screen with scene depth. Release all controls before repeating; close UEVR and
+HUD/mouse adjustment. The shortcuts also work in dialogue.
+After returning, try Reset HUD aspect in WuWa Controls if the HUD is squashed,
+and read its result: the refresh may be unavailable. Opening/closing ESC has
+helped when the game allows it. Saved HUD size/position is unchanged.
+Automatic cinema is experimental and defaults off. It did not activate for the
+latest reported in-engine scene; a prerendered movie has not been tested. Keep
+the manual shortcut available instead of relying on automatic switching.
 
 OPTIONAL WALKING: VR > WuWa Controls > VR controllers for walking (optional) >
 Walking input. This OpenXR layout starts Off each launch. VR controllers only
@@ -157,8 +166,8 @@ Guide: https://chronohaxx.github.io/wuwa-vr/guide.html
 Feedback: https://github.com/ChronoHaxx/wuwa-vr/issues
 Optional support: https://ko-fi.com/chronohax
 
-鸣潮 VR — 桌面启动器 / 公开测试版 1.0.0
-发布版本 beta-2026-10-04-launcher／后端 npc-rim-20261004／游戏 3.7
+鸣潮 VR — 桌面启动器 / 公开测试版 1.0.1
+发布版本 beta-2026-10-04-cinematic／后端 cinematic-20261004／游戏 3.7
 
 运行 WuWa-VR-Setup.exe，为当前 Windows 用户安装，然后从开始菜单打开
 普通 WuWa VR 快捷方式。无需另行安装 Python。小型安装程序不包含 VR 模组；
@@ -180,8 +189,8 @@ Optional support: https://ko-fi.com/chronohax
 更新：第 02 步 > 版本与更新 > 检查更新。“更新启动器”下载并校验桌面应用更新，
 此时不会重启。更新就绪后，关闭游戏和注入器、停止录制并完成其他操作，
 再选择“重启并更新”并确认。安装或更新桌面应用会保留当前选择的 VR 包。
-在第 02 步选择 beta-2026-10-04-launcher 并安装（已安装时直接选用），
-即可使用 npc-rim-20261004（原私测 NPC 轮廓光候选版）。设置、备份、日志和录像会保留；
+在第 02 步选择 beta-2026-10-04-cinematic 并安装（已安装时直接选用），
+即可使用 cinematic-20261004。设置、备份、日志和录像会保留；
 不要删除 LocalAppData 中的 WuWa VR Manager 或 WuWa VR Launcher 文件夹。
 不再提供“设置／录制／帮助”标签页。底部“开发工具”链接打开同一安装包的
 原版网页工具，共用设置、录像、测试和调试功能。录制支持 SteamVR 和内置模拟器；
@@ -198,11 +207,15 @@ Optional support: https://ko-fi.com/chronohax
 WuWa VR Launcher.exe，保持 app 和 python 文件夹完整。这是旧版网页界面，
 不会自动更新桌面应用。发布页及旧版本链接见上方英文部分。
 
-NPC 边缘光临时方案 · 10 月 4 日公开测试版
-桌面应用 1.0.0 使用后端 npc-rim-20261004。作者已在此前版本确认头显二维亮度
-与大招镜头改善；本版保留这些修正。新增 NPC 边缘光开关仍待头显验证。
-全新电脑安装和 Steam／Epic 游戏版本注入尚未确认。最终测试结果以发布记录为准；
-指南本身不代表验收通过。
+过场构图 · 10 月 4 日公开测试版
+应用 1.0.1／后端 cinematic-20261004／游戏 3.7。
+过场构图修正默认开启。作者已确认私测 screen-comfort-r1 的模拟器回放改善；
+最新 68 秒录像抽样中双眼黑边高度一致，头显舒适度仍待验证。
+此修正保留游戏原有黑边，不是可自由环顾的沉浸式过场镜头。
+保留此前已接受的植被、远处间接光照、共鸣者主页面反射、大招镜头与头显二维亮度修正。
+场景／对话加载停顿、HUD 比例刷新与平面菜单背景移动仍未解决。
+手动单目影院可作为菜单临时方案，但不是已确认的加载停顿修复。
+全新电脑安装与 Steam／Epic 注入仍待验证。
 
 可选 NPC 边缘光方案：按 L3 + R3 打开 UEVR，在 VR > WuWa Controls 中选择
 “抑制不匹配的 NPC 边缘光”（Suppress mismatched NPC rim lighting）。默认关闭，
@@ -226,10 +239,13 @@ WuWa Controls 中的 Hand / finger demo 每次启动默认关闭，需要支持�
 OpenXR 运行时；只显示骨架，不含抓取、碰撞或手势玩法。Quest Pro + Virtual Desktop
 的实际对齐与延迟仍待验证。
 
-二维屏幕：先将 LT 与 RT 按到底，再按住 L3 0.8 秒；重复前松开三者。
-关闭 UEVR 与 HUD／鼠标调整，对话中也可使用。离开二维后如 HUD 比例异常，
-在 VR > WuWa Controls 选择 Reset HUD aspect 并查看结果；不会发送 ESC 或修改保存的大小／位置。
-过场仍可能出现右眼场景缺失／闪烁；玩家反馈手动立体二维模式有帮助，但不提供自动过场切换。
+手动屏幕模式：先按住 LT + RT，再点击 R3 切换单目影院（两眼相同场景与 HUD），
+或按住 L3 0.8 秒切换保留场景深度的立体屏幕。重复前松开全部按键；
+关闭 UEVR 与 HUD／鼠标调整，对话中也可使用。
+返回后若 HUD 被压扁，可尝试 WuWa Controls 中的 Reset HUD aspect 并查看结果；
+刷新仍可能不可用。游戏允许时打开再关闭 ESC 菜单曾帮助恢复，不改写保存的大小／位置。
+自动影院是实验功能，默认关闭。最近报告的引擎内过场未触发自动切换，
+真正的预渲染影片也未测试，请保留手动快捷键作为备用。
 可选漫游：VR > WuWa Controls > VR 控制器漫游（可选）> 漫游输入。
 需要 OpenXR，每次启动默认关闭。“仅 VR 控制器”在槽位 0 提供输入，左摇杆移动、右摇杆转动视角。
 “VR + 跑步机／Xbox 槽位 0-3”合并明确选择的已连接槽位；在启动器“故障排查 > 手柄检查”

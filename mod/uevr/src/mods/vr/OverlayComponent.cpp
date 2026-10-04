@@ -210,7 +210,9 @@ void OverlayComponent::on_config_load(const utility::Config& cfg, bool set_defau
 }
 
 bool OverlayComponent::portal_hud_placement(float aspect, Matrix4x4f& transform, float& width, float& height) const {
-    if (!m_ui_attach_to_window->value()) return false;
+    // Theatre owns the complete scene panel. Preserve portal attachment
+    // settings for return, without squeezing this screen into the HUD inset.
+    if (VR::get()->is_using_mono_theatre() || !m_ui_attach_to_window->value()) return false;
     const auto window = WindowMode::get()->get_status();
     if (!window.enabled || !window.anchor_valid) return false;
     const auto fitted = portal_hud::fit(window.width, window.height, window.corner_radius,
@@ -400,12 +402,18 @@ void OverlayComponent::update_slate_openvr() {
         return;
     }
 
-    if (!vr->is_gui_enabled()) {
+    if (!vr->is_gui_enabled() && !vr->is_using_mono_theatre()) {
         vr::VROverlay()->ClearOverlayTexture(m_slate_overlay_handle);
         return;
     }
 
     const auto is_d3d11 = g_framework->get_renderer_type() == Framework::RendererType::D3D11;
+    if (vr->is_using_mono_theatre() && !(is_d3d11
+            ? vr->m_d3d11.is_mono_openvr_ready() : vr->m_d3d12.is_mono_openvr_ready())) {
+        // Do not expose a newly allocated, unwritten overlay during mode entry.
+        vr::VROverlay()->ClearOverlayTexture(m_slate_overlay_handle);
+        return;
+    }
 
     // TODO: do the sizing / scaling calculations below need to take into account non-standard VRTextureBounds_t
     // when we force a symmetrical eye projection matrix?
@@ -914,7 +922,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
 {
     auto& vr = VR::get();
 
-    if (!vr->is_gui_enabled()) {
+    if (!vr->is_gui_enabled() && !vr->is_using_mono_theatre()) {
         m_parent->m_intersect_state.intersecting = false;
         return std::nullopt;
     }
@@ -1031,7 +1039,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerCylinderKHR>> OverlayComp
 {
     auto& vr = VR::get();
 
-    if (!vr->is_gui_enabled()) {
+    if (!vr->is_gui_enabled() && !vr->is_using_mono_theatre()) {
         return std::nullopt;
     }
 
@@ -1101,7 +1109,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
     runtimes::OpenXR::SwapchainIndex swapchain, 
     XrEyeVisibility eye)
 {
-    if (m_parent->m_ui_attach_to_window->value() && WindowMode::get()->get_status().enabled) {
+    if (!VR::get()->is_using_mono_theatre() && m_parent->m_ui_attach_to_window->value() && WindowMode::get()->get_status().enabled) {
         if (auto result = generate_slate_quad(swapchain, eye); result.has_value()) {
             return *(XrCompositionLayerBaseHeader*)&result.value().get();
         }

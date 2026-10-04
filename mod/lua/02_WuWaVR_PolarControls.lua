@@ -484,6 +484,7 @@ cb.on_xinput_get_state(function(_,index,state,result)
     if l3 and r3 then
         actions.view=nil
         if s.view_chord then s.view_chord="cancelled" end
+        s.mono_ready=nil
         s.tap_l=-100; s.tap_r=-100; s.lone_l=false; s.lone_r=false; s.previous=b; input=nil; return
     end
     local adjust=adjusting()
@@ -491,6 +492,7 @@ cb.on_xinput_get_state(function(_,index,state,result)
     -- Enter/leave only after all controls are released. This also protects
     -- menu-click/game-action transitions and a checkbox changed in UEVR.
     if s.adjust_wait or actions.adjust then
+        s.mono_ready=nil; actions.view=nil
         input=nil; zero_pad(state.Gamepad); s.previous=b
         if neutral(p) and not actions.adjust then s.adjust_wait=false; input={pad=p,at=t} end
         return
@@ -499,28 +501,40 @@ cb.on_xinput_get_state(function(_,index,state,result)
         actions.adjust=true; s.adjust_wait=true; s.lone_l=false; s.lone_r=false
         input=nil; zero_pad(state.Gamepad); s.previous=b; return
     end
-    -- One shared latch for portal (LT), diorama (RT), and a deliberate 2D screen
-    -- hold (both triggers, then L3). Only a fresh two-trigger acquisition can
-    -- select screen: rolling out of a single-trigger gesture never promotes it.
-    -- Reserve both triggers until L3 and both release, including cancelled holds.
-    if s.view_chord or (l3 and (p.bLeftTrigger>=30 or p.bRightTrigger>=30) and not adjust) then
+    -- Mono theatre requires a prior, fresh sample with both full triggers and
+    -- neither stick pressed. Simultaneous input or R3-first cannot arm it.
+    local mono_ready=s.mono_ready and t>=s.mono_ready and t-s.mono_ready<=0.25
+    if not s.view_chord and not adjust and b==0 and p.bLeftTrigger>=180 and p.bRightTrigger>=180 then
+        s.mono_ready=t
+    else s.mono_ready=nil end
+    -- One shared latch owns portal, diorama, stereo-screen hold and mono-theatre
+    -- click. A cancelled gesture cannot roll into a different view shortcut.
+    -- Reserve its stick and both triggers until all three are released.
+    if s.view_chord or (not adjust and ((l3 and (p.bLeftTrigger>=30 or p.bRightTrigger>=30)) or
+        (r3 and p.bLeftTrigger>=30 and p.bRightTrigger>=30))) then
         local lt,rt=p.bLeftTrigger,p.bRightTrigger
         if not s.view_chord then
-            s.view_chord=(b==B.L3 and lt>=30 and rt<30) and "portal" or
+            s.view_owner=r3 and "mono" or "left"
+            s.view_chord=(b==B.R3 and lt>=180 and rt>=180 and mono_ready and has(rising,B.R3)) and "mono" or
+                (b==B.L3 and lt>=30 and rt<30) and "portal" or
                 (b==B.L3 and rt>=30 and lt<30) and "diorama" or
                 (b==B.L3 and lt>=30 and rt>=30) and "screen" or "cancelled"
         end
+        s.mono_ready=nil
         -- UObject/cursor reads stay on the engine tick; it validates queued
         -- requests against the current menu state before applying them.
         local menu=game_menu or enabled("WuWaControls_NativeMenu")
-        if (l3 and b~=B.L3) or (s.view_chord~="screen" and lt>=30 and rt>=30) or
+        local stick=s.view_owner=="mono" and B.R3 or B.L3
+        if (has(b,stick) and b~=stick) or
+            (s.view_chord~="screen" and s.view_chord~="mono" and lt>=30 and rt>=30) or
             (s.view_chord=="diorama" and menu) then
             s.view_chord="cancelled"; actions.view=nil
         end
-        s.lone_l=false; s.lone_r=false; s.tap_l=-100
+        s.lone_l=false; s.lone_r=false; s.tap_l=-100; s.tap_r=-100; actions.freecam=nil
         s.rt=false; s.tap_rt=-100; s.turbo=false
         local trigger=s.view_chord=="portal" and lt or s.view_chord=="diorama" and rt or 0
         local fire=l3 and trigger>=180
+        if s.view_chord=="mono" then fire=has(rising,B.R3) and lt>=180 and rt>=180 end
         if s.view_chord=="screen" then
             -- Continuous input is required: a polling pause, clock reversal,
             -- released modifier or trigger drop cannot finish an old long hold.
@@ -539,11 +553,12 @@ cb.on_xinput_get_state(function(_,index,state,result)
         if fire and not s.view_fired then
             actions.view={kind=s.view_chord,slot=index,at=t}; s.view_fired=true
         end
-        state.Gamepad.wButtons=b & (~B.L3)
+        state.Gamepad.wButtons=b & (~stick)
         state.Gamepad.bLeftTrigger=0; state.Gamepad.bRightTrigger=0
         input=nil; s.previous=b
-        if not l3 and lt<30 and rt<30 then
-            s.view_chord=nil; s.view_fired=false; s.view_hold_at=nil; s.view_sample_at=nil
+        if (s.view_owner=="mono" and neutral(p)) or
+            (s.view_owner~="mono" and not l3 and lt<30 and rt<30) then
+            s.view_chord=nil; s.view_owner=nil; s.view_fired=false; s.view_hold_at=nil; s.view_sample_at=nil
         end
         return
     end
@@ -997,13 +1012,21 @@ local function tick(_,delta)
         elseif view.kind=="diorama" and not game_menu then
             set("WuWaDiorama_Enabled",not enabled("WuWaDiorama_Enabled"))
         elseif view.kind=="screen" then
-            -- UEVR's actual monoscopic screen mode; no portal, scale or HUD edits.
-            set("VR_2DScreenMode",not enabled("VR_2DScreenMode"))
+            -- The original screen remains stereoscopic. Mono theatre is an
+            -- independent overlay setting, so exiting restores this choice.
+            if get("WuWaControls_ToggleStereoScreen")=="effective-v1" then
+                set("WuWaControls_ToggleStereoScreen","toggle")
+            else set("VR_2DScreenMode",not enabled("VR_2DScreenMode")) end
+        elseif view.kind=="mono" then
+            if get("WuWaControls_ToggleMonoTheatre")=="effective-v1" then
+                set("WuWaControls_ToggleMonoTheatre","toggle")
+            else set("VR_MonoTheatreMode",not enabled("VR_MonoTheatreMode")) end
         end
     end
     if game_menu or adjust then
         for _,s in pairs(slots) do
             if s.view_chord and (adjust or s.view_chord=="diorama") then s.view_chord="cancelled" end
+            if adjust then s.mono_ready=nil end
         end
     end
     if actions.sheet then set("WuWaControls_ShowShortcutSheet",not enabled("WuWaControls_ShowShortcutSheet")) end

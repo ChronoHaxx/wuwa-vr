@@ -2,6 +2,17 @@
   "schema": 1,
   "releases": [
     {
+      "id": "beta-2026-10-04-cinematic",
+      "gameVersion": "3.7",
+      "buildId": "cinematic-20261004",
+      "channel": "beta",
+      "published": "2026-10-04T21:19:53.460938+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-04-cinematic/WuWa-VR-Launcher.zip",
+      "sha256": "b0470b66bfa39a8c97e39e8181efc79118e8a646bd52732917b83e4a419d789a",
+      "size": 54167862,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic"
+    },
+    {
       "id": "beta-2026-10-04-launcher",
       "gameVersion": "3.7",
       "buildId": "npc-rim-20261004",

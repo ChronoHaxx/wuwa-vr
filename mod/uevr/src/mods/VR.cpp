@@ -26,6 +26,7 @@
 #include "utility/Logging.hpp"
 #include "utility/WuWaTestControl.hpp"
 #include "utility/WuWaStereoComparison.hpp"
+#include "utility/WuWaMonoNativeProjection.hpp"
 
 #include "VR.hpp"
 #include "WindowMode.hpp"
@@ -1484,6 +1485,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
 void VR::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
     ZoneScopedN(__FUNCTION__);
 
+    m_wuwa_controls.advance_auto_cinema(get_runtime()->loaded && is_hmd_active() && is_auto_cinema_enabled());
     m_cvar_manager->on_pre_engine_tick(engine, delta);
     m_last_engine_tick = std::chrono::steady_clock::now();
 
@@ -2413,7 +2415,7 @@ void VR::on_post_present() {
 }
 
 uint32_t VR::get_hmd_width() const {
-    if (m_2d_screen_mode->value()) {
+    if (is_using_2d_screen()) {
         if (get_runtime()->is_openxr()) {
             return g_framework->get_rt_size().x * m_openxr->resolution_scale->value();
         }
@@ -2429,7 +2431,7 @@ uint32_t VR::get_hmd_width() const {
 }
 
 uint32_t VR::get_hmd_height() const {
-    if (m_2d_screen_mode->value()) {
+    if (is_using_2d_screen()) {
         if (get_runtime()->is_openxr()) {
             return g_framework->get_rt_size().y * m_openxr->resolution_scale->value();
         }
@@ -2769,7 +2771,27 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
 
         m_desktop_fix->draw("Desktop Spectator View");
         ImGui::SameLine();
-        m_2d_screen_mode->draw("2D Screen Mode");
+        bool effective_screen = is_using_2d_screen();
+        if (ImGui::Checkbox(wuwa_l10n::label("Screen view on / off").c_str(), &effective_screen))
+            set_stereo_screen_manually(effective_screen);
+        bool effective_mono = is_using_mono_theatre();
+        if (ImGui::Checkbox(wuwa_l10n::label("Mono theatre (no stereo)").c_str(), &effective_mono))
+            set_mono_theatre_manually(effective_mono);
+        wuwa_ui::TextWrapped("Hold LT + RT: hold L3 for 0.8 s to toggle the screen, or click R3 to toggle mono. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.");
+        if (wuwa_ui::draw(*m_auto_cinema, "Automatic cinematic screen (experimental)"))
+            m_wuwa_controls.reset_auto_cinema();
+        wuwa_ui::draw(*m_auto_story_presentation, "Story cutscenes and dialogue");
+        wuwa_ui::TextWrapped("Automatic switching is unverified and off by default. It is intended to use mono for detected videos and the selected view for story scenes. Manual toggles take priority.");
+        wuwa_ui::draw(*m_cinematic_framing_fix, "Match cinematic framing between eyes (default on)");
+        if (ImGui::TreeNode(wuwa_l10n::label("Detection details").c_str())) {
+            wuwa_ui::TextWrapped("Automatic story switching did not activate in the latest reported replay. Prerecorded video switching has not been tested. Missing or changed signals leave the normal view unchanged.");
+            if (is_auto_cinema_enabled()) ImGui::TextWrapped("%s", m_wuwa_controls.auto_cinema_status().c_str());
+            if (is_using_mono_theatre()) ImGui::TextWrapped("%s", wuwa_mono_native::status_text());
+            wuwa_ui::TextWrapped("Framing repair matched both eyes in a simulator quest replay. Headset comfort remains untested; mono theatre is still available as a manual fallback.");
+            if (is_cinematic_framing_fix_enabled() && !is_using_mono_theatre())
+                ImGui::TextWrapped("%s", wuwa_cinematic_framing::status_text());
+            ImGui::TreePop();
+        }
 
         ImGui::TextWrapped("Render Resolution (per-eye): %d x %d", get_runtime()->get_width(), get_runtime()->get_height());
         ImGui::TextWrapped("Total Render Resolution: %d x %d", get_runtime()->get_width() * 2, get_runtime()->get_height());

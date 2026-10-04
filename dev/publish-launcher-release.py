@@ -18,8 +18,8 @@ APP_ID = 'ChronoHaxx.WuWaVR'
 CHANNEL = 'win-beta'
 
 
-def run(*args):
-    result = subprocess.run(args, capture_output=True, text=True, encoding='utf-8')
+def run(*args, input_text=None):
+    result = subprocess.run(args, input=input_text, capture_output=True, text=True, encoding='utf-8')
     if result.returncode:
         raise RuntimeError(result.stderr[-2500:] or result.stdout[-2500:])
     return result.stdout.strip()
@@ -111,6 +111,19 @@ def verify_release_target(remote, tag, commit):
         require(remote.get('target_commitish') == commit, 'Untagged draft does not target the reviewed source commit')
     else:
         require(actual == commit, 'Release tag resolves to a different source commit')
+
+
+def create_draft(tag, commit, version, notes):
+    # Consume the POST response directly: a just-created draft may not yet be
+    # discoverable by tag or in the release listing. Retain this exact ID.
+    payload = {'tag_name': tag, 'target_commitish': commit,
+               'name': 'WuWa VR beta - installer ' + version,
+               'body': notes.read_text(encoding='utf-8-sig'),
+               'draft': True, 'prerelease': True}
+    remote = json.loads(run('gh', 'api', '--method', 'POST', 'repos/' + REPO + '/releases',
+                            '--input', '-', input_text=json.dumps(payload, ensure_ascii=False)))
+    require(type(remote.get('id')) is int and remote['id'] > 0, 'Draft creation did not return a valid release ID')
+    return remote
 
 
 def select_backend(checkout, tag, portable=None):
@@ -228,9 +241,7 @@ def main():
     existing = json.loads(run('gh', 'api', 'repos/' + REPO + '/releases?per_page=100'))
     remote = next((x for x in existing if x['tag_name'] == a.tag), None)
     if remote is None:
-        run('gh', 'release', 'create', a.tag, '--repo', REPO, '--target', commit, '--draft', '--prerelease', '--title', 'WuWa VR beta - installer ' + assets[0]['Version'], '--notes-file', str(a.notes))
-        created = json.loads(run('gh', 'api', 'repos/' + REPO + '/releases?per_page=100'))
-        remote = next(x for x in created if x['tag_name'] == a.tag)
+        remote = create_draft(a.tag, commit, assets[0]['Version'], a.notes)
     verify_release_target(remote, a.tag, commit)
     uploaded = {x['name']: x for x in remote['assets']}
     require(set(uploaded).issubset(x['name'] for x in records), 'Unexpected draft assets')

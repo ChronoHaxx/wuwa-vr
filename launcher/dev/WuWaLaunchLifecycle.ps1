@@ -651,7 +651,8 @@ function Format-InjectorCleanup {
     return ''
 }
 
-# Summarise a harness run that reached a stereo frame. Failed checks, and above
+# Summarise a harness run that reached stereo initialization. Projection setup
+# alone does not prove a submitted or visible frame. Failed checks, and above
 # all a failed continuity check, must not be reported as a running game.
 function Get-LaunchCompletion {
     param(
@@ -661,19 +662,19 @@ function Get-LaunchCompletion {
     )
     if ($Continuity -eq 'FAIL') {
         return [pscustomobject]@{ Phase = 'failed'; Failed = $true
-            Message = 'UEVR reached a stereo frame, but the game did not stay the same running process through the check window. See startup.log.' }
+            Message = 'UEVR reached stereo initialization, but the selected game process could not be continuously verified through the check window. It may have exited or become unreadable; see startup.log.' }
     }
     if ($ChecksFailed -gt 0) {
         return [pscustomobject]@{ Phase = 'finished'; Failed = $true
-            Message = "UEVR produced stereo frames, but $ChecksFailed startup check(s) failed. See the table in startup.log." }
+            Message = "UEVR reached stereo initialization, but $ChecksFailed startup check(s) failed. See the table in startup.log." }
     }
     if ($Continuity -ne 'PASS' -or $ChecksPending -gt 0) {
         $pending = [Math]::Max($ChecksPending, 1)
         return [pscustomobject]@{ Phase = 'finished'; Failed = $false
-            Message = "UEVR produced stereo frames; $pending check(s) are pending, so this is not a complete startup check." }
+            Message = "UEVR reached stereo initialization; $pending check(s) are pending, so this is not a complete startup check." }
     }
     return [pscustomobject]@{ Phase = 'finished'; Failed = $false
-        Message = 'UEVR produced stereo frames and every startup check passed. This is not headset or gameplay acceptance.' }
+        Message = 'UEVR reached stereo initialization and every startup check passed. This does not confirm a visible frame, headset or gameplay acceptance.' }
 }
 
 # ------------------------------------------------------------ console keys ---

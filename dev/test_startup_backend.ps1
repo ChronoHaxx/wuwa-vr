@@ -78,8 +78,11 @@ function Wait-LaunchOutcome {
     $current=& $Observe
     if (-not $current.BackendLogStarted -or $current.FirstFrameSeen -or $current.BackendError -notmatch '-51') { throw 'Fresh backend error not observed correctly' }
     if($global:FixtureSpecial) {
-        if($global:FixtureSpecial -eq 'settle-cancel') {
-            [IO.File]::AppendAllText($global:FixtureProfileLog,"[info] Framework initialized`r`n[info] Derived texture bounds right eye: 0, 1, 0, 1`r`n")
+        if($global:FixtureSpecial -like 'settle-*') {
+            [IO.File]::AppendAllText($global:FixtureProfileLog,"[info] Framework initialized`r`n[info] Creating OpenXR swapchains for D3D12`r`n[info] Original FOV for left eye: -1, 1, 1, -1`r`n[info] Original FOV for right eye: -1, 1, 1, -1`r`n[info] Derived texture bounds left eye: 0, 1, 0, 1`r`n[info] Derived texture bounds right eye: 0, 1, 0, 1`r`n[info] Found FSceneView constructor at 0x1234`r`n")
+            if($global:FixtureSpecial -ne 'settle-pending') {
+                [IO.File]::AppendAllText($global:FixtureProfileLog,"[info] right-eye composite: capture=100x100 game=200x100 expected_eye=100x100 capture_resource=0x1`r`n")
+            }
         } elseif($global:FixtureSpecial -like 'shutdown*') {
             [IO.File]::AppendAllText($global:FixtureProfileLog,"[info] Framework initialized`r`n[info] Derived texture bounds right eye: 0, 1, 0, 1`r`n[info] Framework shutting down...`r`n")
             $global:FixtureGameVisible=$global:FixtureSpecial -eq 'shutdown-live'
@@ -94,6 +97,7 @@ function Wait-LaunchOutcome {
             -InjectorExpected $InjectorExpected -LauncherExpected $LauncherExpected -CancelRequested $CancelRequested `
             -OnPoll $OnPoll -GameGoneGraceSeconds 0
         if($global:FixtureSpecial -eq 'settle-cancel') { [IO.File]::WriteAllText((Join-Path $global:FixtureRun 'cancel.request'),'stop') }
+        if($global:FixtureSpecial -like 'settle-*') { $global:FixtureSettleActive=$true }
         [IO.File]::AppendAllText($global:FixtureProfileLog,"[error] Initialization of mods failed. Reason: final fixture detail`r`n")
         return $result
     }
@@ -124,7 +128,7 @@ function Get-WuWaSteamClient { 'C:\fixture\Steam.exe' }
 function Start-WuWaSteamGame { param($Game) [IO.File]::WriteAllText((Join-Path $global:FixtureRun 'dispatch.txt'),$Game.Uri) }
 function Get-WuWaSteamProcessIdentity {
     param($Process)
-    [pscustomobject]@{Id=$Process.Id;Path=$Process.Path;StartTime=[datetime]::Now;Verified=[bool]$Process.Path;
+    [pscustomobject]@{Id=$Process.Id;Path=$Process.Path;StartTime=[datetime]'2026-10-06 14:59:59';Verified=[bool]$Process.Path;
         Source='inert-fixture';CreationFileTime=0;Win32Error=0;FailedStep=''}
 }
 function Get-ItemPropertyValue { param($Path,$LiteralPath,$Name) if($Name -eq 'ActiveRuntime'){$global:FixtureRuntime}else{throw 'Fixture registry value absent'} }
@@ -143,6 +147,19 @@ function Get-Process {
         [pscustomobject]@{Id=101;ProcessName='Client-Win64-Shipping';Path=$readable}
         if($global:FixtureProcessMode -eq 'duplicate') { [pscustomobject]@{Id=102;ProcessName='Client-Win64-Shipping';Path=$global:FixtureShipping} }
     }
+}
+function Start-Sleep {
+    param([int]$Milliseconds,[int]$Seconds)
+    if($global:FixtureSettleActive -and $Milliseconds -ge 500) {
+        switch($global:FixtureSpecial) {
+            'settle-gone' { $global:FixtureGameVisible=$false }
+            'settle-unreadable' { $global:FixtureProcessMode='unreadable' }
+            'settle-rotated' { [IO.File]::WriteAllText($global:FixtureProfileLog,'[different session] unrelated replacement') }
+            default { throw 'Unexpected sleep during a zero-duration settle fixture' }
+        }
+        return
+    }
+    Microsoft.PowerShell.Utility\Start-Sleep -Milliseconds ($Milliseconds + $Seconds * 1000)
 }
 function Start-Process {
     [CmdletBinding()]param($FilePath,$WorkingDirectory,$WindowStyle,$ArgumentList,[switch]$PassThru,$RedirectStandardOutput,$RedirectStandardError)
@@ -167,6 +184,9 @@ $last=$worker.IndexOf("    & (Join-Path `$PSScriptRoot 'sim-run.ps1') @simArgume
 if($begin -lt 0 -or $last -lt 0){throw 'Worker delegate block moved; update integration fixture'}
 $end=$worker.IndexOf("`n",$last)
 $delegate='param($wuwaGameStart,$runtime,$wuwaSelectedOpenXR,$statePath,$cancel,$run)' + "`r`n" + '$wuwaUseHeadset=$false;$NoDialog=$true' + "`r`n" + $worker.Substring($begin,$end-$begin)
+# Shorten only the wait duration; the production settle loop and completion
+# state writes run unchanged against the fake OS process/log boundaries.
+$delegate=$delegate.Replace("    & (Join-Path `$PSScriptRoot 'sim-run.ps1') @simArguments", "    `$simArguments.SettleSeconds=1; if(`$global:FixtureSpecial -in @('settle-ready','settle-pending')) { `$simArguments.SettleSeconds=0 }; & (Join-Path `$PSScriptRoot 'sim-run.ps1') @simArguments")
 Write-Fixture (Join-Path $dev 'delegate.ps1') $delegate
 $runtime=Join-Path $root 'app/runtime/fixture'
 Write-Fixture (Join-Path $runtime 'Custom_UEVR_Injector.exe') 'inert'
@@ -187,9 +207,12 @@ try {
     foreach($case in @(@{mode='steam';loss=''},@{mode='steam';loss='unreadable'},@{mode='steam';loss='duplicate'},@{mode='launcher';loss=''},@{mode='manual';loss=''},
         @{mode='steam';loss='';special='shutdown-gone'},@{mode='steam';loss='';special='shutdown-live'},
         @{mode='steam';loss='';special='loss-cancel'},@{mode='steam';loss='';special='empty-cancel'},@{mode='steam';loss='';special='ambiguous-timeout'},
-        @{mode='steam';loss='';special='settle-cancel'})) {
+        @{mode='steam';loss='';special='settle-cancel'},@{mode='steam';loss='';special='settle-gone'},
+        @{mode='steam';loss='';special='settle-unreadable'},@{mode='steam';loss='';special='settle-rotated'},
+        @{mode='steam';loss='';special='settle-ready'},@{mode='steam';loss='';special='settle-pending'})) {
         $mode=$case.mode;$global:FixtureLoss=$case.loss;$global:FixtureProcessMode='normal'
         $global:FixtureSpecial=$case['special']
+        $global:FixtureSettleActive=$false
         $global:FixtureMode=$mode
         $global:FixtureRun=Join-Path $root ($mode+'-'+$case.loss+$global:FixtureSpecial);$null=New-Item -ItemType Directory -Path $global:FixtureRun
         $global:FixtureGameVisible=$false
@@ -208,6 +231,18 @@ try {
             Check ($errorText -notmatch 'The game closed|reached renderer initialization, but') ($global:FixtureSpecial+': does not confuse backend shutdown with confirmed game exit or identity-loss failure')
         } elseif($global:FixtureSpecial -eq 'settle-cancel') {
             Check ($saved.phase -eq 'cancelled' -and $saved.firstFrameSeen -and $errorText -match 'Launch cancelled') 'cancellation arriving after readiness prevents the settle window and final Ready result'
+        } elseif($global:FixtureSpecial -in @('settle-gone','settle-unreadable','settle-rotated')) {
+            Check ($saved.phase -eq 'failed' -and $saved.outcome -eq 'ContinuityLost' -and $saved.continuity -eq 'FAIL') ($global:FixtureSpecial+': actual settle failure cannot leave a Ready result')
+            Check ($saved.backendEvidencePresent -and $saved.backendRendererInitialized -and $saved.backendProjectionSeen) ($global:FixtureSpecial+': historical attributed initialization evidence is retained')
+            if($global:FixtureSpecial -eq 'settle-gone') {
+                Check ($saved.steamTargetCount -eq 0 -and $saved.steamTargetCandidateCount -eq 0 -and $saved.steamTargetProcesses.Count -eq 0 -and $saved.targetVerificationLost) 'settle process disappearance replaces stale PID/count without asserting a crash cause'
+            } elseif($global:FixtureSpecial -eq 'settle-unreadable') {
+                Check ($saved.steamTargetCount -eq 0 -and $saved.steamTargetCandidateCount -eq 1 -and $saved.steamTargetUnverifiedCount -eq 1 -and $saved.targetVerificationLost) 'settle identity loss remains distinct from a confirmed game exit'
+            }
+        } elseif($global:FixtureSpecial -eq 'settle-ready') {
+            Check ($saved.phase -eq 'finished' -and $saved.outcome -eq 'Ready' -and $saved.continuity -eq 'PASS' -and $saved.checksFailed -eq 0 -and $saved.checksPending -eq 0) 'successful same-process settle and checks retain Ready result'
+        } elseif($global:FixtureSpecial -eq 'settle-pending') {
+            Check ($saved.phase -eq 'finished' -and $saved.outcome -eq 'StartupChecksPending' -and $saved.checksPending -eq 1) 'incomplete resource observation is pending rather than full Ready result'
         } elseif($global:FixtureSpecial -like '*cancel') {
             Check ($saved.phase -eq 'cancelled' -and $saved.outcome -eq 'Cancelled' -and $errorText -match 'Stopped waiting on request') ($global:FixtureSpecial+': actual wait honors cancellation while selected process identity is unavailable')
         } elseif($global:FixtureSpecial -eq 'ambiguous-timeout') {
@@ -230,6 +265,8 @@ try {
         $savedLog=[IO.File]::ReadAllText((Join-Path $global:FixtureRun 'backend.log'))
         if($mode -eq 'manual') {
             Check ($savedLog -match 'Could not create openxr' -and $savedLog -notmatch 'unrelated replacement') 'A rotated log never overwrites saved attempt evidence in finally'
+        } elseif($global:FixtureSpecial -eq 'settle-rotated') {
+            Check ($savedLog -match 'Creating OpenXR swapchains' -and $savedLog -notmatch 'unrelated replacement') 'a replacement log during settle cannot overwrite the original run evidence'
         } else {
             Check ($savedLog -match 'final fixture detail' -and $savedLog -notmatch 'old attempt') ($mode+': failure finalizer snapshots final backend bytes without old log')
         }

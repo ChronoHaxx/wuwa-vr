@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$OutputRoot,
-    [ValidateSet('Standard','Retained','RetainedFixed','Rendered','EntryGateBaseline','EntryGateFixed')][string]$Mode = 'Standard',
+    [ValidateSet('Standard','Retained','RetainedFixed','Rendered','EntryGateBaseline','EntryGateFixed','ResizeBaseline','ResizeFixed')][string]$Mode = 'Standard',
     [string]$ProductionSnapshot = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -119,6 +119,8 @@ if ($Mode -eq 'RetainedFixed') { $info.Arguments='--retained-fixed' }
 if ($Mode -eq 'Rendered') { $info.Arguments='--rendered' }
 if ($Mode -eq 'EntryGateBaseline') { $info.Arguments='--entry-gate-baseline' }
 if ($Mode -eq 'EntryGateFixed') { $info.Arguments='--entry-gate-fixed' }
+if ($Mode -eq 'ResizeBaseline') { $info.Arguments='--resize-baseline'; $receipt.expectedBehavior='Catch original access violations from both cached resize entries after same-API hook replacement before first Present; remote crash cause not established.' }
+if ($Mode -eq 'ResizeFixed') { $info.Arguments='--resize-fixed'; $receipt.expectedBehavior='Cached/queued resize after replacement, different selected chain and destruction forwards real DXGI once; active selected resize keeps one renderer callback.' }
 $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
 $child=New-Object Diagnostics.Process; $child.StartInfo=$info
 if (-not $child.Start()) { throw 'Could not start actual-hook test.' }

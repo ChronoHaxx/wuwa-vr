@@ -1,13 +1,13 @@
-# Mod source — device-verified dispatch beta
+# Mod source — enum discovery startup beta
 
 The release target is
-[beta-2026-10-06-device-dispatch](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-device-dispatch),
-launcher **1.0.9**, backend/package build **device-dispatch-20261006**, for game
+[beta-2026-10-06-enum-startup](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-enum-startup),
+launcher **1.0.10**, backend/package build **enum-startup-20261006**, for game
 **3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. No affected-PC or headset acceptance is implied.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The affected Windows 11 Steam PC still started flat with 1.0.8. Its logs positively identify a DX12 device, but the callback handoff is never entered after switching probes. This candidate keeps the callback that received frames and lets DX12 own it after the DX11 probe retires, while requiring a verified device and command queue. It retains the earlier startup and recovery repairs. The report does not establish an AMD, driver or Windows-version cause. The backend build and focused callback-dispatch tests passed. Successful startup on the affected PC and physical-headset acceptance remain unverified. See [the device-verified dispatch report](../docs/launch-kit/DEVICE-DISPATCH-20261006.md).
+The affected Windows 11 Steam PC reached OpenXR with 1.0.9, then the game exited. This candidate validates enum objects before reading their class metadata and guards cached resize calls after renderer-hook replacement. It preserves the working DX12 dispatch path. The last SDK message matches the unsafe enum discovery code, but no crash dump establishes the exact cause. The backend build, 15 enum-discovery cases and renderer resize/dispatch regressions passed. Successful startup on the affected PC and physical-headset acceptance remain unverified. See [the enum startup report](../docs/launch-kit/ENUM-STARTUP-20261006.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

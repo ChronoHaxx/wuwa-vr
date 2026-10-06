@@ -163,6 +163,10 @@ protected:
     //OnCreateSwapChainFn m_on_create_swap_chain{ nullptr };
     
     static HRESULT present_internal(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags, DXGI_PRESENT_PARAMETERS* params, bool present1 = false, PresentFn original_override = nullptr);
+    // A queued callback can outlive its hook object. Resolve only this exact
+    // chain's selected original, or its restored live vtable after retirement.
+    static void* resize_original(IDXGISwapChain3* swap_chain, unsigned index);
+    static bool is_selected_resize_chain(IDXGISwapChain3* swap_chain);
 
     static HRESULT WINAPI present(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags);
     static HRESULT WINAPI present1(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags, DXGI_PRESENT_PARAMETERS* params);

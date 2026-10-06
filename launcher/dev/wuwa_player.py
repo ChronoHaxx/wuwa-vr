@@ -888,7 +888,7 @@ def startup_diagnostics(launch):
 
 
 def compact_backend_rows(rows):
-    """Keep probe transitions visible when per-frame failures flood a report."""
+    """Keep bounded, distinct startup evidence despite per-frame log floods."""
     compact = []
     last_key = None
     repeats = 0
@@ -905,22 +905,37 @@ def compact_backend_rows(rows):
         last_key, repeats = key, 0
     if repeats:
         compact.append(f'[previous line repeated {repeats} more times; last occurrence: {last_line}]')
-    if len(compact) <= 180:
-        return compact
-    middle = list(enumerate(compact[40:-80], 40))
-    transitions = [i for i, line in middle if re.search(
-        r'WuWaD3D(?:Probe|Window|Device|Bootstrap|Bridge|Dispatch)|Framework shutting down|Attempting to initialize DirectX|Device or SwapChain null|'
-        r'Hook(?:ed|ing) DirectX|Framework initialized|xrCreateSession|xrBeginSession|'
-        r'xrGetD3D(?:11|12)GraphicsRequirements|FEnumProperty.*(?:offset|candidate)', line, re.IGNORECASE)]
-    # Keep distinct errors, not dozens of timestamp variants of the same error.
-    errors = {}
-    for i, line in middle:
-        if re.search(r'\[(?:error|critical)\]|exception occurred|could not create openxr', line, re.IGNORECASE):
-            key = re.sub(r'^\[\d{4}-\d\d-\d\d [^\]]+\]\s*', '', line)
-            errors[key] = i
-    selected = sorted(set(transitions[-32:] + list(errors.values())[-24:]))
-    return (compact[:40] + ['[... selected initialization/error lines from sampled log ...]'] +
-            [compact[i] for i in selected] + ['[... intermediate backend lines omitted ...]'] + compact[-80:])
+    if len(compact) > 180:
+        middle = list(enumerate(compact[40:-80], 40))
+        # Each stage gets its own allowance: frequent hook retries must not
+        # evict the last SDK offset scan or successful OpenXR initialization.
+        groups = (
+            (12, r'WuWaD3D(?:Probe|Window|Device|Bootstrap|Bridge|Dispatch)|Device or SwapChain null'),
+            (10, r'Framework (?:initialized|shutting down)|Attempting to initialize DirectX|Hook(?:ed|ing) DirectX|'
+                 r'Creating OpenXR swapchains|xr(?:Create|Begin)Session|xrGetD3D(?:11|12)GraphicsRequirements|'
+                 r'texture bounds (?:left|right) eye|Original FOV for'),
+            (8, r'KuroReflection|\b(?:UObjectArray|FUObjectArray|UObject|UField|UStruct|UClass|UProperty|FProperty|FField|UScriptStruct)\.cpp|'
+                r'Initializ(?:ing|ation of) mods'),
+            (12, r'FEnumProperty|\bUEnum\b'),
+            (14, r'\[(?:error|critical)\]|exception occurred|could not create openxr'),
+        )
+        selected = set()
+        for count, pattern in groups:
+            distinct = {}
+            for i, line in middle:
+                if re.search(pattern, line, re.IGNORECASE):
+                    key = re.sub(r'^\[\d{4}-\d\d-\d\d [^\]]+\]\s*', '', line)
+                    distinct[key] = i
+            selected.update(sorted(distinct.values())[-count:])
+        compact = (compact[:40] + ['[... selected initialization/error lines from bounded log ...]'] +
+                   [compact[i] for i in sorted(selected)] + ['[... intermediate backend lines omitted ...]'] + compact[-80:])
+    # A single diagnostic JSON line can itself be enormous. Limit both line
+    # and total shared text, while retaining each selected stage's evidence.
+    line_limit = min(1024, 58000 // max(1, len(compact)) - 1)
+    prefix = (line_limit - 32) * 2 // 3
+    suffix = line_limit - 32 - prefix
+    return [line if len(line) <= line_limit else line[:prefix] + ' [... long line omitted ...] ' + line[-suffix:]
+            for line in compact]
 
 
 def backend_diagnostics(launch):
@@ -947,11 +962,14 @@ def backend_diagnostics(launch):
                 stat = os.fstat(handle.fileno())
                 if not stat.st_size:
                     continue
-                head = handle.read(12288)
-                handle.seek(max(len(head), stat.st_size - 49152))
-                tail = handle.read(49152)
+                # Attempt snapshots are capped at 512 KiB. Read that bounded
+                # window before selecting milestones, instead of dropping the
+                # middle of an ordinary 100 KiB startup log before selection.
+                head = handle.read(262144)
+                handle.seek(max(len(head), stat.st_size - 262144))
+                tail = handle.read(262144)
             stamp = datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds")
-            if stat.st_size <= 61440:
+            if stat.st_size <= 524288:
                 text = (head + tail).decode("utf-8-sig", errors="replace")
             else:
                 text = head.decode("utf-8-sig", errors="replace") + "\n[... middle of backend log omitted ...]\n" + tail.decode("utf-8", errors="replace")

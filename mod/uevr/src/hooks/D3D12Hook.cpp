@@ -771,6 +771,31 @@ HRESULT WINAPI D3D12Hook::present1(IDXGISwapChain3* swap_chain, UINT sync_interv
     return D3D12Hook::present_internal(swap_chain, sync_interval, flags, params, true);
 }
 
+void* D3D12Hook::resize_original(IDXGISwapChain3* swap_chain, unsigned index) {
+    const auto current = g_d3d12_hook;
+    if (current != nullptr && current->m_swapchain_hook != nullptr &&
+        current->m_swapchain_hook->get_instance().as<void*>() == swap_chain) {
+        return current->m_swapchain_hook->get_method<void*>(index);
+    }
+
+    // unhook() restores the per-instance table before the old object is
+    // destroyed. A cached/queued entry may then run with no selected instance
+    // (or a different one) in the replacement. Do not borrow that instance's
+    // originals or require its first Present to have happened.
+    void* table{};
+    void* original{};
+    if (!read_own_pointer(swap_chain, &table) || table == nullptr ||
+        !read_own_pointer(static_cast<void**>(table) + index, &original)) return nullptr;
+    return original;
+}
+
+bool D3D12Hook::is_selected_resize_chain(IDXGISwapChain3* swap_chain) {
+    const auto current = g_d3d12_hook;
+    return current != nullptr && current->m_hooked && !current->m_is_phase_1 &&
+        current->m_swap_chain == swap_chain && current->m_swapchain_hook != nullptr &&
+        current->m_swapchain_hook->get_instance().as<void*>() == swap_chain;
+}
+
 thread_local int32_t g_resize_buffers_depth = 0;
 
 HRESULT WINAPI D3D12Hook::resize_buffers(IDXGISwapChain3* swap_chain, UINT buffer_count, UINT width, UINT height, DXGI_FORMAT new_format, UINT swap_chain_flags) {
@@ -779,15 +804,13 @@ HRESULT WINAPI D3D12Hook::resize_buffers(IDXGISwapChain3* swap_chain, UINT buffe
     spdlog::info("D3D12 resize buffers called");
     spdlog::info(" Parameters: buffer_count {} width {} height {} new_format {} swap_chain_flags {}", buffer_count, width, height, (uint32_t)new_format, swap_chain_flags);
 
-    auto d3d12 = g_d3d12_hook;
-    //auto& hook = d3d12->m_resize_buffers_hook;
-    //auto resize_buffers_fn = hook->get_original<decltype(D3D12Hook::resize_buffers)*>();
-
-    auto resize_buffers_fn = d3d12->m_swapchain_hook->get_method<decltype(D3D12Hook::resize_buffers)*>(13);
-
-    if (!d3d12->m_hooked) {
+    const auto resize_buffers_fn = reinterpret_cast<decltype(D3D12Hook::resize_buffers)*>(resize_original(swap_chain, 13));
+    // Never recurse into our own stale/private table when no original remains.
+    if (resize_buffers_fn == nullptr || resize_buffers_fn == &D3D12Hook::resize_buffers) return DXGI_ERROR_INVALID_CALL;
+    if (!is_selected_resize_chain(swap_chain)) {
         return resize_buffers_fn(swap_chain, buffer_count, width, height, new_format, swap_chain_flags);
     }
+    auto d3d12 = g_d3d12_hook;
 
     const auto window = wuwa_swapchain_window::resolve(swap_chain);
     if (WindowFilter::get().is_filtered(window.window)) {
@@ -852,14 +875,12 @@ HRESULT WINAPI D3D12Hook::resize_target(IDXGISwapChain3* swap_chain, const DXGI_
     spdlog::info("D3D12 resize target called");
     spdlog::info(" Parameters: new_target_parameters {:x}", (uintptr_t)new_target_parameters);
 
-    auto d3d12 = g_d3d12_hook;
-    //auto resize_target_fn = d3d12->m_resize_target_hook->get_original<decltype(D3D12Hook::resize_target)*>();
-
-    auto resize_target_fn = d3d12->m_swapchain_hook->get_method<decltype(D3D12Hook::resize_target)*>(14);
-
-    if (!d3d12->m_hooked) {
+    const auto resize_target_fn = reinterpret_cast<decltype(D3D12Hook::resize_target)*>(resize_original(swap_chain, 14));
+    if (resize_target_fn == nullptr || resize_target_fn == &D3D12Hook::resize_target) return DXGI_ERROR_INVALID_CALL;
+    if (!is_selected_resize_chain(swap_chain) || new_target_parameters == nullptr) {
         return resize_target_fn(swap_chain, new_target_parameters);
     }
+    auto d3d12 = g_d3d12_hook;
 
     const auto window = wuwa_swapchain_window::resolve(swap_chain);
     if (WindowFilter::get().is_filtered(window.window)) {

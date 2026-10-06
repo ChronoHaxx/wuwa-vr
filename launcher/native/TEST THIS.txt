@@ -1,8 +1,8 @@
-WUWA VR — DEVICE DISPATCH BETA CHECKS
-Desktop app 1.0.9 | beta-2026-10-06-device-dispatch
-VR build device-dispatch-20261006 | game 3.7
+WUWA VR — ENUM STARTUP BETA CHECKS
+Desktop app 1.0.10 | beta-2026-10-06-enum-startup
+VR build enum-startup-20261006 | game 3.7
 
-The affected Windows 11 Steam PC still started flat with 1.0.8. Its logs positively identify a DX12 device, but the callback handoff is never entered after switching probes. This candidate keeps the callback that received frames and lets DX12 own it after the DX11 probe retires, while requiring a verified device and command queue. It retains the earlier startup and recovery repairs. The report does not establish an AMD, driver or Windows-version cause. The backend build and focused callback-dispatch tests passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
+The affected Windows 11 Steam PC reached OpenXR with 1.0.9, then the game exited. This candidate validates enum objects before reading their class metadata and guards cached resize calls after renderer-hook replacement. It preserves the working DX12 dispatch path. The last SDK message matches the unsafe enum discovery code, but no crash dump establishes the exact cause. The backend build, 15 enum-discovery cases and renderer resize/dispatch regressions passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
 
 Record Pass / Fail / Blocked / Not tested, with Windows version, game store,
 app/package/build versions and the exact visible result. No need to manufacture
@@ -10,9 +10,9 @@ failures or repeat every earlier feature check just to try this update.
 
 [ ] 1. Update BOTH parts. Step 02 > Versions & updates > Check updates >
     Update launcher, then Restart to update when the game, injector, recording
-    and other operations are idle. Confirm app 1.0.9. Explicitly select and
-    install beta-2026-10-06-device-dispatch in Step 02; confirm VR build
-    device-dispatch-20261006. An app update preserves the old package selection;
+    and other operations are idle. Confirm app 1.0.10. Explicitly select and
+    install beta-2026-10-06-enum-startup in Step 02; confirm VR build
+    enum-startup-20261006. An app update preserves the old package selection;
     Check updates does not select the new VR package automatically.
     If the old app blocks updating, close it and use the new WuWa-VR-Setup.exe
     from https://chronohaxx.github.io/wuwa-vr/. Reinstallation preserves data
@@ -53,17 +53,17 @@ rim lighting, scene/dialogue stalls, HUD refresh and flat-menu backgrounds are
 not claimed fixed by this renderer-startup change.
 
 鸣潮 VR — 渲染器启动测试版检查
-桌面应用 1.0.9 | beta-2026-10-06-device-dispatch
-VR 构建 device-dispatch-20261006 | 游戏 3.7
+桌面应用 1.0.10 | beta-2026-10-06-enum-startup
+VR 构建 enum-startup-20261006 | 游戏 3.7
 
-受影响的 Windows 11 Steam 电脑在 1.0.8 中仍显示平面画面。日志已明确识别 DX12 设备，但切换探测后从未进入回调交接。本候选版保留确实收到画面的回调，在 DX11 探测退出后由 DX12 管理，并要求验证设备和命令队列。此前的启动与恢复修复继续保留。现有报告不能确定 AMD、驱动或 Windows 版本是原因。后端编译及回调分派专项测试已通过。受影响电脑的启动和实体头显体验仍未验证。
+受影响的 Windows 11 Steam 电脑使用 1.0.9 已进入 OpenXR，但随后游戏退出。本候选版本先验证枚举对象身份，再读取其类信息，并保护渲染钩子替换后的缓存调整窗口大小回调。现有 DX12 回调路径予以保留。SDK 最后一条日志与不安全的枚举探测代码吻合，但尚无崩溃转储确认具体原因。后端编译、15 项枚举探测测试及渲染调整大小和分派回归测试已通过。受影响电脑的成功启动和实体头显体验仍未验证。
 
 记录通过／失败／受阻／未测试，并注明 Windows、游戏平台、应用／包／构建版本
 及实际结果。无需刻意制造故障，也无需为本次更新重复所有旧功能检查。
 
 [ ] 1. 两项都更新。第 02 步 > 版本与更新 > 检查更新 > 更新启动器，待游戏、
-    注入器、录制及其他操作结束后重启并更新，确认应用为 1.0.9。再明确选择
-    并安装 beta-2026-10-06-device-dispatch，确认构建 device-dispatch-20261006。
+    注入器、录制及其他操作结束后重启并更新，确认应用为 1.0.10。再明确选择
+    并安装 beta-2026-10-06-enum-startup，确认构建 enum-startup-20261006。
     更新应用会保留旧 VR 包选择；检查更新不会自动改选新包。旧应用阻止更新时，
     关闭后运行网站的新 WuWa-VR-Setup.exe。重装保留数据，也不保证卡住的任务已停止。
 [ ] 2. 启动一次。保留所需的 Steam／库洛安装及运行时，点击一次“以 VR 模式启动”，

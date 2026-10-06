@@ -317,6 +317,51 @@ class LaunchRecovery(unittest.TestCase):
         (player.config().profile / 'log.txt').write_text(content)
         self.assertIn('Could not create openxr session: fixture', '\n'.join(player.backend_diagnostics({})))
 
+    def test_backend_export_retains_sdk_and_openxr_from_previously_omitted_bytes(self):
+        # Model the 114 KiB remote startup: the old 12/48 KiB reader discarded
+        # these milestones before the line selector could even inspect them.
+        player.config().profile.mkdir()
+        content = ('header filler\n' * 1900)
+        content += ('[info] Framework initialized\n'
+                    '[info] Creating OpenXR swapchains for D3D12\n'
+                    '[info] [FEnumProperty.cpp:18] Updating offsets\n'
+                    '[info] [FEnumProperty.cpp:90] Found underlying prop offset: 0x80\n'
+                    '[info] [FEnumProperty.cpp:119] UEnum candidates: first=0x123\n'
+                    '[info] [UClass.cpp:90] Found class offset: 0x80\n')
+        content += 'middle filler\n' * 3500
+        content += 'tail filler\n' * 4000
+        (player.config().profile / 'log.txt').write_text(content, encoding='utf-8')
+        self.assertGreater(len(content), 100000)
+        result = '\n'.join(player.backend_diagnostics({}))
+        for marker in ('Framework initialized', 'Creating OpenXR swapchains', 'Updating offsets',
+                       'Found underlying prop offset', 'UEnum candidates', 'Found class offset'):
+            self.assertIn(marker, result)
+        self.assertLess(len(result), 62000)
+
+    def test_backend_stage_allowances_keep_enum_and_openxr_during_hook_flood(self):
+        rows = [f'header {i}' for i in range(50)]
+        rows += ['[info] Framework initialized', '[info] Creating OpenXR swapchains for D3D12',
+                 '[info] [FEnumProperty.cpp:90] Found underlying prop offset: 0x80',
+                 '[info] [FEnumProperty.cpp:119] UEnum candidates: first=0x123']
+        rows += [f'[info] [WuWaD3DBootstrap] probe={i} callbacks={i}' for i in range(80)]
+        rows += [f'[error] distinct fixture warning {i}' for i in range(80)]
+        rows += [f'tail {i}' for i in range(100)]
+        result = '\n'.join(player.compact_backend_rows(rows))
+        for marker in ('Framework initialized', 'Creating OpenXR swapchains', 'Found underlying prop offset',
+                       'UEnum candidates', 'probe=79 callbacks=79', 'distinct fixture warning 79'):
+            self.assertIn(marker, result)
+        self.assertLess(len(result.splitlines()), 181)
+
+    def test_backend_export_bounds_large_lines_without_losing_later_enum(self):
+        player.config().profile.mkdir()
+        content = '[info] frame-json ' + ('sensitive-frame-data' * 15000) + '\n'
+        content += '[info] [FEnumProperty.cpp:90] Found underlying prop offset: 0x80\n'
+        (player.config().profile / 'log.txt').write_text(content, encoding='utf-8')
+        result = '\n'.join(player.backend_diagnostics({}))
+        self.assertIn('long line omitted', result)
+        self.assertIn('Found underlying prop offset', result)
+        self.assertLess(len(result), 62000)
+
     def test_backend_log_missing_traversal_and_personal_path_redaction(self):
         (self.root / 'backend.log').write_text('outside attempt secret')
         result = '\n'.join(player.backend_diagnostics({'runId': '../../'}))

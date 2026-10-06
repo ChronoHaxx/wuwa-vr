@@ -119,6 +119,25 @@ function Get-SelectedGameProcesses {
     if ($steamGame) { Get-WuWaSteamProcesses $steamGame.Shipping }
     else { Get-Process -Name $gameProcName -ErrorAction SilentlyContinue }
 }
+function Update-SettleProcessState {
+    # The initial wait has finished, but the game can still disappear or lose
+    # its exact identity during sampling. Keep current process observations
+    # separate from the already-attributed backend evidence for this run.
+    if ($steamGame) {
+        $latest = Get-WuWaSteamProcessSnapshot -Game $steamGame -Injector $watchedInjector
+        Update-LaunchState -Path $StatePath -Values @{
+            injectorRunning = [bool]$latest.InjectorRunning;
+            steamTargetCount = $latest.SteamTargetCount;
+            steamTargetCandidateCount = $latest.SteamTargetCandidateCount;
+            steamTargetUnverifiedCount = $latest.SteamTargetUnverifiedCount;
+            steamTargetProcesses = $latest.SteamTargetProcesses;
+            targetVerificationLost = -not [bool]$latest.TargetRunning }
+    } else {
+        $latest = Get-LaunchProcessSnapshot -TargetName $gameProcName -GameNames $gameNames `
+            -LauncherNames $launcherNames -LauncherRoot $launcherRoot -Injector $watchedInjector
+        Update-LaunchState -Path $StatePath -Values @{ injectorRunning = [bool]$latest.InjectorRunning }
+    }
+}
 
 # Which backend actually gets injected is decided by custom_var_urvr_folder in
 # the AppData injector config - NOT by which copy of Custom_UEVR_Injector.exe
@@ -498,7 +517,7 @@ $onPoll = {
     if (-not $StartLauncher) { $message = 'Waiting for the game to start.' }
     if ($steamGame) { $message = 'Steam launch requested; waiting for the selected installation. VR compatibility is unverified.' }
     if ($seen) { $phase = 'game-starting'; $message = 'Game process detected; waiting for UEVR.' }
-    if ($observation.BackendLogStarted) { $phase = 'injected'; $message = 'UEVR log started; waiting for the first stereo frame.' }
+    if ($observation.BackendLogStarted) { $phase = 'injected'; $message = 'UEVR log started; waiting for stereo initialization.' }
     if ($observation.BackendError -and -not $observation.FirstFrameSeen) { $message = 'UEVR startup needs attention; still waiting in case it recovers. ' + $observation.BackendError }
     if ($observation.TargetVerificationLost) {
         $message = 'UEVR log evidence is present, but the selected Steam process can no longer be uniquely verified. Open Troubleshooting and copy diagnostics; do not start another injector.'
@@ -621,13 +640,14 @@ try {
 
     Assert-LaunchNotCancelled -CancelPath $CancelPath
     if ($slice -match 'texture bounds right eye') {
-        # The first stereo frame is far too early to sample per-frame
+        # Projection setup is far too early to sample per-frame
         # instrumentation. [WuWaDiag] records accumulate over the session, and
         # the scene-capture lifecycle only starts churning once a world is
         # loaded. Sampling here reported "0 records" while the log went on to
         # collect hundreds. Let it run, then re-read.
-        Update-LaunchState -Path $StatePath -Values @{ phase = 'settling'; message = "First stereo frame seen; sampling for $SettleSeconds s." }
+        Update-LaunchState -Path $StatePath -Values @{ phase = 'settling'; message = "Stereo initialization observed; sampling for $SettleSeconds s." }
         $gameProcesses = @(Get-SelectedGameProcesses)
+        Update-SettleProcessState
         $expectedProcess = $null
         if ($gameProcesses.Count -eq 1) {
             $expectedProcess = [pscustomobject]@{
@@ -645,7 +665,7 @@ try {
         $runContinuity = Get-RunContinuityCheck -ExpectedProcess $expectedProcess `
             -BackendEntryTime $entryTime -ExpectedLogHeader $expectedHeader `
             -CurrentProcesses $gameProcesses -CurrentLogHeader (Get-LogHeader)
-        Write-Output "First stereo frame seen. Sampling for $SettleSeconds s so per-frame instrumentation can accumulate..."
+        Write-Output "Stereo initialization observed. Sampling for $SettleSeconds s so per-frame instrumentation can accumulate..."
         $settleDeadline = (Get-Date).AddSeconds($SettleSeconds)
         while ($runContinuity.Result -eq 'PASS' -and (Get-Date) -lt $settleDeadline) {
             Assert-LaunchNotCancelled -CancelPath $CancelPath
@@ -654,6 +674,7 @@ try {
             Start-Sleep -Milliseconds ([Math]::Min(3000, $remainingMs))
             Assert-LaunchNotCancelled -CancelPath $CancelPath
             $gameProcesses = @(Get-SelectedGameProcesses)
+            Update-SettleProcessState
             $runContinuity = Get-RunContinuityCheck -ExpectedProcess $expectedProcess `
                 -BackendEntryTime $entryTime -ExpectedLogHeader $expectedHeader `
                 -CurrentProcesses $gameProcesses -CurrentLogHeader (Get-LogHeader)
@@ -667,6 +688,7 @@ try {
                 -BackendEntryTime $entryTime -ExpectedLogHeader $expectedHeader `
                 -CurrentProcesses @(Get-SelectedGameProcesses) `
                 -CurrentLogHeader (Get-LogHeader)
+            Update-SettleProcessState
             if ($runContinuity.Result -eq 'PASS') { $slice = $candidateSlice }
         }
     }
@@ -703,7 +725,7 @@ Add-Check 'openxr d3d12'      ($slice -match 'Creating OpenXR swapchains for D3D
 Add-Check 'left eye fov'      ($slice -match 'Original FOV for left eye')            'per-eye projection logged, left'
 Add-Check 'right eye fov'     ($slice -match 'Original FOV for right eye')           'per-eye projection logged, right'
 Add-Check 'bounds both eyes'  (($slice -match 'texture bounds left eye') -and ($slice -match 'texture bounds right eye')) 'derived texture bounds logged for both eyes'
-Add-Check 'no xrEndFrame err' (-not ($slice -match 'xrEndFrame failed'))             'no rejected frame submissions'
+Add-Check 'no xrEndFrame err' (-not ($slice -match 'xrEndFrame failed'))             'no rejection logged; this does not prove a submitted frame'
 
 # The FSceneView constructor hook hosts every [WuWaDiag] site and the native
 # stereo pass rewrite. The independent LGUI/input fixes can run without it.
@@ -772,7 +794,13 @@ $pending = @($results | Where-Object { $_.Result -eq 'PENDING' })
 if ($pending.Count -gt 0) {
     Write-Warning ('{0} check(s) pending; this log slice does not establish a complete startup.' -f $pending.Count)
 }
+$completionOutcome = 'Ready'
+if ($runContinuity.Result -eq 'FAIL') { $completionOutcome = 'ContinuityLost' }
+elseif ($failed.Count -gt 0) { $completionOutcome = 'StartupChecksFailed' }
+elseif ($runContinuity.Result -ne 'PASS' -or $pending.Count -gt 0) { $completionOutcome = 'StartupChecksPending' }
+$completion = Get-LaunchCompletion -Continuity $runContinuity.Result -ChecksFailed $failed.Count -ChecksPending $pending.Count
 Update-LaunchState -Path $StatePath -Values @{
-    outcome = 'Ready'; continuity = [string]$runContinuity.Result; checksFailed = $failed.Count
+    phase = $completion.Phase; message = $completion.Message; outcome = $completionOutcome
+    continuity = [string]$runContinuity.Result; checksFailed = $failed.Count
     checksPending = $pending.Count; sliceFile = $sliceFile
 }

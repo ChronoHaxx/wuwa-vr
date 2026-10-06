@@ -1,5 +1,5 @@
-WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.9
-Release: beta-2026-10-06-device-dispatch / VR build device-dispatch-20261006 / game 3.7
+WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.10
+Release: beta-2026-10-06-enum-startup / VR build enum-startup-20261006 / game 3.7
 
 Run WuWa-VR-Setup.exe once to install for your Windows user, then open the
 normal WuWa VR shortcut from the Start menu. No separate Python install is needed.
@@ -30,10 +30,10 @@ Updates: Step 02 > Versions & updates > Check updates. Update launcher downloads
 and verifies the desktop app update; it does not restart the app. When ready,
 close the game and injector, stop recording and finish other operations, then
 choose Restart to update and confirm. Installing or updating the desktop app
-preserves your selected VR package. In Step 02 choose beta-2026-10-06-device-dispatch
-and install it, or select it if already installed, to use device-dispatch-20261006
-with the device-verified dispatch repair and current recovery helpers. From 1.0.2–1.0.8, update/restart the app first, then explicitly
-select and install the device-dispatch package. Check updates does not select it for you.
+preserves your selected VR package. In Step 02 choose beta-2026-10-06-enum-startup
+and install it, or select it if already installed, to use enum-startup-20261006
+with enum discovery validation and current recovery helpers. From 1.0.2–1.0.9, update/restart the app first, then explicitly
+select and install the enum-startup package. Check updates does not select it for you.
 If the old app blocks updating, close it and use the new Setup from the website.
 This does not guarantee that a stalled worker has stopped; review remaining processes.
 Settings, backups, logs and recordings are preserved.
@@ -76,16 +76,16 @@ Advanced portable fallback: download WuWa-VR-Launcher.zip from the same release,
 extract the whole ZIP and open WuWa VR Launcher.exe. Keep its app and python
 folders together. This uses the older web interface and does not self-update
 the desktop app. Release downloads and previous versions:
-https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-device-dispatch
+https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-enum-startup
 https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam
 
 Steam and game graphics settings · 6 October public beta
-App 1.0.9 / VR build device-dispatch-20261006 / game 3.7.
+App 1.0.10 / VR build enum-startup-20261006 / game 3.7.
 Choose Steam or Kuro in step 01; saved choices are preserved. The VR package
 keeps the game’s graphics choices instead of forcing low/medium values. A
 one-time cleanup removes only recognized generated overrides, preserving custom
 edits and backups. The accepted timing correction remains separate.
-The affected Windows 11 Steam PC still started flat with 1.0.8. Its logs positively identify a DX12 device, but the callback handoff is never entered after switching probes. This candidate keeps the callback that received frames and lets DX12 own it after the DX11 probe retires, while requiring a verified device and command queue. It retains the earlier startup and recovery repairs. The report does not establish an AMD, driver or Windows-version cause. The backend build and focused callback-dispatch tests passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
+The affected Windows 11 Steam PC reached OpenXR with 1.0.9, then the game exited. This candidate validates enum objects before reading their class metadata and guards cached resize calls after renderer-hook replacement. It preserves the working DX12 dispatch path. The last SDK message matches the unsafe enum discovery code, but no crash dump establishes the exact cause. The backend build, 15 enum-discovery cases and renderer resize/dispatch regressions passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
 Visible startup stages, cancellation, Close launcher only, guarded process recovery
 and Prepare uninstall remain available. Simulator selection and prerequisite
 checks are retained. Existing graphics choices and accepted view fixes are kept.
@@ -196,8 +196,8 @@ Guide: https://chronohaxx.github.io/wuwa-vr/guide.html
 Feedback: https://github.com/ChronoHaxx/wuwa-vr/issues
 Optional support: https://ko-fi.com/chronohax
 
-鸣潮 VR — 桌面启动器 / 公开测试版 1.0.9
-发布版本 beta-2026-10-06-device-dispatch／VR 构建 device-dispatch-20261006／游戏 3.7
+鸣潮 VR — 桌面启动器 / 公开测试版 1.0.10
+发布版本 beta-2026-10-06-enum-startup／VR 构建 enum-startup-20261006／游戏 3.7
 
 运行 WuWa-VR-Setup.exe，为当前 Windows 用户安装，然后从开始菜单打开
 普通 WuWa VR 快捷方式。无需另行安装 Python。小型安装程序不包含 VR 模组；
@@ -221,8 +221,8 @@ Optional support: https://ko-fi.com/chronohax
 更新：第 02 步 > 版本与更新 > 检查更新。“更新启动器”下载并校验桌面应用更新，
 此时不会重启。更新就绪后，关闭游戏和注入器、停止录制并完成其他操作，
 再选择“重启并更新”并确认。安装或更新桌面应用会保留当前选择的 VR 包。
-在第 02 步选择 beta-2026-10-06-device-dispatch 并安装（已安装时直接选用），
-即可使用 device-dispatch-20261006 后端。旧版（包括 1.0.8）须先更新并重启应用，
+在第 02 步选择 beta-2026-10-06-enum-startup 并安装（已安装时直接选用），
+即可使用 enum-startup-20261006 后端。旧版（包括 1.0.9）须先更新并重启应用，
 再明确选择并安装新 VR 包；检查更新不会自动改选。如旧应用阻止更新，请关闭应用并运行网站的新 Setup。
 这不能保证卡住的启动任务已停止；仍需检查残留进程。设置、备份、日志和录像会保留；
 不要删除 LocalAppData 中的 WuWa VR Manager 或 WuWa VR Launcher 文件夹。
@@ -252,10 +252,10 @@ WuWa VR Launcher.exe，保持 app 和 python 文件夹完整。这是旧版网�
 不会自动更新桌面应用。发布页及旧版本链接见上方英文部分。
 
 Steam 与游戏画质设置 · 10 月 6 日公开测试版
-应用 1.0.9／VR 构建 device-dispatch-20261006／游戏 3.7。
+应用 1.0.10／VR 构建 enum-startup-20261006／游戏 3.7。
 第 01 步可选择 Steam 或库洛版本，保留已保存选择。VR 包保留游戏自身画质选择，
 不强制低／中画质；一次性清理仅移除已识别的旧生成覆盖项，保留自定义修改与备份。
-已接受的时序修正独立保留。受影响的 Windows 11 Steam 电脑在 1.0.8 中仍显示平面画面。日志已明确识别 DX12 设备，但切换探测后从未进入回调交接。本候选版保留确实收到画面的回调，在 DX11 探测退出后由 DX12 管理，并要求验证设备和命令队列。此前的启动与恢复修复继续保留。现有报告不能确定 AMD、驱动或 Windows 版本是原因。后端编译及回调分派专项测试已通过。受影响电脑的启动和实体头显体验仍未验证。
+已接受的时序修正独立保留。受影响的 Windows 11 Steam 电脑使用 1.0.9 已进入 OpenXR，但随后游戏退出。本候选版本先验证枚举对象身份，再读取其类信息，并保护渲染钩子替换后的缓存调整窗口大小回调。现有 DX12 回调路径予以保留。SDK 最后一条日志与不安全的枚举探测代码吻合，但尚无崩溃转储确认具体原因。后端编译、15 项枚举探测测试及渲染调整大小和分派回归测试已通过。受影响电脑的成功启动和实体头显体验仍未验证。
 保留启动阶段、取消提示、仅关闭启动器窗口、受保护的进程恢复与准备卸载。
 模拟器选择、依赖检查、已有画质选择及已接受的视图修正继续保留。
 过场构图修正默认开启。作者已确认私测 screen-comfort-r1 的模拟器回放改善；

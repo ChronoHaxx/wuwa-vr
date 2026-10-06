@@ -1,5 +1,5 @@
 diff --git a/src/sdk/AActor.cpp b/src/sdk/AActor.cpp
-index 9e96ea2..1c2a492 100644
+index 9e96ea255b52483515436d41dd4df3828072b0e4..1c2a4927d85cdf8bbb6691a0f47b9c7126757db0 100644
 --- a/src/sdk/AActor.cpp
 +++ b/src/sdk/AActor.cpp
 @@ -1,4 +1,5 @@
@@ -41,8 +41,151 @@ index 9e96ea2..1c2a492 100644
  }
  
  UActorComponent* AActor::add_component_by_class_ex(UClass* uclass, bool deferred) {
+diff --git a/src/sdk/FEnumProperty.cpp b/src/sdk/FEnumProperty.cpp
+index ac90302bcbb407e213ecaa74af3a535dabf0976d..acdaa9dcf6a30a647ae6c5ff2ff0cd072acd908b 100644
+--- a/src/sdk/FEnumProperty.cpp
++++ b/src/sdk/FEnumProperty.cpp
+@@ -1,5 +1,6 @@
+ #include <spdlog/spdlog.h>
+ #include <utility/String.hpp>
++#include <Windows.h>
+ 
+ #include "UObjectArray.hpp"
+ #include "UClass.hpp"
+@@ -8,6 +9,35 @@
+ #include "FEnumProperty.hpp"
+ 
+ namespace sdk {
++namespace {
++template <typename T> bool read_candidate(const void* address, T& value) {
++    SIZE_T read{};
++    return address != nullptr && ReadProcessMemory(GetCurrentProcess(), address,
++        &value, sizeof(value), &read) && read == sizeof(value);
++}
++
++bool registered_object(FUObjectArray* objects, const UObjectBase* object) try {
++    if (objects == nullptr || object == nullptr) return false;
++    int32_t index{};
++    if (!read_candidate(reinterpret_cast<const char*>(object) + UObjectBase::get_internal_index_offset(), index) ||
++        index < 0 || index >= objects->get_object_count()) return false;
++    const auto item = objects->get_object(index);
++    UObjectBase* registered{};
++    return item != nullptr && read_candidate(&item->object, registered) && registered == object;
++} catch (...) {
++    return false;
++}
++
++bool registered_enum(FUObjectArray* objects, const UEnum* candidate, const UClass* enum_class) {
++    // FField/FProperty is not a UObject on newer engines. A readable pointer,
++    // or even a plausible class/name field, does not establish UObject identity.
++    if (!registered_object(objects, candidate)) return false;
++    UClass* candidate_class{};
++    return read_candidate(reinterpret_cast<const char*>(candidate) + UObjectBase::get_class_private_offset(), candidate_class) &&
++        candidate_class == enum_class;
++}
++}
++
+ void FEnumProperty::update_offsets() {
+     if (s_updated_offsets) {
+         return;
+@@ -71,8 +101,10 @@ void FEnumProperty::update_offsets() {
+ 
+     // underlying prop
+     for (auto i = start; i < start + 0x100; i += sizeof(void*)) try {
+-        const auto potential_numeric_property_a = *(sdk::FProperty**)(first_enum_property + i);
+-        const auto potential_numeric_property_b = *(sdk::FProperty**)(second_enum_property + i);
++        sdk::FProperty* potential_numeric_property_a{};
++        sdk::FProperty* potential_numeric_property_b{};
++        if (!read_candidate(reinterpret_cast<const char*>(first_enum_property) + i, potential_numeric_property_a) ||
++            !read_candidate(reinterpret_cast<const char*>(second_enum_property) + i, potential_numeric_property_b)) continue;
+ 
+         if (potential_numeric_property_a == nullptr || potential_numeric_property_b == nullptr) {
+             continue;
+@@ -95,31 +127,40 @@ void FEnumProperty::update_offsets() {
+         continue;
+     }
+ 
+-    // UEnum
++    // GUObjectArray phase 2 clears its once flag before calling us. Together
++    // with s_updated_offsets above, the known-class lookup cannot re-enter
++    // this discovery. Only registered objects are used for class identity.
++    const auto objects = FUObjectArray::get();
++    const auto enum_class = UEnum::static_class();
++    if (!registered_object(objects, enum_class)) {
++        SPDLOG_ERROR("[FEnumProperty::update_offsets] Enum class identity unavailable; enum access disabled");
++        return;
++    }
++
++    // UEnum. Do not invoke engine FName conversion on arbitrary candidate
++    // bytes: even a catch-all cannot recover every invalid ToString call.
+     for (auto i = start; i < start + 0x100; i += sizeof(void*)) try {
+-        const auto potential_enum_a = *(sdk::UEnum**)(first_enum_property + i);
+-        const auto potential_enum_b = *(sdk::UEnum**)(second_enum_property + i);
++        sdk::UEnum* potential_enum_a{};
++        sdk::UEnum* potential_enum_b{};
++        if (!read_candidate(reinterpret_cast<const char*>(first_enum_property) + i, potential_enum_a) ||
++            !read_candidate(reinterpret_cast<const char*>(second_enum_property) + i, potential_enum_b)) continue;
+ 
+         if (potential_enum_a == nullptr || potential_enum_b == nullptr) {
+             continue;
+         }
+         
+-        const auto poential_enum_a_c = potential_enum_a->get_class();
+-        const auto poential_enum_b_c = potential_enum_b->get_class();
+-    
+-
+-        if (poential_enum_a_c != nullptr && poential_enum_b_c != nullptr) {
+-            const auto potential_enum_a_c_name = poential_enum_a_c->get_fname().to_string();
+-            const auto potential_enum_b_c_name = poential_enum_b_c->get_fname().to_string();
+-            
+-            if (potential_enum_a_c_name == L"Enum" && potential_enum_b_c_name == L"Enum") {
+-                s_enum_offset = i;
+-                SPDLOG_INFO("[FEnumProperty::update_offsets] Found enum offset: 0x{:X}", i);
+-                break;
+-            }
++        if (registered_enum(objects, potential_enum_a, enum_class) &&
++            registered_enum(objects, potential_enum_b, enum_class)) {
++            s_enum_offset = i;
++            SPDLOG_INFO("[FEnumProperty::update_offsets] Found registered enum offset: 0x{:X}", i);
++            break;
+         }
+     } catch(...) {
+         continue;
+     }
++    if (s_underlying_prop_offset == 0 || s_enum_offset == 0) {
++        SPDLOG_ERROR("[FEnumProperty::update_offsets] Incomplete offsets: underlying=0x{:X} enum=0x{:X}; unresolved access disabled",
++            s_underlying_prop_offset, s_enum_offset);
++    }
++}
+ }
+-}
+\ No newline at end of file
+diff --git a/src/sdk/FEnumProperty.hpp b/src/sdk/FEnumProperty.hpp
+index 3263888c99784bb584379d1d165149a5151bc169..0036a255e8e757e60ad116e5d8c23c57aa3f64b2 100644
+--- a/src/sdk/FEnumProperty.hpp
++++ b/src/sdk/FEnumProperty.hpp
+@@ -13,10 +13,12 @@ public:
+     static void update_offsets();
+ 
+     FNumericProperty* get_underlying_prop() const {
++        if (s_underlying_prop_offset == 0) return nullptr;
+         return *(FNumericProperty**)((uintptr_t)this + s_underlying_prop_offset);
+     }
+     
+     UEnum* get_enum() const {
++        if (s_enum_offset == 0) return nullptr;
+         return *(UEnum**)((uintptr_t)this + s_enum_offset);
+     }
+ 
+@@ -25,4 +27,4 @@ private:
+     static inline uint32_t s_underlying_prop_offset{0x0}; // idk
+     static inline uint32_t s_enum_offset{0x0}; // idk
+ };
+-}
+\ No newline at end of file
++}
 diff --git a/src/sdk/FSceneView.cpp b/src/sdk/FSceneView.cpp
-index a1517b2..305628c 100644
+index a1517b280d2f758ff46986f2b049aa49f0434000..305628cef77abb4a1dec425c021a28ce48f8d115 100644
 --- a/src/sdk/FSceneView.cpp
 +++ b/src/sdk/FSceneView.cpp
 @@ -1,4 +1,5 @@

@@ -2,7 +2,7 @@
 
 Free, unofficial Wuthering Waves VR mod, built on praydog's UEVR and community work.
 
-**[Download the Windows installer · beta 1.0.9 · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-device-dispatch/WuWa-VR-Setup.exe)** · [Release notes & source](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-device-dispatch) · [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html)
+**[Download the Windows installer · beta 1.0.10 · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-enum-startup/WuWa-VR-Setup.exe)** · [Release notes & source](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-enum-startup) · [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html)
 
 Install **WuWa VR**, then follow **01 Game → 02 Install VR → 03 Headset or simulator**.
 The small installer downloads the separate VR mod (about **54 MB**) in step 02,
@@ -11,20 +11,20 @@ Choose **Launch in VR** and accept Windows permission. Steam starts the selected
 game through Steam; with Kuro, press **Play** in its launcher. The installed app offers launcher updates while idle;
 VR package updates are in step 02. Updates preserve settings, backups and recordings.
 
-Update both the app to **1.0.9** and the step 02 package to
-**beta-2026-10-06-device-dispatch** / build **device-dispatch-20261006**.
+Update both the app to **1.0.10** and the step 02 package to
+**beta-2026-10-06-enum-startup** / build **enum-startup-20261006**.
 Updating the app preserves the selected VR package; explicitly select/install
 the new package after restarting. Existing recovery, cancellation, **Close
 launcher only** and guarded process stopping remain under **Troubleshooting**.
 Game, Steam and VR runtime processes are excluded from confirmed recovery stops.
 
-The affected Windows 11 Steam PC still started flat with 1.0.8. Its logs positively identify a DX12 device, but the callback handoff is never entered after switching probes. This candidate keeps the callback that received frames and lets DX12 own it after the DX11 probe retires, while requiring a verified device and command queue. It retains the earlier startup and recovery repairs. The report does not establish an AMD, driver or Windows-version cause. The backend build and focused callback-dispatch tests passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
+The affected Windows 11 Steam PC reached OpenXR with 1.0.9, then the game exited. This candidate validates enum objects before reading their class metadata and guards cached resize calls after renderer-hook replacement. It preserves the working DX12 dispatch path. The last SDK message matches the unsafe enum discovery code, but no crash dump establishes the exact cause. The backend build, 15 enum-discovery cases and renderer resize/dispatch regressions passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
 
 [Watch / guide](https://chronohaxx.github.io/wuwa-vr/) · [Report an issue](https://github.com/ChronoHaxx/wuwa-vr/issues)
 
-[Portable ZIP (advanced fallback)](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-device-dispatch/WuWa-VR-Launcher.zip)
+[Portable ZIP (advanced fallback)](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-enum-startup/WuWa-VR-Launcher.zip)
 uses the older browser launcher: extract everything, then open **WuWa VR Launcher.exe**.
-No separate Python installation is needed. [Previous beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-handoff).
+No separate Python installation is needed. [Previous beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-device-dispatch).
 Keep older packages for **Troubleshooting → Repair & recovery → Use previous
 installed version**. Close the game/injector and stop recording first. This rolls
 back the VR package, not the desktop app; the old renderer-startup issue may return.

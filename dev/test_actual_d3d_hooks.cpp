@@ -85,6 +85,30 @@ static HRESULT STDMETHODCALLTYPE counted_present(IDXGISwapChain* chain, UINT int
     ++original_presents;
     return native_present(chain, interval, flags);
 }
+using ResizeBuffersFn = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain3*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
+using ResizeTargetFn = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain3*, const DXGI_MODE_DESC*);
+static ResizeBuffersFn native_resize_buffers{};
+static ResizeTargetFn native_resize_target{};
+static unsigned original_resize_buffers{}, original_resize_target{};
+static HRESULT last_resize_target_result{};
+static HRESULT STDMETHODCALLTYPE counted_resize_buffers(IDXGISwapChain3* chain, UINT count, UINT w, UINT h, DXGI_FORMAT format, UINT flags) {
+    ++original_resize_buffers;
+    return native_resize_buffers(chain, count, w, h, format, flags);
+}
+static HRESULT STDMETHODCALLTYPE counted_resize_target(IDXGISwapChain3* chain, const DXGI_MODE_DESC* desc) {
+    ++original_resize_target;
+    return last_resize_target_result = native_resize_target(chain, desc);
+}
+// Catch the original source's access violation inside this inert fixture. No
+// crash dialog/dump or recovery handler is installed in any other process.
+static HRESULT guarded_resize_buffers(ResizeBuffersFn fn, IDXGISwapChain3* chain, UINT w, UINT h, DWORD* fault) {
+    __try { return fn(chain, 2, w, h, DXGI_FORMAT_UNKNOWN, 0); }
+    __except (*fault = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER) { return E_UNEXPECTED; }
+}
+static HRESULT guarded_resize_target(ResizeTargetFn fn, IDXGISwapChain3* chain, const DXGI_MODE_DESC* desc, DWORD* fault) {
+    __try { return fn(chain, desc); }
+    __except (*fault = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER) { return E_UNEXPECTED; }
+}
 class TestD3D12Hook final : public D3D12Hook {
 public:
     // Fault injection in fixture state only, never in the real COM allocation.
@@ -169,7 +193,9 @@ int main(int argc, char** argv) {
         const bool gate_baseline = argc == 2 && std::string(argv[1]) == "--entry-gate-baseline";
         const bool gate_fixed = argc == 2 && std::string(argv[1]) == "--entry-gate-fixed";
         const bool rendered_mode = rendered || gate_baseline || gate_fixed;
-        require(argc == 1 || retained_dispatch || rendered_mode, "Unknown fixture mode");
+        const bool resize_baseline = argc == 2 && std::string(argv[1]) == "--resize-baseline";
+        const bool resize_fixed = argc == 2 && std::string(argv[1]) == "--resize-fixed";
+        require(argc == 1 || retained_dispatch || rendered_mode || resize_baseline || resize_fixed, "Unknown fixture mode");
         spdlog::set_pattern("[%l] %v");
         std::cout << "scope\tactual_D3D11Hook_D3D12Hook_WindowFilter=true\tkananlib=actual_built_library"
             "\tFramework=mutex_only_stub\tfull_Framework_initialized=false\tgame_injected=false" << std::endl;
@@ -235,6 +261,97 @@ int main(int argc, char** argv) {
             }
             require(counter >= expected, std::string("No actual callback: ") + label);
         };
+        if (resize_baseline || resize_fixed) {
+            const auto saved_buffers = slot_value(chain12.version3.Get(), 13);
+            const auto saved_target = slot_value(chain12.version3.Get(), 14);
+            native_resize_buffers = reinterpret_cast<ResizeBuffersFn>(saved_buffers);
+            native_resize_target = reinterpret_cast<ResizeTargetFn>(saved_target);
+            PointerHook count_buffers{&(*reinterpret_cast<void***>(chain12.version3.Get()))[13], reinterpret_cast<void*>(&counted_resize_buffers)};
+            PointerHook count_target{&(*reinterpret_cast<void***>(chain12.version3.Get()))[14], reinterpret_cast<void*>(&counted_resize_target)};
+            unsigned renderer_buffers{}, renderer_targets{};
+            on_new12 = [&](D3D12Hook& current) {
+                current.on_resize_buffers([&](D3D12Hook&, uint32_t, uint32_t) { ++renderer_buffers; });
+                current.on_resize_target([&](D3D12Hook&, uint32_t, uint32_t) { ++renderer_targets; });
+            };
+            install12();
+            present_until(chain12, matching12, 1, "Select chain before resize replacement");
+            const auto cached_buffers = reinterpret_cast<ResizeBuffersFn>(slot_value(chain12.version3.Get(), 13));
+            const auto cached_target = reinterpret_cast<ResizeTargetFn>(slot_value(chain12.version3.Get(), 14));
+            require(cached_buffers != &counted_resize_buffers && cached_target != &counted_resize_target, "Actual instance resize hooks missing");
+            {
+                std::scoped_lock lock{g_framework->get_hook_monitor_mutex()};
+                install12(); // Framework's same-API monitor replacement order.
+            }
+            DWORD buffers_fault{}, target_fault{};
+            DXGI_MODE_DESC mode{}; mode.Width = 96; mode.Height = 64; mode.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            const auto buffers_result = guarded_resize_buffers(cached_buffers, chain12.version3.Get(), 80, 48, &buffers_fault);
+            const auto target_result = guarded_resize_target(cached_target, chain12.version3.Get(), &mode, &target_fault);
+            if (resize_baseline) {
+                require(buffers_fault == EXCEPTION_ACCESS_VIOLATION && target_fault == EXCEPTION_ACCESS_VIOLATION,
+                    "Expected original ResizeBuffers and ResizeTarget null-instance access violations were not reproduced");
+                require(original_resize_buffers == 0 && original_resize_target == 0 && renderer_buffers == 0 && renderer_targets == 0,
+                    "Baseline unexpectedly dispatched resize");
+                std::cout << "REPRODUCED\tcached_resize_before_replacement_first_Present\tResizeBuffers_exception=0x" << std::hex << buffers_fault
+                    << "\tResizeTarget_exception=0x" << target_fault << std::dec << "\toriginals=0\tFramework_resize=0" << std::endl;
+            } else {
+                require(buffers_fault == 0 && target_fault == 0, "Cached resize raised an exception after replacement");
+                checked(buffers_result, "Cached ResizeBuffers before first Present");
+                require(target_result == last_resize_target_result, "Cached ResizeTarget must return exact original result");
+                DXGI_SWAP_CHAIN_DESC desc{}; checked(chain12.base->GetDesc(&desc), "Read resized chain");
+                require(desc.BufferDesc.Width == 80 && desc.BufferDesc.Height == 48 && original_resize_buffers == 1 && original_resize_target == 1,
+                    "Cached resize must execute actual original exactly once and resize real buffers");
+                require(renderer_buffers == 0 && renderer_targets == 0 && hook12->get_display_width() == 0,
+                    "Unselected replacement must not receive stale resize state");
+                std::cout << "PASS\tcached_resize_before_replacement_first_Present\toriginals_once=true\tactual_buffers=80x48\tnew_renderer_untouched=true" << std::endl;
+
+                present_until(chain12, matching12, matching12 + 1, "Select replacement before queued resize");
+                std::promise<void> queued; auto pending_ready = queued.get_future();
+                std::future<HRESULT> pending;
+                {
+                    std::scoped_lock lock{g_framework->get_hook_monitor_mutex()};
+                    pending = std::async(std::launch::async, [&] {
+                        queued.set_value();
+                        return cached_buffers(chain12.version3.Get(), 2, 96, 64, DXGI_FORMAT_UNKNOWN, 0);
+                    });
+                    pending_ready.get(); // callback cannot pass the owned monitor mutex.
+                    install12();
+                }
+                const auto pending_deadline = std::chrono::steady_clock::now() + std::chrono::seconds{3};
+                while (pending.wait_for(std::chrono::milliseconds{0}) != std::future_status::ready &&
+                    std::chrono::steady_clock::now() < pending_deadline) pump_for(std::chrono::milliseconds{1});
+                require(pending.wait_for(std::chrono::milliseconds{0}) == std::future_status::ready, "Queued resize failed to resume after monitor unlock");
+                checked(pending.get(), "Queued ResizeBuffers after replacement");
+                require(original_resize_buffers == 2 && renderer_buffers == 0, "Queued resize dispatched more than once or touched replacement renderer");
+                std::cout << "PASS\tqueued_resize_across_monitor_replacement\toriginal_once=true\tnew_renderer_untouched=true" << std::endl;
+
+                present_until(chain12, matching12, matching12 + 1, "Select replacement before active resize");
+                checked(cached_buffers(chain12.version3.Get(), 2, 80, 48, DXGI_FORMAT_UNKNOWN, 0), "Active selected ResizeBuffers");
+                const auto active_target_result = cached_target(chain12.version3.Get(), &mode);
+                require(original_resize_buffers == 3 && original_resize_target == 2 && renderer_buffers == 1 && renderer_targets == 1 &&
+                    active_target_result == last_resize_target_result, "Active selected resize must keep one original and one renderer callback");
+                std::cout << "PASS\tactive_selected_resize\toriginals_once=true\trenderer_callbacks_once=true" << std::endl;
+
+                HiddenWindow other_window; auto other_chain = make12(other_window.handle, factory.Get(), queue.Get());
+                install12();
+                present_until(other_chain, callbacks12, callbacks12 + 1, "Select a different replacement chain");
+                checked(cached_buffers(chain12.version3.Get(), 2, 96, 64, DXGI_FORMAT_UNKNOWN, 0), "Old chain resize after selecting another");
+                require(original_resize_buffers == 4 && renderer_buffers == 1 && hook12->get_display_width() == 0,
+                    "Old chain resize contaminated the newly selected chain");
+                hook12.reset();
+                checked(cached_buffers(chain12.version3.Get(), 2, 80, 48, DXGI_FORMAT_UNKNOWN, 0), "Cached ResizeBuffers after destruction");
+                const auto destroyed_target_result = cached_target(chain12.version3.Get(), &mode);
+                require(original_resize_buffers == 5 && original_resize_target == 3 && renderer_buffers == 1 && renderer_targets == 1 &&
+                    destroyed_target_result == last_resize_target_result, "Destroyed hook must forward original resize once without renderer callbacks");
+                std::cout << "PASS\tother_chain_and_destroyed_hook_resize\toriginals_once=true\trenderer_untouched=true" << std::endl;
+            }
+            hook12.reset();
+            require(count_buffers.remove() && count_target.remove(), "Resize counter restoration failed");
+            require(slot_value(chain12.version3.Get(), 13) == saved_buffers && slot_value(chain12.version3.Get(), 14) == saved_target &&
+                slot_value(chain12.base.Get(), 8) == saved12 && slot_value(chain12.extended.Get(), 22) == saved12_1, "Resize test did not restore all original slots");
+            require(!IsWindowVisible(window12.handle), "Resize test window became visible");
+            std::cout << "LIMIT\tactual_production_hooks_and_DXGI\tFramework_monitor_mutex_only\tremote_crash_cause_NOT_established" << std::endl;
+            return 0;
+        }
         if (rendered_mode) {
             WindowFilter::get().is_filtered(window12.handle);
             pump_for(std::chrono::milliseconds{450});

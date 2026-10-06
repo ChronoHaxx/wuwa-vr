@@ -13,6 +13,8 @@
 #include <stdexcept>
 #include <thread>
 #include <atomic>
+#include <condition_variable>
+#include <future>
 
 using Microsoft::WRL::ComPtr;
 std::unique_ptr<Framework> g_framework = std::make_unique<Framework>();
@@ -89,11 +91,85 @@ public:
     void reject_queue_offset_for_test() { m_command_queue_offset = UINT32_MAX; }
 };
 
+// A real GPU submission and readback precede every non-TEST Present. Hidden
+// HWND occlusion is allowed; verified pixels prove rendering, not visibility.
+class RenderedFrames {
+    ID3D12Device* device;
+    ID3D12CommandQueue* queue;
+    ComPtr<ID3D12CommandAllocator> allocator;
+    ComPtr<ID3D12GraphicsCommandList> list;
+    ComPtr<ID3D12DescriptorHeap> rtvs;
+    ComPtr<ID3D12Fence> fence;
+    HANDLE ready{};
+    UINT64 serial{};
+public:
+    unsigned verified_pixels{};
+    RenderedFrames(ID3D12Device* d, ID3D12CommandQueue* q) : device{d}, queue{q} {
+        checked(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator)), "Render allocator");
+        checked(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr, IID_PPV_ARGS(&list)), "Render list");
+        checked(list->Close(), "Initial render Close");
+        D3D12_DESCRIPTOR_HEAP_DESC heap{}; heap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV; heap.NumDescriptors = 1;
+        checked(device->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&rtvs)), "Render RTV heap");
+        checked(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)), "Render fence");
+        ready = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        require(ready != nullptr, "Render event");
+    }
+    ~RenderedFrames() { if (ready) CloseHandle(ready); }
+    void draw_and_verify(IDXGISwapChain3* chain, unsigned frame) {
+        ComPtr<ID3D12Resource> target;
+        checked(chain->GetBuffer(chain->GetCurrentBackBufferIndex(), IID_PPV_ARGS(&target)), "Render GetBuffer");
+        const auto desc = target->GetDesc();
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{}; UINT rows{}; UINT64 row_bytes{}, total{};
+        device->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &row_bytes, &total);
+        D3D12_HEAP_PROPERTIES heap{}; heap.Type = D3D12_HEAP_TYPE_READBACK;
+        D3D12_RESOURCE_DESC buffer{}; buffer.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        buffer.Width = total; buffer.Height = 1; buffer.DepthOrArraySize = 1; buffer.MipLevels = 1;
+        buffer.SampleDesc.Count = 1; buffer.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        ComPtr<ID3D12Resource> readback;
+        checked(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &buffer,
+            D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback)), "Render readback");
+        checked(allocator->Reset(), "Render allocator Reset");
+        checked(list->Reset(allocator.Get(), nullptr), "Render list Reset");
+        D3D12_RESOURCE_BARRIER barrier{}; barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = target.Get(); barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT; barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        list->ResourceBarrier(1, &barrier);
+        const auto rtv = rtvs->GetCPUDescriptorHandleForHeapStart(); device->CreateRenderTargetView(target.Get(), nullptr, rtv);
+        const float color[]{frame % 2 ? 1.0f : 0.0f, frame % 2 ? 0.0f : 1.0f, 0.0f, 1.0f};
+        list->ClearRenderTargetView(rtv, color, 0, nullptr);
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
+        list->ResourceBarrier(1, &barrier);
+        D3D12_TEXTURE_COPY_LOCATION from{}; from.pResource = target.Get(); from.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        D3D12_TEXTURE_COPY_LOCATION to{}; to.pResource = readback.Get(); to.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT; to.PlacedFootprint = footprint;
+        list->CopyTextureRegion(&to, 0, 0, 0, &from, nullptr);
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE; barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+        list->ResourceBarrier(1, &barrier);
+        checked(list->Close(), "Render Close");
+        ID3D12CommandList* submitted[]{list.Get()}; queue->ExecuteCommandLists(1, submitted);
+        checked(queue->Signal(fence.Get(), ++serial), "Render Signal");
+        if (fence->GetCompletedValue() < serial) {
+            checked(fence->SetEventOnCompletion(serial, ready), "Render fence event");
+            require(WaitForSingleObject(ready, 2000) == WAIT_OBJECT_0, "GPU fence timed out");
+        }
+        unsigned char* bytes{}; D3D12_RANGE range{static_cast<SIZE_T>(footprint.Offset), static_cast<SIZE_T>(footprint.Offset + 4)};
+        checked(readback->Map(0, &range, reinterpret_cast<void**>(&bytes)), "Render Map");
+        const bool correct = bytes[footprint.Offset] == (frame % 2 ? 255 : 0) &&
+            bytes[footprint.Offset + 1] == (frame % 2 ? 0 : 255) && bytes[footprint.Offset + 2] == 0 && bytes[footprint.Offset + 3] == 255;
+        D3D12_RANGE no_write{}; readback->Unmap(0, &no_write);
+        require(correct, "GPU readback does not match submitted clear");
+        ++verified_pixels;
+    }
+};
+
 int main(int argc, char** argv) {
     try {
         const bool repaired_dispatch = argc == 2 && std::string(argv[1]) == "--retained-fixed";
         const bool retained_dispatch = repaired_dispatch || (argc == 2 && std::string(argv[1]) == "--retained-dispatch");
-        require(argc == 1 || retained_dispatch, "Use no arguments, --retained-dispatch or --retained-fixed");
+        const bool rendered = argc == 2 && std::string(argv[1]) == "--rendered";
+        const bool gate_baseline = argc == 2 && std::string(argv[1]) == "--entry-gate-baseline";
+        const bool gate_fixed = argc == 2 && std::string(argv[1]) == "--entry-gate-fixed";
+        const bool rendered_mode = rendered || gate_baseline || gate_fixed;
+        require(argc == 1 || retained_dispatch || rendered_mode, "Unknown fixture mode");
         spdlog::set_pattern("[%l] %v");
         std::cout << "scope\tactual_D3D11Hook_D3D12Hook_WindowFilter=true\tkananlib=actual_built_library"
             "\tFramework=mutex_only_stub\tfull_Framework_initialized=false\tgame_injected=false" << std::endl;
@@ -114,8 +190,10 @@ int main(int argc, char** argv) {
 
         unsigned callbacks12{}, callbacks11{}, matching12{}, matching11{}, mismatch11{}, post12{}, post11{}, hot_switches{};
         bool hot_switch_armed{};
+        unsigned hot_switch_after{};
         std::unique_ptr<D3D11Hook> hook11;
         std::unique_ptr<D3D12Hook> hook12;
+        std::function<void(D3D12Hook&)> on_new12;
         auto install12 = [&] {
             // Same ordering as Framework::hook_d3d12, including destruction of
             // the previously retired object BEFORE installing replacement hooks.
@@ -128,6 +206,7 @@ int main(int argc, char** argv) {
             });
             hook12->on_post_present([&](D3D12Hook&) { ++post12; });
             require(hook12->hook(), "Actual D3D12Hook::hook failed");
+            if (on_new12) on_new12(*hook12);
         };
         auto install11 = [&] {
             hook11.reset();
@@ -135,7 +214,7 @@ int main(int argc, char** argv) {
             hook11->on_present([&](D3D11Hook& current) {
                 ++callbacks11;
                 if (current.get_device()) ++matching11; else ++mismatch11;
-                if (hot_switch_armed) {
+                if (hot_switch_armed && mismatch11 >= hot_switch_after) {
                     require(!current.get_device(), "Hot mismatch switch received a real DX11 device");
                     hot_switch_armed = false;
                     require(current.unhook(), "Actual hot DX11 unhook failed");
@@ -156,6 +235,134 @@ int main(int argc, char** argv) {
             }
             require(counter >= expected, std::string("No actual callback: ") + label);
         };
+        if (rendered_mode) {
+            WindowFilter::get().is_filtered(window12.handle);
+            pump_for(std::chrono::milliseconds{450});
+            require(!WindowFilter::get().is_filtered(window12.handle), "Rendered target remains filtered");
+            const auto saved_resize = slot_value(chain12.base.Get(), 13);
+            auto** native_slot = &(*reinterpret_cast<void***>(chain12.base.Get()))[8];
+            PointerHook count_original{native_slot, reinterpret_cast<void*>(&counted_present)};
+            native_present = count_original.get_original<PresentFn>();
+            void* primary12{};
+            if (gate_baseline || gate_fixed) {
+                install12();
+                primary12 = slot_value(chain12.base.Get(), 8);
+                require(hook12->unhook(), "Entry-gate initial probe cleanup failed");
+                std::cout << "MODEL\tshared_slot_entry_gate=true\tprimary_DX12_entry_bypassed_to_original=true\tremote_internal_cause_NOT_claimed=true" << std::endl;
+            }
+            RenderedFrames renderer{device12.Get(), queue.Get()};
+            std::atomic_bool installed{}, render_done{}, monitor_done{}, failed{}, retired11_destroyed{};
+            std::atomic_uint monitor_checks{}, bypasses{}, resize12{}, resize11{};
+            on_new12 = [&](D3D12Hook& current) {
+                current.on_resize_buffers([&](D3D12Hook&, uint32_t w, uint32_t h) {
+                    require(w == 80 && h == 48, "Renderer resize dimensions mismatch"); ++resize12;
+                });
+            };
+            DWORD monitor_tid{}, render_tid{};
+            std::mutex error_mutex; std::string error;
+            auto record_failure = [&](const std::exception& e) {
+                std::scoped_lock lock{error_mutex}; error = e.what(); failed = true;
+            };
+            void* working11{};
+            auto real_present = [&] {
+                const auto entry = slot_value(chain12.base.Get(), 8);
+                if (hot_switches > 0 && !gate_baseline) require(entry == working11, "Verified handoff replaced the known-working Present entry");
+                // Explicit fault model at the call site, with unmodified shared
+                // vtable: the primary12 entry is not delivered. Normal Rendered
+                // mode never takes this branch or suppresses any entry.
+                if ((gate_baseline || gate_fixed) && entry == primary12) {
+                    ++bypasses;
+                    checked(counted_present(chain12.base.Get(), 0, 0), "Model original Present");
+                } else {
+                    checked(chain12.base->Present(0, 0), "Rendered non-TEST Present");
+                }
+            };
+            std::jthread monitor([&] {
+                monitor_tid = GetCurrentThreadId();
+                try {
+                    {
+                        std::scoped_lock lock{g_framework->get_hook_monitor_mutex()};
+                        install11();
+                        hook11->on_resize_buffers([&](D3D11Hook&, uint32_t, uint32_t) { ++resize11; });
+                        working11 = slot_value(chain12.base.Get(), 8);
+                        hot_switch_after = 61; hot_switch_armed = true;
+                    }
+                    installed = true;
+                    while (!render_done && !failed) {
+                        {
+                            std::scoped_lock lock{g_framework->get_hook_monitor_mutex()};
+                            ++monitor_checks;
+                            if (hook12 && hook12->is_hooked()) {
+                                require(!hook11 || !hook11->is_hooked(), "Competing API hooks remain active");
+                                if (!gate_baseline && matching12 > 0 && hook11) {
+                                    // Disposal occurs between actual callbacks,
+                                    // not while the old callback stack uses it.
+                                    hook11.reset(); retired11_destroyed = true;
+                                    require(slot_value(chain12.base.Get(), 8) == working11, "Retired DX11 destructor removed the newer slot owner");
+                                }
+                            }
+                        }
+                        Sleep(1);
+                    }
+                    std::scoped_lock lock{g_framework->get_hook_monitor_mutex()};
+                    if (hook12) require(hook12->unhook(), "Rendered monitor DX12 retirement failed");
+                    if (hook11) require(hook11->unhook(), "Rendered monitor DX11 retirement failed");
+                } catch (const std::exception& e) { record_failure(e); }
+                monitor_done = true;
+            });
+            std::jthread render_thread([&] {
+                render_tid = GetCurrentThreadId();
+                try {
+                    while (!installed && !failed) Sleep(1);
+                    if (failed) { render_done = true; return; }
+                    for (unsigned frame = 0; frame < 90; ++frame) {
+                        if (frame == 80) {
+                            // Every local backbuffer reference was released and
+                            // its GPU work fenced before this real resize call.
+                            checked(chain12.base->ResizeBuffers(2, 80, 48, DXGI_FORMAT_UNKNOWN, 0), "Rendered ResizeBuffers");
+                            DXGI_SWAP_CHAIN_DESC desc{}; checked(chain12.base->GetDesc(&desc), "Resized GetDesc");
+                            require(desc.BufferDesc.Width == 80 && desc.BufferDesc.Height == 48, "Real swapchain size did not change");
+                        }
+                        renderer.draw_and_verify(chain12.version3.Get(), frame);
+                        real_present();
+                        Sleep(1);
+                    }
+                } catch (const std::exception& e) { record_failure(e); }
+                render_done = true;
+            });
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{20};
+            while ((!render_done || !monitor_done) && std::chrono::steady_clock::now() < deadline) pump_for(std::chrono::milliseconds{1});
+            if (!render_done || !monitor_done) {
+                std::cerr << "FAIL\tthreaded_render_watchdog" << std::endl;
+                std::quick_exit(3); // End only this isolated process; no detached worker survives.
+            }
+            monitor.join(); render_thread.join();
+            require(!failed, error);
+            require(monitor_tid != render_tid && render_tid != GetCurrentThreadId() && monitor_checks > 0, "Separate monitor/render threads not exercised");
+            require(renderer.verified_pixels == 90 && original_presents == 90, "Rendered frames/original Present must each occur90 times");
+            require(hot_switches == 1 && callbacks11 == 61 && mismatch11 == 61, "Real61-frame DX11 handoff missing");
+            if (gate_baseline) {
+                require(callbacks12 == 0 && bypasses == 29 && resize12 == 0, "Entry-gate baseline did not reproduce missing12 callbacks");
+            } else {
+                require(callbacks12 == 29 && matching12 == 29 && bypasses == 0, "Verified12 renderer did not receive every post-handoff frame");
+                require(resize12 == 1 && resize11 == 0, "Real resize must notify only DX12 renderer exactly once");
+                require(retired11_destroyed, "Retired DX11 destruction while DX12 owned dispatch was not exercised");
+            }
+            hook11.reset(); hook12.reset();
+            require(count_original.remove(), "Rendered original counter cleanup failed");
+            require(slot_value(chain12.base.Get(), 8) == saved12 && slot_value(chain12.base.Get(), 13) == saved_resize &&
+                slot_value(chain12.extended.Get(), 22) == saved12_1, "Rendered hook slots not restored");
+            require(!IsWindowVisible(window12.handle), "Rendered test window became visible");
+            std::cout << (gate_baseline ? "REPRODUCED" : "PASS") << "\trendered_multithread\tentry_gate=" << (gate_baseline || gate_fixed)
+                << "\tGPU_readbacks=" << renderer.verified_pixels << "\tnonTEST_original_Presents=" << original_presents
+                << "\tDX11_callbacks=" << callbacks11 << "\tDX12_matching=" << matching12 << "\tentry_bypasses=" << bypasses
+                << "\tresize12=" << resize12 << "\tresize11=" << resize11 << "\tmonitor_checks=" << monitor_checks
+                << "\tretired11_destroyed=" << retired11_destroyed
+                << "\tmonitor_tid=" << monitor_tid << "\trender_tid=" << render_tid << "\tworking_DX11_entry=" << working11
+                << "\tcleanup=true" << std::endl;
+            std::cout << "LIMIT\tFramework_mutex_stub_with_explicit61frame_bootstrap\tNo_full_Framework_or_remote_Win11_acceptance" << std::endl;
+            return 0;
+        }
         if (retained_dispatch) {
             // Pre-resolve the real title so no filter delay affects counts.
             WindowFilter::get().is_filtered(window12.handle);

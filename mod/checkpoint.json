@@ -1,35 +1,35 @@
 {
   "schema": 3,
-  "build": "renderer-handoff-20261006",
+  "build": "device-dispatch-20261006",
   "privateCandidate": false,
-  "launcherVersion": "1.0.8",
+  "launcherVersion": "1.0.9",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "b5267ae0478f154c290e514fe6e60d21c88852292e8820e77ff27242bebb3365",
-  "frozenPatchSha256": "043f8850d901153c343fb8b20d02b3522d70c834459b9c93243d646b9fc1328b",
-  "sourceReconstructedTree": "d81b96386c52029784136c5c98760d1e08092488",
-  "buildCompleted": "2026-10-06T18:47:35+0100",
+  "backendSha256": "a999659464f394f5072e8abc1c670b3811fba9457854f19ca3290deb3d16ccc8",
+  "frozenPatchSha256": "411736d63447b48ae216e5ef71b990835c3ce7b3939b38881d9782855a26768d",
+  "sourceReconstructedTree": "a6a71a34fff61dde13b5a40b8eefa0a457074351",
+  "buildCompleted": "2026-10-06T19:34:04+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 54285490,
-    "sha256": "6d534a0c9c118105352a959c86fa3bfbc121565cd09c57438da752429f91e0e1",
+    "bytes": 54293054,
+    "sha256": "a8b4c4a748388bcbff8834a12693622e6294f21847665e453aac0f5a8016d095",
     "public": true
   },
   "liveAcceptance": "Native build verified by receipt; see release notes for background checks. Affected-PC startup and headset retest pending.",
   "previousPublicRelease": {
-    "tag": "beta-2026-10-06-window-filter",
-    "backendSha256": "25bc493f981e2c5b5ff9a7e008e923b7dd2cc1dc2b61ff3efbb7c3467f4c4760"
+    "tag": "beta-2026-10-06-renderer-handoff",
+    "backendSha256": "b5267ae0478f154c290e514fe6e60d21c88852292e8820e77ff27242bebb3365"
   },
-  "sourceIdentity": "Device-verified renderer handoff for retained callbacks. See RENDERER-HANDOFF-20261006.md. Injector, accepted scene rendering and graphics policy retained.",
+  "sourceIdentity": "Device-verified dispatch using the known working callback entry after DX11 retirement. See DEVICE-DISPATCH-20261006.md. Injector, accepted scene rendering and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "renderer-handoff-20261006",
+  "rendererBuild": "device-dispatch-20261006",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-2026-10-06-renderer-handoff",
-  "launcherSha256": "2a4f39dd16c0539a8d06f5429001032a1093b061bb73bb5771aabd860c49e290",
-  "setupSha256": "863bb4aefff506d641f0379a0251c4da2b0dfb89e6ab85810ffa65e7a0f1e220"
+  "releaseTag": "beta-2026-10-06-device-dispatch",
+  "launcherSha256": "42e91ed6bddbe9ca1c0b55157f396f587cb3a4e880e6836b37ce25453b5dea98",
+  "setupSha256": "c6768dc8f702d587be3e846d723ad4a760c899c509633ee2e2fa538059179739"
 }

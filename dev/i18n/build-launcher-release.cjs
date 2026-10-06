@@ -20,7 +20,7 @@ function details(t, heading = 'h2') {
   return `<section id="launcher-updates"><${heading}>${t.updatesTitle}</${heading}><p>${t.updates}</p><p>${t.updateFallback}</p><p>${t.recovery}</p><p>${t.runtime}</p></section><section id="launcher-beta"><${heading}>${t.betaTitle}</${heading}><p>${t.accepted}</p><p>${t.rim}</p><p>${t.limits}</p><p>${t.cutscenes}</p></section>`;
 }
 function banner(text) {
-  const value = `<aside class="notice" data-launcher-release><strong>6 October startup compatibility beta:</strong> <a href="${release}">WuWa VR ${status.appVersion} · game ${status.game}</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. Targets retained graphics callbacks that keep reaching an earlier probe. The affected PC still failed with 1.0.7. The backend build and background tests passed; successful remote startup and headset acceptance remain unverified.</aside>`;
+  const value = `<aside class="notice" data-launcher-release><strong>6 October startup compatibility beta:</strong> <a href="${release}">WuWa VR ${status.appVersion} · game ${status.game}</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. ${locales.en.accepted}</aside>`;
   return text.replace(/(<main[^>]+id="main"[^>]*>)\s*(?:<aside class="notice"(?: data-launcher-release)?>([\s\S]*?)<\/aside>)?/, (_, main) => main + value);
 }
 async function build() {

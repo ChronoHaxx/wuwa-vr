@@ -17,6 +17,9 @@ static D3D11Hook* g_d3d11_hook = nullptr;
 
 namespace {
 std::atomic_uint64_t g_d3d11_probe_generation{};
+D3D11Hook::PresentFn g_retired_d3d11_present{};
+using ResizeBuffersFn = HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
+ResizeBuffersFn g_retired_d3d11_resize{};
 
 void log_probe_window(uint64_t generation, const char* stage, IDXGISwapChain* chain,
     HRESULT desc_result, HWND desc_hwnd) {
@@ -31,6 +34,7 @@ void log_probe_window(uint64_t generation, const char* stage, IDXGISwapChain* ch
 
 D3D11Hook::~D3D11Hook() {
     unhook();
+    if (g_d3d11_hook == this) g_d3d11_hook = nullptr;
 }
 
 bool D3D11Hook::hook() {
@@ -110,7 +114,10 @@ bool D3D11Hook::hook() {
         m_probe_present_slot = &present_fn;
 
         m_present_hook = std::make_unique<PointerHook>(&present_fn, (void*)&D3D11Hook::present);
+        m_original_present = m_present_hook->get_original<PresentFn>();
+        g_retired_d3d11_present = m_original_present;
         m_resize_buffers_hook = std::make_unique<PointerHook>(&resize_buffers_fn, (void*)&D3D11Hook::resize_buffers);
+        g_retired_d3d11_resize = m_resize_buffers_hook->get_original<ResizeBuffersFn>();
 
         m_hooked = true;
     } catch (const std::exception& e) {
@@ -139,14 +146,44 @@ bool D3D11Hook::unhook() {
         m_probe_generation, m_probe_callbacks, m_probe_filtered, m_probe_selected,
         m_probe_device_queries, m_probe_device_ok, (uintptr_t)m_probe_present_slot, slot_read,
         (uintptr_t)slot_value, slot_read && slot_value == (void*)&D3D11Hook::present,
-        (uintptr_t)m_present_hook->get_original<void*>());
+        (uintptr_t)m_original_present);
 
     if (m_present_hook->remove() && m_resize_buffers_hook->remove()) {
+        // The next DX12 probe may deliberately install this same thunk. Destroy
+        // the removed owner now, before a newer hook can own that destination.
+        // A queued callback uses m_original_present, not this hook object.
+        m_present_hook.reset();
         m_hooked = false;
         return true;
     }
 
     return false;
+}
+
+std::optional<D3D11Hook::VerifiedDx12Dispatch> D3D11Hook::verified_dx12_dispatch(
+    void** candidate_slot, void* candidate_original, const char*& reason) {
+    auto old = g_d3d11_hook;
+    reason = "no_retired_dx11_probe";
+    if (old == nullptr || old->m_hooked || old->m_present_hook != nullptr) return std::nullopt;
+    reason = "no_positive_dx12_source";
+    if (old->m_observed_dx12_chain == nullptr || old->m_observed_dx12_device == nullptr) return std::nullopt;
+    reason = "original_mismatch";
+    if (candidate_original == nullptr || candidate_original != reinterpret_cast<void*>(old->m_original_present)) return std::nullopt;
+    void** actual_table{};
+    void* actual_original{};
+    SIZE_T bytes{};
+    reason = "actual_table_unreadable";
+    if (!ReadProcessMemory(GetCurrentProcess(), old->m_observed_dx12_chain.Get(),
+        &actual_table, sizeof(actual_table), &bytes) || bytes != sizeof(actual_table) || actual_table == nullptr) return std::nullopt;
+    reason = "actual_slot_differs";
+    if (actual_table + 8 != candidate_slot) return std::nullopt;
+    bytes = 0;
+    reason = "actual_original_changed";
+    if (!ReadProcessMemory(GetCurrentProcess(), candidate_slot, &actual_original, sizeof(actual_original), &bytes) ||
+        bytes != sizeof(actual_original) || actual_original != candidate_original) return std::nullopt;
+    reason = "positive_dx12_same_slot_original";
+    return VerifiedDx12Dispatch{&D3D11Hook::present, old->m_original_present,
+        old->m_observed_dx12_chain, old->m_observed_dx12_device};
 }
 
 thread_local bool g_inside_d3d11_present = false;
@@ -155,10 +192,17 @@ HRESULT last_d3d11_present_result = S_OK;
 HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval, UINT flags) {
     std::scoped_lock _{g_framework->get_hook_monitor_mutex()};
 
+    // DX12 owns the installed slot in this mode. Its retained source identity
+    // survives destruction of the retired DX11 probe; there is no DX11 frame.
+    if (const auto result = D3D12Hook::present_from_stable_d3d11(swap_chain, sync_interval, flags)) return *result;
+
     auto d3d11 = g_d3d11_hook;
 
     // This line must be called before calling our detour function because we might have to unhook the function inside our detour.
-    auto present_fn = d3d11->m_present_hook->get_original<decltype(D3D11Hook::present)*>();
+    auto present_fn = d3d11 != nullptr && d3d11->m_original_present != nullptr ?
+        d3d11->m_original_present : g_retired_d3d11_present;
+    if (present_fn == nullptr) return DXGI_ERROR_INVALID_CALL;
+    if (d3d11 == nullptr) return present_fn(swap_chain, sync_interval, flags);
 
     // Unhook restores the slot but keeps the original callable for an already
     // dispatched callback that waited while Framework switched API probes.
@@ -322,9 +366,11 @@ HRESULT WINAPI D3D11Hook::resize_buffers(
     std::scoped_lock _{g_framework->get_hook_monitor_mutex()};
 
     auto d3d11 = g_d3d11_hook;
-    auto resize_buffers_fn = d3d11->m_resize_buffers_hook->get_original<decltype(D3D11Hook::resize_buffers)*>();
+    auto resize_buffers_fn = d3d11 != nullptr && d3d11->m_resize_buffers_hook != nullptr ?
+        d3d11->m_resize_buffers_hook->get_original<ResizeBuffersFn>() : g_retired_d3d11_resize;
+    if (resize_buffers_fn == nullptr) return DXGI_ERROR_INVALID_CALL;
 
-    if (!d3d11->m_hooked) {
+    if (d3d11 == nullptr || !d3d11->m_hooked) {
         return resize_buffers_fn(swap_chain, buffer_count, width, height, new_format, swap_chain_flags);
     }
 

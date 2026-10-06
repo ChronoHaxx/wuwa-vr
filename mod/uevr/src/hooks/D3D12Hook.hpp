@@ -36,6 +36,8 @@ public:
     // nullopt means the retired caller must forward its original normally.
     static std::optional<HRESULT> present_from_d3d11(IDXGISwapChain3* observed,
         ID3D12Device4* proven_device, PresentFn original, UINT sync_interval, UINT flags);
+    static std::optional<HRESULT> present_from_stable_d3d11(
+        IDXGISwapChain* source, UINT sync_interval, UINT flags);
 
     void on_present(OnPresentFn fn) {
         m_on_present = fn;
@@ -138,6 +140,11 @@ protected:
     unsigned m_probe_filtered_logs{}, m_probe_selected_logs{}, m_probe_other_logs{}, m_probe_resize_logs{};
     void** m_probe_present_slot{};
     void** m_probe_present1_slot{};
+    void* m_present_destination{};
+    uint64_t m_probe_raw_entry_start{}, m_probe_raw_entry1_start{};
+    Microsoft::WRL::ComPtr<IDXGISwapChain3> m_dispatch_swapchain{};
+    Microsoft::WRL::ComPtr<ID3D12Device4> m_dispatch_device{};
+    PresentFn m_dispatch_original{};
     bool m_bridge_attempted{};
     uint64_t m_probe_bridge_calls{};
     Microsoft::WRL::ComPtr<IDXGISwapChain3> m_bridge_swapchain{};

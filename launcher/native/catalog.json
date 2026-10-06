@@ -2,6 +2,17 @@
   "schema": 1,
   "releases": [
     {
+      "id": "beta-2026-10-06-device-dispatch",
+      "gameVersion": "3.7",
+      "buildId": "device-dispatch-20261006",
+      "channel": "beta",
+      "published": "2026-10-06T18:35:05.327584+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-device-dispatch/WuWa-VR-Launcher.zip",
+      "sha256": "a8b4c4a748388bcbff8834a12693622e6294f21847665e453aac0f5a8016d095",
+      "size": 54293054,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-device-dispatch"
+    },
+    {
       "id": "beta-2026-10-06-renderer-handoff",
       "gameVersion": "3.7",
       "buildId": "renderer-handoff-20261006",

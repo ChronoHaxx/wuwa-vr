@@ -39,7 +39,7 @@ permitted. It is not a guarantee of legal protection for the authors.
 
 Do not disable or bypass anti-cheat or Windows security protections. A public
 beta installer, VR package and matching source are available on the project's
-[release page](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam).
+[release page](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-device-dispatch).
 Publication does not change any component's licence terms, establish legal
 clearance or imply publisher approval. Fresh-PC installation and broader
 headset/client compatibility remain unverified.

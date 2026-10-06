@@ -13,12 +13,14 @@
 #include "Framework.hpp"
 
 #include "D3D12Hook.hpp"
+#include "D3D11Hook.hpp"
 #include "utility/WuWaSwapchainWindow.hpp"
 
 static D3D12Hook* g_d3d12_hook = nullptr;
 
 namespace {
 std::atomic_uint64_t g_d3d12_probe_generation{};
+std::atomic_uint64_t g_d3d12_raw_entries{}, g_d3d12_raw_entries1{};
 thread_local bool g_d3d11_bridge_present{};
 
 // The queue offset is discovered on the dummy, not trusted for another object.
@@ -77,6 +79,12 @@ bool D3D12Hook::hook() {
     m_probe_device_queries = m_probe_device_ok = 0;
     m_probe_filtered_logs = m_probe_selected_logs = m_probe_other_logs = m_probe_resize_logs = 0;
     m_probe_present_slot = m_probe_present1_slot = nullptr;
+    m_present_destination = reinterpret_cast<void*>(&D3D12Hook::present);
+    m_probe_raw_entry_start = g_d3d12_raw_entries.load(std::memory_order_relaxed);
+    m_probe_raw_entry1_start = g_d3d12_raw_entries1.load(std::memory_order_relaxed);
+    m_dispatch_swapchain.Reset();
+    m_dispatch_device.Reset();
+    m_dispatch_original = nullptr;
     m_bridge_attempted = false;
     m_probe_bridge_calls = 0;
     m_bridge_swapchain.Reset();
@@ -407,7 +415,23 @@ bool D3D12Hook::hook() {
         auto& present1_fn = (*(void***)target_swapchain)[22]; // Present1
         m_probe_present_slot = &present_fn;
         m_probe_present1_slot = &present1_fn;
-        m_present_hook = std::make_unique<PointerHook>(&present_fn, (void*)&D3D12Hook::present);
+        const char* dispatch_reason = "unsupported_queue_layout";
+        // Preserve the existing native route for layouts the guarded bridge
+        // cannot validate; selecting a guaranteed-refused bridge would stall it.
+        if (!m_using_proton_swapchain && !m_using_frame_generation_swapchain &&
+            m_command_queue_offset > 0 && m_command_queue_offset <= 0x1000) {
+            if (auto dispatch = D3D11Hook::verified_dx12_dispatch(&present_fn, present_fn, dispatch_reason)) {
+                m_present_destination = reinterpret_cast<void*>(dispatch->entry);
+                m_dispatch_swapchain = std::move(dispatch->chain);
+                m_dispatch_device = std::move(dispatch->device);
+                m_dispatch_original = dispatch->original;
+            }
+        }
+        spdlog::info("[WuWaD3DDispatch] api=12 probe={} stage=install route={} reason={} slot={:x} destination={:x} original={:x} source={:x}",
+            m_probe_generation, m_dispatch_swapchain ? "verified_dx11_thunk" : "native_dx12_thunk",
+            dispatch_reason, (uintptr_t)&present_fn, (uintptr_t)m_present_destination, (uintptr_t)present_fn,
+            (uintptr_t)m_dispatch_swapchain.Get());
+        m_present_hook = std::make_unique<PointerHook>(&present_fn, m_present_destination);
         m_present1_hook = std::make_unique<PointerHook>(&present1_fn, (void*)&D3D12Hook::present1);
         m_hooked = true;
     } catch (const std::exception& e) {
@@ -447,14 +471,17 @@ bool D3D12Hook::unhook() {
     bytes = 0;
     const bool slot1_read = m_probe_present1_slot != nullptr && ReadProcessMemory(GetCurrentProcess(),
         m_probe_present1_slot, &slot1_value, sizeof(slot1_value), &bytes) && bytes == sizeof(slot1_value);
-    spdlog::info("[WuWaD3DProbeSummary] api=12 probe={} callbacks={} filtered={} selected={} other_instance={} device_queries={} device_ok={} slot={:x} slot_read={} slot_value={:x} slot_owned={} original={:x} slot1={:x} slot1_read={} slot1_value={:x} slot1_owned={} original1={:x} bridge_calls={}",
+    spdlog::info("[WuWaD3DProbeSummary] api=12 probe={} callbacks={} filtered={} selected={} other_instance={} device_queries={} device_ok={} slot={:x} slot_read={} slot_value={:x} slot_owned={} original={:x} slot1={:x} slot1_read={} slot1_value={:x} slot1_owned={} original1={:x} bridge_calls={} destination={:x} raw_entries={} raw_entries1={}",
         m_probe_generation, m_probe_callbacks, m_probe_filtered, m_probe_selected, m_probe_other_instance,
         m_probe_device_queries, m_probe_device_ok, (uintptr_t)m_probe_present_slot, slot_read,
-        (uintptr_t)slot_value, slot_read && slot_value == (void*)&D3D12Hook::present,
+        (uintptr_t)slot_value, slot_read && slot_value == m_present_destination,
         (uintptr_t)(m_present_hook ? m_present_hook->get_original<void*>() : nullptr),
         (uintptr_t)m_probe_present1_slot, slot1_read, (uintptr_t)slot1_value,
         slot1_read && slot1_value == (void*)&D3D12Hook::present1,
-        (uintptr_t)(m_present1_hook ? m_present1_hook->get_original<void*>() : nullptr), m_probe_bridge_calls);
+        (uintptr_t)(m_present1_hook ? m_present1_hook->get_original<void*>() : nullptr), m_probe_bridge_calls,
+        (uintptr_t)m_present_destination,
+        g_d3d12_raw_entries.load(std::memory_order_relaxed) - m_probe_raw_entry_start,
+        g_d3d12_raw_entries1.load(std::memory_order_relaxed) - m_probe_raw_entry1_start);
 
     // A callback may already have entered and be waiting for Framework's
     // hook-monitor mutex. Restore the slots but retain their original targets
@@ -471,6 +498,21 @@ bool D3D12Hook::unhook() {
 }
 
 thread_local int32_t g_present_depth = 0;
+
+std::optional<HRESULT> D3D12Hook::present_from_stable_d3d11(
+    IDXGISwapChain* source, UINT sync_interval, UINT flags) {
+    // Called only with Framework's hook mutex held. A different source retains
+    // ordinary original forwarding; it never inherits the verified API/queue.
+    auto d3d12 = g_d3d12_hook;
+    if (d3d12 == nullptr || !d3d12->m_hooked || source != d3d12->m_dispatch_swapchain.Get() ||
+        d3d12->m_dispatch_original == nullptr) return std::nullopt;
+    const auto original = d3d12->m_dispatch_original;
+    const auto result = present_from_d3d11(d3d12->m_dispatch_swapchain.Get(), d3d12->m_dispatch_device.Get(),
+        original, sync_interval, flags);
+    // Queue validation/reentry refusal still belongs to this exact source. Do
+    // not fall through to a newer DX11 probe's potentially different original.
+    return result.has_value() ? *result : original(source, sync_interval, flags);
+}
 
 std::optional<HRESULT> D3D12Hook::present_from_d3d11(IDXGISwapChain3* observed,
     ID3D12Device4* proven_device, PresentFn original, UINT sync_interval, UINT flags) {
@@ -716,12 +758,14 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
 }
 
 HRESULT WINAPI D3D12Hook::present(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags) {
+    g_d3d12_raw_entries.fetch_add(1, std::memory_order_relaxed);
     std::scoped_lock _{g_framework->get_hook_monitor_mutex()};
     
     return D3D12Hook::present_internal(swap_chain, sync_interval, flags, nullptr, false);
 }
 
 HRESULT WINAPI D3D12Hook::present1(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags, DXGI_PRESENT_PARAMETERS* params) {
+    g_d3d12_raw_entries1.fetch_add(1, std::memory_order_relaxed);
     std::scoped_lock _{g_framework->get_hook_monitor_mutex()};
 
     return D3D12Hook::present_internal(swap_chain, sync_interval, flags, params, true);

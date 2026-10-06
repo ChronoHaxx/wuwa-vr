@@ -1,7 +1,7 @@
 # Start playing
 
-**Beta for game 3.7 · desktop app 1.0.8.**
-[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-renderer-handoff/WuWa-VR-Setup.exe)
+**Beta for game 3.7 · desktop app 1.0.9.**
+[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-device-dispatch/WuWa-VR-Setup.exe)
 and run it to install **WuWa VR** for your Windows user. Open **WuWa VR** from
 the Start menu. The small installer does not bundle the VR mod: the first
 **Install VR** needs internet to download about **54 MB**. No separate Python
@@ -34,7 +34,7 @@ antivirus, SmartScreen or anti-cheat. Game injection asks for Windows permission
 separately from installing the app for your user.
 
 The owner previously confirmed Steam startup/backend activity on Windows 10.
-The affected Windows 11 Steam PC still started flat with 1.0.7 despite verified DLL loading and process identity. Its new logs show rendering calls reaching the wrong graphics probe while the DX12 probe receives no frames. This candidate targets callbacks retained from an earlier probe: a handoff to DX12 is allowed only after that exact rendering chain positively exposes a DX12 device. It retains the window-filter and startup-recovery repairs. The backend build and background tests passed: retained callbacks reached DX12 with a verified device and queue, original presentation ran once per call, and ordinary DX11/DX12 paths and refused handoffs were checked. Successful startup on the affected PC and physical-headset acceptance remain unverified. SteamVR is headset software, separate
+The affected Windows 11 Steam PC still started flat with 1.0.8. Its logs positively identify a DX12 device, but the callback handoff is never entered after switching probes. This candidate keeps the callback that received frames and lets DX12 own it after the DX11 probe retires, while requiring a verified device and command queue. It retains the earlier startup and recovery repairs. The report does not establish an AMD, driver or Windows-version cause. The backend build and focused callback-dispatch tests passed. Successful startup on the affected PC and physical-headset acceptance remain unverified. SteamVR is headset software, separate
 from the Steam-store game route.
 
 Choosing a simulator or restoring the headset runtime changes the system OpenXR
@@ -47,12 +47,12 @@ follow the prerequisite message; the launcher does not install them automaticall
 ## Updates
 
 - Open **02 → Versions & updates → Check updates**.
-- **From an older app, including 1.0.7, to desktop app 1.0.8:** choose **Update launcher** to download and verify the update;
+- **From an older app, including 1.0.8, to desktop app 1.0.9:** choose **Update launcher** to download and verify the update;
   this does not restart the app. When it is ready, close the game and injector,
   stop recording and finish other operations, then choose **Restart to update**
   and confirm. Installing or updating the desktop app preserves your selected VR package.
-- **VR package:** in **step 02**, choose **beta-2026-10-06-renderer-handoff** and install it,
-  or select it if already installed, to use VR build **renderer-handoff-20261006**.
+- **VR package:** in **step 02**, choose **beta-2026-10-06-device-dispatch** and install it,
+  or select it if already installed, to use VR build **device-dispatch-20261006**.
   **Explicitly select the new package after the app
   restarts:** Check updates preserves the old selection. Both updates are needed.
   Older installed VR versions remain available for rollback.
@@ -77,19 +77,19 @@ open after Windows uninstall. Recordings, backups and settings are preserved.
 
 ## What this beta changes
 
-The candidate addresses retained rendering callbacks that can keep reaching an earlier
-graphics probe after the launcher has switched probes. It requires positive DX12
-device identity on that same rendering chain before handing the call to DX12.
-The backend build, focused rendering-hook tests, launcher tests, isolated package
-installation and installer packaging passed. This is not a claim that the affected
-PC or a physical headset has passed.
+The candidate keeps the callback that actually received frames after positive DX12
+identification, with DX12 owning that entry after the DX11 probe retires. The
+device and command queue must be verified before rendering proceeds.
+The backend build and focused callback-dispatch tests passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
+
+Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. No affected-PC or headset acceptance is implied.
 
 Startup attempts preserve available **backend.log** through **Copy diagnostics**.
 Uncertain process identity remains **TargetUnverified**. A shutdown reported by
 the current backend ends the wait; it does not prove why the game closed. Existing
 recovery and **Close launcher only** remain available.
 
-The **renderer-handoff-20261006** VR build retains Steam selection and keeps your game’s
+The **device-dispatch-20261006** VR build retains Steam selection and keeps your game’s
 graphics choices. It stops recreating inherited low/medium graphics overrides,
 with a one-time cleanup of recognized generated settings; custom edits are kept.
 The accepted timing correction remains separate from graphics quality.
@@ -167,12 +167,12 @@ Keep the data folders if you want to retain recordings, backups and settings.
 
 ## Portable fallback
 
-[WuWa-VR-Launcher.zip](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-renderer-handoff/WuWa-VR-Launcher.zip)
+[WuWa-VR-Launcher.zip](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-device-dispatch/WuWa-VR-Launcher.zip)
 is an advanced fallback. Extract the whole archive, keep `app` and `python`
 together, and open **WuWa VR Launcher.exe**. It uses the older browser interface;
 it does not install or self-update the desktop app. Choose **Apply & launch**,
 accept Windows permission, then follow the selected Steam or Kuro launch route.
 
-The [previous 6 October beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-startup)
-remains available. [Release notes and checksums](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-handoff)
+The [previous 6 October beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-handoff)
+remains available. [Release notes and checksums](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-device-dispatch)
 identify each download. Versions for older game releases may be incompatible.

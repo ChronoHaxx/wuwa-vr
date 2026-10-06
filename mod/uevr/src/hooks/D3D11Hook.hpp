@@ -39,6 +39,16 @@ public:
     bool hook();
     bool unhook();
 
+    using PresentFn = HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT);
+    struct VerifiedDx12Dispatch {
+        PresentFn entry{}, original{};
+        Microsoft::WRL::ComPtr<IDXGISwapChain3> chain{};
+        Microsoft::WRL::ComPtr<ID3D12Device4> device{};
+    };
+    // Called under Framework's hook mutex after this probe has fully retired.
+    static std::optional<VerifiedDx12Dispatch> verified_dx12_dispatch(
+        void** candidate_slot, void* candidate_original, const char*& reason);
+
     void on_present(OnPresentFn fn) { m_on_present = fn; }
     void on_post_present(OnPresentFn fn) { m_on_post_present = fn; }
     void on_resize_buffers(OnResizeBuffersFn fn) { m_on_resize_buffers = fn; }
@@ -72,6 +82,7 @@ protected:
     ComPtr<ID3D12Device4> m_observed_dx12_device{};
     std::chrono::steady_clock::time_point m_dx12_next_source_probe{};
     unsigned m_dx12_source_logs{};
+    PresentFn m_original_present{};
 
     std::optional<uint32_t> m_next_present_interval{};
 

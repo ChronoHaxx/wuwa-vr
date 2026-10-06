@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$OutputRoot,
-    [ValidateSet('Standard','Retained','RetainedFixed')][string]$Mode = 'Standard',
+    [ValidateSet('Standard','Retained','RetainedFixed','Rendered','EntryGateBaseline','EntryGateFixed')][string]$Mode = 'Standard',
     [string]$ProductionSnapshot = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -110,12 +110,15 @@ $receipt = [ordered]@{
     scope='Actual production hooks/filter and built kananlib; hidden own-process hardware DXGI. Not full Framework, remote Windows11/AMD, game or headset acceptance.'
     mode=$Mode
     productionSnapshot=$ProductionSnapshot
-    expectedBehavior=$(if ($Mode -eq 'Retained') { 'Reproduce missing active DX12 callbacks when fixture deliberately retains retired DX11 dispatch; not evidence remote software does this.' } elseif ($Mode -eq 'RetainedFixed') { 'Positively observed retained DX11 dispatch reaches active DX12, original Present exactly once, actual DX11 and retired hooks do not bridge.' } else { 'Active hook callbacks and restoration succeed.' })
+    expectedBehavior=$(if ($Mode -eq 'Retained') { 'Reproduce missing active DX12 callbacks when fixture deliberately retains retired DX11 dispatch; not evidence remote software does this.' } elseif ($Mode -eq 'RetainedFixed') { 'Positively observed retained DX11 dispatch reaches active DX12, original Present exactly once, actual DX11 and retired hooks do not bridge.' } elseif ($Mode -eq 'EntryGateBaseline') { 'Explicit call-site fault model bypasses primary12 entry: expect0 DX12 callbacks after61 DX11 callbacks; remote cause not established.' } elseif ($Mode -eq 'EntryGateFixed') { 'Same labelled entry-gate model succeeds via verified stable11 dispatch; real GPU readback/Present/resize on separate threads.' } elseif ($Mode -eq 'Rendered') { 'No entry gate:90 GPU pixel readbacks and non-TEST original Presents, stable verified device/queue, single resize callback, separate monitor/render threads, cleanup.' } else { 'Active hook callbacks and restoration succeed.' })
 }
 $info = New-Object Diagnostics.ProcessStartInfo
 $info.FileName=$exe; $info.WorkingDirectory=$output; $info.UseShellExecute=$false; $info.CreateNoWindow=$true
 if ($Mode -eq 'Retained') { $info.Arguments='--retained-dispatch' }
 if ($Mode -eq 'RetainedFixed') { $info.Arguments='--retained-fixed' }
+if ($Mode -eq 'Rendered') { $info.Arguments='--rendered' }
+if ($Mode -eq 'EntryGateBaseline') { $info.Arguments='--entry-gate-baseline' }
+if ($Mode -eq 'EntryGateFixed') { $info.Arguments='--entry-gate-fixed' }
 $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
 $child=New-Object Diagnostics.Process; $child.StartInfo=$info
 if (-not $child.Start()) { throw 'Could not start actual-hook test.' }

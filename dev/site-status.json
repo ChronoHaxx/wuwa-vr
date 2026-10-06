@@ -1,8 +1,8 @@
 {
-  "tag": "beta-2026-10-06-renderer-handoff",
-  "previousTag": "beta-2026-10-06-window-filter",
+  "tag": "beta-2026-10-06-device-dispatch",
+  "previousTag": "beta-2026-10-06-renderer-handoff",
   "game": "3.7",
-  "appVersion": "1.0.8",
-  "buildId": "renderer-handoff-20261006",
+  "appVersion": "1.0.9",
+  "buildId": "device-dispatch-20261006",
   "installer": "WuWa-VR-Setup.exe"
 }

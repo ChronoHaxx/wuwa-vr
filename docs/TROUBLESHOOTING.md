@@ -1,8 +1,8 @@
 # Known issues and recovery
 
-Status: 4 October 2026. The current public release is
-[beta-2026-10-04-cinematic](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic):
-desktop app **1.0.1**, backend **cinematic-20261004**, for game **3.7**.
+Status: 6 October 2026. The current public release is
+[beta-2026-10-06-steam](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam):
+desktop app **1.0.2**, VR build **steam-20261006**, for game **3.7**.
 Fresh-PC installation and the new optional features' physical-headset acceptance
 remain pending; a published package is not proof of those checks.
 
@@ -16,6 +16,10 @@ checkpoint does not automatically apply to another.
 
 | Symptom | What to do / current finding |
 | --- | --- |
+| Steam or Kuro installation is missing or wrong | Use **01 → Change** to choose the installation. For Steam, select **Wuthering Waves.exe**, not the inner Shipping executable, and keep Steam installed and signed in. Saved choices are preserved; several detected installations require a choice. The owner confirmed Steam startup/backend activity on one PC; other PCs and headset use remain pending. |
+| Updated launcher but Steam is unavailable | The desktop app and VR package are separate. Update the app to **1.0.2**, then install/select **beta-2026-10-06-steam** in step 02. An older VR package does not gain Steam support just from updating the app. |
+| Progress still says waiting for UEVR while the game is running | This status can lag behind actual backend startup. Check whether the VR view and UEVR menu work before retrying; do not start a second injector. Include the selected build and copied diagnostics in a report if it persists. |
+| Graphics quality changes unexpectedly after launch | This release keeps the game’s graphics choices and removes only recognized inherited/generated overrides once, with a backup and receipt. Custom edits are kept; it no longer writes a forced low or medium preset at startup. Use the game’s graphics menu for quality changes. The timing correction is separate. |
 | Unequal cinematic letterbox heights in immersive VR | Cinematic framing is on by default in this release. The owner confirmed the simulator replay of private screen-comfort-r1, and sampled frames from the latest 68-second recording match across eyes. Headset comfort and other scenes remain pending. Keep a manual screen shortcut available if another scene differs. |
 | Need a manual screen for a cutscene or menu | Fully hold LT + RT first, then click R3 for mono theatre (same scene and HUD for both eyes), or hold L3 for 0.8 seconds for a stereo screen. Close UEVR and HUD/mouse adjustment; release all controls before repeating. |
 | Automatic cinema does not switch | It is experimental and off by default. It did not activate for the latest reported in-engine scene; prerendered movie switching has not been tested. Use the manual shortcut rather than assuming automatic detection works. |

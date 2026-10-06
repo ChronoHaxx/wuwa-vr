@@ -412,7 +412,7 @@ void WuWaControlsComponent::on_draw_recovery() {
         m_hud_aspect_status.set("Refresh queued; requires the supplied Comfort script.");
         m_hud_aspect_request.set("true");
     }
-    wuwa_ui::TextWrapped("Refreshes the game HUD layout without opening ESC or changing your saved HUD size and position.");
+    wuwa_ui::TextWrapped("Requests a HUD layout refresh without opening ESC. If this game version is unsupported, the status explains why; saved HUD size and position stay unchanged.");
     wuwa_ui::TextWrapped("%s", m_hud_aspect_status.get().c_str());
     if (wuwa_ui::TreeNode("Restore profile settings")) {
         wuwa_ui::TextWrapped("Restore this build's supplied controls, first-person/freecam settings, camera scale, aiming and HUD layout. Rendering and runtime selection are preserved. Temporary HUD/mouse mode is always turned off. You can undo the reset below.");
@@ -447,7 +447,7 @@ bool WuWaControlsComponent::game_focused() {
 }
 
 void WuWaControlsComponent::on_draw_shortcuts() {
-    wuwa_ui::draw(*m_enabled,"Enable Polar Xbox controls");
+    wuwa_ui::draw(*m_enabled,"Enable WuWa Xbox shortcuts");
     wuwa_ui::draw(*m_mouse,"Enable Xbox mouse shortcuts");
     wuwa_ui::TextWrapped("Close UEVR before using these shortcuts. L3/R3 mean clicking the sticks; View is the two-squares button and Menu is the three-lines button.");
     if (ImGui::BeginTable("Everyday Xbox shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
@@ -472,13 +472,16 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         }
         ImGui::EndTable();
     }
-    wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
-    wuwa_ui::TextWrapped("Fully hold both triggers first: hold L3 for 0.8 seconds for the stereo screen, or click R3 for mono theatre with no stereo depth. Release all controls and center the sticks before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
-    wuwa_ui::TextWrapped("Mono theatre preserves your stereo-screen choice. Turning mono off returns to that choice; it does not change your portal or world scale. This source candidate still needs headset verification.");
-    wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
+    if (wuwa_ui::TreeNode("How to use view toggles")) {
+        wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
+        wuwa_ui::TextWrapped("Fully hold both triggers first: hold L3 for 0.8 seconds for the stereo screen, or click R3 for mono theatre with no stereo depth. Release all controls and center the sticks before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
+        wuwa_ui::TextWrapped("Mono preserves your saved stereo-screen choice; screen off exits both screen modes. Neither changes portal or normal world scale. Manual toggles take priority over automatic cinema for the current scene.");
+        wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
+        ImGui::TreePop();
+    }
     wuwa_ui::draw(*m_sheet,"Show shortcut sheet");
     wuwa_ui::draw(*m_sheet_page,"Shortcut sheet page");
-    wuwa_ui::TextWrapped("UI visibility (L3 + B), recenter, UEVR settings and sheet toggle are shown on every page. With the sheet open, hold L3 and tap D-pad left/right to browse all four pages; L3 + D-pad up returns to automatic. These page shortcuts leave the game D-pad unchanged while the sheet is hidden.");
+    wuwa_ui::TextWrapped("With the sheet visible, L3 + D-pad left/right changes page; L3 + D-pad up returns to automatic. L3 + Menu hides the sheet.");
     if (wuwa_ui::Button("Bring sheet in front")) { m_sheet->value() = true; m_sheet_position->value() = 1; }
     ImGui::SameLine();
     if (wuwa_ui::Button("Place sheet at feet")) { m_sheet->value() = true; m_sheet_position->value() = 0; }
@@ -502,7 +505,6 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         for (const auto& row : sheet) { wuwa_ui::TextUnformatted(row[0]); wuwa_ui::TextUnformatted(row[1]); }
         ImGui::TreePop();
     }
-    wuwa_ui::TextWrapped("Shortcuts and the sheet start enabled on a fresh profile. Your saved choices are respected. The sheet is below your recentered headset origin; L3 + Menu hides it.");
 }
 
 void WuWaControlsComponent::on_draw_experiments() {
@@ -525,7 +527,8 @@ void WuWaControlsComponent::on_draw_experiments() {
             wuwa_ui::draw(*m_collision_complex,"Trace mesh triangles when supported");
             wuwa_ui::TextWrapped("Sweeps the camera against surfaces that block the game's Visibility trace. Slides along contact surfaces. Unsupported queries hold movement and report a reason below. Physical headset leaning is not constrained. Starts off; world geometry still needs live verification.");
         }
-        if (wuwa_ui::TreeNode("Stereo freeze fix bench (60-second windows)")) {
+        if (wuwa_ui::TreeNode("Legacy stereo comparison bench (60-second tests)")) {
+            wuwa_ui::TextWrapped("These old comparison tests are separate from the normal far-object repair. Some deliberately invert or duplicate eye data; they are not recommended player settings.");
             // Diagnostic windows for the far-foliage freeze in one eye. Each button opens a
             // 60 s window that expires by itself; nothing is saved to the profile. Verdicts
             // go to the log with the active mode so the session can be read back afterwards.
@@ -611,7 +614,7 @@ void WuWaControlsComponent::on_draw_experiments() {
             ImGui::TreePop();
         }
     wuwa_ui::draw(*m_auto_mouse,"Automatically use mouse in game menus (legacy)");
-    wuwa_ui::TextWrapped("These options are optional comparisons. Opening this section does not enable them or change your camera.");
+    wuwa_ui::TextWrapped("Legacy automatic mouse can intercept game menu buttons. Manual L3 + LB adjustment remains the normal choice.");
 }
 
 void WuWaControlsComponent::on_draw_recording() {
@@ -687,33 +690,24 @@ void WuWaControlsComponent::on_draw_recording() {
 }
 
 void WuWaControlsComponent::on_draw_ui() {
-    wuwa_ui::draw(*m_warn_hidden_ui,"Warn when a menu opens with game UI hidden");
-    wuwa_ui::TextWrapped("Hidden UI stays quiet during normal gameplay. A recovery notice appears only when the game cursor or a known menu-rendering path indicates a menu. L3 + B restores UI. An unknown menu may not be detected; UEVR settings always retain the Show game UI button.");
-    wuwa_ui::TextWrapped("L3/R3 mean clicking the sticks. Controls need the supplied WuWa camera script; physical gamepad passthrough bypasses scripts. Both sticks still open UEVR.");
-    wuwa_ui::TextWrapped("Settings: D-pad selects, A activates, left stick scrolls the focused pane. Mouse wheel also scrolls. Release RT first: holding it adjusts the camera instead.");
     wuwa_ui::draw(*m_camera,"Camera view");
-    if (wuwa_ui::Button(m_camera->value()==2 ? "Leave freecam" : "Enter freecam (move viewpoint with sticks)"))
-        m_camera->value()=m_camera->value()==2 ? 0 : 2;
-    wuwa_ui::draw(*m_keep_camera,"Keep camera and head hiding during Alt-Tab / UEVR settings");
-    wuwa_ui::TextWrapped("Input still pauses when WuWa loses focus. Real game menus temporarily restore the game camera and character visibility.");
-    wuwa_ui::draw(*m_sync_eye_lod,"Match far-object detail between eyes");
-    wuwa_ui::TextWrapped("Fixes distant trees and props that freeze or look simpler in one eye. The game builds the second eye with a default 90 degree field of view, so it switched far objects to cheaper versions sooner.");
-    wuwa_ui::draw(*m_refill_far_lighting,"Match far lighting between eyes");
-    if (wuwa_ui::Button("Refill far lighting now")) wuwa_clv::request();
-    wuwa_ui::TextWrapped("Requests a bounded cascade-lighting-volume refresh after stereo starts or resumes, after detected teleports, or on request. It helped the tested ship/wheel lighting case; it is not a general fix for dark objects or character rims. Each refill can cause a short hitch.");
-    wuwa_ui::draw(m_suppress_npc_rim,"Suppress mismatched NPC rim lighting");
-    wuwa_ui::TextWrapped("Optional workaround, off by default. Removes toon-depth rim lighting from all characters using it, including nearby characters. This hides the observed extra eye contour; it does not repair the underlying stereo cause. Restores the prior value when disabled, in 2D screen mode, or when native VR is inactive.");
-    const auto rim_status = wuwa_rim::status();
-    wuwa_ui::TextWrapped("%s",wuwa_rim::message(rim_status.code));
+    if (m_camera->value()==2 && wuwa_ui::Button("Leave freecam")) m_camera->value()=0;
+    wuwa_ui::draw(*m_walk,"Walk by default; hold RB for normal speed");
     wuwa_ui::draw(*m_recenter_position,"L3 + A also resets headset position (seated)");
     if (wuwa_ui::Button("Reset headset position and direction now")) recenter(true);
-    wuwa_ui::TextWrapped("Simulator Home resets only the simulated headset and preview. Use this reset afterwards to align UEVR's origin. It preserves world scale and camera offsets.");
+    wuwa_ui::TextWrapped("Recenter keeps world scale and camera offsets. Simulator Home resets only the simulator, not the game's VR origin.");
     ImGui::BeginDisabled(!m_mouse->value());
     wuwa_ui::draw(m_adjust,"HUD / mouse adjustment ON (L3 + LB toggles)");
     ImGui::EndDisabled();
-    wuwa_ui::TextWrapped("Close UEVR, press L3 + LB once, then release the controller. Left stick moves the cursor; A clicks, B goes back, X + stick scrolls. LT/RT moves the HUD nearer/farther; LB/RB lowers/raises it. L3 + LB again returns to normal controls. Adjustment pauses freecam flight and starts off each launch.");
-    wuwa_ui::TextWrapped("Automatic mouse starts off so the game's menu buttons, tabs and triggers work normally. Legacy automatic mouse does not adjust the HUD. Page 04 of the sheet is a reference: open UEVR with L3 + R3 before using those controls.");
-    wuwa_ui::draw(*m_walk,"Polar walk speed unless RB is held");
+    if (wuwa_ui::TreeNode("HUD and focus comfort")) {
+        wuwa_ui::draw(*m_keep_camera,"Keep camera and head hiding during Alt-Tab / UEVR settings");
+        wuwa_ui::TextWrapped("Input still pauses when WuWa loses focus. Real game menus temporarily restore the game camera and character visibility.");
+        wuwa_ui::draw(*m_warn_hidden_ui,"Warn when a menu opens with game UI hidden");
+        wuwa_ui::TextWrapped("Hidden UI stays quiet during normal gameplay. A recovery notice appears only when the game cursor or a known menu-rendering path indicates a menu. L3 + B restores UI. An unknown menu may not be detected; UEVR settings always retain the Show game UI button.");
+        wuwa_ui::TextWrapped("Close UEVR, press L3 + LB once, then release the controller. Left stick moves the cursor; A clicks, B goes back, X + stick scrolls. LT/RT moves the HUD nearer/farther; LB/RB lowers/raises it. L3 + LB again returns to normal controls. Adjustment pauses freecam flight and starts off each launch.");
+        wuwa_ui::TextWrapped("Settings: D-pad selects, A activates, left stick scrolls the focused pane. Mouse wheel also scrolls. Release RT first: holding it adjusts the camera instead.");
+        ImGui::TreePop();
+    }
     if (wuwa_ui::TreeNode("Camera customization")) {
         wuwa_ui::draw(*m_fixed_distance,"Fixed camera distance (game units)");
         wuwa_ui::draw(*m_fixed_height,"Fixed camera height above pawn (game units)");
@@ -744,9 +738,19 @@ void WuWaControlsComponent::on_draw_ui() {
         wuwa_ui::TextWrapped("These modes move the viewpoint; the character stays put. Acro is a camera flight model, without motor, propeller or battery simulation.");
         ImGui::TreePop();
     }
-    {
+    if (wuwa_ui::TreeNode("Advanced rendering and script diagnostics")) {
+        wuwa_ui::draw(*m_sync_eye_lod,"Keep matched far-object detail (recommended)");
+        wuwa_ui::TextWrapped("Keeps distant trees and props on the same level of detail in both eyes. This is the normal foliage repair; legacy comparison tests are separate.");
+        wuwa_ui::draw(*m_refill_far_lighting,"Refresh far-lighting cache (limited workaround)");
+        if (wuwa_ui::Button("Refill far lighting now")) wuwa_clv::request();
+        wuwa_ui::TextWrapped("Requests a bounded cascade-lighting-volume refresh after stereo starts or resumes, after detected teleports, or on request. It helped the tested ship/wheel lighting case; it is not a general fix for dark objects or character rims. Each refill can cause a short hitch.");
+        wuwa_ui::draw(m_suppress_npc_rim,"Hide character rim lighting (optional workaround)");
+        wuwa_ui::TextWrapped("Optional workaround, off by default. Removes toon-depth rim lighting from all characters using it, including nearby characters. This hides the observed extra eye contour; it does not repair the underlying stereo cause. Restores the prior value when disabled, in 2D screen mode, or when native VR is inactive.");
+        const auto rim_status = wuwa_rim::status();
+        wuwa_ui::TextWrapped("%s",wuwa_rim::message(rim_status.code));
         std::scoped_lock lock{m_bridge_mutex};
         wuwa_ui::TextWrapped("%s", m_script_status.c_str());
+        ImGui::TreePop();
     }
 }
 
@@ -754,14 +758,18 @@ void WuWaControlsComponent::on_draw_first_person() {
         if (wuwa_ui::Button(m_camera->value()==3 ? "Leave first person" : "Enter first person"))
             m_camera->value()=m_camera->value()==3 ? 0 : 3;
         wuwa_ui::TextWrapped("L3 + View toggles first person. These settings apply when first person is active.");
-        wuwa_ui::draw(*m_fp_forward,"First person forward offset");
-        wuwa_ui::draw(*m_fp_right,"First person right offset");
-        wuwa_ui::draw(*m_fp_up,"First person height offset");
-        wuwa_ui::TextWrapped("While playing in first person, hold L3 + Y to raise eye level or L3 + X to lower it. This lets you see the result with this menu closed.");
-        if (wuwa_ui::Button("Lower eye level by 5")) m_fp_up->value() = (std::max)(-100.0f, m_fp_up->value() - 5.0f);
-        ImGui::SameLine();
-        if (wuwa_ui::Button("Raise eye level by 5")) m_fp_up->value() = (std::min)(100.0f, m_fp_up->value() + 5.0f);
         wuwa_ui::draw(*m_fp_motion,"First person motion");
+        wuwa_ui::draw(*m_mesh,"First person character visibility");
+        if (wuwa_ui::TreeNode("First-person position")) {
+            wuwa_ui::draw(*m_fp_forward,"First person forward offset");
+            wuwa_ui::draw(*m_fp_right,"First person right offset");
+            wuwa_ui::draw(*m_fp_up,"First person height offset");
+            wuwa_ui::TextWrapped("While playing in first person, hold L3 + Y to raise eye level or L3 + X to lower it. This lets you see the result with this menu closed.");
+            if (wuwa_ui::Button("Lower eye level by 5")) m_fp_up->value() = (std::max)(-100.0f, m_fp_up->value() - 5.0f);
+            ImGui::SameLine();
+            if (wuwa_ui::Button("Raise eye level by 5")) m_fp_up->value() = (std::min)(100.0f, m_fp_up->value() + 5.0f);
+            ImGui::TreePop();
+        }
         if (m_fp_motion->value()==3 && (VR::get()->get_aim_method()!=VR::AimMethod::GAME || VR::get()->is_decoupled_pitch_enabled())) {
             wuwa_ui::TextWrapped("Full animation is paused: headset/controller aim or Decoupled Pitch conflicts with animated head turning. Game-view rotation is being used; head position still follows the character.");
             if (wuwa_ui::Button("Use game aim for full animation")) {
@@ -770,23 +778,31 @@ void WuWaControlsComponent::on_draw_first_person() {
                 VR::get()->set_decoupled_pitch(false);
             }
         }
-        wuwa_ui::TextWrapped("L3 + D-pad Down toggles full animation follow and your previous first-person motion. Custom keeps your saved settings. The other choices sample the head after animation. Animated position preserves normal stick aiming. Full animation follows character turns and bone rotation; it can be intense.");
-        int stick_choice=m_fp_look->value()==2 ? 1 : 0;
-        const char* choices[]{"Exact animation", "Use game view while either stick moves"};
-        if (wuwa_ui::Combo("Full animation: stick override",&stick_choice,choices,2)) m_fp_look->value()=stick_choice==1 ? 2 : 0;
-        if (m_fp_look->value()==1) wuwa_ui::TextWrapped("Legacy pitch-only override is active; choose either option above to replace it.");
-        ImGui::BeginDisabled(m_fp_look->value()!=2);
-        wuwa_ui::draw(*m_fp_smooth,"Smooth transition between animation and game view");
-        if (m_fp_smooth->value()) wuwa_ui::draw(*m_fp_blend_time,"Transition duration (seconds)");
-        ImGui::EndDisabled();
-        wuwa_ui::TextWrapped("Smoothing blends stick handovers and reported movement-state changes, such as takeoff/landing. It starts enabled on the supplied profile. Head position stays current; ordinary aiming and animation are immediate after the handover. Off restores the instant switch.");
-        wuwa_ui::TextWrapped("Game-view override shows the game's camera direction while either stick is used, then returns to animation 0.4 seconds after release. Full animation and headset view can still disagree with movement or target selection; aim alignment remains under investigation. These options never rotate or move the character for you.");
-        ImGui::BeginDisabled(m_fp_motion->value()!=0);
-        wuwa_ui::draw(*m_fp_animation,"Follow animated head / neck position (Custom)");
-        wuwa_ui::draw(*m_fp_horizon,"Keep first person horizon level (Custom)");
-        wuwa_ui::draw(*m_fp_late,"Refresh position before drawing (Custom)");
-        ImGui::EndDisabled();
-        wuwa_ui::TextWrapped("Horizon level removes the game's camera pitch from the VR view. Turn it off for right-stick up/down look, and disable UEVR's Decoupled Pitch below. Head aiming is an alternative; grapple selection still needs game testing.");
+        if (m_fp_motion->value()==3)
+            wuwa_ui::TextWrapped("Full animation follows character turns and can be intense. L3 + D-pad Down returns to your previous motion choice.");
+        if (wuwa_ui::TreeNode("Animation comfort")) {
+            wuwa_ui::TextWrapped("L3 + D-pad Down toggles full animation follow and your previous first-person motion. Custom keeps your saved settings. The other choices sample the head after animation. Animated position preserves normal stick aiming. Full animation follows character turns and bone rotation; it can be intense.");
+            int stick_choice=m_fp_look->value()==2 ? 1 : 0;
+            const char* choices[]{"Exact animation", "Use game view while either stick moves"};
+            if (wuwa_ui::Combo("Full animation: stick override",&stick_choice,choices,2)) m_fp_look->value()=stick_choice==1 ? 2 : 0;
+            if (m_fp_look->value()==1) wuwa_ui::TextWrapped("Legacy pitch-only override is active; choose either option above to replace it.");
+            ImGui::BeginDisabled(m_fp_look->value()!=2);
+            wuwa_ui::draw(*m_fp_smooth,"Smooth transition between animation and game view");
+            if (m_fp_smooth->value()) wuwa_ui::draw(*m_fp_blend_time,"Transition duration (seconds)");
+            ImGui::EndDisabled();
+            wuwa_ui::TextWrapped("Smoothing blends stick handovers and reported movement-state changes, such as takeoff/landing. It starts enabled on the supplied profile. Head position stays current; ordinary aiming and animation are immediate after the handover. Off restores the instant switch.");
+            wuwa_ui::TextWrapped("Game-view override shows the game's camera direction while either stick is used, then returns to animation 0.4 seconds after release. Full animation and headset view can still disagree with movement or target selection; aim alignment remains under investigation. These options never rotate or move the character for you.");
+            if (wuwa_ui::TreeNode("Custom motion settings")) {
+                ImGui::BeginDisabled(m_fp_motion->value()!=0);
+                wuwa_ui::draw(*m_fp_animation,"Follow animated head / neck position (Custom)");
+                wuwa_ui::draw(*m_fp_horizon,"Keep first person horizon level (Custom)");
+                wuwa_ui::draw(*m_fp_late,"Refresh position before drawing (Custom)");
+                ImGui::EndDisabled();
+                wuwa_ui::TextWrapped("Horizon level removes the game's camera pitch from the VR view. Turn it off for right-stick up/down look, and disable UEVR's Decoupled Pitch below. Head aiming is an alternative; grapple selection still needs game testing.");
+                ImGui::TreePop();
+            }
+            ImGui::TreePop();
+        }
         if (wuwa_ui::TreeNode("Aiming and right-stick pitch")) {
             wuwa_ui::draw(*m_fp_look,"All stick overrides (includes legacy pitch-only)");
             wuwa_ui::TextWrapped("These are UEVR's existing global aim settings, shared with VR > Input. They are not limited to first person.");
@@ -810,14 +826,17 @@ void WuWaControlsComponent::on_draw_first_person() {
             wuwa_ui::TextWrapped("Headset aim selects Head and sends that direction to the game; the stick still turns. Right-stick pitch selects Game, disables control-rotation override and both pitch locks. Neither changes LB + Y or the selected utility.");
             ImGui::TreePop();
         }
-        wuwa_ui::draw(*m_mesh,"First person character visibility");
-        if (m_mesh->value()==4) wuwa_ui::TextWrapped("Default: keeps the body visible and head bones hidden, with a full shadow copy. Original non-casting/hidden equipment stays excluded. Copies are removed on exit, menus, rig changes or script reset. Unsupported rigs report a fallback below.");
-        wuwa_ui::TextWrapped("Animation off: stable height relative to the character root. On: follow the head, or reconstruct it from a visible parent bone when the head is hidden. This follows leaning and sprinting but can add bobbing. Missing rig support falls back to the stable anchor; see the status below.");
-        wuwa_ui::TextWrapped("Hide head bones keeps the visible body, but also removes the head from its shadow. Hide body; keep full character shadow requests hidden shadows only from the game's original visible shadow casters; it does not enable unused wings or effect rigs. Shadow support depends on the character/material.");
-        wuwa_ui::TextWrapped("A hidden head bone has no usable animated pose: the neck supplies an approximation. For actual head-bone tracking choose Keep entire character visible or Hide body; keep full character shadow. Separate accessories without a head bone may remain visible in head-only mode. Exit and re-enter first person in a neutral pose to recalibrate. Offsets use game units. L3 + A recenters headset/simulator displacement.");
-    {
+        if (wuwa_ui::TreeNode("Character visibility details")) {
+            if (m_mesh->value()==4) wuwa_ui::TextWrapped("Default: keeps the body visible and head bones hidden, with a full shadow copy. Original non-casting/hidden equipment stays excluded. Copies are removed on exit, menus, rig changes or script reset. Unsupported rigs report a fallback below.");
+            wuwa_ui::TextWrapped("Animation off: stable height relative to the character root. On: follow the head, or reconstruct it from a visible parent bone when the head is hidden. This follows leaning and sprinting but can add bobbing. Missing rig support falls back to the stable anchor; see the status below.");
+            wuwa_ui::TextWrapped("Hide head bones keeps the visible body, but also removes the head from its shadow. Hide body; keep full character shadow requests hidden shadows only from the game's original visible shadow casters; it does not enable unused wings or effect rigs. Shadow support depends on the character/material.");
+            wuwa_ui::TextWrapped("A hidden head bone has no usable animated pose: the neck supplies an approximation. For actual head-bone tracking choose Keep entire character visible or Hide body; keep full character shadow. Separate accessories without a head bone may remain visible in head-only mode. Exit and re-enter first person in a neutral pose to recalibrate. Offsets use game units. L3 + A recenters headset/simulator displacement.");
+            ImGui::TreePop();
+        }
+    if (wuwa_ui::TreeNode("First-person script status")) {
         std::scoped_lock lock{m_bridge_mutex};
         wuwa_ui::TextWrapped("%s", m_script_status.c_str());
+        ImGui::TreePop();
     }
 
 }

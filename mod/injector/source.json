@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/mirudo2/Custom-UEVR-Injector",
+  "baseCommit": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
+  "overlay": "Recursively copy GUI files, including Properties/AssemblyInfo.cs, over that checkout before building GUI/Custom_UEVR_Injector.csproj.",
+  "steamPathBinding": "--target-path selects only the exact shipping executable and revalidates its process creation identity on the opened handle. EXE Comments capability: WUWA_INJECTOR_TARGET_PATH_V1. No live Steam acceptance claimed.",
+  "configuration": "Release|x64; .NET Framework 4.7.2; MSBuild /m:1",
+  "preservedLocalChanges": ["InjectionManager.cs", "LogSyncManager.cs", "LoopManager.cs", "RemoteLibraryLoader.cs", "main__form.cs", "Custom_UEVR_Injector.csproj"],
+  "graphicsChange": "Profiles containing wuwa-graphics-policy.json preserve saved graphics files on injector startup. Explicit graphics slider changes patch only the selected key; absent overrides display Game. Marker-free legacy behavior is unchanged.",
+  "markerFailurePolicy": "Presence of the marker is sufficient to suppress automatic defaults, including malformed or future receipts. The launcher owns receipt validation; a read error must not restore synthetic graphics overrides."
+}

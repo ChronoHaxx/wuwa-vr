@@ -26,10 +26,20 @@ constexpr int target_slot(int mode) noexcept {
     return mode == 1 ? 0 : mode >= 2 && mode <= 5 ? mode - 2 : -1;
 }
 
+// Diagnostics describe the same decision which produced Result, not merely
+// whether the runtime recently supplied a sample. External blockers are set by
+// the caller before Mixer runs and never change the mixing policy.
+enum class Status {
+    Off, WaitingSample, WaitingPoll, WaitingRelease, MissingSlot, StaleSample,
+    Armed, MenuReady, Passthrough, SlotFiltered, InputMuted, GameUnfocused,
+    OpenXRRequired
+};
+
 struct Result {
     Pad pad{};
     bool connected{};
     bool vr_active{};
+    Status status{Status::Off};
 };
 
 class Mixer {
@@ -60,7 +70,10 @@ public:
         last_now_ms_ = now_ms;
         last_sample_ms_ = sample_ms;
         if (!valid || !fresh || backwards || (merge && !connected)) armed_ = false;
-        const Result fallback = merge && connected ? Result{physical, true, false} : Result{};
+        const auto status = merge && !connected ? Status::MissingSlot :
+            !valid ? Status::WaitingSample : !fresh || backwards ? Status::StaleSample : Status::WaitingRelease;
+        const Result fallback = merge && connected ? Result{physical, true, false, status} :
+            Result{{}, false, false, status};
         if (!valid || !fresh || backwards || (merge && !connected)) return fallback;
 
         // Only VR controls must be released. Real treadmill movement continues
@@ -69,7 +82,7 @@ public:
             if (!neutral(vr)) return fallback;
             armed_ = true;
         }
-        if (!merge) return {vr, true, true};
+        if (!merge) return {vr, true, true, Status::Armed};
 
         Pad mixed = physical;
         mixed.buttons = static_cast<std::uint16_t>(physical.buttons | vr.buttons);
@@ -82,7 +95,7 @@ public:
             mixed.ry = vr.ry;
         }
         // lx/ly remain byte-for-byte physical, including a stationary treadmill.
-        return {mixed, true, true};
+        return {mixed, true, true, Status::Armed};
     }
 
     void reset() noexcept {
@@ -101,6 +114,48 @@ private:
     int mode_{-1};
     bool armed_{}, connected_{}, ui_open_{}, have_time_{};
     std::uint64_t last_now_ms_{}, last_sample_ms_{};
+};
+
+// The caller holds its input mutex for every method. Successful samples alone
+// never claim that the game polled the selected slot or that neutral rearm ran.
+class Readiness {
+public:
+    void reset() noexcept { *this = {}; }
+
+    void sample(int mode, Status source, std::uint64_t now_ms) noexcept {
+        if (mode != sample_mode_ || source != Status::Armed || source_ != Status::Armed)
+            have_poll_ = false;
+        sample_mode_ = mode;
+        source_ = source;
+        sample_ms_ = now_ms;
+    }
+
+    void poll(int mode, const Result& result, Status blocker, bool ui_open, std::uint64_t now_ms) noexcept {
+        poll_mode_ = mode;
+        delivered_ = blocker != Status::Armed ? blocker : result.status;
+        ui_open_ = ui_open;
+        poll_ms_ = now_ms;
+        have_poll_ = true;
+    }
+
+    Status read(int mode, std::uint64_t now_ms, bool ui_open) const noexcept {
+        if (target_slot(mode) < 0) return Status::Off;
+        if (mode != sample_mode_) return Status::WaitingSample;
+        if (!fresh(sample_ms_, now_ms)) return Status::StaleSample;
+        if (source_ != Status::Armed) return source_;
+        if (!have_poll_ || poll_mode_ != mode || !fresh(poll_ms_, now_ms) || ui_open != ui_open_)
+            return Status::WaitingPoll;
+        return delivered_ == Status::Armed && ui_open ? Status::MenuReady : delivered_;
+    }
+
+private:
+    static bool fresh(std::uint64_t sample, std::uint64_t now) noexcept {
+        return sample <= now && now - sample <= Mixer::max_age_ms;
+    }
+    int sample_mode_{-1}, poll_mode_{-1};
+    Status source_{Status::WaitingSample}, delivered_{Status::WaitingPoll};
+    std::uint64_t sample_ms_{}, poll_ms_{};
+    bool have_poll_{}, ui_open_{};
 };
 
 class PacketCounter {

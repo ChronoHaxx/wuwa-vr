@@ -25,6 +25,10 @@ function Test-WuWaBuildReady {
     $script:wuwaUseHeadset=-not ($selectedRuntime -eq $simulator -or (Test-WuWaSimulatorManifest $selectedRuntime))
     $script:wuwaSelectedOpenXR=$selectedRuntime
     $script:wuwaGameStart=Get-WuWaLaunchSettings $ctx
+    if($wuwaGameStart.Mode -eq 'steam') {
+        $null=Get-WuWaSteamClient
+        Assert-WuWaSteamInjector -Injector (Join-Path $runtime 'Custom_UEVR_Injector.exe')
+    }
 }
 $isAdmin=([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 # The web launcher captures this front end in a hidden child process. Always
@@ -82,13 +86,13 @@ try {
             }
         } else { Write-Warning 'Automatic recording Python is unavailable; manual capture remains available.' }
     }
-    $simArguments=@{RuntimeName=(Split-Path -Leaf $runtime);Headset=$wuwaUseHeadset;WaitSeconds=600;SettleSeconds=30;StatePath=$statePath;CancelPath=$cancel}
+    $simArguments=@{GameStart=$wuwaGameStart.Mode;RuntimeName=(Split-Path -Leaf $runtime);Headset=$wuwaUseHeadset;WaitSeconds=600;SettleSeconds=30;StatePath=$statePath;CancelPath=$cancel}
     if(-not $wuwaUseHeadset) { $simArguments.SimulatorPath=Split-Path -Parent $wuwaSelectedOpenXR }
     if($wuwaGameStart.Mode -eq 'manual') {
         Write-Host 'Start Wuthering Waves in your chosen launcher and press Play. Steam/Epic injection is unverified; Steam previously failed and has not been retested.'
     } else {
         $simArguments.StartLauncher=$true
-        $simArguments.PromptOnLauncherClosed=(!$NoDialog)
+        $simArguments.PromptOnLauncherClosed=(!$NoDialog -and $wuwaGameStart.Mode -ne 'steam')
         if($wuwaGameStart.Launcher) { $simArguments.LauncherPath=$wuwaGameStart.Launcher }
     }
     & (Join-Path $PSScriptRoot 'sim-run.ps1') @simArguments

@@ -29,7 +29,7 @@ namespace WuWaVR.Manager
 
     public sealed class LauncherUpdateService : IDisposable
     {
-        public const string Version = "1.0.1";
+        public const string Version = "1.0.2";
         public const string AppId = "ChronoHaxx.WuWaVR";
         public const string Channel = "win-beta";
         public const string Repository = "https://github.com/ChronoHaxx/wuwa-vr";

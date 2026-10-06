@@ -31,6 +31,7 @@ legend{font-weight:650;padding-inline:6px}
 .stopped main>*:not(#stopped){display:none}
 .button.primary{background:#1f3a55;border-color:var(--accent);font-weight:650}.button.primary:hover{background:#28496b}
 button:disabled{opacity:.55;cursor:not-allowed}
+#incidentNote{display:block;width:100%;box-sizing:border-box;font:inherit;margin-top:8px;padding:10px}
 @media(max-width:760px){.status-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -77,10 +78,10 @@ button:disabled{opacity:.55;cursor:not-allowed}
 
 <section aria-labelledby="game-heading">
 <h2 id="game-heading">3. How do you start the game?</h2>
-<p>The standalone official launcher is the previously working route. This portable package still needs a real game-launch test. SteamVR / Steam Link headset support is separate from the Steam version of the game.</p>
+<p>Choose the installed copy you want to play. Steam starts through Steam; the official version opens Kuro's launcher. Steam game injection still needs a real playtest. SteamVR / Steam Link headset support is separate from the Steam version of the game.</p>
 <fieldset id="gameChoices"><legend>Game start</legend></fieldset>
-<details id="customPath"><summary>Use a different launcher.exe location</summary>
-<label for="launcherPath">Full path to the official launcher.exe</label>
+<details id="customPath"><summary>Use a different game location</summary>
+<label for="launcherPath">Full path to Kuro's launcher.exe or Steam's Wuthering Waves.exe</label>
 <div class="path-row"><input id="launcherPath" type="text" spellcheck="false" autocomplete="off" placeholder="C:\Program Files\Wuthering Waves\launcher.exe"><button type="button" id="savePath">Use this path</button></div>
 </details>
 </section>
@@ -104,6 +105,28 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <p class="small">30 fps is a useful starting point for 30-45 fps gameplay. Higher targets need more headroom. The recorder reports its measured capture rate; choosing 60 cannot create game frames that were never rendered. Video has no diagnostic labels burned in, in either mode.</p>
 <div class="actions"><button id="recordStart" type="button">Start recording</button><button id="recordStop" type="button" disabled>Stop recording</button><button id="openRecordings" type="button">Open recordings</button></div>
 <p class="small">Stops after five minutes, game exit or a scene change. Keep footage private until you have reviewed it for player names/UIDs. Recording does not play the game or change camera settings.</p>
+</section>
+<section aria-labelledby="graphics-heading" data-no-translate>
+<h2 id="graphics-heading">Graphics: saved vs live / 画质：已保存与实时值</h2>
+<p>New graphics packages remove only the recognized inherited low-quality templates. Your custom overrides are preserved. The accepted frame-timing fix stays separate. Installing or switching packages requires closing the game.</p>
+<p class="small">新画质包仅移除已识别的旧低画质模板，保留自定义覆盖项和帧时序修正。更换安装包前需关闭游戏。此处仅检查，不会改变画质。</p>
+<div class="actions"><button type="button" id="graphicsSaved">Inspect saved overrides / 检查已保存覆盖项</button><button type="button" id="graphicsLive">Read live graphics / 读取实时画质</button></div>
+<p id="graphicsResult" role="status">No live query has been sent. / 尚未发送实时查询。</p>
+<pre id="graphicsPolicy" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<div style="overflow-x:auto"><table id="graphicsValues" hidden><thead><tr><th>Variable / 变量</th><th>Live value / 实时值</th></tr></thead><tbody></tbody></table></div>
+<p class="small">Saved presets and startup commands are intentions; live values show the current numeric state. Neither proves every visual effect is correct. Queries run only when clicked; no graphics changes are sent.</p>
+</section>
+<section aria-labelledby="incident-heading" data-no-translate>
+<h2 id="incident-heading">A problem just happened? / 刚刚遇到问题？</h2>
+<p>Keep Developer tools open while playing. Its helper keeps up to five minutes of recent status and log observations in memory. After a loading stall or rendering problem, save them here. No video, microphone or controller input is captured.</p>
+<p class="small">游玩时保持开发者工具运行；遇到卡顿后在这里保存最近五分钟的状态与日志。不会录制画面、麦克风或手柄输入。</p>
+<p id="incidentState" role="status">Checking recent diagnostic coverage…</p>
+<label for="incidentNote">What happened? (optional) / 问题描述（可选）</label>
+<textarea id="incidentNote" rows="2" maxlength="4000" placeholder="Long black screen after dialogue; recovered after about 30 seconds"></textarea>
+<p><label for="incidentAgo">When did it start? / 何时开始？</label> <select id="incidentAgo"><option value="0">Just now / 刚刚</option><option value="30">About 30 seconds ago / 约30秒前</option><option value="60">About a minute ago / 约1分钟前</option><option value="180">About 3 minutes ago / 约3分钟前</option><option value="300">About 5 minutes ago / 约5分钟前</option></select></p>
+<div class="actions"><button type="button" id="saveIncident">Save recent diagnostics / 保存最近诊断</button><button type="button" id="openIncidents">Open saved reports / 打开报告文件夹</button></div>
+<p id="incidentResult" role="status" style="white-space:pre-wrap;overflow-wrap:anywhere"></p>
+<p class="small">This cannot recover earlier video or evidence from before the helper started. Missing or stale samples are labelled. Reports stay on this PC; review them before sharing.</p>
 </section>
 <section aria-labelledby="help-heading">
 <h2 id="help-heading">Recovery and removal</h2>
@@ -189,10 +212,16 @@ function renderBuilds(s) {
 function renderGame(s) {
   const box = $("gameChoices"), game = s.game;
   const options = [];
-  for (const found of game.detected.filter(d => d.kind === "official")) options.push({value: "launcher:" + found.path, text: "Open the official launcher for me", detail: found.path});
-  if (game.mode === "launcher" && game.launcher && !options.some(o => o.value === "launcher:" + game.launcher)) options.unshift({value: "launcher:" + game.launcher, text: "Open the official launcher for me", detail: game.launcher});
-  const stores = game.detected.filter(d => d.kind !== "official").map(d => d.label).join(" ");
-  options.push({value: "manual", text: "I start the game myself (experimental for Steam/Epic)", detail: (stores ? stores + " " : "") + "Steam injection previously failed and has not been retested; Epic is untested. Detecting an installation does not verify injection."});
+  for (const found of game.detected.filter(d => d.kind === "official" || d.kind === "steam")) {
+    const mode = found.kind === "steam" ? "steam" : "launcher";
+    options.push({value: mode + ":" + found.path, mode, path: found.path,
+      text: mode === "steam" ? "Play the Steam version" : "Open the official launcher for me", detail: found.path});
+  }
+  if (["launcher", "steam"].includes(game.mode) && game.launcher && !options.some(o => o.value === game.mode + ":" + game.launcher))
+    options.unshift({value: game.mode + ":" + game.launcher, mode: game.mode, path: game.launcher,
+      text: game.mode === "steam" ? "Play the Steam version" : "Open the official launcher for me", detail: game.launcher});
+  const stores = game.detected.filter(d => d.kind === "epic").map(d => d.label).join(" ");
+  options.push({value: "manual", text: "I will start the game myself", detail: (stores ? stores + " " : "") + "Start your chosen copy after requesting VR launch. Steam/Epic injection remains unverified."});
   const key = JSON.stringify(options);
   if (box.dataset.key !== key) {
     box.querySelectorAll(".choice").forEach(n => n.remove());
@@ -201,7 +230,7 @@ function renderGame(s) {
       const input = document.createElement("input"); input.type = "radio"; input.name = "game"; input.id = "game-" + index; input.value = option.value;
       input.addEventListener("change", () => {
         if (option.value === "manual") act("/api/settings", {gameStart: "manual"}, "Saving…");
-        else act("/api/settings", {gameStart: "launcher", gameLauncher: option.value.slice(9)}, "Saving…");
+        else act("/api/settings", {gameStart: option.mode, gameLauncher: option.path}, "Saving…");
       });
       const label = document.createElement("label"); label.htmlFor = input.id; label.textContent = option.text;
       const detail = document.createElement("p"); detail.textContent = option.detail;
@@ -209,7 +238,7 @@ function renderGame(s) {
     });
     box.dataset.key = key;
   }
-  const value = game.mode === "manual" ? "manual" : "launcher:" + game.launcher;
+  const value = game.mode === "manual" ? "manual" : game.mode + ":" + game.launcher;
   box.querySelectorAll("input").forEach(input => { input.checked = input.value === value; });
 }
 function render(s) {
@@ -272,7 +301,11 @@ $("risk").addEventListener("change", event => act("/api/settings", {riskAcknowle
 for (const [id, mode] of [["useHeadset", "headset"], ["useSimulator", "simulator"]]) {
   $(id).addEventListener("click", () => act("/api/runtime", {mode, expectedActive: current.openxr.manifest}, "Selecting " + mode + "; accept Windows' prompt…"));
 }
-$("savePath").addEventListener("click", () => act("/api/settings", {gameStart: "launcher", gameLauncher: $("launcherPath").value}, "Checking that path…"));
+$("savePath").addEventListener("click", () => {
+  const path = $("launcherPath").value;
+  const steam = /(?:^|[\\/])Wuthering Waves\.exe$/i.test(path.trim().replace(/^"|"$/g, ""));
+  act("/api/settings", {gameStart: steam ? "steam" : "launcher", gameLauncher: path}, "Checking that path…");
+});
 $("launch").addEventListener("click", () => {
   if (!$("risk").checked) { notify("Tick the account-risk box first.", true, 10); $("risk").focus(); return; }
   act("/api/launch", {id: chosenBuild}, "Starting…");
@@ -300,10 +333,69 @@ $("copyDiag").addEventListener("click", async () => {
 $("stop").addEventListener("click", async () => {
   try {
     await post("/api/stop", {});
-    clearInterval(timer);
+    clearInterval(timer); clearInterval(incidentTimer);
     document.body.classList.add("stopped"); $("stopped").hidden = false; $("stopped").focus();
   } catch (error) { notify(error.message, true, 15); }
 });
+let graphicsReading = false;
+async function inspectGraphics(live) {
+  if (graphicsReading || document.body.classList.contains("stopped")) return;
+  graphicsReading = true;
+  $("graphicsSaved").disabled = $("graphicsLive").disabled = true;
+  $("graphicsResult").textContent = live ? "Reading the running game's graphics… / 正在读取实时画质…" : "Reading saved overrides… / 正在检查已保存覆盖项…";
+  $("graphicsValues").hidden = true;
+  try {
+    if (live) {
+      const data = await post("/api/graphics/read", {});
+      const body = $("graphicsValues").querySelector("tbody"); body.replaceChildren();
+      for (const [name, value] of Object.entries(data.values)) {
+        const row = document.createElement("tr");
+        for (const text of [name, value.available ? String(value.float) : "Unavailable / 不可用: " + value.error]) {
+          const cell = document.createElement("td"); cell.textContent = text; row.appendChild(cell);
+        }
+        body.appendChild(row);
+      }
+      $("graphicsValues").hidden = false;
+      $("graphicsResult").textContent = "Snapshot / 快照: " + data.captured_at + " · PID " + data.pid + ". No settings changed. / 未更改设置。 " + data.limitations;
+    } else {
+      const response = await fetch("/api/graphics", {cache:"no-store", headers:{"X-WuWa-Token":TOKEN}});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Saved graphics audit failed");
+      $("graphicsPolicy").textContent = JSON.stringify(data, null, 2);
+      $("graphicsResult").textContent = "Saved profile only — these are not live renderer values. / 仅为已保存的配置，并非实时渲染值。";
+    }
+  } catch (error) { $("graphicsResult").textContent = "Graphics check unavailable / 画质检查不可用: " + error.message; }
+  finally { graphicsReading = false; $("graphicsSaved").disabled = $("graphicsLive").disabled = false; }
+}
+$("graphicsSaved").addEventListener("click", () => inspectGraphics(false));
+$("graphicsLive").addEventListener("click", () => inspectGraphics(true));
+let incidentRefreshing = false;
+async function refreshIncidents() {
+  if (incidentRefreshing || document.body.classList.contains("stopped")) return;
+  incidentRefreshing = true;
+  try {
+    const response = await fetch("/api/incidents", {cache: "no-store", headers: {"X-WuWa-Token": TOKEN}});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Diagnostics unavailable");
+    const latest = data.latest;
+    $("incidentState").textContent = "Recent observations: " + data.sample_count +
+      (latest?.status_state ? ". Latest backend status: " + latest.status_state + ". Log: " + (latest.log_state || "not sampled") + "." : ". Waiting for the first sample.") +
+      " Up to five minutes retained while this helper runs.";
+  } catch (error) { $("incidentState").textContent = "Recent diagnostics unavailable: " + error.message; }
+  finally { incidentRefreshing = false; }
+}
+$("saveIncident").addEventListener("click", async () => {
+  $("saveIncident").disabled = true;
+  $("incidentResult").textContent = "Saving local diagnostic report…";
+  try {
+    const result = await post("/api/incidents/save", {note: $("incidentNote").value, event_ago_seconds: Number($("incidentAgo").value)});
+    $("incidentResult").textContent = "Saved locally: " + result.folder + (result.warning ? "\n" + result.warning : "") + "\nNothing was uploaded.";
+  } catch (error) { $("incidentResult").textContent = "Could not save: " + error.message; }
+  finally { $("saveIncident").disabled = false; }
+});
+$("openIncidents").addEventListener("click", () => act("/api/open", {folder: "incidents"}));
+const incidentTimer = setInterval(refreshIncidents, 5000);
+refreshIncidents();
 const timer = setInterval(refresh, 2000);
 refresh();
 </script>

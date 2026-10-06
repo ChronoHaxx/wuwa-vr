@@ -60,6 +60,7 @@ param(
     [int]$LauncherGraceSeconds = 15,
     [string]$InjectorPath,
     [string]$LauncherPath = 'C:\Program Files\Wuthering Waves\launcher.exe',
+    [ValidateSet('launcher','manual','steam')][string]$GameStart = 'launcher',
     [string]$StatePath,
     [string]$CancelPath,
     [switch]$PromptOnLauncherClosed
@@ -69,6 +70,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Get-SceneCaptureCheck.ps1')
 . (Join-Path $PSScriptRoot 'Get-RunContinuityCheck.ps1')
 . (Join-Path $PSScriptRoot 'WuWaLaunchLifecycle.ps1')
+. (Join-Path $PSScriptRoot 'WuWaSteamStart.ps1')
 
 # Activate / deactivate the simulator machine-wide. Both scripts self-elevate
 # and prompt for UAC. activate stashes the outgoing runtime in
@@ -102,6 +104,20 @@ $profileLog   = Join-Path $profileDir 'log.txt'
 $profileCfg   = Join-Path $profileDir 'config.txt'
 $injectorCfg  = Join-Path $profileDir 'injector_config.txt'
 $simJson      = Join-Path $SimulatorPath 'openxr_simulator.json'
+$steamGame = $null
+if ($GameStart -eq 'steam' -and -not $Stop) {
+    $steamGame = Get-WuWaSteamGame -Bootstrap $launcherExe
+    if (-not $Probe) {
+        if ($ObserveOnly) { throw 'Steam launch requires its own path-bound injector; it cannot adopt a waiting injector.' }
+        if (-not $StartLauncher) { throw 'Use -StartLauncher with the selected Steam installation, or choose manual start.' }
+        Assert-WuWaSteamInjector -Injector $injectorExe
+        $null = Get-WuWaSteamClient
+    }
+}
+function Get-SelectedGameProcesses {
+    if ($steamGame) { Get-WuWaSteamProcesses $steamGame.Shipping }
+    else { Get-Process -Name $gameProcName -ErrorAction SilentlyContinue }
+}
 
 # Which backend actually gets injected is decided by custom_var_urvr_folder in
 # the AppData injector config - NOT by which copy of Custom_UEVR_Injector.exe
@@ -400,8 +416,11 @@ $watchedInjector = $null
 $injectorHandled = $false
 $progress = @{ Message = '' }
 $observe = {
+    if ($steamGame) { $observation = Get-WuWaSteamProcessSnapshot -Game $steamGame -Injector $watchedInjector }
+    else {
     $observation = Get-LaunchProcessSnapshot -TargetName $gameProcName -GameNames $gameNames `
         -LauncherNames $launcherNames -LauncherRoot $launcherRoot -Injector $watchedInjector
+    }
     $observation.BackendLogStarted = $false
     $observation.FirstFrameSeen = $false
     $observation.Slice = ''
@@ -421,6 +440,9 @@ $observe = {
             $observation.FirstFrameSeen = $observation.Slice -match 'texture bounds right eye'
         }
     }
+    if ($steamGame -and -not $observation.TargetRunning) {
+        $observation.BackendLogStarted = $false; $observation.FirstFrameSeen = $false
+    }
     $observation
 }
 $onPoll = {
@@ -429,6 +451,7 @@ $onPoll = {
     $message = 'Launcher open; press Play.'
     if (-not $observation.LauncherRunning) { $message = 'Launcher not detected; the attempt ends if it stays closed.' }
     if (-not $StartLauncher) { $message = 'Waiting for the game to start.' }
+    if ($steamGame) { $message = 'Steam launch requested; waiting for the selected installation. VR compatibility is unverified.' }
     if ($seen) { $phase = 'game-starting'; $message = 'Game process detected; waiting for UEVR.' }
     if ($observation.BackendLogStarted) { $phase = 'injected'; $message = 'UEVR log started; waiting for the first stereo frame.' }
     if ($message -ne $progress.Message) {
@@ -443,7 +466,7 @@ $cancelCheck = {
     ($CancelPath -and (Test-Path -LiteralPath $CancelPath)) -or ($PromptOnLauncherClosed -and (Test-LaunchCancelKey))
 }
 $launcherPrompt = $null
-if ($PromptOnLauncherClosed -and $StartLauncher) {
+if ($PromptOnLauncherClosed -and $StartLauncher -and -not $steamGame) {
     $launcherPrompt = {
         Write-Host ''
         Write-Host 'The game launcher closed before Play was pressed.' -ForegroundColor Yellow
@@ -465,19 +488,22 @@ try {
         Write-Output "Observing existing injector (PID $($watchedInjector.Id)); no new injector started."
     } else {
         Write-Output 'Starting injector...'
-        # Minimised rather than hidden: it stays in the taskbar, can be closed by
-        # the user, and has a window this script can ask to close.
+        $injectorArguments = 'Client-Win64-Shipping.exe'
+        if ($steamGame) { $injectorArguments = '--target-path "' + $steamGame.Shipping + '"' }
         $injectorProcess = Start-Process -FilePath $injectorExe `
             -WorkingDirectory (Split-Path -Parent $injectorExe) `
-            -WindowStyle Minimized `
-            -ArgumentList 'Client-Win64-Shipping.exe' `
+            -WindowStyle Hidden `
+            -ArgumentList $injectorArguments `
             -PassThru
         $watchedInjector = $injectorProcess
         Update-LaunchState -Path $StatePath -Values @{ injectorPid = $injectorProcess.Id; injectorStarted = $true }
-        Write-Output "Injector started minimised in the taskbar (PID $($injectorProcess.Id)); press Play in the game launcher."
+        Write-Output "Injector started (PID $($injectorProcess.Id)); waiting for the selected game."
     }
 
-    if ($StartLauncher) {
+    if ($steamGame) {
+        Write-Output 'Asking Steam to start app 3513350 through the normal desktop. Steam VR injection is unverified.'
+        Start-WuWaSteamGame -Game $steamGame
+    } elseif ($StartLauncher) {
         Write-Output 'Starting the Wuthering Waves launcher. Sign in and press Play yourself.'
         $null = Start-Process -FilePath $launcherExe
     } else {
@@ -489,7 +515,7 @@ try {
     if ($PromptOnLauncherClosed) { Write-Output 'Press Q in this window to stop waiting. This script never closes the game.' }
 
     $outcome = Wait-LaunchOutcome -Observe $observe -TimeoutSeconds $WaitSeconds `
-        -InjectorExpected ($null -ne $watchedInjector) -LauncherExpected $StartLauncher.IsPresent `
+        -InjectorExpected ($null -ne $watchedInjector) -LauncherExpected ($StartLauncher.IsPresent -and -not $steamGame) `
         -CancelRequested $cancelCheck -OnPoll $onPoll -OnLauncherClosed $launcherPrompt `
         -LauncherGraceSeconds $LauncherGraceSeconds
     $slice = [string]$outcome.Observation.Slice
@@ -521,7 +547,7 @@ try {
         # loaded. Sampling here reported "0 records" while the log went on to
         # collect hundreds. Let it run, then re-read.
         Update-LaunchState -Path $StatePath -Values @{ phase = 'settling'; message = "First stereo frame seen; sampling for $SettleSeconds s." }
-        $gameProcesses = @(Get-Process -Name $gameProcName -ErrorAction SilentlyContinue)
+        $gameProcesses = @(Get-SelectedGameProcesses)
         $expectedProcess = $null
         if ($gameProcesses.Count -eq 1) {
             $expectedProcess = [pscustomobject]@{
@@ -545,7 +571,7 @@ try {
             $remainingMs = [int][Math]::Ceiling(($settleDeadline - (Get-Date)).TotalMilliseconds)
             if ($remainingMs -le 0) { break }
             Start-Sleep -Milliseconds ([Math]::Min(3000, $remainingMs))
-            $gameProcesses = @(Get-Process -Name $gameProcName -ErrorAction SilentlyContinue)
+            $gameProcesses = @(Get-SelectedGameProcesses)
             $runContinuity = Get-RunContinuityCheck -ExpectedProcess $expectedProcess `
                 -BackendEntryTime $entryTime -ExpectedLogHeader $expectedHeader `
                 -CurrentProcesses $gameProcesses -CurrentLogHeader (Get-LogHeader)
@@ -557,7 +583,7 @@ try {
             $candidateSlice = Read-LogSlice $readFrom
             $runContinuity = Get-RunContinuityCheck -ExpectedProcess $expectedProcess `
                 -BackendEntryTime $entryTime -ExpectedLogHeader $expectedHeader `
-                -CurrentProcesses @(Get-Process -Name $gameProcName -ErrorAction SilentlyContinue) `
+                -CurrentProcesses @(Get-SelectedGameProcesses) `
                 -CurrentLogHeader (Get-LogHeader)
             if ($runContinuity.Result -eq 'PASS') { $slice = $candidateSlice }
         }

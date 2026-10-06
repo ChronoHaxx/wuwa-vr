@@ -136,6 +136,92 @@ int main() {
         inactive(call(mixer, 1, {}, false, vr), "explicit runtime reset replayed held input");
     }
     {
+        Mixer mixer;
+        Readiness readiness;
+        check(readiness.read(0, 1000, false) == Status::Off, "disabled input reported readiness");
+        check(readiness.read(2, 1000, false) == Status::WaitingSample, "new mode inherited a sample");
+        readiness.sample(2, Status::Armed, 1000);
+        check(readiness.read(2, 1000, false) == Status::WaitingPoll, "fresh sample falsely claimed actual delivery");
+        const auto held = call(mixer, 2, physical, true, vr);
+        unchanged(held, physical, true, "waiting-release diagnostic changed treadmill input");
+        readiness.poll(2, held, Status::Armed, false, 1000);
+        check(held.status == Status::WaitingRelease && readiness.read(2, 1000, false) == Status::WaitingRelease,
+            "held controls reported armed before neutral rearm");
+        const auto ready = call(mixer, 2, physical, true, {});
+        readiness.poll(2, ready, Status::Armed, false, 1000);
+        check(ready.vr_active && ready.status == Status::Armed && readiness.read(2, 1000, false) == Status::Armed,
+            "actual neutral rearm was not reflected in readiness");
+        const auto active = call(mixer, 2, physical, true, vr);
+        readiness.poll(2, active, Status::Armed, false, 1000);
+        check(active.vr_active && active.pad.buttons == (physical.buttons | vr.buttons) &&
+            active.pad.lx == physical.lx && readiness.read(2, 1000, false) == Status::Armed,
+            "armed status disagreed with actual mixed delivery");
+        readiness.sample(2, Status::Armed, 1100);
+        check(readiness.read(2, 1100, false) == Status::Armed, "new sample erased a recent actual poll");
+        readiness.sample(2, Status::Armed, 1251);
+        check(readiness.read(2, 1251, false) == Status::WaitingPoll, "old game poll remained armed while only tracking updated");
+        const auto missing = call(mixer, 2, {}, false, vr, true, 1251);
+        readiness.poll(2, missing, Status::Armed, false, 1251);
+        check(!missing.connected && !missing.vr_active && neutral(missing.pad) &&
+            missing.status == Status::MissingSlot && readiness.read(2, 1251, false) == Status::MissingSlot,
+            "missing merge slot diagnostic disagreed with disconnected delivery");
+        const auto reconnect = call(mixer, 2, physical, true, vr, true, 1252);
+        readiness.poll(2, reconnect, Status::Armed, false, 1252);
+        unchanged(reconnect, physical, true, "reconnect waiting status changed physical input");
+        check(reconnect.status == Status::WaitingRelease && readiness.read(2, 1252, false) == Status::WaitingRelease,
+            "reconnected slot claimed armed while VR controls still held");
+        const auto neutral_reconnect = call(mixer, 2, physical, true, {}, true, 1253);
+        readiness.poll(2, neutral_reconnect, Status::Armed, false, 1253);
+        check(neutral_reconnect.vr_active && readiness.read(2, 1253, false) == Status::Armed,
+            "connected slot could not report successful rearm");
+        check(readiness.read(2, 1253, true) == Status::WaitingPoll, "opening menu reused gameplay readiness");
+        const auto menu_held = call(mixer, 2, physical, true, vr, true, 1254, true);
+        readiness.poll(2, menu_held, Status::Armed, true, 1254);
+        check(!menu_held.vr_active && readiness.read(2, 1254, true) == Status::WaitingRelease,
+            "menu transition failed to report required release");
+        const auto menu_ready = call(mixer, 2, physical, true, {}, true, 1255, true);
+        readiness.poll(2, menu_ready, Status::Armed, true, 1255);
+        check(menu_ready.vr_active && readiness.read(2, 1255, true) == Status::MenuReady,
+            "menu navigation was described as game delivery");
+        check(readiness.read(2, 1255, false) == Status::WaitingPoll, "closing menu reused menu readiness");
+        check(readiness.read(3, 1255, true) == Status::WaitingSample, "different selected slot inherited prior readiness");
+        readiness.sample(3, Status::Armed, 1255);
+        check(readiness.read(3, 1255, true) == Status::WaitingPoll, "changed slot inherited another slot's poll");
+        readiness.reset();
+        check(readiness.read(2, 1255, true) == Status::WaitingSample, "reset retained readiness");
+    }
+    {
+        Mixer mixer;
+        Readiness readiness;
+        call(mixer, 1, {}, false, {});
+        const auto active = call(mixer, 1, {}, false, vr);
+        readiness.sample(1, Status::Armed, 1000);
+        readiness.poll(1, active, Status::Armed, false, 1000);
+        check(active.pad == vr && readiness.read(1, 1250, false) == Status::Armed,
+            "virtual-only mode incorrectly requires a physical slot");
+        const auto stale = mixer.apply(1, {}, false, vr, true, 1000, 1251, false);
+        readiness.poll(1, stale, Status::Armed, false, 1251);
+        check(stale.status == Status::StaleSample && !stale.connected && neutral(stale.pad) &&
+            readiness.read(1, 1251, false) == Status::StaleSample, "stale controller sample retained armed status");
+        check(readiness.read(1, 999, false) == Status::StaleSample, "clock reversal retained armed status");
+        readiness.sample(1, Status::Armed, 1252);
+        const auto focus_lost = call(mixer, 1, {}, false, vr, false, 1252);
+        readiness.poll(1, focus_lost, Status::GameUnfocused, false, 1252);
+        check(!focus_lost.connected && readiness.read(1, 1252, false) == Status::GameUnfocused,
+            "focus loss at poll time was hidden by a previously valid sample");
+        for (const auto blocker : {Status::Passthrough, Status::SlotFiltered, Status::InputMuted,
+            Status::GameUnfocused, Status::OpenXRRequired, Status::WaitingSample}) {
+            readiness.sample(1, blocker, 1253);
+            check(readiness.read(1, 1253, false) == blocker, "sample blocker was hidden by old armed state");
+        }
+        readiness.sample(1, Status::Armed, 1254);
+        check(readiness.read(1, 1254, false) == Status::WaitingPoll, "clearing a blocker reused a previous poll");
+        const auto held = call(mixer, 1, {}, false, vr, true, 1254);
+        readiness.poll(1, held, Status::Armed, false, 1254);
+        check(!held.connected && held.status == Status::WaitingRelease &&
+            readiness.read(1, 1254, false) == Status::WaitingRelease, "focus recovery skipped actual neutral rearm");
+    }
+    {
         PacketCounter counter;
         check(counter.stamp(0, true, physical, 900) == 0, "first delivered state lacks deterministic packet seed");
         check(counter.stamp(0, true, physical, 2) == 0 && counter.stamp(0, true, physical, 901) == 0,

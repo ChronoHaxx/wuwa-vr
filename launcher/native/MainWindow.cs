@@ -55,6 +55,9 @@ namespace WuWaVR.Manager
         CheckBox compatible, risk;
         TextBlock gamePath, gameHint, runtime, runtimeHint, packageState, launchState, catalogState, operationText, gameVersion, recordingState, riskNotice;
         GameDiscovery.Result discovery;
+        StackPanel gameLocationOptions;
+        ComboBox gameLocations;
+        Func<CancellationToken, Task<GameDiscovery.Result>> gameChoicesOverride;
         Button runtimeCheck;
         TextBox details;
         ProgressBar progress;
@@ -299,6 +302,7 @@ namespace WuWaVR.Manager
                 // as a side effect of installing or selecting a runtime.
                 if (WantsInstall()) { await Install(c); return; }
                 await EnsureConnected(c);
+                if (SteamChoiceNeedsPackage()) { OfferSteamPackageUpdate(); ShowStatus(); return; }
                 if (discovery != null && discovery.Message == "gameMultiple" &&
                     String.IsNullOrEmpty(store.State.launcherPath) && !Json.Flag(Json.Child(status, "game"), "saved"))
                     throw new InvalidOperationException(text["gameMultiple"]);
@@ -373,6 +377,40 @@ namespace WuWaVR.Manager
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = body }; }
         bool WantsInstall()
         { return store.Selected == null || SelectedRelease().id != store.Selected.release.id; }
+        bool SelectedPackageSupportsSteam()
+        {
+            if (store.Selected == null) return false;
+            // Passive capability check on the installed, package-verified payload.
+            // An older helper must never receive a mode it cannot understand.
+            string folder = store.Folder(store.Selected);
+            return File.Exists(Path.Combine(folder, "app", "dev", "wuwa_game_start.py")) &&
+                File.Exists(Path.Combine(folder, "app", "dev", "WuWaSteamStart.ps1"));
+        }
+        bool SteamChoiceNeedsPackage()
+        {
+            string pending = store.State.pendingLauncherPath;
+            return !String.IsNullOrWhiteSpace(pending) &&
+                String.Equals(Path.GetFileName(pending), "Wuthering Waves.exe", StringComparison.OrdinalIgnoreCase) &&
+                !SelectedPackageSupportsSteam();
+        }
+        void OfferSteamPackageUpdate()
+        {
+            if (!SteamChoiceNeedsPackage()) return;
+            // Propose an update without installing it or changing the old helper.
+            // Retain an already deliberate package selection and require consent.
+            if (store.Selected != null && !WantsInstall())
+            {
+                Func<Release, DateTimeOffset> date = r => {
+                    DateTimeOffset parsed;
+                    return DateTimeOffset.TryParse(r.published ?? r.created, out parsed) ? parsed : DateTimeOffset.MinValue;
+                };
+                var newer = releases.Items.Cast<Release>().Where(r => r.id != store.Selected.release.id && date(r) > date(store.Selected.release))
+                    .OrderByDescending(date).FirstOrDefault();
+                if (newer != null) releases.SelectedItem = newer;
+            }
+            advancedPanel.IsExpanded = true;
+            operationText.Text = text["gameSteamUpdateRequired"];
+        }
         UIElement Setup()
         {
             var panel = new StackPanel();
@@ -390,15 +428,41 @@ namespace WuWaVR.Manager
             gamePath = Label(text["noGame"], 12, muted); gamePath.TextWrapping = TextWrapping.NoWrap; gamePath.TextTrimming = TextTrimming.CharacterEllipsis;
             var browse = Action("browse", async c =>
             {
-                var picker = new OpenFileDialog { Filter = "Windows launcher (*.exe)|*.exe", CheckFileExists = true, Title = text["browse"] };
-                if (picker.ShowDialog(this) == true)
+                if (gameLocationOptions.Visibility == Visibility.Visible) { gameLocationOptions.Visibility = Visibility.Collapsed; operationText.Text = text["notChanged"]; return; }
+                var found = gameChoicesOverride != null ? await gameChoicesOverride(c) :
+                    await Task.Run(() => GameDiscovery.Discover(null, bridge.Data, c, choicesOnly: true), c);
+                gameLocations.Items.Clear();
+                foreach (var choice in found.Choices)
                 {
-                    await ChooseLauncher(picker.FileName, c);
+                    var label = new StackPanel();
+                    label.Children.Add(Label(text[choice.Mode == "steam" ? "gameSteamLabel" : "gameOfficialLabel"], 13));
+                    var path = Label(choice.Path, 11, muted); path.TextWrapping = TextWrapping.NoWrap; path.TextTrimming = TextTrimming.CharacterEllipsis;
+                    label.Children.Add(path);
+                    gameLocations.Items.Add(new ComboBoxItem { Content = label, Tag = choice, ToolTip = choice.Path });
                 }
-                else operationText.Text = text["notChanged"];
+                gameLocations.SelectedIndex = found.Choices.Count == 1 ? 0 : -1;
+                gameLocations.Visibility = found.Choices.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+                gameLocationOptions.Visibility = Visibility.Visible;
+                operationText.Text = text[found.Choices.Count == 0 ? "gameNotFound" : "gameChooseHint"];
             });
+            gameLocations = Choice();
+            gameLocations.SelectionChanged += (s, e) => { if (!rendering) ShowStatus(); };
+            gameLocationOptions = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 8, 0, 0) };
+            gameLocationOptions.Children.Add(Label(text["gameChooseHint"], 12, muted));
+            gameLocationOptions.Children.Add(gameLocations);
+            gameLocationOptions.Children.Add(Wrap(Action("useGameLocation", async c =>
+            {
+                var choice = (gameLocations.SelectedItem as ComboBoxItem)?.Tag as GameDiscovery.Choice;
+                if (choice == null) throw new InvalidOperationException(text["gameChooseHint"]);
+                await ChooseLauncher(choice.Path, c);
+            }), Action("browseGameFile", async c =>
+            {
+                var picker = new OpenFileDialog { Filter = "WuWa launcher (launcher.exe;Wuthering Waves.exe)|launcher.exe;Wuthering Waves.exe", CheckFileExists = true, Title = text["locate"] };
+                if (picker.ShowDialog(this) == true) await ChooseLauncher(picker.FileName, c);
+                else operationText.Text = text["notChanged"];
+            })));
             gameHint = Label(text[preview ? "locateHint" : "findingGame"], 11, muted);
-            panel.Children.Add(Step("01", text["locate"], browse, gamePath, gameHint));
+            panel.Children.Add(Step("01", text["locate"], browse, gamePath, gameHint, gameLocationOptions));
             runtime = Label(text["runtimeHint"], 12, muted);
             runtimeCheck = Action("check", async c => { await EnsureConnected(c); await SubmitJob("/api/check", new { id = CurrentBuild() }, c); });
             runtimeHint = Label(text["runtimeInstallHint"], 11, muted);
@@ -690,14 +754,17 @@ namespace WuWaVR.Manager
         string CurrentBuild() { return store.Selected.release.buildId; }
         async Task ChooseLauncher(string path, CancellationToken c)
         {
-            string chosen = GameDiscovery.ExistingLauncher(path, File.Exists);
-            if (chosen == null) throw new InvalidOperationException(text["locateHint"]);
+            var selection = GameDiscovery.ExistingChoice(path, File.Exists);
+            if (selection == null) throw new InvalidOperationException(text["locateHint"]);
+            string chosen = selection.Path;
             string previous = store.State.launcherPath, pending = store.State.pendingLauncherPath;
             store.State.launcherPath = chosen; store.State.pendingLauncherPath = chosen;
             try { store.Save(); }
             catch { store.State.launcherPath = previous; store.State.pendingLauncherPath = pending; throw; }
             await DiscoverGame(c);
+            OfferSteamPackageUpdate();
             if (connectionReady) await Connect(c);
+            gameLocationOptions.Visibility = Visibility.Collapsed;
         }
         async Task DiscoverGame(CancellationToken c)
         {
@@ -713,28 +780,36 @@ namespace WuWaVR.Manager
             try
             {
                 string pending = store.State.pendingLauncherPath;
-                if (!String.IsNullOrWhiteSpace(pending) && GameDiscovery.ExistingLauncher(pending, File.Exists) == null)
+                var pendingSelection = GameDiscovery.ExistingChoice(pending, File.Exists);
+                if (!String.IsNullOrWhiteSpace(pending) && pendingSelection == null)
                     throw new InvalidOperationException(text["gameSavedMissing"]);
                 await bridge.Connect(store.Folder(store.Selected), c);
                 status = await bridge.Status(c); ShowStatus();
                 await bridge.Post("/api/language", new { language = text.Language }, c);
                 if (discovery == null) await DiscoverGame(c);
-                string chosen = GameDiscovery.PathToApply(pending ?? store.State.launcherPath, discovery, Json.Child(status, "game"), File.Exists, !String.IsNullOrWhiteSpace(pending));
+                bool deferSteamChoice = pendingSelection?.Mode == "steam" && !SelectedPackageSupportsSteam();
+                string chosen = deferSteamChoice ? null : GameDiscovery.PathToApply(pending ?? store.State.launcherPath, discovery, Json.Child(status, "game"), File.Exists, !String.IsNullOrWhiteSpace(pending));
                 if (chosen != null)
                 {
-                    await bridge.Post("/api/settings", new { gameStart = "launcher", gameLauncher = chosen }, c);
-                    status = await bridge.Status(c);
+                    var selection = GameDiscovery.ExistingChoice(chosen, File.Exists);
+                    if (selection == null) throw new InvalidOperationException(text["gameSavedMissing"]);
+                    if (selection.Mode != "steam" || SelectedPackageSupportsSteam())
+                    {
+                        await bridge.Post("/api/settings", new { gameStart = selection.Mode, gameLauncher = selection.Path }, c);
+                        status = await bridge.Status(c);
+                    }
                 }
-                if (!String.IsNullOrWhiteSpace(pending))
+                if (!String.IsNullOrWhiteSpace(pending) && !deferSteamChoice)
                 {
                     var savedGame = Json.Child(status, "game");
-                    if (Json.Text(savedGame, "mode") != "launcher" || !String.Equals(Json.Text(savedGame, "launcher"), pending, StringComparison.OrdinalIgnoreCase))
+                    if (Json.Text(savedGame, "mode") != pendingSelection.Mode || !String.Equals(Json.Text(savedGame, "launcher"), pendingSelection.Path, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidOperationException(text["gameChoiceUnconfirmed"]);
                     store.State.pendingLauncherPath = null;
                     try { store.Save(); } catch { store.State.pendingLauncherPath = pending; throw; }
                 }
                 connectionReady = true; connectionProblem = "";
                 if (!riskRestored) { riskRestored = true; if (Json.Flag(status, "riskAcknowledged")) risk.IsChecked = true; }
+                if (deferSteamChoice) OfferSteamPackageUpdate();
                 ShowStatus();
             }
             catch (Exception e) { status = new Dictionary<string, object>(); connectionProblem = e.Message; ShowStatus(); throw; }
@@ -798,6 +873,7 @@ namespace WuWaVR.Manager
             catalogState.Text = text[catalogKey]; operationText.Text = text[catalogKey];
             advancedPanel.IsExpanded = true;
             if (catalogKey == "catalogOffline") feedbackPanel.IsExpanded = true;
+            OfferSteamPackageUpdate();
         }
         async Task CheckUpdates(CancellationToken c)
         {
@@ -927,8 +1003,9 @@ namespace WuWaVR.Manager
             if (String.IsNullOrEmpty(gamePath.Text)) gamePath.Text = text["noGame"];
             gamePath.ToolTip = gamePath.Text;
             string hint = discovery == null ? (preview ? "locateHint" : "findingGame") : discovery.Message;
+            if (SteamChoiceNeedsPackage()) hint = "gameSteamUpdateRequired";
             if (!pendingChoice && Json.Flag(game, "saved")) hint = Json.Text(game, "mode") == "manual" ? "gameManualSaved" :
-                String.IsNullOrEmpty(Json.Text(game, "problem")) ? "gameSavedFound" : "gameSavedMissing";
+                String.IsNullOrEmpty(Json.Text(game, "problem")) ? Json.Text(game, "mode") == "steam" ? "gameSteamSaved" : "gameSavedFound" : "gameSavedMissing";
             gameHint.Text = text[hint];
             gameHint.ToolTip = discovery != null && discovery.Candidates.Count > 1 ? String.Join(Environment.NewLine, discovery.Candidates) : gameHint.Text;
             runtime.Text = store.Selected != null && !connectionReady ? text["connectionRequired"] : LauncherPresentation.RuntimeSummary(bridge.Address != null, status, k => text[k]);
@@ -947,7 +1024,7 @@ namespace WuWaVR.Manager
             gameVersion.Text = text["targetGame"] + " " + (wantsInstall ? SelectedRelease().gameVersion : store.Selected.release.gameVersion);
             runtimeHint.Text = text[!hasPackage ? "runtimeInstallHint" : !connectionReady ? "connectionRequired" : gameRunning || injectorRunning ? "runtimeCloseFirst" : !Json.Flag(xr, "canHeadset") || !Json.Flag(xr, "canSimulator") ? "runtimeUnavailableHint" : "runtimeChoiceHint"];
             launchState.Text = gameRunning || running ? LauncherBridge.LaunchSummary(status, k => text[k]) :
-                text[wantsInstall ? "installNext" : !connectionReady ? "connectionRequired" : injectorRunning ? "runtimeCloseFirst" : risk.IsChecked != true ? "riskNext" : "launchNext"];
+                text[wantsInstall ? "installNext" : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : injectorRunning ? "runtimeCloseFirst" : risk.IsChecked != true ? "riskNext" : Json.Text(game, "mode") == "steam" ? "launchNextSteam" : "launchNext"];
             feedbackPanel.Visibility = String.IsNullOrWhiteSpace(details.Text) ? Visibility.Collapsed : Visibility.Visible;
             var capture = Json.Child(status, "recording");
             bool canRecord = CaptureAvailability.HasSource(status, new[] { "auto", "steamvr", "simulator" }[Math.Max(0, source.SelectedIndex)]);
@@ -968,10 +1045,12 @@ namespace WuWaVR.Manager
                 {
                     switch (key)
                     {
+                        case "useGameLocation": reason = running ? "busy" : gameLocations.SelectedItem == null ? "gameChooseHint" : null; break;
+                        case "browse": case "browseGameFile": reason = running ? "busy" : null; break;
                         case "install": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : compatible.IsChecked != true ? "compatRequired" : null; break;
                         case "updateLauncher": reason = launcherUpdates.Busy ? "busy" : launcherUpdates.AvailableVersion == null ? "launcherUpdateHint" :
                             launcherUpdates.ReadyToRestart && (running || recording || gameRunning || injectorRunning) ? "launcherRestartIdle" : null; break;
-                        case "launch": reason = running ? "busy" : gameRunning ? "alreadyRunning" : injectorRunning ? "runtimeCloseFirst" : wantsInstall ? (conflict ? "connectionRequired" : compatible.IsChecked != true ? "compatRequired" : null) : !connectionReady ? "connectionRequired" : risk.IsChecked != true ? "riskAccept" : null; break;
+                        case "launch": reason = running ? "busy" : gameRunning ? "alreadyRunning" : injectorRunning ? "runtimeCloseFirst" : wantsInstall ? (conflict ? "connectionRequired" : compatible.IsChecked != true ? "compatRequired" : null) : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : risk.IsChecked != true ? "riskAccept" : null; break;
                         case "recordStart": reason = !hasPackage ? "chooseVersion" : running || recording ? "busy" : !gameRunning ? "recordNeedsGame" : !canRecord ? "recordUnavailable" : null; break;
                         case "recordStop": reason = !recording ? "noRecording" : null; break;
                         case "repair": case "useVersion": case "remove": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : installed.SelectedItem == null ? "chooseVersion" : null; break;
@@ -995,7 +1074,7 @@ namespace WuWaVR.Manager
                 if (key == "openExisting" || key == "switchLauncher") button.Visibility = conflict ? Visibility.Visible : Visibility.Collapsed;
             }
             UpdateControllerCheck();
-            foreach (var choice in new[] { releases, installed, source, fps, size, purpose }) choice.IsEnabled = operation == null && !running;
+            foreach (var choice in new[] { releases, installed, source, fps, size, purpose, gameLocations }) choice.IsEnabled = operation == null && !running;
             bool active = operation != null || running;
             bool canCancel = operation != null || (bridge.Address != null && LauncherPresentation.CanCancelBackend(job));
             cancelButton.IsEnabled = canCancel; cancelButton.Visibility = canCancel ? Visibility.Visible : Visibility.Collapsed;

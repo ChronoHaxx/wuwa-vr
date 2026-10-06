@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Status','Select','Launch','Restore')][string]$Action='Status',
+    [ValidateSet('Status','Select','Launch','Restore','GraphicsStatus')][string]$Action='Status',
     [string]$Id,
     [switch]$ResetToSupplied,
     [string]$DataRoot
@@ -9,6 +9,7 @@ $ErrorActionPreference='Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 . (Join-Path $PSScriptRoot 'WuWaBuildProfiles.ps1')
 $context=Get-WuWaBuildContext -DataRoot $DataRoot
+if($Action -eq 'GraphicsStatus') { Get-WuWaGraphicsPolicyAudit -Profile $context.Profile | ConvertTo-Json -Depth 12; return }
 if($Action -eq 'Status') {
     [pscustomobject]@{ state=(Get-WuWaBuildState $context); runtime=(Get-WuWaSelectedRuntime $context); busy=@(Get-WuWaBusyProcesses | ForEach-Object { [pscustomobject]@{name=$_.ProcessName;pid=$_.Id} }); builds=@(Get-WuWaBuildCatalog $context) } | ConvertTo-Json -Depth 12
     return

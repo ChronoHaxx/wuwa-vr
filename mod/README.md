@@ -1,8 +1,13 @@
-# Mod source — 4 October 2026 public beta
+# Mod source — Steam and graphics settings beta
 
-This source matches public release
-[beta-2026-10-04-cinematic](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic),
-backend **cinematic-20261004**, for game **3.7**. It retains the existing rendering
+The current release is
+[beta-2026-10-06-steam](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam),
+launcher **1.0.2**, package build **steam-20261006**, for game **3.7**.
+`checkpoint.json` identifies its exact artifacts and acceptance status. The renderer
+is unchanged from **graphics-20261006-r2**. Steam startup and backend activity were
+observed on the owner's PC; headset and other-PC checks remain pending. Graphics
+follow game preferences instead of inherited low/medium startup overrides.
+It retains the existing rendering
 changes and includes portal, diorama and 2D-screen shortcuts, HUD recovery, and
 optional walking, optical-hand and menu-comfort features. See the
 [controller reference](../docs/CONTROLS.md) for controls and their limits.

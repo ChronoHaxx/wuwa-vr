@@ -774,6 +774,68 @@ class Tests
             Assert(GameDiscovery.Discover(null, folder, CancellationToken.None).Message == "gameSettingsUnreadable", "unreadable settings replaced");
             Assert(File.ReadAllText(file) == "{broken", "unreadable settings overwritten");
         });
+        string steamRoot = @"D:\SteamLibrary", steamPath = steamRoot + @"\steamapps\common\Wuthering Waves\Wuthering Waves.exe";
+        string shipping = steamRoot + @"\steamapps\common\Wuthering Waves\Client\Binaries\Win64\Client-Win64-Shipping.exe";
+        string manifest = steamRoot + @"\steamapps\appmanifest_3513350.acf";
+        var steamFiles = new HashSet<string>(new[] { official, steamPath, shipping }, StringComparer.OrdinalIgnoreCase);
+        var metadata = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            { manifest, "\"AppState\" { \"appid\" \"3513350\" \"installdir\" \"Wuthering Waves\" }" },
+            { @"C:\Steam\steamapps\libraryfolders.vdf", "\"libraryfolders\" { \"1\" { \"path\" \"D:\\\\SteamLibrary\" \"apps\" { \"3513350\" \"100\" } } }" }
+        };
+        Func<string, string> readSteam = p => metadata.ContainsKey(p) ? metadata[p] : null;
+        Test("Steam library metadata discovers validated bootstrap with independent launch mode", () =>
+        {
+            var paths = GameDiscovery.SteamCandidates(new[] { @"C:\Steam", steamRoot }, steamFiles.Contains, readSteam);
+            Assert(paths.Count == 1 && paths[0] == steamPath, "secondary Steam library was missed or duplicated");
+            var found = GameDiscovery.Resolve(null, empty, none, new string[0], steamFiles.Contains, false, paths, readSteam);
+            Assert(found.CanUse && found.Mode == "steam" && found.Path == steamPath && found.Message == "gameSteamFound", "Steam treated as official or not discovered");
+            Assert(found.Choices.Count == 1 && found.Choices[0].Mode == "steam", "picker lost Steam identity");
+        });
+        Test("official and Steam coexist without silently choosing either", () =>
+        {
+            var found = GameDiscovery.Resolve(null, empty, none, new[] { official }, steamFiles.Contains, false, new[] { steamPath }, readSteam);
+            Assert(!found.CanUse && found.Message == "gameMultiple" && found.Choices.Count == 2, "multi-install default was silently selected");
+            Assert(GameDiscovery.PathToApply(null, found, empty, steamFiles.Contains, false, readSteam) == null, "ambiguous install applied");
+            foreach (string mode in new[] { "launcher", "manual", "steam" })
+            {
+                var saved = Json.Read<Dictionary<string, object>>(Json.Write(new { gameStart = mode, gameLauncher = mode == "steam" ? steamPath : official }));
+                var selected = GameDiscovery.Resolve(steamPath, saved, none, new[] { official }, steamFiles.Contains, false, new[] { steamPath }, readSteam);
+                Assert(mode == "manual" ? selected.Message == "gameManualSaved" : selected.Mode == mode, "saved route replaced: " + mode);
+                var game = Json.Read<Dictionary<string, object>>(Json.Write(new { mode, launcher = mode == "steam" ? steamPath : official, saved = true }));
+                Assert(GameDiscovery.PathToApply(steamPath, found, game, steamFiles.Contains, false, readSteam) == null, "cached Steam path overrode saved route");
+                Assert(GameDiscovery.PathToApply(steamPath, found, game, steamFiles.Contains, true, readSteam) == (mode == "steam" ? null : steamPath), "explicit Steam selection did not apply exactly once");
+            }
+        });
+        Test("Steam selection rejects malformed or mismatched install identity", () =>
+        {
+            string original = metadata[manifest];
+            foreach (string bad in new[] { "", original.Replace("3513350", "999999"), original.Replace("Wuthering Waves", "Other"), original + " \"appid\" \"3513350\"", new string('x', 1024 * 1024 + 1) })
+            {
+                metadata[manifest] = bad;
+                Assert(GameDiscovery.ExistingChoice(steamPath, steamFiles.Contains, readSteam) == null, "invalid manifest accepted");
+            }
+            metadata[manifest] = original;
+            steamFiles.Remove(shipping);
+            Assert(GameDiscovery.ExistingChoice(steamPath, steamFiles.Contains, readSteam) == null, "missing real game executable accepted");
+            steamFiles.Add(shipping);
+            foreach (string bad in new[] { "Wuthering Waves.exe", @"C:Wuthering Waves.exe", steamPath + " -foo", @"C:\Other\Wuthering Waves.exe", steamPath.Replace("Wuthering Waves.exe", "Client-Win64-Shipping.exe") })
+                Assert(GameDiscovery.ExistingChoice(bad, p => true, readSteam) == null, "non-bootstrap/argument path accepted");
+            metadata[manifest] = original.Replace("Wuthering Waves", "..\\..\\Elsewhere");
+            Assert(GameDiscovery.SteamCandidates(new[] { steamRoot }, p => true, readSteam).Count == 0, "manifest path traversal accepted");
+            metadata[manifest] = original;
+        });
+        Test("saved Steam identity remains saved when missing and cannot silently become official", () =>
+        {
+            var saved = Json.Read<Dictionary<string, object>>(Json.Write(new { gameStart = "steam", gameLauncher = steamPath }));
+            var found = GameDiscovery.Resolve(null, saved, none, new[] { official }, steamFiles.Contains, false, null, readSteam);
+            Assert(found.CanUse && found.Mode == "steam" && found.Message == "gameSteamSaved", "saved Steam selection not restored");
+            steamFiles.Remove(steamPath);
+            found = GameDiscovery.Resolve(null, saved, none, new[] { official }, steamFiles.Contains, false, null, readSteam);
+            Assert(!found.CanUse && found.Path == steamPath && found.Message == "gameSavedMissing", "missing Steam silently replaced");
+            steamFiles.Add(steamPath);
+            saved["gameLauncher"] = official;
+            Assert(!GameDiscovery.Resolve(null, saved, none, new[] { official }, steamFiles.Contains, false, null, readSteam).CanUse, "Steam mode accepted official executable");
+        });
     }
     [STAThread]
     static int Main(string[] args)

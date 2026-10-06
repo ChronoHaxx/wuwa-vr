@@ -1,7 +1,7 @@
 # Start playing
 
-**Beta for game 3.7 · desktop app 1.0.1.**
-[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-04-cinematic/WuWa-VR-Setup.exe)
+**Beta for game 3.7 · desktop app 1.0.2.**
+[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-steam/WuWa-VR-Setup.exe)
 and run it to install **WuWa VR** for your Windows user. Open **WuWa VR** from
 the Start menu. The small installer does not bundle the VR mod: the first
 **Install VR** needs internet to download about **54 MB**. No separate Python
@@ -18,22 +18,25 @@ restrict or ban an account. It is not approved by Kuro Games.
 
 ## Install and launch
 
-1. **01 · Game.** Check the detected official game launcher, or choose its location.
+1. **01 · Game.** Choose the detected Kuro or Steam installation. Saved choices
+   are kept; if several installations are found, choose one. For Steam, browse to
+   **Wuthering Waves.exe** if needed, not the inner Shipping executable.
 2. **02 · Install VR.** Read and accept the account-risk notice, then install the
    selected VR version. Existing settings and backups are kept.
 3. **03 · Headset or simulator.** Start your headset software and check the
    displayed runtime, or deliberately choose the simulator. Select **Launch in VR**,
-   accept the Windows permission prompt, then press **Play** in the official
-   game launcher.
+   accept the Windows permission prompt. Steam opens the selected game through
+   Steam; for Kuro, press **Play** in its launcher.
 
 The installer is unsigned, so Windows may warn. Download from this project's
 GitHub Releases and compare the published checksum if unsure. Do not disable
 antivirus, SmartScreen or anti-cheat. Game injection asks for Windows permission
 separately from installing the app for your user.
 
-The standalone official launcher is the tested route. Steam/Epic game injection
-and installation on a fresh PC remain unverified. SteamVR headset support does
-not establish support for the Steam-store game version.
+The owner has confirmed Steam startup with the VR backend running on this PC.
+The existing Kuro route remains available. This does not verify the current build
+on other PCs or in a headset; Epic injection and fresh-PC installation remain
+unverified. SteamVR is headset software, separate from the Steam-store game route.
 
 Choosing a simulator or restoring the headset runtime changes the system OpenXR
 runtime and may ask for Windows permission. Close the game and injector first.
@@ -42,12 +45,12 @@ Opening or updating the app does not automatically select the simulator.
 ## Updates
 
 - Open **02 → Versions & updates → Check updates**.
-- **Desktop app:** choose **Update launcher** to download and verify the update;
+- **Desktop app 1.0.2:** choose **Update launcher** to download and verify the update;
   this does not restart the app. When it is ready, close the game and injector,
   stop recording and finish other operations, then choose **Restart to update**
   and confirm. Installing or updating the desktop app preserves your selected VR package.
-- **VR package:** in **step 02**, choose **beta-2026-10-04-cinematic** and install it,
-  or select it if already installed, to use **cinematic-20261004**. Older installed VR versions remain available for rollback.
+- **VR package:** in **step 02**, choose **beta-2026-10-06-steam** and install it,
+  or select it if already installed, to use **steam-20261006**. Older installed VR versions remain available for rollback.
 
 Updating keeps settings, backups, logs and recordings. The manager uses
 `%LOCALAPPDATA%\WuWa VR Manager`; the existing launcher data stays in
@@ -55,7 +58,12 @@ Updating keeps settings, backups, logs and recordings. The manager uses
 
 ## What this beta changes
 
-This release uses backend **cinematic-20261004**. Cinematic framing is **on by
+The **steam-20261006** VR build adds Steam selection and keeps your game’s
+graphics choices. It stops recreating inherited low/medium graphics overrides,
+with a one-time cleanup of recognized generated settings; custom edits are kept.
+The accepted timing correction remains separate from graphics quality.
+
+Cinematic framing is **on by
 default**. The owner confirmed the simulator replay on private build
 **screen-comfort-r1**; sampled frames from the latest 68-second recording show
 matching letterbox heights. **Headset comfort remains pending.** Earlier accepted
@@ -65,7 +73,9 @@ foliage, far indirect-lighting, main Resonators reflection, ultimate-camera and
 Automatic cinema remains **off by default and unverified**. It did not activate
 for the latest reported in-engine scene; a prerendered movie has not been tested.
 Long scene/dialogue stalls, HUD-aspect refresh and moving backgrounds behind
-flat menus remain open. Manual mono theatre is a menu workaround.
+flat menus remain open. Manual mono theatre is a menu workaround. Launch progress
+may still say **waiting for UEVR** after the backend starts; check the actual game
+view before retrying or starting another launcher.
 
 **VR → WuWa Controls → Suppress mismatched NPC rim lighting** starts **off**.
 It suppresses the toon-rim effect that produced extra bright contours in the
@@ -109,12 +119,12 @@ Keep the data folders if you want to retain recordings, backups and settings.
 
 ## Portable fallback
 
-[WuWa-VR-Launcher.zip](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-04-cinematic/WuWa-VR-Launcher.zip)
+[WuWa-VR-Launcher.zip](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-steam/WuWa-VR-Launcher.zip)
 is an advanced fallback. Extract the whole archive, keep `app` and `python`
 together, and open **WuWa VR Launcher.exe**. It uses the older browser interface;
 it does not install or self-update the desktop app. Choose **Apply & launch**,
-accept Windows permission, then press **Play** in the official game launcher.
+accept Windows permission, then follow the selected Steam or Kuro launch route.
 
-The [previous 4 October launcher beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-launcher)
-remains available. [Release notes and checksums](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic)
+The [previous 4 October cinematic beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic)
+remains available. [Release notes and checksums](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam)
 identify each download. Versions for older game releases may be incompatible.

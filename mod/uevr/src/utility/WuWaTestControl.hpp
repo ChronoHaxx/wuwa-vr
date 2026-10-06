@@ -6,6 +6,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <nlohmann/json.hpp>
@@ -33,6 +34,7 @@
 #include "WuWaStereoOrder.hpp"
 #include "WuWaProjectionTest.hpp"
 #include "WuWaRimSuppression.hpp"
+#include "WuWaConsoleReadPolicy.hpp"
 
 namespace wuwa_test {
 // Explicit, expiring requests for one-variable graphics comparisons. This is
@@ -287,14 +289,102 @@ inline void draw_controls() {
 struct ConsoleLease { sdk::IConsoleVariable* var{}; std::string name; std::wstring previous; float applied{}; uint64_t until{}; };
 inline ConsoleLease console_lease{};
 inline sdk::IConsoleVariable* find_console_variable(const std::string& name) {
-    if (name.rfind("r.", 0) != 0 || name.size() > 96) throw std::runtime_error("console tests accept r.* names only");
-    for (const auto c : name) if (!std::isalnum(static_cast<unsigned char>(c)) && c != '.' && c != '_') throw std::runtime_error("invalid name");
+    if (!wuwa_console_read::valid_name(name, wuwa_console_read::Access::Write))
+        throw std::runtime_error("console writes accept r.* variable names only");
     const auto manager = sdk::FConsoleManager::get();
     if (manager == nullptr) throw std::runtime_error("console manager unavailable");
     auto* object = manager->find(std::wstring(name.begin(), name.end()));
     if (object == nullptr || object->AsCommand() != nullptr) throw std::runtime_error("no such console variable");
     return static_cast<sdk::IConsoleVariable*>(object);
 }
+// The SDK's public getters return zero when discovery fails. Check discovery
+// first through the same inherited member-pointer probe as the rim/CLV helpers;
+// do not reinterpret an absent accessor as a real zero or call an invented slot.
+struct ConsoleReadAccess : sdk::IConsoleVariable {
+    static bool available(sdk::IConsoleObject* object) {
+        if (!object) return false;
+        const auto probe = &ConsoleReadAccess::locate_vtable_indices;
+        const auto info = (object->*probe)();
+        return info && wuwa_console_read::numeric_accessors_available(
+            info->as_console_command_index, info->get_int_vtable_index, info->get_float_vtable_index);
+    }
+    static std::unique_lock<std::recursive_mutex> try_lock_cache() {
+        return std::unique_lock<std::recursive_mutex>{s_vtable_mutex, std::try_to_lock};
+    }
+    // Caller retains the SDK mutex through the public getters, which acquire
+    // this same recursive mutex. Never start discovery or wait behind a scan.
+    static wuwa_console_read::CachedAccess cached(sdk::IConsoleObject* object, bool locked) {
+        if (!locked) return wuwa_console_read::cached_access(false, false, 0, 0, 0);
+        if (!object) return wuwa_console_read::cached_access(true, false, 0, 0, 0);
+        // Use exactly the SDK's existing vtable cache key; no inferred offsets
+        // or speculative virtual calls. The outer reader catches invalid memory.
+        const auto vtable = *reinterpret_cast<void**>(object);
+        const auto entry = s_vtable_infos.find(vtable);
+        if (entry == s_vtable_infos.end())
+            return wuwa_console_read::cached_access(true, false, 0, 0, 0);
+        const auto& info = entry->second;
+        return wuwa_console_read::cached_access(true, true, info.as_console_command_index,
+            info.get_int_vtable_index, info.get_float_vtable_index);
+    }
+};
+inline Json read_console_value(const std::string& name, bool cached_only = false) {
+    Json value{{"available", false}, {"int", nullptr}, {"float", nullptr},
+        {"flags", nullptr}, {"flags_available", false},
+        {"flags_error", "sdk_flags_unverified_for_game"}, {"set_by_available", false},
+        {"set_by", nullptr}, {"set_by_error", "Bundled SDK has no verified SetBy decoder for this game."}};
+    if (!wuwa_console_read::valid_name(name, wuwa_console_read::Access::Read)) {
+        value["error"] = "read_rejected: only r.* and sg.* variable names are allowed";
+        return value;
+    }
+    try {
+        const auto manager = sdk::FConsoleManager::get();
+        if (!manager) { value["error"] = "console_manager_unavailable"; return value; }
+        auto* object = manager->find(std::wstring(name.begin(), name.end()));
+        if (!object) { value["error"] = "variable_missing"; return value; }
+        std::unique_lock<std::recursive_mutex> cache_lock;
+        if (cached_only) {
+            cache_lock = ConsoleReadAccess::try_lock_cache();
+            const auto access = ConsoleReadAccess::cached(object, cache_lock.owns_lock());
+            if (const auto error = wuwa_console_read::cached_access_error(access)) {
+                value["error"] = error;
+                return value;
+            }
+        } else if (!ConsoleReadAccess::available(object)) {
+            // Preserve the resolving single-variable diagnostic. Batch snapshots
+            // above never call this potentially expensive discovery path.
+            value["error"] = "sdk_numeric_accessors_unavailable";
+            return value;
+        }
+        if (object->AsCommand() != nullptr) {
+            value["error"] = "read_rejected: object is a console command";
+            return value;
+        }
+        auto* var = static_cast<sdk::IConsoleVariable*>(object);
+        const auto integer = var->GetInt();
+        const auto number = var->GetFloat();
+        if (!std::isfinite(number)) { value["error"] = "nonfinite_numeric_value"; return value; }
+        value["int"] = integer;
+        value["float"] = number;
+        value["available"] = true;
+        // The SDK declares GetFlags but does not discover/validate that virtual
+        // slot. WuWa rejected it in graphics-r1; do not probe it again.
+    } catch (const std::exception& error) {
+        value["error"] = std::string{"read_failed: "} + error.what();
+    } catch (...) { value["error"] = "read_failed"; }
+    return value;
+}
+inline Json graphics_snapshot() {
+    Json values = Json::object();
+    for (const auto name : wuwa_console_read::snapshot_names)
+        values[std::string{name}] = read_console_value(std::string{name}, true);
+    return {{"schema", 1}, {"values", std::move(values)},
+        {"getter_validation", "sdk_cached_numeric_accessors_only"},
+        {"cold_accessor_discovery", false},
+        {"flags_source", "unavailable_unverified_for_game"},
+        {"set_by_available", false}, {"settings_changed", false},
+        {"scope", "Game-thread CVar values; not per-eye values, a rendered frame, or a graphics-preset verdict."}};
+}
+
 inline std::wstring console_value_text(sdk::IConsoleVariable* var) {
     const auto f = var->GetFloat();
     const auto i = var->GetInt();
@@ -657,9 +747,16 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
                 {"dx", wuwa_steady_view::last_dx.load()}, {"dy", wuwa_steady_view::last_dy.load()},
                 {"roll", wuwa_steady_view::last_roll.load()}};
         } else if (op == "console_get") {
-            auto* var = find_console_variable(request.at("name").get<std::string>());
-            reply["int"] = var->GetInt();
-            reply["float"] = var->GetFloat();
+            const auto name = request.at("name").get<std::string>();
+            reply.update(read_console_value(name));
+            reply["name"] = name;
+            reply["getter_validation"] = "sdk_discovered_numeric_accessors";
+            reply["settings_changed"] = false;
+        } else if (op == "graphics_snapshot") {
+            if (request.contains("name") || request.contains("names") ||
+                request.contains("value") || request.contains("values"))
+                throw std::runtime_error("graphics_snapshot uses a fixed read-only variable list; no names or values accepted");
+            reply["graphics"] = graphics_snapshot();
         } else if (op == "console_set") {
             const auto name = request.at("name").get<std::string>();
             const auto seconds = request.value("seconds", 0);

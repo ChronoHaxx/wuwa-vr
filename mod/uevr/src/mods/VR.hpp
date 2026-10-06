@@ -1253,6 +1253,7 @@ private:
     uint64_t m_sightseeing_sample_ms{};
     bool m_sightseeing_valid{};
     wuwa_sightseeing::Mixer m_sightseeing_mixer;
+    wuwa_sightseeing::Readiness m_sightseeing_readiness;
     wuwa_sightseeing::PacketCounter m_sightseeing_packets;
     std::array<bool, 4> m_sightseeing_packet_owned{};
     void update_sightseeing_sample(bool synced);

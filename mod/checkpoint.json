@@ -1,48 +1,35 @@
 {
   "schema": 3,
-  "build": "cinematic-20261004",
-  "publicReleaseTag": "beta-2026-10-04-cinematic",
-  "launcherVersion": "1.0.1",
+  "build": "steam-20261006",
+  "privateCandidate": false,
+  "launcherVersion": "1.0.2",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "f9e050db26937edc0e8f59d55d7f0c7efbb3d01c28c2b13f737ad65d241e29f1",
-  "frozenPatchSha256": "d4ae518377c955642159970664a9f1d3bab2a605688900232adc4f489f013116",
-  "sourceReconstructedTree": "14d4a495e1c6534bd814c0d062a4c69373ef11ce",
-  "buildCompleted": "2026-10-04T22:17:53+0100",
+  "backendSha256": "c3e19ef50f1b5e9a28b2d09e61743381fd3ba38287f5fafd30ee0486e5eb2c2c",
+  "frozenPatchSha256": "585955b8c94b224f1e33f19945ec7b528ec3272b78131a5d151382720a679dc3",
+  "sourceReconstructedTree": "b72d161f56aa4a1a2aff80dccdd719ad48a8fb99",
+  "buildCompleted": "2026-10-06T10:22:19+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 54167862,
-    "sha256": "b0470b66bfa39a8c97e39e8181efc79118e8a646bd52732917b83e4a419d789a",
+    "bytes": 54265807,
+    "sha256": "ec5a3689ef3b7211545a3431394d508aada25ef47ce6e791fd2e8813cd35eaec",
     "public": true
   },
-  "liveAcceptance": "Owner accepted cinematic framing in simulator quest replay on screen-comfort-r1. Same framing algorithm, now default ON. Physical headset comfort remains pending. Automatic cinematic detection was unavailable because of delayed Lua require; loader repaired and offline-tested, actual story/movie recognition unverified and OFF by default. Long scene/dialogue loading, unsupported HUD refresh and flat-menu background movement remain open.",
-  "sourceIdentity": "This commit contains the exact native overlays and reconstructible patch for the backend; source ZIP is paired on the same release.",
-  "simulatorEvidence": {
-    "recording": "20261004-220346-570bc86d",
-    "publishedVideo": false,
-    "note": "68-second simulator capture: sampled cinematic shots have matching letterbox; motion sidecar incomplete after preview stopped."
+  "liveAcceptance": "Owner-reported startup, confirmed by backend activity. Headset/other-PC checks remain pending.",
+  "previousPublicRelease": {
+    "tag": "beta-2026-10-04-cinematic",
+    "backendSha256": "f9e050db26937edc0e8f59d55d7f0c7efbb3d01c28c2b13f737ad65d241e29f1"
   },
-  "launcherInstaller": {
-    "name": "WuWa-VR-Setup.exe",
-    "bytes": 10429579,
-    "sha256": "e14a7013e7c80cbcc7e73c41d000cd8f0cdd8306bdc100ad1207c4bc6d7fe638"
+  "sourceIdentity": "Renderer source/patch/build unchanged from graphics-r2; injector unchanged from tested Steam preview. Launcher 1.0.2 includes the upgrade handoff correction. See STEAM-RELEASE-20261006.md.",
+  "injector": {
+    "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
+    "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
+    "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
+    "sourceOverlay": "mod/injector/GUI"
   },
-  "launcherVerification": {
-    "componentTests": "passed",
-    "controllerTests": "passed",
-    "updateTests": "passed with local SDK and mocked installed state",
-    "offscreenWpf": "passed; no window or game launched",
-    "exactReleasePayloadInstall": "passed with compiled 1.0.1 assembly in isolated store",
-    "productionAppUpdate": "not run for this release",
-    "productionGameLaunch": "not run for this installer release"
-  },
-  "cinematicVerification": {
-    "nativeBuild": "passed; one worker",
-    "luaAutoCinemaGroups": 13,
-    "luaHudGroups": 18,
-    "luaMenuGroups": 10,
-    "defaultFraming": true,
-    "defaultAutomaticSwitching": false,
-    "headsetAcceptance": "pending"
-  }
+  "rendererBuild": "graphics-20261006-r2",
+  "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
+  "releaseTag": "beta-2026-10-06-steam",
+  "launcherSha256": "ff019d6f4e1fba3d6d692910097851103681bad1dd2eb9286e8855feca71bbaa",
+  "setupSha256": "402741c909f2a3e7a03d07e8ebc1bb44d84a24b6eab5bb38cce511339cbef282"
 }

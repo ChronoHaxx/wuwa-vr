@@ -32,3 +32,33 @@ Forward application and source comparison passed; this is not a fresh-PC
 build guarantee. Test in a separate profile, with the game closed when copying
 all supplied Lua scripts (including the companion modules) and language catalogs.
 Use the release for ordinary play.
+
+## Injector source for the Steam and graphics settings beta
+
+The native DLL alone does not fix the injector's automatic graphics-file writes.
+For the graphics-r2 renderer and Steam release, reconstruct the companion injector from
+`mod/injector/source.json`: checkout `mirudo2/Custom-UEVR-Injector` at
+`95d7eee535dda4c59cfe812e4e7942ac05da5541`, then copy the `mod/injector/GUI/`
+overlay into its `GUI/` directory. It includes the earlier local injection and
+logging reliability changes as well as the graphics-file correction.
+
+Build `GUI/Custom_UEVR_Injector.csproj` with Visual Studio MSBuild, configuration
+`Release`, platform `x64`, `/m:1` and `/p:UseSharedCompilation=false`; its target
+is .NET Framework 4.7.2. Keep existing dependency assemblies alongside the output.
+Run `dev/test_injector_graphics.ps1 -AssemblyPath <exe> -OutputRoot <inert folder>`
+using Windows PowerShell 5.1. That test loads the assembly and uses a never-shown
+form with fixture files; it does not launch a game or invoke injection.
+
+The injector suppresses automatic graphics serialization when the launcher's
+policy receipt is present. The launcher remains responsible for validating the
+receipt and migrating profiles with the game closed. Explicit injector slider
+edits are startup overrides, not live-game controls. Preserve component licensing.
+
+The Steam beta reuses the graphics-r2 renderer and extends the
+injector overlay with `Program.cs`, `TargetPathBinding.cs` and
+`Properties/AssemblyInfo.cs`. Copy the overlay recursively. Run
+`dev/test_injector_target_path.ps1 -AssemblyPath <exe> -OutputRoot <inert folder>`
+in Windows PowerShell 5.1 to check argument parsing, exact-path/instance selection
+and the passive capability marker without enumerating or injecting a live game.
+The launcher requires this marked injector before dispatching a Steam launch.
+See `docs/launch-kit/STEAM-LAUNCHER-20261006.md` for verification boundaries.

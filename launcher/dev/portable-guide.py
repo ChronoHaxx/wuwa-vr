@@ -18,7 +18,7 @@ SETUP = (
     'Extract the whole ZIP and open WuWa VR Launcher.exe. Python is included.',
     'Connect the Xbox controller to the PC and start the headset software. For the target headset check, use Quest Pro through Steam Link/SteamVR.',
     'Choose the intended build in the launcher. A baseline is selected initially; select a candidate explicitly. Check “Next Apply & launch”.',
-    'Read and acknowledge the risk notice, then Apply & launch. Accept the injector’s Windows prompt and press Play in the official game launcher.',
+    'Choose the installed game copy, then acknowledge the risk notice and Apply & launch. Steam opens the Steam version automatically; for Kuro’s launcher, press Play after accepting the injector’s Windows prompt.',
     'L3 + R3 (both stick clicks), or Insert, opens UEVR settings. Close settings to use gameplay shortcuts. Leave the launcher running for recording.',
 )
 CHECKS = (
@@ -60,7 +60,7 @@ def documents(catalog, profiles, sources, default):
           'This is unofficial code injection. Anti-cheat restrictions or an account ban are possible. No account-safety guarantee is made. [Read the risk notice](RISK.md).', '',
           '## Start', '']
     md += [f'{i}. {item}' for i, item in enumerate(SETUP, 1)]
-    compatibility = 'The standalone official launcher previously reached gameplay on the owner’s PC. Steam-store injection previously failed; Epic is untested. SteamVR headset support does not establish Steam-store compatibility. A complete check of this package on the target headset and a clean PC is still pending.'
+    compatibility = 'The standalone official launcher previously reached gameplay on the owner’s PC. The Steam route now starts through Steam and binds injection to the selected installation. Its background checks do not establish in-game compatibility: Steam injection previously failed and a new live playtest is pending. Epic remains manual and untested. SteamVR headset support is separate from Steam-store compatibility.'
     md += ['', compatibility, '', '## Included builds and supplied settings', '']
     tables = []
     for b in builds:

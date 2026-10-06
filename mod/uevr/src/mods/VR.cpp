@@ -734,6 +734,7 @@ void VR::reset_sightseeing() {
     m_sightseeing_sample_ms = 0;
     m_sightseeing_valid = false;
     m_sightseeing_mixer.reset();
+    m_sightseeing_readiness.reset();
     // Keep delivered packet counters through disabling/reinitialization so a
     // release cannot collide with an unrelated physical driver's packet number.
 }
@@ -741,17 +742,26 @@ void VR::reset_sightseeing() {
 void VR::update_sightseeing_sample(bool synced) {
     wuwa_sightseeing::Pad pad{};
     const auto mode = sightseeing_mode();
-    const bool permitted = mode != 0 && synced && !physical_gamepad_passthrough() &&
-        !wuwa_test::filter_input_slot(gamepad_slot_filter(), wuwa_sightseeing::target_slot(mode)) &&
-        !wuwa_test::motion_input_muted() && sightseeing_focused();
+    using Status = wuwa_sightseeing::Status;
+    const auto blocker = mode == 0 ? Status::Off :
+        !synced ? Status::WaitingSample :
+        physical_gamepad_passthrough() ? Status::Passthrough :
+        wuwa_test::filter_input_slot(gamepad_slot_filter(), wuwa_sightseeing::target_slot(mode)) ? Status::SlotFiltered :
+        wuwa_test::motion_input_muted() ? Status::InputMuted :
+        !sightseeing_focused() ? Status::GameUnfocused : Status::Armed;
     const auto runtime = get_runtime();
-    const bool valid = permitted && runtime && runtime->is_openxr() &&
-        m_openxr->read_sightseeing_pad(pad);
+    const bool openxr = runtime && runtime->is_openxr();
+    const bool valid = blocker == Status::Armed && openxr && m_openxr->read_sightseeing_pad(pad);
+    // OpenVR never sets synced; still explain the unsupported runtime rather
+    // than claiming its controllers simply need waking up.
+    const auto source = mode != 0 && runtime && !openxr ? Status::OpenXRRequired :
+        blocker != Status::Armed ? blocker : valid ? Status::Armed : Status::WaitingSample;
     // Finish runtime queries before taking the mutex used by XInput.
     std::scoped_lock lock{m_sightseeing_mtx};
     m_sightseeing_pad = valid ? pad : wuwa_sightseeing::Pad{};
     m_sightseeing_sample_ms = GetTickCount64();
     m_sightseeing_valid = valid;
+    m_sightseeing_readiness.sample(mode, source, m_sightseeing_sample_ms);
     if (!valid) m_sightseeing_mixer.reset();
 }
 
@@ -763,14 +773,18 @@ bool VR::apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* 
     if (!result || !state || slot != wuwa_sightseeing::target_slot(mode)) return true;
     const bool connected = *result == ERROR_SUCCESS;
     const auto physical = connected ? sightseeing_pad(state->Gamepad) : wuwa_sightseeing::Pad{};
-    const bool permitted = !physical_gamepad_passthrough() && !wuwa_test::motion_input_muted() &&
-        sightseeing_focused();
+    using Status = wuwa_sightseeing::Status;
+    const auto blocker = physical_gamepad_passthrough() ? Status::Passthrough :
+        wuwa_test::motion_input_muted() ? Status::InputMuted :
+        !sightseeing_focused() ? Status::GameUnfocused : Status::Armed;
+    const bool permitted = blocker == Status::Armed;
     const bool ui_open = g_framework->is_drawing_ui();
     {
         std::scoped_lock lock{m_sightseeing_mtx};
+        const auto now = GetTickCount64();
         const auto mixed = m_sightseeing_mixer.apply(mode, physical, connected, m_sightseeing_pad,
-            permitted && m_sightseeing_valid, m_sightseeing_sample_ms, GetTickCount64(),
-            ui_open);
+            permitted && m_sightseeing_valid, m_sightseeing_sample_ms, now, ui_open);
+        m_sightseeing_readiness.poll(mode, mixed, blocker, ui_open, now);
         // The VR left stick navigates UEVR even in treadmill mode; walking on
         // the belt must not scroll this menu. Never send that UI stick to WuWa.
         const auto delivered = ui_open ? (mixed.vr_active ? m_sightseeing_pad : wuwa_sightseeing::Pad{}) : mixed.pad;
@@ -2109,6 +2123,7 @@ void VR::on_frame() {
     if (m_sightseeing_mode.exchange(walking) != walking) {
         std::scoped_lock lock{m_sightseeing_mtx};
         m_sightseeing_mixer.reset();
+        m_sightseeing_readiness.reset();
         m_sightseeing_valid = false;
     }
 
@@ -2544,6 +2559,35 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         break;
     }
 
+    const auto draw_view_modes = [&] {
+        int presentation = is_using_mono_theatre() ? 2 : is_using_2d_screen() ? 1 : 0;
+        const char* choices[] = {"Immersive VR", "Stereo screen (3D depth)", "Mono theatre (flat 2D)"};
+        if (wuwa_ui::Combo("View", &presentation, choices, 3)) {
+            if (presentation == 2) set_mono_theatre_manually(true);
+            else {
+                set_mono_theatre_manually(false);
+                set_stereo_screen_manually(presentation == 1);
+            }
+        }
+        wuwa_ui::TextWrapped("Mono shows the same scene and HUD to both eyes. Use it for troublesome cutscenes or flat menus.");
+        wuwa_ui::TextWrapped("Hold LT + RT: hold L3 for 0.8 s for stereo screen, or click R3 for mono. Release controls before repeating.");
+        wuwa_ui::draw(*m_cinematic_framing_fix, "Match cinematic framing between eyes (default on)");
+        if (wuwa_ui::TreeNode("Automatic cutscene switching (unverified)")) {
+            if (wuwa_ui::draw(*m_auto_cinema, "Enable automatic switching"))
+                m_wuwa_controls.reset_auto_cinema();
+            wuwa_ui::draw(*m_auto_story_presentation, "Story cutscenes and dialogue");
+            wuwa_ui::TextWrapped("Off by default. Detected movies are intended to use mono; story scenes use your choice above. Recognition remains unverified. Manual view changes take priority.");
+            if (is_auto_cinema_enabled()) ImGui::TextWrapped("%s", m_wuwa_controls.auto_cinema_status().c_str());
+            ImGui::TreePop();
+        }
+        if (wuwa_ui::TreeNode("Framing and theatre details")) {
+            wuwa_ui::TextWrapped("Framing matched both eyes in the owner's simulator replay. Headset comfort and rare prerecorded movies still need testing.");
+            if (is_using_mono_theatre()) ImGui::TextWrapped("%s", wuwa_mono_native::status_text());
+            else if (is_cinematic_framing_fix_enabled()) ImGui::TextWrapped("%s", wuwa_cinematic_framing::status_text());
+            ImGui::TreePop();
+        }
+    };
+
     if (selected_page == PAGE_WUWA && wuwa_test::is_wuwa()) {
         wuwa_ui::FontScope language_font;
         // Give this long page its own bounded scrolling region. In particular,
@@ -2554,11 +2598,14 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         if (draw_wuwa) {
         m_wuwa_controls.on_draw_language();
         m_wuwa_controls.on_draw_recovery();
+        if (wuwa_ui::CollapsingHeader("View modes and cutscenes", ImGuiTreeNodeFlags_DefaultOpen))
+            draw_view_modes();
         if (wuwa_ui::CollapsingHeader("VR controllers for walking (optional)")) {
             if (wuwa_ui::draw(m_sightseeing_choice, "Walking input")) {
                 m_sightseeing_mode.store(m_sightseeing_choice.value());
                 std::scoped_lock lock{m_sightseeing_mtx};
                 m_sightseeing_mixer.reset();
+                m_sightseeing_readiness.reset();
                 m_sightseeing_valid = false;
             }
             wuwa_ui::TextWrapped("For sightseeing with Quest controllers through OpenXR. Starts off each launch. Choose First person below if wanted; your camera and aiming settings stay unchanged.");
@@ -2566,15 +2613,39 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             wuwa_ui::TextWrapped("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu = Start; left grip + Menu = View. Both stick clicks open UEVR. D-pad actions are not mapped in this walking layout.");
             wuwa_ui::TextWrapped("Wake both controllers, focus the game, then release buttons and center sticks to arm. After closing UEVR, release them again. Physical gamepad passthrough and a conflicting slot filter block VR input. Choose Off to restore normal input.");
             if (sightseeing_mode() != 0) {
-                bool fresh{};
+                using Status = wuwa_sightseeing::Status;
+                Status status{};
                 {
                     std::scoped_lock lock{m_sightseeing_mtx};
-                    const auto now = GetTickCount64();
-                    fresh = m_sightseeing_valid && now >= m_sightseeing_sample_ms &&
-                        now - m_sightseeing_sample_ms <= wuwa_sightseeing::Mixer::max_age_ms;
+                    status = m_sightseeing_readiness.read(sightseeing_mode(), GetTickCount64(), g_framework->is_drawing_ui());
                 }
-                wuwa_ui::TextWrapped(fresh ? "VR controller sample received. Release controls to arm; the selected merge slot must also be connected." :
-                    "Waiting for focused OpenXR and both active controllers. No VR movement is being added.");
+                switch (status) {
+                case Status::Armed:
+                    wuwa_ui::TextWrapped("Armed: VR controls are being delivered to the selected game controller slot."); break;
+                case Status::MenuReady:
+                    wuwa_ui::TextWrapped("Armed for UEVR menu navigation. Game input is paused while this menu is open; release controls after closing it."); break;
+                case Status::WaitingRelease:
+                    wuwa_ui::TextWrapped("Waiting for release: let go of all VR buttons and triggers, and center both sticks to arm."); break;
+                case Status::MissingSlot:
+                    wuwa_ui::TextWrapped("The selected treadmill / Xbox slot is disconnected. Connect it or choose its connected slot; check launcher Troubleshooting > Controller check."); break;
+                case Status::Passthrough:
+                    wuwa_ui::TextWrapped("VR walking input is blocked by Physical gamepad passthrough. Turn passthrough off to use VR controllers."); break;
+                case Status::SlotFiltered:
+                    wuwa_ui::TextWrapped("VR walking input is blocked by the controller slot filter. Allow the selected walking slot."); break;
+                case Status::InputMuted:
+                    wuwa_ui::TextWrapped("VR walking input is paused by the diagnostic motion-input mute."); break;
+                case Status::GameUnfocused:
+                    wuwa_ui::TextWrapped("Waiting for game focus. Select the game window, then release VR controls to arm."); break;
+                case Status::OpenXRRequired:
+                    wuwa_ui::TextWrapped("VR walking input requires OpenXR. The current runtime is not OpenXR."); break;
+                case Status::StaleSample:
+                    wuwa_ui::TextWrapped("VR controller updates have stopped. No VR input is being added; wake both controllers and focus the game."); break;
+                case Status::WaitingPoll:
+                    wuwa_ui::TextWrapped("VR controllers are available. Waiting for the game to poll the selected controller slot before checking readiness."); break;
+                case Status::WaitingSample:
+                    wuwa_ui::TextWrapped("Waiting for focused OpenXR and both active controllers. No VR input is being added."); break;
+                case Status::Off: break;
+                }
             }
         }
         if (wuwa_ui::CollapsingHeader("Diorama mode (optional)")) {
@@ -2594,7 +2665,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             if (get_runtime()->is_openxr()) m_openxr->draw_hand_demo();
             else wuwa_ui::TextWrapped("The hand demo needs OpenXR with optical hand tracking. Xbox gameplay is unchanged.");
         }
-        if (wuwa_ui::CollapsingHeader("Xbox shortcuts", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (wuwa_ui::CollapsingHeader("Xbox shortcuts")) {
             m_wuwa_controls.on_draw_shortcuts();
         }
         if (wuwa_ui::CollapsingHeader("First person")) {
@@ -2603,13 +2674,15 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         if (wuwa_ui::CollapsingHeader("Camera and gameplay controls")) {
             m_wuwa_controls.on_draw_ui();
         }
-        if (wuwa_ui::CollapsingHeader("HUD placement and visibility", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (wuwa_ui::CollapsingHeader("HUD placement and visibility")) {
             m_overlay_component.on_draw_game_ui_controls();
         }
         wuwa_ui::TextWrapped("Camera / HUD layouts: LuaLoader > Script UI > WuWa VR comfort controls.");
         if (wuwa_ui::CollapsingHeader("Recording and privacy")) {
             m_wuwa_controls.on_draw_recording();
         }
+        if (wuwa_ui::CollapsingHeader("Advanced compatibility and diagnostics")) {
+        wuwa_ui::TextWrapped("For troubleshooting. These controls can change rendering or input; opening this section changes nothing.");
         if (wuwa_ui::CollapsingHeader("Developer playtest checklist"))
             wuwa_playtest::draw_controls(Framework::get_persistent_dir());
         if (wuwa_ui::CollapsingHeader("Stereo rendering compatibility")) {
@@ -2651,7 +2724,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         const bool stereo_comparison_running=wuwa_test::stereo_candidate_lease.active(GetTickCount64());
         if (stereo_comparison_running) wuwa_ui::TextWrapped("An automated stereo comparison is active. These three settings return to your choices when it ends (at most 60 seconds).");
         ImGui::BeginDisabled(stereo_comparison_running);
-        wuwa_ui::draw(*m_wuwa_planar_eye_parameters,"Select reflection parameters for each eye (candidate)");
+        wuwa_ui::draw(*m_wuwa_planar_eye_parameters,"Reflection projection correction");
         wuwa_ui::TextWrapped("With Native Stereo Fix and Use Same Stereo Pass on, keeps the source eye's projection for supported custom reflection captures. With Native Stereo Fix off, selects verified two-eye atlas parameters. Visual acceptance is pending.");
         wuwa_ui::draw(*m_wuwa_stereo_translucency,"Full-resolution translucent materials in stereo (candidate)");
         wuwa_ui::TextWrapped("Uses the game's full-resolution translucency path for ordinary two-eye views. Compare Lynae, Mornye and Iuno in both eyes. May cost performance. Requires Native Stereo with Native Stereo Fix and Extreme Compatibility off; other renderers keep their normal behavior.");
@@ -2688,13 +2761,13 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         wuwa_ui::draw(*m_wuwa_lgui_redirect,"Extract game HUD into the VR panel");
         wuwa_ui::TextWrapped("On uses our LGUI capture. Off shows the game's original HUD in the eye images. This does not hide the UEVR settings panel.");
         wuwa_ui::draw(*m_wuwa_lgui_menu_redirect,"Extract additional game menus (experimental)");
-        wuwa_ui::TextWrapped("Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.");
+        wuwa_ui::TextWrapped("Moves supported menus into the VR panel, including with Native Stereo Fix on. The supplied profile enables this. Some flat backgrounds still move separately; mono theatre is the manual fallback.");
         wuwa_ui::draw(*m_wuwa_native_frame_timing,"Native Stereo Fix frame timing (experimental)");
-        wuwa_ui::TextWrapped("Starts off. Only affects Native Stereo Fix with OpenXR; requires a headset timing comparison before treating it as a fix.");
+        wuwa_ui::TextWrapped("The supplied profile enables this for Native Stereo Fix with OpenXR. Headset timing acceptance is still limited; disable only for a deliberate comparison.");
         wuwa_ui::draw(*m_wuwa_early_stereo_views,"Early stereo view setup (experimental)");
         wuwa_ui::TextWrapped("Requires Native Stereo Fix and Use Same Stereo Pass. Applies the pass correction before game-side view setup. Turn off to return to the previous correction. Culling and lighting acceptance is pending.");
-        wuwa_ui::draw(*m_wuwa_stereo_base_pose,"Keep stereo camera transitions together (candidate)");
-        wuwa_ui::TextWrapped("Uses one game camera pose for both eyes during the same frame, while preserving headset movement and eye separation. Requires Native Stereo Fix. Menu and ultimate transitions still need visual acceptance; this does not repair foliage.");
+        wuwa_ui::draw(*m_wuwa_stereo_base_pose,"Keep stereo camera transitions together");
+        wuwa_ui::TextWrapped("Uses one game camera pose for both eyes during the same frame, while preserving headset movement and eye separation. Requires Native Stereo Fix. The owner confirmed the ultimate return-to-gameplay fix. Other scene transitions remain under test; this does not repair foliage.");
         ImGui::Separator();
         wuwa_ui::TextWrapped("Live input tests. Change one option, close this menu, then repeat the same action.");
         wuwa_ui::draw(*m_controllers_allowed,"Allow VR motion-controller input");
@@ -2748,6 +2821,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         wuwa_test::draw_controls();
         }
         }
+        }
         ImGui::EndChild();
         ImGui::PopStyleVar();
     }
@@ -2770,7 +2844,9 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         ImGui::Text((std::string{"Runtime Information ("} + get_runtime()->name().data() + ")").c_str());
 
         m_desktop_fix->draw("Desktop Spectator View");
-        ImGui::SameLine();
+        if (wuwa_test::is_wuwa()) {
+            wuwa_ui::TextWrapped("Screen views and cutscene options are in VR > WuWa Controls > View modes and cutscenes.");
+        } else {
         bool effective_screen = is_using_2d_screen();
         if (ImGui::Checkbox(wuwa_l10n::label("Screen view on / off").c_str(), &effective_screen))
             set_stereo_screen_manually(effective_screen);
@@ -2791,6 +2867,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             if (is_cinematic_framing_fix_enabled() && !is_using_mono_theatre())
                 ImGui::TextWrapped("%s", wuwa_cinematic_framing::status_text());
             ImGui::TreePop();
+        }
         }
 
         ImGui::TextWrapped("Render Resolution (per-eye): %d x %d", get_runtime()->get_width(), get_runtime()->get_height());

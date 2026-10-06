@@ -1,8 +1,10 @@
 # Build/profile switching shared by the command line and the WuWa launcher.
 # Profiles are immutable snapshots; switching never overwrites a saved snapshot.
 Set-StrictMode -Version 2
+. (Join-Path $PSScriptRoot 'WuWaGraphicsPolicy.ps1')
+. (Join-Path $PSScriptRoot 'WuWaSteamStart.ps1')
 
-$script:WuWaManaged = @('config.txt','wuwa-profile-defaults.txt','user_script.txt','cameras.txt','imgui.ini','cvars_standard.txt','cvars_data.txt','scripts','plugins')
+$script:WuWaManaged = @('config.txt','wuwa-profile-defaults.txt','user_script.txt','cameras.txt','imgui.ini','cvars_standard.txt','cvars_data.txt','wuwa-graphics-policy.json','scripts','plugins')
 
 # Writable state location. The development workspace keeps its existing
 # extracted\build-manager folder. A portable package (app\portable.json) keeps
@@ -39,15 +41,20 @@ function Get-WuWaBuildContext {
 # default path. 'manual' means the player presses Play in Steam/Epic/etc.
 function Get-WuWaLaunchSettings {
     param($Context)
-    $result = [pscustomobject]@{ Mode = 'launcher'; Launcher = '' }
+    $result = [pscustomobject]@{ Mode = 'launcher'; Launcher = ''; Shipping = '' }
     if (-not (Test-Path -LiteralPath $Context.Settings -PathType Leaf)) { return $result }
     $saved = Get-Content -LiteralPath $Context.Settings -Raw -Encoding UTF8 | ConvertFrom-Json
     $mode = ''
     if ($saved.PSObject.Properties['gameStart']) { $mode = [string]$saved.gameStart }
     if ($mode -eq 'manual') { $result.Mode = 'manual'; return $result }
-    if ($mode -and $mode -ne 'launcher') { throw 'Launcher settings name an unknown game start method. Choose the game location again.' }
+    if ($mode -and $mode -notin @('launcher','steam')) { throw 'Launcher settings name an unknown game start method. Choose the game location again.' }
     $path = ''
     if ($saved.PSObject.Properties['gameLauncher']) { $path = [string]$saved.gameLauncher }
+    if ($mode -eq 'steam') {
+        $game = Get-WuWaSteamGame -Bootstrap $path
+        $result.Mode = 'steam'; $result.Launcher = $game.Bootstrap; $result.Shipping = $game.Shipping
+        return $result
+    }
     if ($path) {
         if (-not [IO.Path]::IsPathRooted($path) -or $path -match '["\r\n]' -or [IO.Path]::GetFileName($path) -ne 'launcher.exe' -or -not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "The saved game launcher was not found: $path. Choose the game location again, or select 'I will start the game myself'."
@@ -268,11 +275,21 @@ function Initialize-WuWaTimingDefault {
 }
 
 function New-WuWaCompatibleProfile {
-    param([string]$Before, [string]$Supplied, [string]$Destination)
+    param([string]$Before, [string]$Supplied, [string]$Destination, [switch]$DiscardGraphicsPolicyReceipt)
     # Keep camera, graphics, CVars and personal extra files. Only the release's
     # named scripts/plugins and its defaults marker are updated. The original
     # verified snapshot remains immutable for rollback.
     Copy-WuWaManagedProfile $Before $Destination
+    if ($DiscardGraphicsPolicyReceipt) {
+        # An older package helper cannot remove a receipt it does not know.
+        # Its rollback may leave that receipt beside restored legacy graphics.
+        # Discard only this staged copy, never the immutable before-snapshot.
+        $receipt = Join-Path $Destination 'wuwa-graphics-policy.json'
+        if (Test-Path -LiteralPath $receipt) {
+            if (Test-Path -LiteralPath $receipt -PathType Container) { throw 'Unexpected graphics policy receipt directory in the staged profile.' }
+            Remove-Item -LiteralPath $receipt -Force
+        }
+    }
     foreach ($name in @('scripts','plugins','wuwa-profile-defaults.txt')) {
         $source = Join-Path $Supplied $name
         if (-not (Test-Path -LiteralPath $source)) { continue }
@@ -299,6 +316,10 @@ function Select-WuWaBuild {
         $build = @($catalog | Where-Object id -eq $Id)
         if ($build.Count -ne 1) { throw 'Unknown or duplicate build ID.' }
         $build = $build[0]
+        $graphicsPolicy = if ($build.PSObject.Properties['graphicsPolicy']) { [string]$build.graphicsPolicy } else { '' }
+        # Reject malformed receipts before staging can discard an orphaned
+        # marker left by a genuinely policy-unaware predecessor.
+        $null = Test-WuWaGraphicsPolicyNeeded $Context.Profile $graphicsPolicy
         $runtime = Assert-WuWaBuildFiles $Context $build
         $state = Get-WuWaBuildState $Context
         $oldRuntime = Get-WuWaSelectedRuntime $Context
@@ -308,7 +329,8 @@ function Select-WuWaBuild {
         if (-not $ResetToSupplied -and $saved -and (Test-Path -LiteralPath $saved.Value)) { $source = $saved.Value }
         if (-not (Test-Path -LiteralPath (Join-Path $source 'config.txt'))) { throw 'Target profile is missing.' }
         if (-not $ResetToSupplied -and $state.selected -eq $Id -and $oldRuntime -eq $runtime -and
-            -not (Test-WuWaTimingDefaultNeeded $Context.Profile)) {
+            -not (Test-WuWaGraphicsPolicyNeeded $Context.Profile $graphicsPolicy) -and
+            ($graphicsPolicy -cin $script:WuWaGraphicsPolicyNames -or -not (Test-WuWaTimingDefaultNeeded $Context.Profile))) {
             # Repair state written by older helpers: a past restore is no longer
             # current evidence once a mod profile is selected again.
             if ($state.PSObject.Properties['restoredOriginalAt'] -and $state.restoredOriginalAt) {
@@ -339,13 +361,24 @@ function Select-WuWaBuild {
             $oldId -and $build.PSObject.Properties['settingsFrom'] -and
             @($build.settingsFrom | Where-Object id -eq $oldId).Count -eq 1 -and
             (Test-Path -LiteralPath (Join-Path $before 'config.txt') -PathType Leaf)) {
-            $source = New-WuWaCompatibleProfile -Before $before -Supplied $source -Destination (Join-Path $backup 'upgraded-profile')
+            # Only policy-aware predecessors can carry a meaningful receipt.
+            # For a one-build portable package, settingsFrom supplies that
+            # predecessor metadata after Get-WuWaPreviousBuildId verifies its hash.
+            $previous = @($catalog | Where-Object id -eq $oldId)
+            if ($previous.Count -ne 1) { $previous = @($build.settingsFrom | Where-Object id -eq $oldId) }
+            $previousHadPolicy = $previous.Count -eq 1 -and $previous[0].PSObject.Properties['graphicsPolicy'] -and
+                $previous[0].graphicsPolicy -cin $script:WuWaGraphicsPolicyNames
+            $discardReceipt = $graphicsPolicy -cin $script:WuWaGraphicsPolicyNames -and -not $previousHadPolicy
+            $source = New-WuWaCompatibleProfile -Before $before -Supplied $source -Destination (Join-Path $backup 'upgraded-profile') -DiscardGraphicsPolicyReceipt:$discardReceipt
         }
         Assert-WuWaProfileIdle
         try {
             if (-not $profileExisted) { New-Item -ItemType Directory -Path $Context.Profile -Force | Out-Null }
             Set-WuWaManagedProfile $source $Context.Profile
-            Initialize-WuWaTimingDefault $Context.Profile
+            Invoke-WuWaGraphicsPolicy -Profile $Context.Profile -Policy $graphicsPolicy
+            # The opt-in policy supplies timing once and preserves subsequent
+            # edits, including removing it. Legacy packages keep their behavior.
+            if (-not $graphicsPolicy) { Initialize-WuWaTimingDefault $Context.Profile }
             $injectorLines = @()
             if ($injectorExisted) { $injectorLines = @(Get-Content -LiteralPath (Join-Path $before 'injector_config.txt') -Encoding UTF8 | Where-Object { $_ -notmatch '^custom_var_(urvr_folder|last_pid|auto_focus|auto_inject|auto_close)=' }) }
             $injectorLines += @(('custom_var_urvr_folder=' + $runtime), 'custom_var_last_pid=0', 'custom_var_auto_focus=0', 'custom_var_auto_inject=1', 'custom_var_auto_close=1')

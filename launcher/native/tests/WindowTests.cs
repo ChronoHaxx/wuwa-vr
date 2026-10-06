@@ -156,13 +156,13 @@ public static class WindowTests
                     case "/api/stop": Stops++; return Reply(new { ok = true });
                     case "/api/settings":
                         var settings = Json.Read<Dictionary<string, object>>(request.Content.ReadAsStringAsync().GetAwaiter().GetResult());
-                        if (AllowGameSettings && settings.Count == 2 && Json.Text(settings, "gameStart") == "launcher")
+                        if (AllowGameSettings && settings.Count == 2 && (Json.Text(settings, "gameStart") == "launcher" || Json.Text(settings, "gameStart") == "steam"))
                         {
                             GameSettingsWrites++;
                             if (RejectGameSettings) return Reply(new { error = "Fixture game choice rejected" }, HttpStatusCode.BadRequest);
-                            string launcher = Json.Text(settings, "gameLauncher");
-                            Status["game"] = new Dictionary<string, object> { { "saved", true }, { "mode", "launcher" }, { "launcher", launcher }, { "problem", "" } };
-                            if (SettingsFile != null) Json.Save(SettingsFile, new { gameStart = "launcher", gameLauncher = launcher });
+                            string launcher = Json.Text(settings, "gameLauncher"), mode = Json.Text(settings, "gameStart");
+                            Status["game"] = new Dictionary<string, object> { { "saved", true }, { "mode", mode }, { "launcher", launcher }, { "problem", "" } };
+                            if (SettingsFile != null) Json.Save(SettingsFile, new { gameStart = mode, gameLauncher = launcher });
                             return Reply(new { ok = true });
                         }
                         Check(AllowLaunch && settings.Count == 1 && Json.Flag(settings, "riskAcknowledged"), "unexpected settings write: only explicit launch risk acceptance is supported");
@@ -232,11 +232,11 @@ public static class WindowTests
         public readonly HelperHttp Http;
         public readonly NoDownload Downloads = new NoDownload();
         public readonly Installed A, B;
-        public Fixture(string root, bool install = true)
+        public Fixture(string root, bool install = true, bool oldSelectedHelper = false)
         {
             string folder = Path.Combine(root, "window-ui", Guid.NewGuid().ToString("N"));
             Store = new PackageStore(Path.Combine(folder, "manager"));
-            if (install) { A = AddCandidate(folder, "a"); B = AddCandidate(folder, "b"); }
+            if (install) { A = AddCandidate(folder, "a"); B = AddCandidate(folder, "b", !oldSelectedHelper); }
             string data = Path.Combine(folder, "backend");
             Json.Save(Path.Combine(data, "settings.json"), new { gameStart = "manual", gameLauncher = "" });
             Json.Save(Path.Combine(data, "launcher.json"), new { url = "http://127.0.0.1:34671/", pid = int.MaxValue });
@@ -252,7 +252,7 @@ public static class WindowTests
             Set(Window, "status", Http.Status);
             Invoke(Window, "ShowStatus"); Offscreen(Window);
         }
-        Installed AddCandidate(string folder, string suffix)
+        Installed AddCandidate(string folder, string suffix, bool steamSupport = true)
         {
             string id = "candidate-window-" + suffix, build = "window-" + suffix;
             var files = new Dictionary<string, byte[]> {
@@ -261,6 +261,11 @@ public static class WindowTests
                 { "app/dev/wuwa-builds.json", Encoding.UTF8.GetBytes("{}") },
                 { "app/portable.json", Encoding.UTF8.GetBytes(Json.Write(new { packageId = "wuwa-vr-launcher-" + id, defaultBuild = build })) }
             };
+            if (steamSupport)
+            {
+                files.Add("app/dev/wuwa_game_start.py", Encoding.UTF8.GetBytes("# inert Steam identity fixture"));
+                files.Add("app/dev/WuWaSteamStart.ps1", Encoding.UTF8.GetBytes("# inert Steam worker fixture"));
+            }
             var hashes = new Dictionary<string, string>();
             foreach (var item in files)
                 using (var sha = System.Security.Cryptography.SHA256.Create()) hashes[item.Key] = BitConverter.ToString(sha.ComputeHash(item.Value)).Replace("-", "").ToLowerInvariant();
@@ -347,6 +352,79 @@ public static class WindowTests
                 f.Http.RejectGameSettings = false; Click(w, Button(w, "retryConnection"));
                 Check(f.Http.GameSettingsWrites == 2 && f.Store.State.pendingLauncherPath == null, "path retry failed to consume confirmed pending intent");
                 Console.WriteLine("PASS WINDOW rejected native path stays pending across disk reload and succeeds only after explicit retry (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; f.Http.AllowGameSettings = true;
+                string library = Path.Combine(f.Store.Root, "steam-library"), install = Path.Combine(library, "steamapps", "common", "Wuthering Waves");
+                string launcher = Path.Combine(install, "Wuthering Waves.exe"), shipping = Path.Combine(install, "Client", "Binaries", "Win64", "Client-Win64-Shipping.exe");
+                Directory.CreateDirectory(Path.GetDirectoryName(shipping));
+                File.WriteAllText(launcher, "Inert Steam bootstrap; never execute."); File.WriteAllText(shipping, "Inert game; never execute.");
+                File.WriteAllText(Path.Combine(library, "steamapps", "appmanifest_3513350.acf"), "\"AppState\" { \"appid\" \"3513350\" \"installdir\" \"Wuthering Waves\" }");
+                string official = Path.Combine(f.Store.Root, "official-game", "launcher.exe"); Directory.CreateDirectory(Path.GetDirectoryName(official)); File.WriteAllText(official, "Inert official launcher.");
+                Set(w, "gameChoicesOverride", new Func<CancellationToken, Task<GameDiscovery.Result>>(c => Task.FromResult(new GameDiscovery.Result {
+                    Message = "gameMultiple", Choices = new List<GameDiscovery.Choice> {
+                        new GameDiscovery.Choice { Mode = "launcher", Path = official }, new GameDiscovery.Choice { Mode = "steam", Path = launcher } } })));
+                Click(w, Button(w, "browse"));
+                Check(Field<StackPanel>(w, "gameLocationOptions").Visibility == Visibility.Visible && Field<ComboBox>(w, "gameLocations").Items.Count == 2, "Change did not expose both launch routes");
+                Check(!Button(w, "useGameLocation").IsEnabled && f.Http.GameSettingsWrites == 0 && f.Store.State.pendingLauncherPath == null, "opening ambiguous choices applied a route");
+                Field<ComboBox>(w, "gameLocations").SelectedIndex = 1;
+                Click(w, Button(w, "useGameLocation"));
+                Check(f.Http.GameSettingsWrites == 0 && new PackageStore(f.Store.Root).State.pendingLauncherPath == launcher, "disconnected Steam selection not retained durably");
+                var restarted = new PackageStore(f.Store.Root); Set(w, "store", restarted);
+                Set(w, "discovery", null); Set(w, "status", new Dictionary<string, object>()); Load(w);
+                Check(f.Http.GameSettingsWrites == 1 && restarted.State.pendingLauncherPath == null && Json.Text(Json.Child(f.Http.Status, "game"), "mode") == "steam", "reloaded choice did not post Steam mode exactly once");
+                Check(Json.Text(Json.Child(f.Http.Status, "game"), "launcher") == launcher && Field<TextBlock>(w, "gameHint").Text == new Strings()["gameSteamSaved"], "Steam path or explanation incorrect");
+                Connect(w); Check(f.Http.GameSettingsWrites == 1, "Steam selection repeated on reconnect");
+                Await(w, "ChooseLauncher", official, CancellationToken.None);
+                Check(f.Http.GameSettingsWrites == 2 && Json.Text(Json.Child(f.Http.Status, "game"), "mode") == "launcher", "explicit switch back to official kept Steam mode");
+                Check(f.Http.Launches == 0, "choosing installation launched the game");
+                Console.WriteLine("PASS WINDOW explicit Steam/official picker, disconnected persistence and one-time reloaded Steam selection (inert files and fake HTTP only)");
+            }
+            foreach (bool freshInstall in new[] { false, true })
+            using (var f = new Fixture(root, true, true))
+            {
+                var w = f.Window; f.Http.AllowGameSettings = true;
+                f.A.release.created = "2026-10-04T00:00:00Z";
+                var versions = Field<ComboBox>(w, "releases"); versions.Items.Clear();
+                versions.Items.Add(f.B.release); versions.Items.Add(f.A.release); versions.SelectedItem = f.B.release;
+                if (freshInstall)
+                {
+                    f.Store.State.installed.Clear(); f.Store.State.selected = null; f.Store.State.previous = null; f.Store.Save();
+                    versions.SelectedItem = f.A.release; Invoke(w, "PopulateInstalled"); Invoke(w, "ShowStatus");
+                }
+                else Connect(w);
+                string install = Path.Combine(f.Store.Root, "steamapps", "common", "Wuthering Waves");
+                string bootstrap = Path.Combine(install, "Wuthering Waves.exe");
+                string shipping = Path.Combine(install, "Client", "Binaries", "Win64", "Client-Win64-Shipping.exe");
+                Directory.CreateDirectory(Path.GetDirectoryName(shipping)); File.WriteAllText(bootstrap, "Inert bootstrap."); File.WriteAllText(shipping, "Inert shipping.");
+                File.WriteAllText(Path.Combine(f.Store.Root, "steamapps", "appmanifest_3513350.acf"), "\"AppState\" { \"appid\" \"3513350\" \"installdir\" \"Wuthering Waves\" }");
+                f.Http.RejectGameSettings = true; // An older helper cannot understand Steam.
+                Await(w, "ChooseLauncher", bootstrap, CancellationToken.None);
+                Check(f.Http.GameSettingsWrites == 0 && f.Store.State.pendingLauncherPath == bootstrap, "Steam selection contacted old/no helper or lost pending intent");
+                Check(versions.SelectedItem == f.A.release && Field<Expander>(w, "advancedPanel").IsExpanded, "pending Steam did not offer the newer package in step 02");
+                Check(Field<TextBlock>(w, "gameHint").Text == new Strings()["gameSteamUpdateRequired"], "pending upgrade explanation missing");
+                if (!freshInstall)
+                {
+                    Check(Field<bool>(w, "connectionReady") && Field<Border>(w, "connectionPanel").Visibility == Visibility.Collapsed, "valid old helper presented as disconnected");
+                    Check(Json.Text(Json.Child(f.Http.Status, "game"), "mode") == "manual", "old helper settings were changed before update");
+                    var restarted = new PackageStore(f.Store.Root); Set(w, "store", restarted);
+                    typeof(HelperHttp).GetField("store", PrivateInstance).SetValue(f.Http, restarted);
+                    Set(w, "discovery", null); Connect(w);
+                    Check(f.Http.GameSettingsWrites == 0 && restarted.State.pendingLauncherPath == bootstrap && Field<bool>(w, "connectionReady"), "pending Steam restart treated old helper as failed connection");
+                    versions.SelectedItem = f.B.release; Field<CheckBox>(w, "risk").IsChecked = true;
+                    Check(!Field<Button>(w, "launchButton").IsEnabled, "unsupported old package could launch with pending Steam choice");
+                    versions.SelectedItem = f.A.release;
+                }
+                Field<CheckBox>(w, "compatible").IsChecked = true;
+                f.Http.RejectGameSettings = false;
+                Click(w, Field<Button>(w, "launchButton"));
+                var applied = Field<PackageStore>(w, "store");
+                Check(applied.Selected.release.id == f.A.release.id && f.Http.GameSettingsWrites == 1 && Json.Text(Json.Child(f.Http.Status, "game"), "mode") == "steam", "new package did not apply Steam intent exactly once");
+                Check(applied.State.pendingLauncherPath == null && new PackageStore(applied.Root).State.pendingLauncherPath == null, "confirmed Steam intent remained queued");
+                Check(f.Http.Launches == 0 && f.Http.RiskAcknowledgements == 0, "installation launched or acknowledged launch automatically");
+                Connect(w); Check(f.Http.GameSettingsWrites == 1, "post-update reconnect reapplied Steam choice");
+                Console.WriteLine("PASS WINDOW " + (freshInstall ? "fresh Steam choose/install/launch separation" : "old helper stays connected while Steam waits for package update") + " (inert ZIP/paths and fake HTTP only)");
             }
             using (var f = new Fixture(root))
             {

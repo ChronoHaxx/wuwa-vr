@@ -91,6 +91,21 @@ VERIFY_RESULT: dict = {}
 SERVER = None
 PLAYTEST = None
 PLAYTEST_LOCK = threading.Lock()
+INCIDENTS = None
+INCIDENTS_LOCK = threading.Lock()
+
+
+def incident_service():
+    """Construct only; the helper lifecycle owns the read-only sampling worker."""
+    global INCIDENTS
+    with INCIDENTS_LOCK:
+        if INCIDENTS is None:
+            spec = importlib.util.spec_from_file_location('wuwa_incident', config().app / 'dev/wuwa_incident.py')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            INCIDENTS = module.Collector(config().profile, config().data / 'incidents',
+                lambda: module.package_identity(config().app, config().data), redact=redact)
+        return INCIDENTS
 
 
 def playtest_service():
@@ -339,7 +354,18 @@ def clean_icon_path(value):
     return re.sub(r",\s*-?\d+$", "", value).strip('"')
 
 
-def detect_games(registry=registry_entries, epic=epic_entries, default=r"C:\Program Files\Wuthering Waves\launcher.exe"):
+def game_start_module():
+    spec = importlib.util.spec_from_file_location('wuwa_game_start', Path(__file__).with_name('wuwa_game_start.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def validate_steam_launcher(path):
+    return game_start_module().validate_steam(path)
+
+
+def detect_games(registry=registry_entries, epic=epic_entries, default=r"C:\Program Files\Wuthering Waves\launcher.exe", steam=None):
     """Candidate ways to start the game, best first. Paths are only suggestions."""
     found, seen = [], set()
 
@@ -350,8 +376,12 @@ def detect_games(registry=registry_entries, epic=epic_entries, default=r"C:\Prog
             found.append({"kind": kind, "label": label, "path": str(path)})
     for entry in registry():
         location = entry.get("InstallLocation", "")
-        if entry.get("key", "").startswith("Steam App "):
-            add("steam", "Steam installation detected. Injection previously failed and has not been retested.", location)
+        if entry.get("key", "").lower().startswith("steam app "):
+            if entry.get("key", "").lower() == "steam app 3513350" and location:
+                try:
+                    add("steam", "Steam Wuthering Waves (VR compatibility unverified)", validate_steam_launcher(str(Path(location) / "Wuthering Waves.exe")))
+                except ValueError:
+                    pass
             continue
         icon = clean_icon_path(entry.get("DisplayIcon", ""))
         candidates = [Path(icon)] if icon.lower().endswith("launcher.exe") else []
@@ -365,6 +395,11 @@ def detect_games(registry=registry_entries, epic=epic_entries, default=r"C:\Prog
         add("epic", "Epic installation detected. Injection is untested.", entry["location"])
     if Path(default).is_file():
         add("official", "Official Wuthering Waves launcher", Path(default))
+    for candidate in (game_start_module().steam_candidates() if steam is None else steam()):
+        try:
+            add("steam", "Steam Wuthering Waves (VR compatibility unverified)", validate_steam_launcher(candidate))
+        except ValueError:
+            pass
     return found
 
 
@@ -408,9 +443,22 @@ def game_status():
             launcher = validate_launcher(launcher)
         except ValueError as error:
             problem = str(error)
+    elif mode == "steam":
+        try:
+            launcher = validate_steam_launcher(launcher)
+        except ValueError as error:
+            problem = str(error)
     elif mode != "manual":
-        official = next((d for d in detected if d["kind"] == "official"), None)
-        mode, launcher = ("launcher", official["path"]) if official else ("manual", "")
+        if "gameStart" in saved:
+            problem = "The saved game start method is unknown. Choose an installation again."
+        else:
+            supported = [d for d in detected if d["kind"] in ("official", "steam")]
+            mode, launcher = "manual", ""
+            if len(supported) == 1:
+                mode = "steam" if supported[0]["kind"] == "steam" else "launcher"
+                launcher = supported[0]["path"]
+            elif len(supported) > 1:
+                problem = "More than one installation was found. Choose which Wuthering Waves installation to launch."
     return {"mode": mode, "launcher": launcher, "saved": "gameStart" in saved, "problem": problem, "detected": detected}
 
 
@@ -506,6 +554,13 @@ def run_build(action, build_id=None, reset=False):
     if result.returncode:
         raise OperationError(result.returncode, last_error_line(text) or "The operation failed.")
     return text
+
+
+def graphics_snapshot():
+    spec = importlib.util.spec_from_file_location('wuwa_graphics', config().app / 'dev/wuwa_graphics.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.read_live_graphics(config().profile, config().app / 'dev/wuwa-test.py')
 
 
 class OperationError(RuntimeError):
@@ -710,11 +765,12 @@ def begin_job(kind, message, operation, prepare=None):
 
 def open_folder(which):
     folders = {"data": config().data, "logs": config().logs, "package": config().package, "profile": config().profile,
-               "recordings": config().data / "recordings", "comparisons": config().data / "comparisons"}
+               "recordings": config().data / "recordings", "comparisons": config().data / "comparisons",
+               "incidents": config().data / "incidents"}
     folder = folders.get(which)
     if folder is None:
         raise ValueError("Unknown folder.")
-    if which in ("data", "logs", "recordings", "comparisons"):
+    if which in ("data", "logs", "recordings", "comparisons", "incidents"):
         folder.mkdir(parents=True, exist_ok=True)
     if not folder.is_dir():
         raise ValueError("That folder does not exist yet.")
@@ -898,6 +954,18 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/playtest':
                 page = (config().app / 'dev/wuwa-playtest.html').read_text(encoding='utf-8').replace('__TOKEN__', TOKEN)
                 return self.reply(200, page.encode('utf-8'), 'text/html; charset=utf-8')
+            if path in ('/api/incidents', '/api/incidents/report'):
+                if self.headers.get('X-WuWa-Token') != TOKEN:
+                    return self.reply(403, {'error': 'Open diagnostics from this launcher.'})
+                service = incident_service()
+                if path == '/api/incidents':
+                    return self.reply(200, service.snapshot())
+                query = parse_qs(urlparse(self.path).query)
+                return self.reply(200, service.report(query.get('id', [''])[0]))
+            if path == '/api/graphics':
+                if self.headers.get('X-WuWa-Token') != TOKEN:
+                    return self.reply(403, {'error': 'Open diagnostics from this launcher.'})
+                return self.reply(200, json.loads(run_build('GraphicsStatus')))
             if path in ('/api/playtest', '/api/playtest/report', '/api/playtest/audio'):
                 if self.headers.get('X-WuWa-Token') != TOKEN:
                     return self.reply(403, {'error': 'Open playtests from this launcher.'})
@@ -986,6 +1054,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(500, {"error": str(error)})
 
     def post_action(self, path, body):
+        if path == '/api/graphics/read':
+            if body:
+                raise ValueError('The graphics reader accepts no settings or commands.')
+            return graphics_snapshot()
+        if path == '/api/incidents/save':
+            if set(body) - {'note', 'event_ago_seconds'}:
+                raise ValueError('Unknown incident field')
+            return incident_service().save(body.get('note', ''), body.get('event_ago_seconds', 0))
         if path.startswith('/api/playtest/'):
             return playtest_service().action(path.removeprefix('/api/playtest/'), body)
         if path == '/api/language':
@@ -1017,6 +1093,8 @@ class Handler(BaseHTTPRequestHandler):
                     changes.update(gameStart="manual", gameLauncher="")
                 elif body["gameStart"] == "launcher":
                     changes.update(gameStart="launcher", gameLauncher=validate_launcher(body.get("gameLauncher")))
+                elif body["gameStart"] == "steam":
+                    changes.update(gameStart="steam", gameLauncher=validate_steam_launcher(body.get("gameLauncher")))
                 else:
                     raise ValueError("Choose how the game is started.")
             if not changes:
@@ -1136,9 +1214,10 @@ def self_check():
     check("package description", info.get("schema") == 1, redact(app / "portable.json"))
     for name in ("dev/wuwa-builds.json", "dev/wuwa-player.html", "dev/wuwa-build.ps1", "dev/WuWaBuildProfiles.ps1",
                  "dev/start-wuwa-build.ps1", "dev/WuWaLaunchLifecycle.ps1", "dev/WuWaOpenXR.ps1", "dev/sim-run.ps1",
+                 "dev/wuwa_game_start.py", "dev/WuWaSteamStart.ps1",
                  "dev/Get-SceneCaptureCheck.ps1", "dev/Get-RunContinuityCheck.ps1", "site/index.html", "site/guide.html",
                  "dev/wuwa-playtest.html", "dev/wuwa_playtest.py", "dev/wuwa_playtest_service.py",
-                 "dev/wuwa_playtest_bridge.py", "dev/wuwa_voice_notes.py"):
+                 "dev/wuwa_playtest_bridge.py", "dev/wuwa_voice_notes.py", "dev/wuwa_incident.py"):
         check("file " + name, (app / name).is_file())
     for build in catalog():
         folder = runtime_folder(build)
@@ -1200,6 +1279,15 @@ def serve(args):
                 if not args.no_open:
                     threading.Timer(0.3, lambda: webbrowser.open(BASE_URL)).start()
                 threading.Thread(target=idle_watch, daemon=True).start()
+                # RAM-only status/log retention. No recording, input or game
+                # requests; save requires a separate authenticated user action.
+                try:
+                    thread = threading.Thread(target=incident_service().run, args=(bridge_stop,), daemon=True,
+                                              name='wuwa-recent-diagnostics')
+                    thread.start()
+                    bridge_threads.append(thread)
+                except (OSError, ValueError, ImportError) as error:
+                    log('Recent diagnostics unavailable: ' + str(error))
                 for label, factory in (('recording', video_menu_bridge), ('playtest', playtest_menu_bridge)):
                     try:
                         bridge = factory()

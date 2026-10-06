@@ -1,12 +1,15 @@
-WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.1
-Release: beta-2026-10-04-cinematic / backend cinematic-20261004 / game 3.7
+WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.2
+Release: beta-2026-10-06-steam / VR build steam-20261006 / game 3.7
 
 Run WuWa-VR-Setup.exe once to install for your Windows user, then open the
 normal WuWa VR shortcut from the Start menu. No separate Python install is needed.
 This small installer does not bundle the VR mod: first installation downloads
 about 54 MB, so an internet connection is required.
 
-01 · Game. WuWa VR finds your saved/default official launcher. Use Change only if needed.
+01 · Game. WuWa VR keeps your saved choice. Use Change to select Kuro or Steam.
+   For Steam, choose the detected installation or browse to Wuthering Waves.exe.
+   The game opens through Steam. The owner confirmed startup/backend activity
+   on this PC; other PCs and current headset use remain unverified.
    If another package is already running, the home screen offers Open existing launcher,
    Stop old launcher & use this version, or Retry connection. Switching requires
    the game, injector and recorder to be idle; it never force-kills them.
@@ -18,17 +21,18 @@ about 54 MB, so an internet connection is required.
    marked. Close the game and injector before switching; accept Windows permission
    if requested. Start your headset connection software before headset play.
    Read the account-risk notice. The main button now says Launch in VR. Accept
-   Windows permission, then press Play in the game's own launcher.
+   Windows permission. Steam opens the selected game through Steam; with Kuro,
+   press Play in its launcher.
 
 Returning players: use the main Launch in VR button with saved choices.
-Windows permission and Play in the official game launcher may still be required.
+Windows permission and, for Kuro, Play in its launcher may still be required.
 Updates: Step 02 > Versions & updates > Check updates. Update launcher downloads
 and verifies the desktop app update; it does not restart the app. When ready,
 close the game and injector, stop recording and finish other operations, then
 choose Restart to update and confirm. Installing or updating the desktop app
-preserves your selected VR package. In Step 02 choose beta-2026-10-04-cinematic
-and install it, or select it if already installed, to use cinematic-20261004
-(formerly the private NPC-rim candidate).
+preserves your selected VR package. In Step 02 choose beta-2026-10-06-steam
+and install it, or select it if already installed, to use steam-20261006
+with Steam support. Both the app and VR package are needed for the new route.
 Settings, backups, logs and recordings are preserved.
 Do not delete the WuWa VR Manager or WuWa VR Launcher folders in LocalAppData.
 There are no Setup/Record/Help tabs. The footer's Developer tools link opens the
@@ -56,11 +60,17 @@ Advanced portable fallback: download WuWa-VR-Launcher.zip from the same release,
 extract the whole ZIP and open WuWa VR Launcher.exe. Keep its app and python
 folders together. This uses the older web interface and does not self-update
 the desktop app. Release downloads and previous versions:
+https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam
 https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic
-https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-01-1817
 
-Cinematic framing · 4 October public beta
-App 1.0.1 / backend cinematic-20261004 / game 3.7.
+Steam and game graphics settings · 6 October public beta
+App 1.0.2 / VR build steam-20261006 / game 3.7.
+Choose Steam or Kuro in step 01; saved choices are preserved. The VR package
+keeps the game’s graphics choices instead of forcing low/medium values. A
+one-time cleanup removes only recognized generated overrides, preserving custom
+edits and backups. The accepted timing correction remains separate.
+Launch progress can still say waiting for UEVR after the backend starts; check
+the actual game view before retrying or starting another injector.
 Cinematic framing defaults on. The owner confirmed the simulator replay on
 private screen-comfort-r1; sampled frames in the latest 68-second recording show
 matching letterbox heights. Headset comfort remains pending. This retains the
@@ -69,7 +79,8 @@ Accepted foliage, far indirect-lighting, main Resonators reflection, ultimate
 camera and headset 2D-brightness corrections are retained.
 Long scene/dialogue stalls, HUD-aspect refresh and moving flat-menu backgrounds
 remain open. Manual mono theatre is a menu workaround, not a loading-stall fix.
-Fresh-PC installation and Steam/Epic injection remain unverified.
+Fresh-PC installation, other-PC Steam use and this build’s headset experience
+remain unverified. Epic game injection is also unverified.
 
 OPTIONAL NPC RIM WORKAROUND: press L3 + R3 to open UEVR, then choose
 VR > WuWa Controls > Suppress mismatched NPC rim lighting. Default off; your
@@ -166,14 +177,16 @@ Guide: https://chronohaxx.github.io/wuwa-vr/guide.html
 Feedback: https://github.com/ChronoHaxx/wuwa-vr/issues
 Optional support: https://ko-fi.com/chronohax
 
-鸣潮 VR — 桌面启动器 / 公开测试版 1.0.1
-发布版本 beta-2026-10-04-cinematic／后端 cinematic-20261004／游戏 3.7
+鸣潮 VR — 桌面启动器 / 公开测试版 1.0.2
+发布版本 beta-2026-10-06-steam／VR 构建 steam-20261006／游戏 3.7
 
 运行 WuWa-VR-Setup.exe，为当前 Windows 用户安装，然后从开始菜单打开
 普通 WuWa VR 快捷方式。无需另行安装 Python。小型安装程序不包含 VR 模组；
 首次安装 VR 需要联网下载约 54 MB。
 
-01 · 游戏。自动查找已保存或默认位置的官方启动器。仅在需要时点击“更改”。
+01 · 游戏。保留已保存的选择；点击“更改”可选择库洛或 Steam。
+   Steam 版可选已检测的安装，或浏览到 Wuthering Waves.exe；通过 Steam 启动。
+   作者已在本机确认 Steam 启动成功、VR 后端运行；其他电脑及头显体验仍待验证。
    如旧版启动器仍在运行，可打开旧版、停止旧版并使用本版，或重试连接。
    切换前需关闭游戏及注入器并结束录制；不会强制结束它们。
 02 · 安装 VR。检查已安装／已选 VR 版本和游戏兼容版本；需要时展开“版本与更新”。
@@ -182,15 +195,15 @@ Optional support: https://ko-fi.com/chronohax
 03 · 头显或模拟器。选择头显或内置模拟器，当前选项会标注。
    切换前请关闭游戏和注入器，并在需要时同意 Windows 授权。
    阅读账号风险提示；主按钮会变成“以 VR 模式启动”。同意 Windows 授权后，
-   在游戏官方启动器中点击开始。使用头显前请启动其连接软件。
+   Steam 版通过 Steam 启动；库洛版需在其启动器中点击开始。使用头显前请启动连接软件。
 
 之后使用已保存的选项，点击“以 VR 模式启动”即可进入启动流程。
-仍可能需要 Windows 授权和在官方启动器内点击开始。
+仍可能需要 Windows 授权；库洛版需在其启动器内点击开始。
 更新：第 02 步 > 版本与更新 > 检查更新。“更新启动器”下载并校验桌面应用更新，
 此时不会重启。更新就绪后，关闭游戏和注入器、停止录制并完成其他操作，
 再选择“重启并更新”并确认。安装或更新桌面应用会保留当前选择的 VR 包。
-在第 02 步选择 beta-2026-10-04-cinematic 并安装（已安装时直接选用），
-即可使用 cinematic-20261004。设置、备份、日志和录像会保留；
+在第 02 步选择 beta-2026-10-06-steam 并安装（已安装时直接选用），
+即可使用 steam-20261006。设置、备份、日志和录像会保留；
 不要删除 LocalAppData 中的 WuWa VR Manager 或 WuWa VR Launcher 文件夹。
 不再提供“设置／录制／帮助”标签页。底部“开发工具”链接打开同一安装包的
 原版网页工具，共用设置、录像、测试和调试功能。录制支持 SteamVR 和内置模拟器；
@@ -207,15 +220,19 @@ Optional support: https://ko-fi.com/chronohax
 WuWa VR Launcher.exe，保持 app 和 python 文件夹完整。这是旧版网页界面，
 不会自动更新桌面应用。发布页及旧版本链接见上方英文部分。
 
-过场构图 · 10 月 4 日公开测试版
-应用 1.0.1／后端 cinematic-20261004／游戏 3.7。
+Steam 与游戏画质设置 · 10 月 6 日公开测试版
+应用 1.0.2／VR 构建 steam-20261006／游戏 3.7。
+第 01 步可选择 Steam 或库洛版本，保留已保存选择。VR 包保留游戏自身画质选择，
+不强制低／中画质；一次性清理仅移除已识别的旧生成覆盖项，保留自定义修改与备份。
+已接受的时序修正独立保留。后端启动后进度仍可能显示“等待 UEVR”；
+重试或另开注入器前，请先检查实际游戏画面。
 过场构图修正默认开启。作者已确认私测 screen-comfort-r1 的模拟器回放改善；
 最新 68 秒录像抽样中双眼黑边高度一致，头显舒适度仍待验证。
 此修正保留游戏原有黑边，不是可自由环顾的沉浸式过场镜头。
 保留此前已接受的植被、远处间接光照、共鸣者主页面反射、大招镜头与头显二维亮度修正。
 场景／对话加载停顿、HUD 比例刷新与平面菜单背景移动仍未解决。
 手动单目影院可作为菜单临时方案，但不是已确认的加载停顿修复。
-全新电脑安装与 Steam／Epic 注入仍待验证。
+全新电脑安装、其他电脑的 Steam 路径及本版本头显体验仍待验证；Epic 注入也未验证。
 
 可选 NPC 边缘光方案：按 L3 + R3 打开 UEVR，在 VR > WuWa Controls 中选择
 “抑制不匹配的 NPC 边缘光”（Suppress mismatched NPC rim lighting）。默认关闭，

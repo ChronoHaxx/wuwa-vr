@@ -2,7 +2,7 @@
   "schema": 3,
   "build": "steam-20261006",
   "privateCandidate": false,
-  "launcherVersion": "1.0.2",
+  "launcherVersion": "1.0.3",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
   "backendSha256": "c3e19ef50f1b5e9a28b2d09e61743381fd3ba38287f5fafd30ee0486e5eb2c2c",
@@ -11,16 +11,16 @@
   "buildCompleted": "2026-10-06T10:22:19+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 54265807,
-    "sha256": "ec5a3689ef3b7211545a3431394d508aada25ef47ce6e791fd2e8813cd35eaec",
+    "bytes": 54284478,
+    "sha256": "6c40666809404f0551e297a846ddf9a8c4b028a47df835b916bcb42feb7790ea",
     "public": true
   },
-  "liveAcceptance": "Owner-reported startup, confirmed by backend activity. Headset/other-PC checks remain pending.",
+  "liveAcceptance": "Startup recovery component/isolated checks passed; affected Windows 11 Steam launch and current headset acceptance pending.",
   "previousPublicRelease": {
     "tag": "beta-2026-10-04-cinematic",
     "backendSha256": "f9e050db26937edc0e8f59d55d7f0c7efbb3d01c28c2b13f737ad65d241e29f1"
   },
-  "sourceIdentity": "Renderer source/patch/build unchanged from graphics-r2; injector unchanged from tested Steam preview. Launcher 1.0.2 includes the upgrade handoff correction. See STEAM-RELEASE-20261006.md.",
+  "sourceIdentity": "Renderer and injector unchanged from beta-2026-10-06-steam. Launcher 1.0.3 and its helper payload add startup recovery. See STARTUP-RECOVERY-RELEASE-20261006.md.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
@@ -29,7 +29,7 @@
   },
   "rendererBuild": "graphics-20261006-r2",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-2026-10-06-steam",
-  "launcherSha256": "ff019d6f4e1fba3d6d692910097851103681bad1dd2eb9286e8855feca71bbaa",
-  "setupSha256": "402741c909f2a3e7a03d07e8ebc1bb44d84a24b6eab5bb38cce511339cbef282"
+  "releaseTag": "beta-2026-10-06-recovery",
+  "launcherSha256": "95609d9ebef8d4de622d5953c563060a54bb76ed6e8eaf85cc3f0d332c87d3b1",
+  "setupSha256": "c3cd68634259ae1c046cd84da320722d9e89a15b0b81d4ea6fcfc15f3ac6cebf"
 }

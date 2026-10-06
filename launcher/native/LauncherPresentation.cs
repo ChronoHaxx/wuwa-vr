@@ -12,7 +12,9 @@ namespace WuWaVR.Manager
             if (!connected) return text("runtimeHint");
             var runtime = Json.Child(status, "openxr");
             var name = Json.Text(runtime, "name");
-            if (String.IsNullOrWhiteSpace(name)) return text("runtimeMissing");
+            if (String.IsNullOrWhiteSpace(name)) return text(Json.Flag(runtime, "canSimulator") ? "runtimeMissingSimulator" : "runtimeMissing");
+            if (Json.Flag(runtime, "isSimulator")) return name + " · " + text(Json.Flag(runtime, "isBundledSimulator") ? "runtimeBundledSimulator" : "runtimeOtherSimulator") +
+                (Json.Flag(runtime, "available") ? "" : " · " + text("runtimeUnavailable"));
             return name + " · " + text(Json.Flag(runtime, "available") ? "runtimeDetected" : "runtimeUnavailable");
         }
         public static string PackageSummary(string activeId, string chosenId, bool chosenIsCandidate, Func<string, string> text)

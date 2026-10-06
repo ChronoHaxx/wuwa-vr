@@ -14,8 +14,8 @@ function Enter-LaunchLock {
     try {
         $mutex = [Threading.Mutex]::new($false, $Name)
     } catch [UnauthorizedAccessException] {
-        # Created by an elevated process that is still alive.
-        return [pscustomobject]@{ Status = 'Busy'; Mutex = $null; Owned = $false }
+        # A protected object exists, but access denial does not prove ownership.
+        return [pscustomobject]@{ Status = 'Busy'; Reason = 'AccessDenied'; Mutex = $null; Owned = $false }
     }
     $abandoned = $false
     try {
@@ -25,14 +25,17 @@ function Enter-LaunchLock {
         # ownership, so this attempt proceeds instead of failing forever.
         $owned = $true
         $abandoned = $true
+    } catch [UnauthorizedAccessException] {
+        $mutex.Dispose()
+        return [pscustomobject]@{ Status = 'Busy'; Reason = 'AccessDenied'; Mutex = $null; Owned = $false }
     }
     if (-not $owned) {
         $mutex.Dispose()
-        return [pscustomobject]@{ Status = 'Busy'; Mutex = $null; Owned = $false }
+        return [pscustomobject]@{ Status = 'Busy'; Reason = 'Held'; Mutex = $null; Owned = $false }
     }
     $status = 'Acquired'
     if ($abandoned) { $status = 'AcquiredAbandoned' }
-    return [pscustomobject]@{ Status = $status; Mutex = $mutex; Owned = $true }
+    return [pscustomobject]@{ Status = $status; Reason = $status; Mutex = $mutex; Owned = $true }
 }
 
 function Exit-LaunchLock {
@@ -46,25 +49,32 @@ function Exit-LaunchLock {
     $Lock.Mutex = $null
 }
 
-# Read-only probe for a lock another process may own. A medium-integrity caller
-# cannot open a mutex created by the elevated startup; that denial still proves
-# a live holder because the object disappears with its last handle.
+# A protected mutex can be unowned while another process merely holds a handle.
+# Keep the conservative legacy Held result, but expose uncertainty to new callers.
+function New-LaunchLockPresenceResult {
+    param([string]$State, [bool]$AccessDenied = $false, [switch]$Detailed)
+    if ($Detailed) { return [pscustomobject]@{State=$State;AccessDenied=$AccessDenied} }
+    if ($AccessDenied) { return 'Held' }
+    return $State
+}
+
 function Get-LaunchLockPresence {
-    param([Parameter(Mandatory)][string]$Name)
+    param([Parameter(Mandatory)][string]$Name, [switch]$Detailed)
     $mutex = $null
     try {
-        if (-not [Threading.Mutex]::TryOpenExisting($Name, [ref]$mutex)) { return 'Absent' }
+        if (-not [Threading.Mutex]::TryOpenExisting($Name, [ref]$mutex)) { return (New-LaunchLockPresenceResult 'Absent' -Detailed:$Detailed) }
     } catch [UnauthorizedAccessException] {
-        return 'Held'
+        return (New-LaunchLockPresenceResult 'Unknown' -AccessDenied $true -Detailed:$Detailed)
     }
     try {
         $got = $false
         try { $got = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $got = $true }
+        catch [UnauthorizedAccessException] { return (New-LaunchLockPresenceResult 'Unknown' -AccessDenied $true -Detailed:$Detailed) }
         if ($got) {
             $mutex.ReleaseMutex()
-            return 'Free'
+            return (New-LaunchLockPresenceResult 'Free' -Detailed:$Detailed)
         }
-        return 'Held'
+        return (New-LaunchLockPresenceResult 'Held' -Detailed:$Detailed)
     } finally {
         $mutex.Dispose()
     }
@@ -174,6 +184,31 @@ function New-LaunchFrontEndResult {
     return [pscustomobject]@{ Outcome = $Outcome; ExitCode = $ExitCode; Message = $Message }
 }
 
+function Format-LaunchLockBlockedMessage {
+    param([bool]$AccessDenied, [AllowNull()][object]$State)
+    if ($AccessDenied) {
+        $message = 'Windows denied access to the WuWa startup lock. This does not confirm a running launch. Nothing else was started.'
+    } else {
+        $message = 'Another startup owns the WuWa launch lock. No second launch was started.'
+    }
+    # A reused PID or an old copied state file cannot identify a stoppable worker.
+    $owner = $null
+    if ($State -and $State.PSObject.Properties['ownerPid'] -and $State.PSObject.Properties['ownerStartedUtc'] -and
+            $State.phase -notin @('finished','failed','cancelled','first-frame','firstFrame')) {
+        try {
+            $candidate = Get-Process -Id ([int]$State.ownerPid) -ErrorAction Stop
+            $started = [DateTimeOffset]::Parse([string]$State.ownerStartedUtc, [Globalization.CultureInfo]::InvariantCulture)
+            if ([Math]::Abs(($candidate.StartTime.ToUniversalTime() - $started.UtcDateTime).TotalMilliseconds) -lt 10) { $owner = $candidate }
+        } catch { }
+    }
+    if ($owner -and $State.PSObject.Properties['cancelPath'] -and $State.cancelPath) {
+        $message += ' The recorded startup is still running (PID ' + $owner.Id + '). Use Stop waiting in the launcher to cancel that recorded wait; the game is not closed.'
+    } else {
+        $message += ' The lock owner could not be identified; an old saved launch status is not evidence of an active launch.'
+    }
+    return ($message + ' Open Troubleshooting and copy diagnostics. If this persists after closing WuWa VR, restart Windows to clear leftover startup processes.')
+}
+
 # Process.Start returns once Windows has approved elevation, before the child
 # has loaded PowerShell and taken the worker lock. Until one of those happens a
 # second click would see neither lock and ask for elevation again.
@@ -194,9 +229,41 @@ function Wait-LaunchHandoff {
     return 'Timeout'
 }
 
-# The non-elevated half of the shortcut: never changes anything, refuses to open
-# a second administrator prompt while one is pending, and turns every failure
-# into a message instead of a silently closing window.
+# One attempt owns its diagnostic folder and cancellation marker before UAC.
+# These are launcher files only; no game/profile/runtime operation happens here.
+function New-LaunchAttemptState {
+    param([Parameter(Mandatory)][string]$Path, [string]$AttemptId = ([guid]::NewGuid().ToString('N')),
+        [string]$BuildId, [string]$Phase = 'preflight', [string]$Message = 'Checking launch readiness.')
+    if ($AttemptId -notmatch '^[a-fA-F0-9]{32}$') { throw 'Invalid launch attempt identity.' }
+    $run = Join-Path (Split-Path -Parent $Path) ('runs\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $AttemptId)
+    $null = New-Item -ItemType Directory -Path $run -Force
+    Write-LaunchState -Path $Path -State ([ordered]@{
+        attemptId=$AttemptId; requestedAt=[DateTime]::UtcNow.ToString('o'); pid=$PID;
+        ownerPid=$PID; ownerStartedUtc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o');
+        started=(Get-Process -Id $PID).StartTime.ToString('o'); buildId=$BuildId;
+        runDir=$run; cancelPath=(Join-Path $run 'cancel.request'); phase=$Phase; message=$Message;
+        elevated=$false; injectorStarted=$false
+    })
+    return Read-LaunchState -Path $Path
+}
+
+function Assert-LaunchNotCancelled {
+    param([AllowEmptyString()][string]$CancelPath)
+    if ($CancelPath -and (Test-Path -LiteralPath $CancelPath)) {
+        throw [OperationCanceledException]::new('Launch cancelled. No further game or injector startup was requested.')
+    }
+}
+
+function Assert-LaunchUserIdentity {
+    param([Parameter(Mandatory)][string]$ExpectedSid,
+        [string]$CurrentSid = ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value))
+    if ($ExpectedSid -notmatch '^S-1-[0-9-]+$' -or $ExpectedSid -cne $CurrentSid) {
+        throw 'Windows permission was granted using a different user account. Nothing was launched. Open WuWa VR while signed in to the same Windows account that grants administrator permission; settings cannot safely be shared across those accounts.'
+    }
+}
+
+# Checks are read-only. A launch records progress and errors even if its hidden
+# elevated worker exits before loading the rest of the packaged scripts.
 function Invoke-LaunchFrontEnd {
     param(
         [Parameter(Mandatory)][string]$WorkerLockName,
@@ -205,52 +272,89 @@ function Invoke-LaunchFrontEnd {
         [Parameter(Mandatory)][scriptblock]$Preflight,
         [Parameter(Mandatory)][scriptblock]$Elevate,
         [switch]$CheckOnly,
-        [int]$HandoffTimeoutSeconds = 30
+        [int]$HandoffTimeoutSeconds = 30,
+        [string]$AttemptId = ([guid]::NewGuid().ToString('N')),
+        [string]$BuildId
     )
     $state = Read-LaunchState -Path $StatePath
-    if ((Get-LaunchLockPresence -Name $WorkerLockName) -eq 'Held') {
-        $detail = 'Another rendering-test startup is still running, so nothing new was started.'
-        if (Test-LaunchStateLive -State $state) {
-            $detail += [Environment]::NewLine + (Format-LaunchState $state)
-            $detail += [Environment]::NewLine + "Its window is titled 'WuWa VR rendering test'. Press Q there to stop it, or run: dev\start-wuwa-rendering-test.ps1 -Cancel"
-        } else {
-            $detail += [Environment]::NewLine + 'It did not record a live heartbeat (an older hidden startup). It stops on its own within ten minutes of its start.'
-        }
+    $presence = Get-LaunchLockPresence -Name $WorkerLockName -Detailed
+    if ($presence.AccessDenied -or $presence.State -eq 'Held') {
+        $detail = Format-LaunchLockBlockedMessage -AccessDenied $presence.AccessDenied -State $state
         return (New-LaunchFrontEndResult 'Busy' 2 $detail)
     }
-    try {
-        & $Preflight
-    } catch {
-        return (New-LaunchFrontEndResult 'PreflightFailed' 1 ('Not started: ' + $_.Exception.Message))
-    }
     if ($CheckOnly) {
-        return (New-LaunchFrontEndResult 'CheckPassed' 0 'PASS: game/injector/SteamVR closed, compiled DLL matches receipt, selected backend and simulator files verified. Nothing changed.')
+        try { & $Preflight }
+        catch { return (New-LaunchFrontEndResult 'PreflightFailed' 1 ('Not started: ' + $_.Exception.Message)) }
+        return (New-LaunchFrontEndResult 'CheckPassed' 0 'PASS: selected build files, game/injector state and active OpenXR runtime verified. Nothing changed.')
     }
     $request = Enter-LaunchLock -Name $RequestLockName
     if ($request.Status -eq 'Busy') {
-        return (New-LaunchFrontEndResult 'PromptPending' 3 'A Windows administrator prompt from this shortcut is already waiting for an answer. Answer that prompt (it may be behind other windows or flashing in the taskbar); no second prompt was opened.')
+        if ($request.Reason -eq 'AccessDenied') {
+            return (New-LaunchFrontEndResult 'PromptPending' 3 'Windows denied access to the WuWa permission-request lock. A waiting administrator prompt could not be confirmed. Nothing was started. Open Troubleshooting and copy diagnostics; if the problem persists after closing WuWa VR, restart Windows.')
+        }
+        return (New-LaunchFrontEndResult 'PromptPending' 3 'A Windows administrator prompt is already waiting for an answer. Answer or cancel that prompt; no second prompt was opened.')
     }
+    $attemptCreated=$false
     try {
+        # The previous request can hand its lock over while this caller is
+        # acquiring ours. Recheck before replacing its live worker's status.
+        $presence = Get-LaunchLockPresence -Name $WorkerLockName -Detailed
+        if ($presence.AccessDenied -or $presence.State -eq 'Held') {
+            return (New-LaunchFrontEndResult 'Busy' 2 (Format-LaunchLockBlockedMessage -AccessDenied $presence.AccessDenied -State (Read-LaunchState -Path $StatePath)))
+        }
+        $null = New-LaunchAttemptState -Path $StatePath -AttemptId $AttemptId -BuildId $BuildId
+        $attemptCreated=$true
+        try { & $Preflight }
+        catch {
+            $message = 'Not started: ' + $_.Exception.Message
+            Update-LaunchState $StatePath @{phase='failed';outcome='PreflightFailed';message=$message}
+            return (New-LaunchFrontEndResult 'PreflightFailed' 1 $message)
+        }
+        Update-LaunchState $StatePath @{phase='permission-pending';message='Waiting for Windows administrator permission. Answer the Windows prompt; cancelling leaves the game closed.'}
         $child = & $Elevate
         $childId = ''
         if ($child -and $child.Id) { $childId = " (PID $($child.Id))" }
-        # Keep the request lock until the child owns the worker lock or ends.
         $handoff = Wait-LaunchHandoff -Child $child -WorkerLockName $WorkerLockName -TimeoutSeconds $HandoffTimeoutSeconds
+        $latest = Read-LaunchState -Path $StatePath
+        if ($latest -and $latest.PSObject.Properties['attemptId'] -and $latest.attemptId -ne $AttemptId) {
+            return (New-LaunchFrontEndResult 'Superseded' 1 'A newer launch attempt owns the status. This attempt did not replace it; follow the current launch progress.')
+        }
+        # Preserve the worker's concrete failure instead of replacing it with
+        # an optimistic generic launch result or a stale previous attempt.
+        if ($latest -and $latest.PSObject.Properties['attemptId'] -and $latest.attemptId -eq $AttemptId -and $latest.phase -in @('failed','cancelled')) {
+            return (New-LaunchFrontEndResult 'ChildExited' 1 ([string]$latest.message))
+        }
         if ($handoff -eq 'Exited') {
-            return (New-LaunchFrontEndResult 'ChildExited' 1 "The elevated startup$childId closed before it began. Nothing was started; run dev\start-wuwa-rendering-test.ps1 -Status for the last recorded reason.")
+            $code = ''; try { $code = ' Exit code: ' + $child.ExitCode + '.' } catch { }
+            $message = "The elevated startup$childId exited before it began.$code Open Troubleshooting and copy diagnostics. Check Windows Security protection history if it blocked a packaged file; do not disable security software."
+            Update-LaunchState $StatePath @{phase='failed';outcome='ChildExited';message=$message}
+            return (New-LaunchFrontEndResult 'ChildExited' 1 $message)
         }
         if ($handoff -eq 'Timeout') {
-            return (New-LaunchFrontEndResult 'StartedUnconfirmed' 5 "Startup$childId has not confirmed it is ready after $HandoffTimeoutSeconds s. Do not start another injector. Check the launch progress and use Recovery > Copy diagnostics; permission and injection are not confirmed by this result.")
+            $message = "Startup$childId has not confirmed it is ready after $HandoffTimeoutSeconds s. Use Stop waiting to cancel, or open Troubleshooting and copy diagnostics. Do not start another injector."
+            $values = @{phase='handoff-unconfirmed';outcome='StartedUnconfirmed';message=$message}
+            if ($child -is [Diagnostics.Process]) {
+                try { $values.pid=$child.Id; $values.started=$child.StartTime.ToString('o'); $values.ownerPid=$child.Id; $values.ownerStartedUtc=$child.StartTime.ToUniversalTime().ToString('o') } catch { }
+            }
+            Update-LaunchState $StatePath $values
+            return (New-LaunchFrontEndResult 'StartedUnconfirmed' 5 $message)
         }
-        return (New-LaunchFrontEndResult 'Started' 0 "Opened the 'WuWa VR rendering test' window$childId. Follow it there; press Play in the launcher.")
+        return (New-LaunchFrontEndResult 'Started' 0 'Windows permission accepted. Follow launch progress here; Steam opens the selected game, while Kuro may require pressing Play in its launcher.')
     } catch {
+        $message = 'Could not open the elevated startup: ' + $_.Exception.Message
+        $outcome='ElevationFailed'; $code=1; $phase='failed'
         if (Test-ElevationCancelled $_.Exception) {
-            return (New-LaunchFrontEndResult 'ElevationCancelled' 4 'Windows administrator permission was declined, so nothing was changed. Run the shortcut again and choose Yes to start the rendering test.')
+            $message='Windows administrator permission was declined. The game was not launched; use Launch in VR again when ready.'
+            $outcome='ElevationCancelled'; $code=4; $phase='cancelled'
         }
-        return (New-LaunchFrontEndResult 'ElevationFailed' 1 ('Could not open the elevated startup: ' + $_.Exception.Message))
-    } finally {
-        Exit-LaunchLock $request
-    }
+        try {
+            $owned=Read-LaunchState $StatePath
+            if ($attemptCreated -and $owned -and $owned.PSObject.Properties['attemptId'] -and $owned.attemptId -eq $AttemptId) {
+                Update-LaunchState $StatePath @{phase=$phase;outcome=$outcome;message=$message}
+            }
+        } catch { }
+        return (New-LaunchFrontEndResult $outcome $code $message)
+    } finally { Exit-LaunchLock $request }
 }
 
 # ------------------------------------------------------ wait-for-game loop ---
@@ -416,6 +520,17 @@ function Stop-OwnedInjector {
     } catch {
         return 'StopFailed: ' + $_.Exception.Message
     }
+}
+
+function Get-LaunchProcessExitDetail {
+    param([Parameter(Mandatory)][Diagnostics.Process]$Process)
+    try {
+        $Process.Refresh()
+        if (-not $Process.HasExited) { return '' }
+        $code=[int]$Process.ExitCode
+        $unsigned=[BitConverter]::ToUInt32([BitConverter]::GetBytes($code),0)
+        return (' Injector exit code: {0} (0x{1:X8}).' -f $code,$unsigned)
+    } catch { return '' }
 }
 
 function Format-InjectorCleanup {

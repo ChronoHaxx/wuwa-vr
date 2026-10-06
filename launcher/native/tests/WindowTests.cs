@@ -83,6 +83,14 @@ public static class WindowTests
         var task = (Task)Invoke(window, "RefreshStatus");
         PumpUntil(() => task.IsCompleted, "fixture status refresh"); task.GetAwaiter().GetResult();
     }
+    static RecoveryReport RecoveryFixture()
+    {
+        return new RecoveryReport { ScannedUtc = "2026-10-06T20:00:00Z", Message = "Fixture identity scan", Candidates = new List<RecoveryCandidate> {
+            new RecoveryCandidate { Pid = 101, StartedUtc = "2026-10-06T19:00:00Z", Executable = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", Script = @"C:\fixture\app\dev\start-wuwa-build.ps1", CommandLine = "private-command-line-token", Kind = "Startup worker", Eligible = true, Reason = "Fixture exact identity" },
+            new RecoveryCandidate { Pid = 202, StartedUtc = "2026-10-06T19:01:00Z", Executable = @"C:\fixture\python\pythonw.exe", Script = @"C:\fixture\app\dev\wuwa_player.py", Kind = "Launcher helper", Eligible = true, Reason = "Fixture idle helper" },
+            new RecoveryCandidate { Pid = 303, StartedUtc = "2026-10-06T19:02:00Z", Executable = @"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe", Script = @"C:\fixture\app\dev\wuwa-runtime.ps1", Kind = "Runtime/profile worker", Eligible = false, Reason = "Fixture runtime mutation is protected" }
+        } };
+    }
     static ControllerDiagnostics.Report ControllerSnapshot()
     {
         return new ControllerDiagnostics.Report {
@@ -197,9 +205,9 @@ public static class WindowTests
                         RecordStops++; Json.Child(Status, "recording")["stopping"] = true;
                         return Reply(new { ok = true });
                     case "/api/cancel":
-                        Check(Json.Text(Json.Child(Status, "job"), "kind") == "launch" && Json.Flag(Json.Child(Status, "job"), "running"), "cancellation sent outside a waiting launch");
+                        Check(LauncherBridge.CanCancelLaunch(Status), "cancellation sent outside a waiting launch");
                         Cancels++;
-                        Status["launch"] = new Dictionary<string, object> { { "phase", "cancelled" }, { "firstFrameSeen", false } };
+                        Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", false }, { "cancellable", false }, { "phase", "cancelled" }, { "message", "Fixture launch cancelled before the game started" }, { "firstFrameSeen", false } };
                         Status["job"] = new Dictionary<string, object> { { "kind", "launch" }, { "running", false }, { "code", 0 }, { "output", "Fixture launch cancelled before the game started" } };
                         return Reply(new { ok = true });
                     case "/api/check":
@@ -282,6 +290,7 @@ public static class WindowTests
         public void Dispose()
         {
             var operation = Field<CancellationTokenSource>(Window, "operation");
+            Set(Window, "allowClose", true); // Fixture disposal is not a user exit action.
             if (operation == null) Window.Close();
             else
             {
@@ -299,6 +308,81 @@ public static class WindowTests
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
         try
         {
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; var report = RecoveryFixture(); int scans = 0, stops = 0; string confirmation = null;
+                f.Http.Status["job"] = new Dictionary<string, object> { { "kind", "launch" }, { "running", true } }; Invoke(w, "ShowStatus");
+                Set(w, "processRecoveryScanOverride", new Func<CancellationToken, Task<RecoveryReport>>(c => { scans++; return Task.FromResult(report); }));
+                Set(w, "processRecoveryStopOverride", new Func<RecoveryReport, IEnumerable<int>, CancellationToken, Task<RecoveryReport>>((scan, pids, c) => {
+                    stops++; Check(Object.ReferenceEquals(scan, report) && pids.OrderBy(x => x).SequenceEqual(new[] { 101, 202 }), "recovery stop changed confirmed identities or included protected rows");
+                    var result = RecoveryFixture(); result.Candidates[0].Outcome = "Stopped"; result.Candidates[1].Outcome = "Failed";
+                    result.Candidates[1].Reason = "Fixture access denied after revalidation"; return Task.FromResult(result);
+                }));
+                Check(!Field<Expander>(w, "processRecoveryPanel").IsExpanded && Button(w, "processRecoveryScan").IsEnabled,
+                    "recovery cluttered setup or requires a connected/idle backend");
+                Invoke(w, "ShowPage", true); Field<Expander>(w, "processRecoveryPanel").IsExpanded = true;
+                Click(w, Button(w, "processRecoveryScan"));
+                var choices = Tree(Field<StackPanel>(w, "processRecoveryRows")).OfType<CheckBox>().ToArray();
+                Check(scans == 1 && f.Http.Writes.Count == 0 && Field<LauncherBridge>(w, "bridge").Address == null && choices.Length == 3 && choices.All(x => x.IsChecked != true),
+                    "scan attached a helper, changed it, hid candidates or automatically selected processes");
+                Check(!choices.Single(x => ((RecoveryCandidate)x.Tag).Pid == 303).IsEnabled && !Button(w, "processRecoveryStop").IsEnabled,
+                    "protected runtime process was selectable or empty selection could stop");
+                Check(Tree(Field<StackPanel>(w, "processRecoveryRows")).OfType<TextBlock>().Any(x => x.Text.Contains(@"C:\fixture\python\pythonw.exe")), "scan omitted executable identity");
+                Check(!Tree(Field<StackPanel>(w, "processRecoveryRows")).OfType<TextBlock>().Any(x => x.Text.Contains("private-command-line-token")), "scan exposed raw command-line data");
+                choices.Single(x => ((RecoveryCandidate)x.Tag).Pid == 101).IsChecked = true;
+                Field<ComboBox>(w, "languages").SelectedIndex = 1; Drain();
+                choices = Tree(Field<StackPanel>(w, "processRecoveryRows")).OfType<CheckBox>().ToArray();
+                Check(Field<Expander>(w, "processRecoveryPanel").IsExpanded && choices.Count(x => x.IsChecked == true) == 1 && scans == 1,
+                    "language change lost explicit process selection or silently rescanned");
+                Set(w, "processRecoveryConfirmOverride", new Func<string, bool>(message => { confirmation = message; return false; }));
+                Click(w, Button(w, "processRecoveryStop"));
+                Check(stops == 0 && confirmation.Contains("PID 101") && confirmation.Contains("2026-10-06T19:00:00Z") && confirmation.Contains("Steam") && !confirmation.Contains("PID 303"),
+                    "declined confirmation stopped a process or did not show precise selected identity and effect");
+                choices.Single(x => ((RecoveryCandidate)x.Tag).Pid == 202).IsChecked = true;
+                Set(w, "processRecoveryConfirmOverride", new Func<string, bool>(message => { confirmation = message; return true; }));
+                Click(w, Button(w, "processRecoveryStop"));
+                var zh = new Strings { Language = "zh-Hans" };
+                Check(stops == 1 && confirmation.Contains("PID 101") && confirmation.Contains("PID 202") && !confirmation.Contains("PID 303") &&
+                    Field<TextBlock>(w, "processRecoveryState").Text.Contains(zh["processRecoveryPartial"]), "partial recovery was reported as complete or changed the selection");
+                Check(!Field<bool>(w, "connectionReady") && Field<LauncherBridge>(w, "bridge").Address == null && f.Http.Writes.Count == 0 && f.Http.Launches == 0 &&
+                    !Button(w, "processRecoveryStop").IsEnabled && Button(w, "retryConnection").IsEnabled, "recovery auto-connected/launched or reused a consumed scan");
+                Check(Tree(Field<StackPanel>(w, "processRecoveryRows")).OfType<TextBlock>().Any(x => x.Text.Contains("Fixture access denied")), "partial stop error omitted from its row");
+                Offscreen(w);
+                Console.WriteLine("PASS WINDOW process recovery works disconnected/busy, starts unchecked, protects rows, confirms exact selection, retains partial results and requires explicit reconnect (inert service only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; int stops = 0;
+                Set(w, "processRecoveryScanOverride", new Func<CancellationToken, Task<RecoveryReport>>(c => { throw new InvalidOperationException("Fixture Windows permission declined"); }));
+                Set(w, "processRecoveryStopOverride", new Func<RecoveryReport, IEnumerable<int>, CancellationToken, Task<RecoveryReport>>((scan, ids, c) => { stops++; throw new Exception("must not stop"); }));
+                Click(w, Button(w, "processRecoveryScan"));
+                Check(stops == 0 && Field<TextBox>(w, "details").Text.Contains("permission declined") && !Button(w, "processRecoveryStop").IsEnabled &&
+                    Button(w, "processRecoveryScan").IsEnabled && f.Http.Writes.Count == 0, "failed scan hid retry or enabled a stop");
+                Set(w, "processRecoveryScanOverride", new Func<CancellationToken, Task<RecoveryReport>>(c => { var cancelled = RecoveryFixture(); cancelled.Cancelled = true; return Task.FromResult(cancelled); }));
+                Click(w, Button(w, "processRecoveryScan"));
+                Check(!Button(w, "processRecoveryStop").IsEnabled && !Field<bool>(w, "processRecoveryFresh") && stops == 0,
+                    "cancelled scan granted stop eligibility");
+                Offscreen(w);
+                Console.WriteLine("PASS WINDOW failed/cancelled elevation scan cannot stop processes and leaves visible retry (inert service only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); int stopped = 0; int writesBefore = f.Http.Writes.Count;
+                Set(w, "processRecoveryScanOverride", new Func<CancellationToken, Task<RecoveryReport>>(c => Task.FromResult(RecoveryFixture())));
+                Set(w, "processRecoveryStopOverride", new Func<RecoveryReport, IEnumerable<int>, CancellationToken, Task<RecoveryReport>>((scan, ids, c) => {
+                    stopped++; throw new IOException("Fixture recovery result could not be read after stop request");
+                }));
+                Set(w, "processRecoveryConfirmOverride", new Func<string, bool>(message => true));
+                Click(w, Button(w, "processRecoveryScan"));
+                Tree(Field<StackPanel>(w, "processRecoveryRows")).OfType<CheckBox>().Single(x => ((RecoveryCandidate)x.Tag).Pid == 101).IsChecked = true;
+                Click(w, Button(w, "processRecoveryStop"));
+                Check(stopped == 1 && Field<LauncherBridge>(w, "bridge").Address == null && !Field<bool>(w, "connectionReady") &&
+                    Field<TextBox>(w, "details").Text.Contains("could not be read") && Button(w, "retryConnection").IsEnabled &&
+                    !Button(w, "processRecoveryStop").IsEnabled && f.Http.Writes.Count == writesBefore,
+                    "uncertain stop result retained stale attachment, retried a stop or lost error/reconnect");
+                Offscreen(w);
+                Console.WriteLine("PASS WINDOW uncertain stop result invalidates attachment and consumed selection without auto-reconnect (inert service only)");
+            }
             foreach (bool running in new[] { true, false }) using (var f = new Fixture(root))
             {
                 var w = f.Window;
@@ -563,6 +647,15 @@ public static class WindowTests
                 Check(!Button(w, "useSimulator").IsEnabled && Field<TextBlock>(w, "runtimeHint").Text.Contains("OpenXR runtime"), "missing simulator capability silently enabled");
                 Click(w, Button(w, "check"));
                 Check(f.Http.ReadinessChecks == 1 && Field<TextBlock>(w, "operationText").Text.Contains("not applied yet") && Field<Expander>(w, "feedbackPanel").IsExpanded, "readiness result is hidden or conflated with headset success");
+                f.Http.Status["openxr"] = new Dictionary<string, object> { { "name", "" }, { "available", false }, { "manifest", "" }, { "canHeadset", false }, { "canSimulator", true } }; Refresh(w);
+                Check(Button(w, "useSimulator").IsEnabled && !Button(w, "useHeadset").IsEnabled &&
+                    Field<TextBlock>(w, "runtime").Text == new Strings()["runtimeMissingSimulator"], "fresh PC lacks a supported simulator recovery action");
+                Click(w, Button(w, "useSimulator"));
+                var runtimeRequest = Json.Read<Dictionary<string, object>>(f.Http.RuntimeBody);
+                Check(runtimeRequest.ContainsKey("expectedActive") && Json.Text(runtimeRequest, "expectedActive") == "" && f.Http.RuntimeChanges == 3,
+                    "first runtime registration lost its explicit empty expectedActive guard");
+                Json.Child(f.Http.Status, "openxr")["isBundledSimulator"] = false; Refresh(w);
+                Check(Button(w, "useSimulator").IsEnabled && Field<TextBlock>(w, "runtime").Text.Contains(new Strings()["runtimeOtherSimulator"]), "foreign simulator conceals package switch");
                 Console.WriteLine("PASS WINDOW headset/simulator roundtrip, decline, capability/activity gates and visible readiness result (fake HTTP only)");
             }
             using (var f = new Fixture(root))
@@ -730,6 +823,39 @@ public static class WindowTests
                     "asynchronous launch failure hid its error or stranded retry");
                 Offscreen(w);
                 Console.WriteLine("PASS WINDOW launch request rejection and asynchronous permission failure remain visible and permit retry (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); Field<CheckBox>(w, "risk").IsChecked = true;
+                f.Http.Status["job"] = new Dictionary<string, object> { { "kind", "launch" }, { "running", false }, { "code", 0 }, { "output", "Fixture worker dispatched" } };
+                var worker = new Dictionary<string, object> { { "current", true }, { "running", true }, { "cancellable", true },
+                    { "phase", "waiting-game" }, { "message", "Fixture Steam is opening; waiting for the selected game" }, { "attemptId", "current-attempt" }, { "ownerPid", 98765 } };
+                f.Http.Status["launch"] = worker; Refresh(w);
+                Check(Field<TextBlock>(w, "operationText").Text.Contains("Steam is opening") && Field<TextBlock>(w, "launchState").Text.Contains("Steam is opening"), "completed dispatch job hid external worker progress");
+                Check(Field<Button>(w, "cancelButton").IsEnabled && Field<Button>(w, "cancelButton").Visibility == Visibility.Visible &&
+                    !Field<Button>(w, "launchButton").IsEnabled && !Button(w, "useSimulator").IsEnabled && Field<ProgressBar>(w, "progress").IsIndeterminate,
+                    "pending worker hid Stop waiting or allowed a conflicting launch/runtime action");
+                var blockedClose = (Task<bool>)Invoke(w, "PrepareToClose"); PumpUntil(() => blockedClose.IsCompleted, "pending worker close guard");
+                Check(!blockedClose.GetAwaiter().GetResult() && f.Http.Stops == 0 && Field<TextBox>(w, "details").Text.Contains("98765") &&
+                    Field<TextBlock>(w, "operationText").Text.Contains(new Strings()["closeStartup"]), "closing abandoned the pending worker or hid its process identity");
+                Click(w, Field<Button>(w, "cancelButton"));
+                Check(f.Http.Cancels == 1 && Field<TextBlock>(w, "operationText").Text.Contains("cancelled before the game started") &&
+                    Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed && Field<Button>(w, "launchButton").IsEnabled, "external worker Stop waiting failed");
+                // The same completed job can outlive a worker failure: only phase/message change.
+                worker["running"] = false; worker["cancellable"] = false; worker["phase"] = "failed"; worker["message"] = "Fixture Steam handoff failed after dispatch";
+                f.Http.Status["launch"] = worker; Refresh(w);
+                Check(Field<TextBlock>(w, "launchState").Text == new Strings()["launchFailed"] && Field<TextBox>(w, "details").Text.Contains("handoff failed after dispatch") &&
+                    Field<Expander>(w, "feedbackPanel").IsExpanded && Field<Expander>(w, "feedbackPanel").Visibility == Visibility.Visible,
+                    "terminal external worker failure stayed hidden behind successful dispatch");
+                worker["current"] = false; worker["running"] = true; worker["cancellable"] = true; worker["message"] = "Stale worker must not block"; Refresh(w);
+                Check(Field<Button>(w, "launchButton").IsEnabled && Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed &&
+                    !Field<TextBlock>(w, "operationText").Text.Contains("Stale worker"), "historical worker affected current controls");
+                f.Http.Status["gameRunning"] = true; f.Http.Status["injectorRunning"] = true; Refresh(w);
+                var idleClose = (Task<bool>)Invoke(w, "PrepareToClose"); PumpUntil(() => idleClose.IsCompleted, "idle helper close");
+                Check(idleClose.GetAwaiter().GetResult() && f.Http.Stops == 1 && Json.Flag(f.Http.Status, "gameRunning") && Json.Flag(f.Http.Status, "injectorRunning") && f.Http.Launches == 0,
+                    "idle launcher exit failed to stop its helper exactly once or changed the running game");
+                Offscreen(w);
+                Console.WriteLine("PASS WINDOW external worker remains visible/cancellable after dispatch, late failure expands, stale worker is ignored (fake HTTP only)");
             }
             using (var f = new Fixture(root))
             {
@@ -906,6 +1032,19 @@ public static class WindowTests
                 Click(w, Button(w, "retryConnection"));
                 Check(Field<bool>(w, "connectionReady") && f.Http.Stops == 0 && f.Http.Launches == 0, "cancel/retry could not recover without game side effects");
                 Console.WriteLine("PASS WINDOW cancellation before first connection leaves a visible working Retry");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window;
+                var work = (Task)Invoke(w, "Run", new Func<CancellationToken, Task>(c => { throw new TaskCanceledException("Fixture transport timeout, not user cancellation"); }));
+                PumpUntil(() => work.IsCompleted, "transport timeout feedback"); work.GetAwaiter().GetResult();
+                Check(Field<TextBlock>(w, "operationText").Text.Contains(new Strings()["failed"]) &&
+                    Field<TextBox>(w, "details").Text == new Strings()["requestInterrupted"] && Field<Expander>(w, "feedbackPanel").IsExpanded,
+                    "transport timeout was mislabeled as user Cancelled or hidden");
+                Check(Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed && Field<ProgressBar>(w, "progress").Visibility == Visibility.Collapsed,
+                    "transport timeout left an endless spinner");
+                Offscreen(w);
+                Console.WriteLine("PASS WINDOW transport cancellation is actionable failure; explicit user cancellation remains separate");
             }
             using (var f = new Fixture(root, false))
             {

@@ -1,56 +1,88 @@
-WuWa VR beta - Steam and Kuro - 6 October 2026
-Launcher 1.0.2 | VR package beta-2026-10-06-steam | game 3.7
+WUWA VR — STARTUP-RECOVERY BETA CHECKS
+Desktop app 1.0.3 | beta-2026-10-06-recovery | VR build steam-20261006 | game 3.7
 
-Download WuWa-VR-Setup.exe, run it, then open WuWa VR.
-1. Choose your detected Kuro or Steam installation in step 01.
-2. Confirm your game version and install the VR package in step 02.
-3. Start your headset software, check the runtime, then Launch in VR.
-Kuro opens its launcher; press Play there. Steam starts the selected game through
-Steam. Windows permission, Steam sign-in or game updates may still be needed.
+The renderer and injector are unchanged from beta-2026-10-06-steam.
+Startup/runtime changes have background test coverage. The previous app 1.0.2
+failed to start on a remote Windows 11 Steam PC; 1.0.3 still needs a retest there.
+Do not treat these notes as a successful UAC, game-launch or headset acceptance.
 
-Already installed using Setup? The app checks for updates at startup. In step 02,
-Versions & updates > Check updates can also refresh both update lists. Choose
-Update launcher; when ready and the game/injector/recording are stopped, choose
-Restart to update. Then select beta-2026-10-06-steam in step 02 and install it.
-Updating the app keeps your existing VR package selection and settings.
-A portable EXE does not self-update; use Setup for installed-app updates.
+For each relevant group, record Pass / Fail / Blocked / Not tested, with the
+Windows version, game store, app/package version and exact visible result.
+Skip deliberately exercising failures if you only want to play.
 
-What changed
-- Steam installation detection and explicit Kuro/Steam choice. The Steam route
-  targets that installation's actual game process and refuses ambiguous targets.
-- Steam choices survive upgrading an older VR package.
-- Graphics now follow the game's settings instead of silently writing old low
-  or medium startup overrides. Recognized inherited overrides are backed up and
-  removed; custom overrides remain explicit. No universal quality preset is imposed.
-- The player menu groups ordinary controls and keeps experimental diagnostics
-  separate. Optional walking input can merge VR buttons with a selected treadmill
-  or Xbox slot; Xbox remains the main gameplay option.
-- Prior cinematic framing, mono/stereo screen, portal, diorama and accepted
-  foliage/lighting corrections are retained. Renderer unchanged from graphics-r2.
+[ ] 1. Update both parts. From installed 1.0.2, Step 02 > Versions & updates >
+    Check updates > Update launcher. When idle, Restart to update and confirm.
+    After reopening, explicitly select beta-2026-10-06-recovery in Step 02 and
+    install it. The old selection, saved settings and recordings are preserved
+    by the app update; Check updates does not select the new VR package.
+    If the old app blocks updating, close it and use the new WuWa-VR-Setup.exe
+    from https://chronohaxx.github.io/wuwa-vr/. A stalled worker can remain;
+    the installer does not promise to stop it.
+[ ] 2. Startup feedback. Launch in VR once with your intended Steam/Kuro choice.
+    Confirm the real startup stage is visible. If Windows permission is declined
+    or startup fails, the reason should remain visible and a safe retry should
+    become available. Stop waiting, when offered, cancels startup waiting; it
+    must not terminate the running game. Inspect View details / Copy diagnostics
+    before retrying an unknown result. Do not start another injector in parallel.
+[ ] 3. Explicit runtime choice. With game and injector closed, select the intended
+    headset runtime or Use bundled simulator. No runtime or an old package's
+    simulator should allow an explicit simulator choice. Missing Visual C++
+    2015–2022 x64 dependencies should show a useful message. Opening/updating the
+    app alone must not switch runtimes. Only change runtime if you intend to.
+[ ] 4. Recovery, only if needed. Troubleshooting > Stuck launcher processes >
+    Find stuck launcher processes may request Windows permission. Scan alone
+    stops nothing. Review name, PID, role, start time, path and eligibility;
+    no row should be selected automatically. Select only an eligible verified
+    launcher helper/startup worker you intend to stop. Stop selected must list
+    the exact targets for confirmation, then show individual results. WuWa,
+    Steam, headset/runtime and injector processes are excluded. Runtime/profile
+    workers and active/unknown recording state stay protected. Inconclusive
+    processes may need manual handling; copy diagnostics instead of guessing.
+    Choose Retry connection explicitly when ready; no automatic game launch.
+[ ] 5. Ordinary use. After one successful launch, check the actual game view,
+    L3+R3 settings, L3+A recenter and L3+B HUD toggle. Exit normally and check that
+    another intentional launch is available. Headset comfort remains a separate
+    user check; stop if uncomfortable. No rendering change is claimed here.
 
-Evidence and remaining limits
-The owner reported the Steam game running; its backend startup and stereo activity
-were observed. Background discovery, exact-path injection policy, upgrade handoff,
-graphics migration, packaging and offscreen UI checks are covered. Other PCs,
-physical headset comfort, all controls and normal Steam exit need further testing.
-The launch status can remain waiting for UEVR even after backend startup.
-Long scene/dialogue stalls, menu backgrounds moving separately from the HUD,
-unreliable HUD refresh and some stereo effects remain open. Automatic cinema is
-experimental, off by default, and actual prerecorded movie detection is unverified.
-No claim is made that this fixes Indath's initialization crash.
+Known limits and all optional controls remain in PlayerGuide.html / README.txt.
+The rim-light workaround stays OFF by default and removes intended nearby rim
+lighting when enabled. Scene stalls, HUD refresh and flat-menu background issues
+remain open. Keep the previous Steam beta for rollback; do not overwrite an
+installed app by hand or delete its data folders to update.
 
-Manual fallback: hold LT + RT, then click R3 for mono theatre. Hold L3 for 0.8s
-with both triggers held for the stereo screen. Release controls before repeating.
+鸣潮 VR — 启动恢复测试版检查
+桌面应用 1.0.3 | beta-2026-10-06-recovery | VR 构建 steam-20261006 | 游戏 3.7
 
-Previous releases remain available for rollback. Your data stays in the existing
-WuWa VR Manager and WuWa VR Launcher folders under LocalAppData.
-For reports use Troubleshooting > Copy diagnostics and include the selected package,
-game storefront, headset/runtime, what happened, and any displayed error.
+渲染器和注入器与上一个 Steam 测试版相同。启动／运行时改动已有后台测试覆盖，
+但此前 1.0.2 在远程 Windows 11 Steam 电脑上启动失败，1.0.3 的复测仍待进行。
+这些说明不代表 Windows 授权、实际启动或头显验收通过。
+按相关分组记录：通过／失败／受阻／未测试，并注明 Windows、游戏平台、应用和包版本。
+只想正常游玩时，无需刻意制造故障。
 
-Advanced portable fallback: fully extract WuWa-VR-Launcher.zip and open
-WuWa VR Launcher.exe. Keep app and python together. This uses the developer web UI.
+[ ] 1. 两项都更新。第 02 步 > 版本与更新 > 检查更新 > 更新启动器，空闲时
+    重启并更新。重新打开后，明确选择 beta-2026-10-06-recovery 并安装。
+    更新应用保留旧 VR 包选择、设置和录像；检查更新不会自动改选新包。
+    旧应用阻止更新时，关闭后运行网站的新 WuWa-VR-Setup.exe；卡住的任务
+    可能仍在运行，安装程序不能保证将其停止。
+[ ] 2. 启动反馈。确认所选 Steam／库洛安装，点击一次 Launch in VR。
+    应显示实际启动阶段；拒绝 Windows 授权或启动失败后应保留原因并允许
+    安全重试。“停止等待”只取消启动等待，不结束游戏。结果不明时先查看详情／
+    复制诊断，不要并行启动另一个注入器。
+[ ] 3. 明确选择运行时。关闭游戏和注入器后，再按需选择头显或内置模拟器。
+    没有运行时注册或旧包模拟器路径时，应能明确选择内置模拟器。
+    缺少 Visual C++ 2015–2022 x64 依赖时应有明确提示。仅打开或更新应用
+    不应切换运行时；不需要更改时无需测试此项。
+[ ] 4. 仅在需要时恢复。故障排查 > 卡住的启动器进程 > 查找卡住的启动器进程，
+    可能请求 Windows 授权；扫描本身不会停止进程。核对名称、PID、角色、
+    启动时间、路径和可停止状态，默认不勾选。只选择确实想停止且已验证归属、
+    允许停止的辅助程序／启动任务。“停止所选进程”应列出确切目标并要求确认，
+    随后显示逐项结果。游戏、Steam、头显／运行时、注入器不属于终止目标。
+    运行时／配置任务和正在录制或状态不明的录制仍受保护。无法判断时先复制
+    诊断，不要猜测。准备好后明确点击“重试连接”；不会自动启动游戏。
+[ ] 5. 正常使用。成功启动后检查实际画面、L3+R3 设置、L3+A 重置中心和
+    L3+B 界面开关。正常退出后应能再次明确启动。头显舒适度另行验收，
+    不适时停止。本版不宣称新增渲染修复。
 
-Unofficial beta, not approved by Kuro Games. Injection may trigger anti-cheat or
-account restrictions. Component licenses and notices remain unchanged.
-Source and checksums accompany this release; no game content or private recordings
-are included. This beta does not assert cross-PC or headset acceptance.
+完整可选功能和限制见 PlayerGuide.html／README.txt。NPC 轮廓光临时方案默认关闭，
+开启后也会移除附近角色原有轮廓光。场景停顿、HUD 刷新和平面菜单背景问题仍未解决。
+保留上一 Steam 测试版以便回退；不要手动覆盖已安装应用或删除数据目录来更新。

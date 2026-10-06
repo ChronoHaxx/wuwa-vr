@@ -63,6 +63,7 @@ param(
     [ValidateSet('launcher','manual','steam')][string]$GameStart = 'launcher',
     [string]$StatePath,
     [string]$CancelPath,
+    [string]$DiagnosticDirectory,
     [switch]$PromptOnLauncherClosed
 )
 
@@ -268,7 +269,7 @@ if ($configuredRuntime) {
 }
 
 if (Test-Path -LiteralPath $profileLog) {
-    Write-Report 'Profile log' ('{0:N0} bytes' -f (Get-Item $profileLog).Length)
+    Write-Report 'Profile log' ('{0:N0} bytes' -f (Get-Item -LiteralPath $profileLog).Length)
 } else {
     Write-Report 'Profile log' 'absent (first run)'
 }
@@ -404,7 +405,7 @@ function Read-LogSlice($from) {
 }
 
 $logOffset = 0
-if (Test-Path -LiteralPath $profileLog) { $logOffset = (Get-Item $profileLog).Length }
+if (Test-Path -LiteralPath $profileLog) { $logOffset = (Get-Item -LiteralPath $profileLog).Length }
 $logHeaderBefore = Get-LogHeader
 
 if ($StartLauncher -and -not (Test-Path -LiteralPath $launcherExe)) { throw "Launcher not found: $launcherExe" }
@@ -435,7 +436,7 @@ $observe = {
             $observation.ReadFrom = 0
             $observation.BackendLogStarted = $true
         }
-        if ($observation.BackendLogStarted -or (Get-Item $profileLog).Length -gt $logOffset) {
+        if ($observation.BackendLogStarted -or (Get-Item -LiteralPath $profileLog).Length -gt $logOffset) {
             $observation.Slice = Read-LogSlice $observation.ReadFrom
             $observation.FirstFrameSeen = $observation.Slice -match 'texture bounds right eye'
         }
@@ -474,7 +475,7 @@ if ($PromptOnLauncherClosed -and $StartLauncher -and -not $steamGame) {
         $key = Read-LaunchKey -TimeoutSeconds 60 -StopWhen { $CancelPath -and (Test-Path -LiteralPath $CancelPath) }
         if ($key -and $key.Key -eq [ConsoleKey]::R) {
             Write-Host 'Reopening the launcher.'
-            $null = Start-Process -FilePath $launcherExe
+            $null = Start-Process -FilePath $launcherExe -WorkingDirectory (Split-Path -Parent $launcherExe)
             $progress.Message = ''
             return 'Retry'
         }
@@ -487,25 +488,30 @@ try {
         $watchedInjector = $waitingInjectors[0]
         Write-Output "Observing existing injector (PID $($watchedInjector.Id)); no new injector started."
     } else {
+        Assert-LaunchNotCancelled -CancelPath $CancelPath
         Write-Output 'Starting injector...'
         $injectorArguments = 'Client-Win64-Shipping.exe'
         if ($steamGame) { $injectorArguments = '--target-path "' + $steamGame.Shipping + '"' }
-        $injectorProcess = Start-Process -FilePath $injectorExe `
-            -WorkingDirectory (Split-Path -Parent $injectorExe) `
-            -WindowStyle Hidden `
-            -ArgumentList $injectorArguments `
-            -PassThru
+        $injectorStart = @{FilePath=$injectorExe;WorkingDirectory=(Split-Path -Parent $injectorExe);
+            WindowStyle='Hidden';ArgumentList=$injectorArguments;PassThru=$true}
+        if ($DiagnosticDirectory) {
+            if (-not (Test-Path -LiteralPath $DiagnosticDirectory -PathType Container)) { throw 'The launch diagnostics folder is missing. Retry from the launcher.' }
+            $injectorStart.RedirectStandardOutput=Join-Path $DiagnosticDirectory 'injector.stdout.log'
+            $injectorStart.RedirectStandardError=Join-Path $DiagnosticDirectory 'injector.stderr.log'
+        }
+        $injectorProcess = Start-Process @injectorStart
         $watchedInjector = $injectorProcess
         Update-LaunchState -Path $StatePath -Values @{ injectorPid = $injectorProcess.Id; injectorStarted = $true }
         Write-Output "Injector started (PID $($injectorProcess.Id)); waiting for the selected game."
     }
 
+    Assert-LaunchNotCancelled -CancelPath $CancelPath
     if ($steamGame) {
         Write-Output 'Asking Steam to start app 3513350 through the normal desktop. Steam VR injection is unverified.'
         Start-WuWaSteamGame -Game $steamGame
     } elseif ($StartLauncher) {
         Write-Output 'Starting the Wuthering Waves launcher. Sign in and press Play yourself.'
-        $null = Start-Process -FilePath $launcherExe
+        $null = Start-Process -FilePath $launcherExe -WorkingDirectory (Split-Path -Parent $launcherExe)
     } else {
         Write-Output 'Now start Wuthering Waves through its launcher. Re-run with -StartLauncher to have this open it for you.'
     }
@@ -528,14 +534,16 @@ try {
         $injectorHandled = $true
         $advice = switch ($outcome.Action) {
             'LauncherClosed' { ' Run the shortcut again and press Play in the launcher.' }
-            'InjectorExited' { ' Run the shortcut again and leave the injector open until the game starts.' }
+            'InjectorExited' { ' Open Troubleshooting and copy diagnostics; include injector.stdout.log and injector.stderr.log from this attempt if present. Check Windows Security protection history for a blocked file. Do not disable security software.' }
             'GameExited'     { ' Check the game or launcher for an error, then run the shortcut again.' }
-            'NotInjected'    { ' Open Recovery > Copy diagnostics in the launcher. Include the injector log when reporting this failure. Close the game normally before retrying.' }
+            'NotInjected'    { ' Open Troubleshooting > Copy diagnostics in the launcher. Include the injector log when reporting this failure. Close the game normally before retrying.' }
             default          { '' }
         }
         $phase = 'failed'
         if ($outcome.Action -eq 'Cancelled') { $phase = 'cancelled' }
-        $message = $outcome.Detail + $cleanup + $advice
+        $exitDetail = ''
+        if ($outcome.Action -eq 'InjectorExited' -and $watchedInjector) { $exitDetail = Get-LaunchProcessExitDetail -Process $watchedInjector }
+        $message = $outcome.Detail + $exitDetail + $cleanup + $advice
         Update-LaunchState -Path $StatePath -Values @{ phase = $phase; outcome = $outcome.Action; message = $message }
         throw $message
     }
@@ -594,7 +602,8 @@ try {
     # Stop-OwnedInjector leaves everything alone while a game process runs.
     if ($injectorHandled -or -not $injectorProcess) { throw }
     $message = $_.Exception.Message + (Format-InjectorCleanup (Stop-OwnedInjector -Process $injectorProcess -GameNames $gameNames))
-    try { Update-LaunchState -Path $StatePath -Values @{ phase = 'failed'; outcome = 'Error'; message = $message } } catch { }
+    $phase=if($_.Exception -is [OperationCanceledException]){'cancelled'}else{'failed'}
+    try { Update-LaunchState -Path $StatePath -Values @{ phase = $phase; outcome = 'Error'; message = $message } } catch { }
     throw $message
 }
 

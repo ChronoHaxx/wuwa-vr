@@ -266,7 +266,7 @@ function render(s) {
   $("chosenBuild").textContent = "Next Apply & launch: " + (s.builds.find(b => b.id === chosenBuild)?.name || "choose a build") + ".";
   $("dataFolder").textContent = "Data folder: " + s.dataFolder;
   $("restore").disabled = !s.originalBackup;
-  const job = s.job, busy = job.running || s.gameRunning || s.injectorRunning;
+  const job = s.job, busy = job.running || s.launch?.running || s.gameRunning || s.injectorRunning;
   $("recordStart").disabled = job.running || !s.gameRunning || !s.recording?.available || (s.openxr.isSimulator && !s.recording?.sources?.simulator);
   $("recordStop").disabled = !s.recording?.running;
   $("compareGraphics").disabled = job.running || !s.gameRunning || s.openxr.isSimulator || !s.comparisons?.available;
@@ -275,14 +275,15 @@ function render(s) {
   $("simulatorCopy").hidden = !s.openxr.isSimulator || s.openxr.isBundledSimulator;
   for (const id of ["launch", "apply", "reset", "restore"]) $(id).disabled = busy || (id === "restore" && !s.originalBackup);
   $("check").disabled = job.running; $("verify").disabled = job.running; $("stop").disabled = job.running;
-  const waiting = s.launch && ["preflight", "waiting-for-play", "game-starting", "injected", "settling"].includes(s.launch.phase) && !s.gameRunning;
+  const waiting = s.launch?.current && s.launch?.cancellable;
   $("cancel").hidden = !waiting;
   let text, isError = false;
-  if (job.running) text = job.message + "…";
+  if (s.launch?.current && s.launch?.running && s.launch.message) text = s.launch.message;
+  else if (job.running) text = job.message + "…";
   else if (flash && Date.now() < flash.until) { text = flash.text; isError = flash.isError; }
   else if (job.kind) {
     text = job.output || job.message; isError = job.error;
-    if (job.kind === "launch" && !job.error && s.launch && s.launch.message) { text += "\n\nStartup: " + s.launch.message; isError = s.launch.phase === "failed"; }
+    if (job.kind === "launch" && !job.error && s.launch?.current && s.launch.message) { text += "\n\nStartup: " + s.launch.message; isError = s.launch.phase === "failed"; }
   }
   else if (s.game.problem) { text = s.game.problem; isError = true; }
   else text = s.riskAcknowledged ? "Ready. Choose Apply & launch when your headset software is running." : "Tick the account-risk box, choose a build, then Apply & launch.";

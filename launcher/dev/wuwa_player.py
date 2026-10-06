@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 from ctypes import wintypes
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import importlib.util
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -255,17 +255,20 @@ def simulator_manifest(path):
 
 def openxr_status():
     """Read-only; changing the runtime requires an explicit guarded POST."""
-    previous = ""
+    previous, active, has_active = "", "", False
     try:
         with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Khronos\OpenXR\1", 0,
                             winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
             active = str(winreg.QueryValueEx(key, "ActiveRuntime")[0])
+            has_active = True
             try:
                 previous = str(winreg.QueryValueEx(key, "PreviousActiveRuntime")[0])
             except OSError:
                 pass
+    except FileNotFoundError:
+        pass  # A fresh PC can explicitly register its first bundled simulator.
     except OSError:
-        return {"available": False, "message": "No OpenXR runtime is selected. Open SteamVR, Quest Link or Virtual Desktop and set it as the OpenXR runtime."}
+        return {"available": False, "message": "Windows could not read the OpenXR runtime. Check Windows permissions before changing it."}
     lower = active.lower()
     name = ("SteamVR" if "steamxr" in lower else "Meta Quest Link" if "oculus" in lower else
             "Virtual Desktop" if "virtualdesktop" in lower or "virtual desktop" in lower else
@@ -274,11 +277,11 @@ def openxr_status():
     simulator = config().app / "dev-tools/OpenXR-Simulator/openxr_simulator.json"
     is_simulator = simulator_manifest(active) or (not Path(active).is_file() and Path(active).name.lower() == "openxr_simulator.json")
     headset = previous if is_simulator else active
-    return {"available": ok, "name": name, "manifest": active,
-            "isSimulator": is_simulator, "canSimulator": runtime_manifest(simulator) and ok,
+    return {"available": ok, "name": name if active else "", "manifest": active,
+            "isSimulator": is_simulator, "canSimulator": runtime_manifest(simulator) and (ok or is_simulator or not has_active),
             "isBundledSimulator": is_simulator and Path(active).resolve() == simulator.resolve(),
             "canHeadset": runtime_manifest(headset) and not simulator_manifest(headset),
-            "message": "" if ok else "The selected OpenXR runtime file is missing. Re-select your headset software as the OpenXR runtime."}
+            "message": "" if ok else "No working OpenXR runtime is selected. Choose the bundled simulator for a desktop preview, or select your headset runtime in its own app."}
 
 
 def require_runtime(mode, expected):
@@ -286,7 +289,7 @@ def require_runtime(mode, expected):
         raise ValueError("Choose headset or simulator.")
     require_idle()
     current = openxr_status()
-    if not isinstance(expected, str) or not expected or current.get("manifest") != expected:
+    if not isinstance(expected, str) or current.get("manifest") != expected:
         raise ValueError("The runtime changed. Refresh and choose again.")
     if not current.get("canHeadset" if mode == "headset" else "canSimulator"):
         raise ValueError("Runtime unavailable. Select your headset runtime in its own app first; the simulator also needs to be included in this package.")
@@ -463,13 +466,64 @@ def game_status():
 
 
 # ----------------------------------------------------------------- state ---
-def launch_state():
+def utc_timestamp(value):
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).astimezone(timezone.utc).timestamp()
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+def launch_owner_alive(state):
+    """Match the process creation time, not a recyclable PID or an old phase."""
+    pid = state.get("ownerPid", state.get("pid"))
+    started = utc_timestamp(state.get("ownerStartedUtc", state.get("started")))
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0 or started is None:
+        return False
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(0x1000, False, pid)  # query limited information; never terminate
+    if not handle:
+        return False
+    try:
+        creation, exited, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
+        if not kernel.GetProcessTimes(handle, ctypes.byref(creation), ctypes.byref(exited), ctypes.byref(kernel_time), ctypes.byref(user_time)):
+            return False
+        actual = ((creation.dwHighDateTime << 32) | creation.dwLowDateTime) / 10_000_000 - 11644473600
+        return not (exited.dwLowDateTime or exited.dwHighDateTime) and abs(actual - started) < 0.01
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def launch_cancel_path(state):
+    cancel = state.get("cancelPath")
+    if not isinstance(cancel, str) or not cancel:
+        return None
+    try:
+        target = Path(cancel).resolve()
+        if target.parent.parent == (config().data / "runs").resolve() and target.name == "cancel.request":
+            return target
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def launch_state(state=None):
     """Progress written by the elevated startup, confined to our data folder."""
-    state = read_json(config().data / "launch-state.json")
+    if state is None:
+        state = read_json(config().data / "launch-state.json")
     if not isinstance(state, dict):
         return {}
-    shown = {k: state.get(k) for k in ("phase", "message", "outcome", "buildId", "started",
+    shown = {k: state.get(k) for k in ("phase", "message", "outcome", "buildId", "started", "attemptId", "requestedAt", "ownerPid", "ownerStartedUtc",
         "elevated", "injectorPid", "injectorStarted", "injectorRunning", "backendLogStarted", "firstFrameSeen") if k in state}
+    active = state.get("phase") not in (None, "", "failed", "cancelled", "finished") and launch_owner_alive(state)
+    requested = utc_timestamp(state.get("requestedAt", state.get("started")))
+    job_started = utc_timestamp(JOB.get("startedUtc"))
+    recent = JOB.get("kind") == "launch" and requested is not None and job_started is not None and job_started <= requested <= time.time() + 5
+    shown.update(current=bool(active or recent), running=bool(active),
+                 cancellable=bool(active and launch_cancel_path(state)))
     run = state.get("runDir")
     if isinstance(run, str) and run:
         try:
@@ -532,10 +586,36 @@ def powershell(*arguments, encoding="oem"):
         raise RuntimeError("Windows PowerShell was not found. It is part of Windows 10/11; repair Windows before retrying.")
     # Legacy helpers use the OEM code page; the build helper emits UTF-8 JSON
     # so paths survive accounts and package folders with non-ASCII characters.
-    return subprocess.run([str(executable), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", *arguments],
-                          cwd=config().app, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                          env=environment, text=True, encoding=encoding, errors="replace",
-                          creationflags=subprocess.CREATE_NO_WINDOW)
+    # Keep early failures visible before the elevated worker has a transcript.
+    # Arguments may contain local paths; only record the helper's filename.
+    trace = None
+    try:
+        config().logs.mkdir(parents=True, exist_ok=True)
+        trace = config().logs / ("helper-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f") + "-" + secrets.token_hex(4) + ".log")
+        script = Path(arguments[arguments.index("-File") + 1]).name if "-File" in arguments else "PowerShell"
+        trace.write_text(f"Started {script} at {datetime.now(timezone.utc).isoformat()}\n", encoding="utf-8")
+    except (OSError, IndexError):
+        trace = None
+    try:
+        result = subprocess.run([str(executable), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", *arguments],
+                                cwd=config().app, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                                env=environment, text=True, encoding=encoding, errors="replace", creationflags=subprocess.CREATE_NO_WINDOW)
+    except Exception as error:
+        if trace:
+            try:
+                with trace.open("a", encoding="utf-8") as handle:
+                    handle.write("Could not run helper: " + redact(error) + "\n")
+            except OSError:
+                pass
+        raise
+    if trace:
+        try:
+            with trace.open("a", encoding="utf-8") as handle:
+                handle.write(f"Finished at {datetime.now(timezone.utc).isoformat()}, exit {result.returncode}\n")
+                handle.write(redact(result.stdout[-65536:]) + "\n")
+        except OSError:
+            pass
+    return result
 
 
 def build_command(action, build_id=None, reset=False):
@@ -579,17 +659,19 @@ def last_error_line(text):
 
 
 LAUNCH_RESULTS = {
-    0: "Startup helper confirmed. Press Play in your chosen game launcher. Watch the progress below for UEVR and its first stereo frame. Steam/Epic injection remains unverified.",
+    0: "Startup helper confirmed. Follow the launch progress for the game, UEVR and its first stereo frame.",
     2: "A launch is already in progress. Wait for it to finish, or use Stop waiting.",
     3: "A Windows permission prompt is already open. Look for it in the taskbar and answer it.",
-    4: "Windows permission was declined, so nothing was started. Choose Apply & launch again when ready.",
-    5: "Startup is unconfirmed. Do not start another injector. Use Recovery > Copy diagnostics to check the helper and injector state.",
+    4: "Windows permission was declined, so nothing was started. Choose Launch in VR again when ready.",
+    5: "Startup is unconfirmed. Use Stop waiting if available, or copy diagnostics from Troubleshooting before retrying.",
 }
 
 
 def require_idle():
     if processes():
         raise ValueError("Close Wuthering Waves and any waiting injector first. The launcher never closes the game for you.")
+    if launch_state().get("running"):
+        raise ValueError("A launch is still waiting. Use Stop waiting before changing runtimes or launching again.")
 
 
 def require_build(build_id):
@@ -616,7 +698,7 @@ def launch_build(build_id):
     result = powershell(*build_command("Launch", build_id), encoding="utf-8")
     detail = last_error_line(result.stdout.strip())
     if result.returncode in LAUNCH_RESULTS and result.returncode != 0:
-        raise OperationError(result.returncode, LAUNCH_RESULTS[result.returncode])
+        raise OperationError(result.returncode, result.stdout.strip()[:8192] or LAUNCH_RESULTS[result.returncode])
     if result.returncode:
         raise OperationError(result.returncode, "Launch did not start: " + (detail or "unknown reason."))
     return LAUNCH_RESULTS[0]
@@ -641,11 +723,10 @@ def check_ready(build_id):
 
 def cancel_launch():
     state = read_json(config().data / "launch-state.json")
-    cancel = state.get("cancelPath") if isinstance(state, dict) else None
-    if not isinstance(cancel, str) or not cancel:
+    if not isinstance(state, dict) or not launch_state(state).get("cancellable"):
         raise ValueError("No launch is waiting.")
-    target = Path(cancel).resolve()
-    if target.parent.parent != (config().data / "runs").resolve() or target.name != "cancel.request":
+    target = launch_cancel_path(state)
+    if target is None:
         raise ValueError("The recorded launch is not from this launcher.")
     target.write_text("cancel\n", encoding="utf-8")
     return "Asked the waiting startup to stop. The game is never closed by the launcher."
@@ -712,6 +793,32 @@ def injector_diagnostics(build_id):
         return ["", f"No readable injector log for {build_id}."]
 
 
+def startup_diagnostics(launch):
+    """Only bounded, named logs from the recorded attempt, never arbitrary paths."""
+    run_id = launch.get("runId")
+    if not isinstance(run_id, str) or not run_id:
+        return []
+    runs = (config().data / "runs").resolve()
+    folder = (runs / run_id).resolve()
+    if folder.parent != runs:
+        return []
+    lines = []
+    for name in ("startup-error.txt", "injector.stdout.log", "injector.stderr.log"):
+        file = (folder / name).resolve()
+        if file.parent != folder:
+            continue
+        try:
+            with file.open("rb") as handle:
+                handle.seek(0, 2)
+                handle.seek(max(0, handle.tell() - 16384))
+                tail = handle.read(16384).decode("utf-8-sig", errors="replace").strip()
+            if tail:
+                lines += ["", f"Recorded attempt {run_id}: {name}", *(redact(line) for line in tail.splitlines()[-30:])]
+        except OSError:
+            pass
+    return lines
+
+
 def diagnostics():
     info = status()
     lines = [f"WuWa VR Launcher diagnostics, {datetime.now().astimezone().isoformat(timespec='seconds')}",
@@ -719,6 +826,7 @@ def diagnostics():
              f"Package folder: {info['package']['folder']}; data folder: {info['dataFolder']}",
              f"Selected build: {info['selected'] or 'none'}; injector points at it: {info['selectionMatches']}",
              f"OpenXR: {info['openxr'].get('name', 'unavailable')} ({'ok' if info['openxr'].get('available') else info['openxr'].get('message')})",
+             f"Active runtime: {redact(info['openxr'].get('manifest', 'none'))}; bundled simulator: {info['openxr'].get('isBundledSimulator', False)}",
              f"Game start: {info['game']['mode']} {redact(info['game']['launcher'])} {info['game']['problem']}".rstrip(),
              f"Running: {', '.join(p['name'] for p in info['processes']) or 'none'}",
              f"Last job: {info['job'].get('message')} {redact(info['job'].get('output', ''))[:400]}",
@@ -731,7 +839,14 @@ def diagnostics():
         lines += ["", "Recent launcher log:", *(redact(line) for line in tail)]
     except (IndexError, OSError):
         pass
+    try:
+        newest = sorted(config().logs.glob("helper-*.log"))[-1]
+        tail = newest.read_text(encoding="utf-8", errors="replace").splitlines()[-35:]
+        lines += ["", "Most recent helper request:", *(redact(line) for line in tail)]
+    except (IndexError, OSError):
+        pass
     launch = info.get("launch") or {}
+    lines += startup_diagnostics(launch)
     lines += injector_diagnostics(launch.get("buildId") or info["selected"])
     return "\n".join(lines) + "\n"
 
@@ -744,7 +859,8 @@ def begin_job(kind, message, operation, prepare=None):
             raise ValueError("Another operation is still running.")
         if prepare:
             prepare()
-        JOB.update(running=True, kind=kind, message=message, output="", error=False, code=None)
+        JOB.update(running=True, kind=kind, message=message, output="", error=False, code=None,
+                   startedUtc=datetime.now(timezone.utc).isoformat())
 
     def work():
         try:
@@ -1144,8 +1260,10 @@ class Handler(BaseHTTPRequestHandler):
             open_folder(body.get("folder"))
             return {"ok": True}
         if path == "/api/stop":
-            if JOB["running"]:
+            if JOB["running"] or launch_state().get("running"):
                 raise ValueError("Wait for the current operation to finish before stopping the launcher.")
+            if RECORDING["running"]:
+                raise ValueError("Stop recording before closing the launcher.")
             if playtest_busy():
                 raise ValueError('Stop the voice note or finish transcription before stopping the launcher.')
             threading.Thread(target=stop_server, daemon=True).start()
@@ -1163,7 +1281,7 @@ def idle_watch():
     """Exit when the page has been closed for a long time and nothing runs."""
     while True:
         time.sleep(30)
-        if JOB["running"] or playtest_busy() or time.monotonic() - LAST_REQUEST < IDLE_EXIT_SECONDS:
+        if JOB["running"] or RECORDING["running"] or launch_state().get("running") or playtest_busy() or time.monotonic() - LAST_REQUEST < IDLE_EXIT_SECONDS:
             continue
         try:
             if processes():

@@ -19,6 +19,7 @@ namespace WuWaVR.Manager
         {
             Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
             ConfigureRuntime();
+            if (LauncherProcessRecovery.TryRun(args)) return 0;
             bool preview = args.Length >= 2 && args[0] == "--preview";
             string root = Environment.GetEnvironmentVariable("WUWA_VR_MANAGER_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WuWa VR Manager");
             string data = Environment.GetEnvironmentVariable("WUWA_VR_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WuWa VR Launcher");

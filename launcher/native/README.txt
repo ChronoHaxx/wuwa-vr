@@ -1,5 +1,5 @@
-WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.2
-Release: beta-2026-10-06-steam / VR build steam-20261006 / game 3.7
+WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.3
+Release: beta-2026-10-06-recovery / VR build steam-20261006 / game 3.7
 
 Run WuWa-VR-Setup.exe once to install for your Windows user, then open the
 normal WuWa VR shortcut from the Start menu. No separate Python install is needed.
@@ -30,9 +30,12 @@ Updates: Step 02 > Versions & updates > Check updates. Update launcher downloads
 and verifies the desktop app update; it does not restart the app. When ready,
 close the game and injector, stop recording and finish other operations, then
 choose Restart to update and confirm. Installing or updating the desktop app
-preserves your selected VR package. In Step 02 choose beta-2026-10-06-steam
+preserves your selected VR package. In Step 02 choose beta-2026-10-06-recovery
 and install it, or select it if already installed, to use steam-20261006
-with Steam support. Both the app and VR package are needed for the new route.
+with the recovery helpers. From 1.0.2, update/restart the app first, then explicitly
+select and install the recovery package. Check updates does not select it for you.
+If the old app blocks updating, close it and use the new Setup from the website.
+This does not guarantee that a stalled worker has stopped; review remaining processes.
 Settings, backups, logs and recordings are preserved.
 Do not delete the WuWa VR Manager or WuWa VR Launcher folders in LocalAppData.
 There are no Setup/Record/Help tabs. The footer's Developer tools link opens the
@@ -47,6 +50,15 @@ Refresh reruns it and Copy report copies a sanitized summary. It works without
 the web helper. No hiding rules, driver settings or running apps are changed.
 A visible controller is not proof that the game receives its buttons.
 Failures expand Details beside the persistent status.
+Troubleshooting > Stuck launcher processes > Find stuck launcher processes scans
+names, PIDs, roles, start times, paths and eligibility, requesting elevation if needed.
+No process is selected automatically. Select a verified launcher helper/startup
+worker, choose Stop selected, and confirm the listed targets. It does not stop
+the game, Steam, headset/runtime or injector processes, or kill by name/process tree.
+Runtime/profile changes and active/unknown recording state remain protected. Inconclusive
+processes may need manual handling; copy diagnostics and review them first.
+Review the per-process results, then choose Retry connection when ready.
+Recovery does not reconnect or launch the game automatically.
 The readiness check may report that the profile still needs applying. It does not
 certify headset output. Nothing is uploaded automatically.
 
@@ -60,17 +72,21 @@ Advanced portable fallback: download WuWa-VR-Launcher.zip from the same release,
 extract the whole ZIP and open WuWa VR Launcher.exe. Keep its app and python
 folders together. This uses the older web interface and does not self-update
 the desktop app. Release downloads and previous versions:
+https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-recovery
 https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam
-https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic
 
 Steam and game graphics settings · 6 October public beta
-App 1.0.2 / VR build steam-20261006 / game 3.7.
+App 1.0.3 / VR build steam-20261006 / game 3.7.
 Choose Steam or Kuro in step 01; saved choices are preserved. The VR package
 keeps the game’s graphics choices instead of forcing low/medium values. A
 one-time cleanup removes only recognized generated overrides, preserving custom
 edits and backups. The accepted timing correction remains separate.
-Launch progress can still say waiting for UEVR after the backend starts; check
-the actual game view before retrying or starting another injector.
+Startup-recovery 1.0.3 adds visible startup stages, failure/cancellation feedback
+and guarded process recovery. Fresh-PC simulator selection supports absent runtime
+registration and old-package replacement; missing VC++ 2015-2022 x64 dependencies
+produce a prerequisite message. These changes have background test coverage.
+The previous 1.0.2 failed on a remote Windows 11 Steam PC; its 1.0.3 retest is
+pending. Renderer and injector are unchanged; no remote launch fix is claimed.
 Cinematic framing defaults on. The owner confirmed the simulator replay on
 private screen-comfort-r1; sampled frames in the latest 68-second recording show
 matching letterbox heights. Headset comfort remains pending. This retains the
@@ -79,8 +95,8 @@ Accepted foliage, far indirect-lighting, main Resonators reflection, ultimate
 camera and headset 2D-brightness corrections are retained.
 Long scene/dialogue stalls, HUD-aspect refresh and moving flat-menu backgrounds
 remain open. Manual mono theatre is a menu workaround, not a loading-stall fix.
-Fresh-PC installation, other-PC Steam use and this build’s headset experience
-remain unverified. Epic game injection is also unverified.
+The remote Windows 11 Steam retest and this build’s headset acceptance remain
+pending. Epic game injection is also unverified.
 
 OPTIONAL NPC RIM WORKAROUND: press L3 + R3 to open UEVR, then choose
 VR > WuWa Controls > Suppress mismatched NPC rim lighting. Default off; your
@@ -96,8 +112,9 @@ or leaving active native VR also restores it while the option still owns the val
 returning to eligible normal VR reapplies suppression if the option remains on.
 Read the status below the option: failed restoration is not a successful rollback.
 External changes are preserved. If the status requests a retry, turn the option
-off, then on; it retries restoration before applying again. See TEST THIS.txt for
-one grouped check when you choose to test; previous features need only regression.
+off, then on; it retries restoration before applying again. If testing, compare
+the visual tradeoff and restoration as one group. TEST THIS.txt covers the current
+release checks; previous features need only relevant regression checks.
 
 Horizontal and Vertical Projection defaults remain Raw / default; saved choices
 are unchanged. The separate timed projection comparison stays inactive and cannot
@@ -146,8 +163,8 @@ blocks VR input. No driver, HidHide, RealityRunner or system settings are change
 Rollback the walking layout with Off (normal input). Off restores the existing
 ControllersAllowed behavior: if that setting was already ON, the legacy VR
 controller mapping resumes. It does not disable that pre-existing mapping.
-If testing this beta, previous features need only the relevant regression
-checks in TEST THIS.txt, not a complete repeat of earlier acceptance.
+If testing this beta, previous features need only relevant regression checks;
+TEST THIS.txt covers this release, not all earlier acceptance.
 
 Optional diorama: VR > WuWa Controls > Diorama mode (optional) > Miniature world
 (this launch only). It temporarily uses the maximum 10x world scale, not ten times
@@ -177,8 +194,8 @@ Guide: https://chronohaxx.github.io/wuwa-vr/guide.html
 Feedback: https://github.com/ChronoHaxx/wuwa-vr/issues
 Optional support: https://ko-fi.com/chronohax
 
-鸣潮 VR — 桌面启动器 / 公开测试版 1.0.2
-发布版本 beta-2026-10-06-steam／VR 构建 steam-20261006／游戏 3.7
+鸣潮 VR — 桌面启动器 / 公开测试版 1.0.3
+发布版本 beta-2026-10-06-recovery／VR 构建 steam-20261006／游戏 3.7
 
 运行 WuWa-VR-Setup.exe，为当前 Windows 用户安装，然后从开始菜单打开
 普通 WuWa VR 快捷方式。无需另行安装 Python。小型安装程序不包含 VR 模组；
@@ -202,14 +219,23 @@ Optional support: https://ko-fi.com/chronohax
 更新：第 02 步 > 版本与更新 > 检查更新。“更新启动器”下载并校验桌面应用更新，
 此时不会重启。更新就绪后，关闭游戏和注入器、停止录制并完成其他操作，
 再选择“重启并更新”并确认。安装或更新桌面应用会保留当前选择的 VR 包。
-在第 02 步选择 beta-2026-10-06-steam 并安装（已安装时直接选用），
-即可使用 steam-20261006。设置、备份、日志和录像会保留；
+在第 02 步选择 beta-2026-10-06-recovery 并安装（已安装时直接选用），
+即可使用更新的恢复辅助程序。1.0.2 用户须先更新并重启应用，再明确选择并安装
+恢复包；检查更新不会自动改选。如旧应用阻止更新，请关闭应用并运行网站的新 Setup。
+这不能保证卡住的启动任务已停止；仍需检查残留进程。设置、备份、日志和录像会保留；
 不要删除 LocalAppData 中的 WuWa VR Manager 或 WuWa VR Launcher 文件夹。
 不再提供“设置／录制／帮助”标签页。底部“开发工具”链接打开同一安装包的
 原版网页工具，共用设置、录像、测试和调试功能。录制支持 SteamVR 和内置模拟器；
 暂不支持音频和 VDXR。
 
 底部“故障排查”提供手柄检查、启动检查、诊断及修复恢复；“返回”回到首页。
+故障排查 > 卡住的启动器进程 > 查找卡住的启动器进程，扫描名称、PID、角色、
+启动时间、路径和是否允许停止，需要时请求管理员权限，默认不勾选任何进程。
+只选择已验证归属的启动器辅助程序或启动任务，点击 Stop selected（停止所选进程），
+核对并确认列表。不会结束游戏、Steam、头显／运行时或注入器，也不按名称或进程树终止。
+查看逐项结果，准备好后再点击“重试连接”；不会自动重连或启动游戏。
+运行时／配置修改、正在录制或无法确认的录制状态仍受保护。无法判断的进程可能需要手动处理；
+请先复制诊断并检查。
 手柄检查只读取四个 XInput 插槽、HidHide 和常见输入辅助程序；可刷新及复制脱敏报告。
 不依赖网页辅助程序，不更改隐藏规则、驱动或运行中的程序。
 检测到手柄不代表已验证游戏收到按键。
@@ -221,18 +247,20 @@ WuWa VR Launcher.exe，保持 app 和 python 文件夹完整。这是旧版网�
 不会自动更新桌面应用。发布页及旧版本链接见上方英文部分。
 
 Steam 与游戏画质设置 · 10 月 6 日公开测试版
-应用 1.0.2／VR 构建 steam-20261006／游戏 3.7。
+应用 1.0.3／VR 构建 steam-20261006／游戏 3.7。
 第 01 步可选择 Steam 或库洛版本，保留已保存选择。VR 包保留游戏自身画质选择，
 不强制低／中画质；一次性清理仅移除已识别的旧生成覆盖项，保留自定义修改与备份。
-已接受的时序修正独立保留。后端启动后进度仍可能显示“等待 UEVR”；
-重试或另开注入器前，请先检查实际游戏画面。
+已接受的时序修正独立保留。1.0.3 更新启动阶段、错误／取消反馈及受保护的进程恢复。
+模拟器可在没有运行时注册时明确选用，也可替换旧包；缺少 VC++ 2015-2022 x64 时会提示。
+这些改动已有后台测试覆盖。此前 1.0.2 在远程 Windows 11 Steam 电脑启动失败；
+1.0.3 复测仍待进行。渲染器和注入器不变，不能宣称已修好该电脑的问题。
 过场构图修正默认开启。作者已确认私测 screen-comfort-r1 的模拟器回放改善；
 最新 68 秒录像抽样中双眼黑边高度一致，头显舒适度仍待验证。
 此修正保留游戏原有黑边，不是可自由环顾的沉浸式过场镜头。
 保留此前已接受的植被、远处间接光照、共鸣者主页面反射、大招镜头与头显二维亮度修正。
 场景／对话加载停顿、HUD 比例刷新与平面菜单背景移动仍未解决。
 手动单目影院可作为菜单临时方案，但不是已确认的加载停顿修复。
-全新电脑安装、其他电脑的 Steam 路径及本版本头显体验仍待验证；Epic 注入也未验证。
+远程 Windows 11 Steam 复测及本版头显验收仍待完成；Epic 注入也未验证。
 
 可选 NPC 边缘光方案：按 L3 + R3 打开 UEVR，在 VR > WuWa Controls 中选择
 “抑制不匹配的 NPC 边缘光”（Suppress mismatched NPC rim lighting）。默认关闭，
@@ -246,7 +274,7 @@ Steam 与游戏画质设置 · 10 月 6 日公开测试版
 本选项持有该数值的情况下恢复；若选项保持开启，返回适用的普通 VR 后会再次抑制。
 请读取选项下方状态，恢复失败不能视为回退成功。外部修改不会被覆盖。
 若状态提示重试，先关闭再开启，系统会先重试恢复原值，再重新应用。
-之后如选择测试，请按 TEST THIS.txt 做一组检查；已有功能只需相关回归。
+之后如选择测试，仅检查相关可选功能；TEST THIS.txt 列出本次发布检查，不替代全部早期验收。
 
 水平／垂直投影默认仍为 Raw / default，不改写已保存选择。独立的限时投影对比
 默认不运行；边缘光抑制会干扰对比时不允许启动。两者均不能证明 NPC 光照的底层原因。
@@ -277,7 +305,7 @@ Quest A/B/X/Y 与印字对应；扳机 = LT/RT，握持键 = LB/RB，按下摇�
 不会更改驱动、HidHide、RealityRunner 或系统设置。
 选择“关闭（常规输入）”撤销此漫游布局，恢复原有 ControllersAllowed 行为；如果该设置原已开启，
 旧版 VR 控制器映射会恢复，关闭漫游并不会关闭那项既有映射。如选择测试本版，
-已有功能仅需 TEST THIS.txt 所列相关回归检查，无需重复全部早期验收。
+已有功能仅需相关回归检查；TEST THIS.txt 列出本次发布检查，无需重复全部早期验收。
 可选微缩模式：VR > WuWa Controls > Diorama mode (optional) > Miniature world
 (this launch only)。临时使用最高 10 倍世界比例，不是在普通比例上再乘十倍。
 关闭后使用当前普通 VR_WorldScale，包括期间主动修改的新值；开关不会改写它。

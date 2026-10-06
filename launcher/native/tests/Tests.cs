@@ -401,6 +401,91 @@ class Tests
         using (var bridge = new LauncherBridge(folder, null, handler))
         { bridge.Connect(Path.Combine(folder, "package"), CancellationToken.None).GetAwaiter().GetResult(); test(bridge, handler); }
     }
+    sealed class StalledBody : Stream
+    {
+        readonly TaskCompletionSource<int> pending = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool ReadStarted, Disposed;
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken token)
+        { ReadStarted = true; return pending.Task; } // Deliberately ignores cancellation, like a wedged body read.
+        protected override void Dispose(bool disposing) { Disposed = true; pending.TrySetException(new ObjectDisposedException("fixture body")); base.Dispose(disposing); }
+        public override bool CanRead { get { return true; } }
+        public override bool CanSeek { get { return false; } }
+        public override bool CanWrite { get { return false; } }
+        public override long Length { get { throw new NotSupportedException(); } }
+        public override long Position { get { throw new NotSupportedException(); } set { throw new NotSupportedException(); } }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+        public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
+        public override void SetLength(long value) { throw new NotSupportedException(); }
+        public override void Write(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+    }
+    static LauncherBridge TimedBridge(string folder, LauncherHttp handler, int requestMs, int connectMs,
+        Func<System.Diagnostics.ProcessStartInfo, System.Diagnostics.Process> start)
+    {
+        return (LauncherBridge)Activator.CreateInstance(typeof(LauncherBridge), BindingFlags.NonPublic | BindingFlags.Instance, null,
+            new object[] { folder, null, handler, new Func<string[]>(() => new string[0]), new Func<int, bool?>(pid => false),
+                TimeSpan.FromMilliseconds(requestMs), TimeSpan.FromMilliseconds(connectMs), start }, null);
+    }
+    static void BridgeDeadlineTests()
+    {
+        Test("complete helper requests bound stalled identity/token/status/POST bodies without a live helper", () =>
+        {
+            foreach (string path in new[] { "/api/identity", "/", "/api/status", "/api/launch" })
+            {
+                string folder = Path.Combine(root, "deadline-" + Guid.NewGuid().ToString("N")), package = Path.Combine(folder, "package");
+                Directory.CreateDirectory(folder);
+                Json.Save(Path.Combine(folder, "launcher.json"), new { url = "http://127.0.0.1:34567/", pid = 123456 });
+                var handler = new LauncherHttp { AppRoot = Path.Combine(package, "app") };
+                int starts = 0; var bodies = new List<StalledBody>();
+                using (var bridge = TimedBridge(folder, handler, 40, 150, info => {
+                    Assert(info.EnvironmentVariables["WUWA_VR_NO_DIALOG"] == "1", "hidden helper startup could open a blocking error dialog");
+                    starts++; return System.Diagnostics.Process.GetCurrentProcess(); }))
+                {
+                    if (path == "/api/status" || path == "/api/launch") bridge.Connect(package, CancellationToken.None).GetAwaiter().GetResult();
+                    handler.Intercept = (request, token) => {
+                        if (request.RequestUri.AbsolutePath != path) return handler.DefaultReply(request);
+                        var body = new StalledBody(); bodies.Add(body);
+                        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(body) });
+                    };
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    try
+                    {
+                        (path == "/api/status" ? (Task)bridge.Status(CancellationToken.None) : path == "/api/launch" ?
+                            bridge.Post(path, new { }, CancellationToken.None) : bridge.Connect(package, CancellationToken.None)).GetAwaiter().GetResult();
+                        throw new Exception("stalled body was accepted");
+                    }
+                    catch (TimeoutException e) { Assert(e.Message.Contains("Retry connection") || e.Message.Contains("may still be running"), "timeout lacks a next step"); }
+                    Assert(watch.ElapsedMilliseconds < 3000 && bodies.Count > 0 && bodies.All(b => b.ReadStarted && b.Disposed), "body deadline/disposal failed");
+                    Assert(starts <= 1 && (path != "/api/launch" || handler.Posts == 1), "timeout retried a mutation or spawned multiple helpers");
+                }
+            }
+        });
+        Test("connect bounds stalled headers and repeated receipts under one elapsed deadline", () =>
+        {
+            foreach (bool stalledHeaders in new[] { false, true })
+            {
+                string folder = Path.Combine(root, "connect-deadline-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(folder);
+                string package = Path.Combine(folder, "package");
+                Json.Save(Path.Combine(folder, "launcher.json"), new { url = "http://127.0.0.1:34567/", pid = 123456 });
+                var handler = new LauncherHttp { AppRoot = Path.Combine(package, "app") }; int starts = 0;
+                var pending = new List<TaskCompletionSource<HttpResponseMessage>>();
+                handler.Intercept = (request, token) => {
+                    if (!stalledHeaders) return Task.FromResult(LauncherHttp.Reply(new { app = "unrelated-server", pid = 123456 }));
+                    var item = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously); pending.Add(item); return item.Task;
+                };
+                using (var bridge = TimedBridge(folder, handler, 40, 150, info => {
+                    Assert(info.EnvironmentVariables["WUWA_VR_NO_DIALOG"] == "1", "hidden helper startup could open a blocking error dialog");
+                    starts++; return System.Diagnostics.Process.GetCurrentProcess(); }))
+                {
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    try { bridge.Connect(package, CancellationToken.None).GetAwaiter().GetResult(); throw new Exception("connect never timed out"); }
+                    catch (TimeoutException e) { Assert(e.Message.Contains("did not become ready"), "overall startup timeout lost stage"); }
+                    Assert(watch.ElapsedMilliseconds < 3000 && starts == 1 && handler.Requests.Count > 1 && handler.Posts == 0, "receipt loop escaped deadline or mutated backend");
+                    foreach (var item in pending) item.TrySetResult(LauncherHttp.Reply(new { }));
+                }
+            }
+        });
+    }
     static Dictionary<string, object> IdleStatus()
     {
         return Json.Read<Dictionary<string, object>>(Json.Write(new { gameRunning = false, injectorRunning = false,
@@ -882,6 +967,15 @@ class Tests
                     Assert(LauncherPresentation.RuntimeSummary(true, state, k => k) == "SteamVR · " + (available ? "runtimeDetected" : "runtimeUnavailable"), "runtime state conflated");
                 }
             });
+            Test("runtime summary distinguishes foreign simulator and first-time setup recovery", () =>
+            {
+                var s = Json.Read<Dictionary<string, object>>(Json.Write(new { openxr = new { name = "", available = false, canSimulator = true } }));
+                Assert(LauncherPresentation.RuntimeSummary(true, s, k => k) == "runtimeMissingSimulator", "fresh PC hides valid simulator recovery");
+                s["openxr"] = new Dictionary<string, object> { { "name", "OpenXR Simulator" }, { "available", true }, { "isSimulator", true }, { "isBundledSimulator", false } };
+                Assert(LauncherPresentation.RuntimeSummary(true, s, k => k).Contains("runtimeOtherSimulator"), "another package's simulator mislabeled current");
+                Json.Child(s, "openxr")["isBundledSimulator"] = true;
+                Assert(LauncherPresentation.RuntimeSummary(true, s, k => k).Contains("runtimeBundledSimulator"), "selected bundled simulator not distinguished");
+            });
             Test("choosing another release never labels it installed", () =>
             {
                 Assert(LauncherPresentation.PackageSummary("old", "candidate", true, k => k) == "otherInstalled", "wrong selected release labelled installed");
@@ -1093,7 +1187,7 @@ class Tests
             Test("running game is not reported as confirmed stereo", () =>
             {
                 var s = new Dictionary<string, object> { { "gameRunning", true } }; Assert(LauncherBridge.LaunchSummary(s, x => x) == "awaitingStereo", "false success");
-                s["launch"] = new Dictionary<string, object> { { "phase", "failed" }, { "firstFrameSeen", true }, { "injectorRunning", true } };
+                s["launch"] = new Dictionary<string, object> { { "current", true }, { "phase", "failed" }, { "firstFrameSeen", true }, { "injectorRunning", true } };
                 Assert(LauncherBridge.LaunchSummary(s, x => x) == "launchFailed", "failure concealed");
                 s["gameRunning"] = false; Json.Child(s, "launch")["phase"] = "finished";
                 Assert(LauncherBridge.LaunchSummary(s, x => x) == "gameNotRunning", "old frames imply running game");
@@ -1111,9 +1205,21 @@ class Tests
                 s["selected"] = "another-build"; Assert(LauncherBridge.LaunchSummary(s, x => x) == "awaitingStereo", "wrong build confirmed");
                 s["selected"] = "test-build"; s["job"] = new Dictionary<string, object> { { "kind", "launch" }, { "error", true } };
                 Assert(LauncherBridge.LaunchSummary(s, x => x) == "launchFailed", "failed checks concealed by finished phase");
-                s.Remove("job"); Json.Child(s, "launch")["phase"] = "cancelled";
+                s.Remove("job"); Json.Child(s, "launch")["phase"] = "cancelled"; Json.Child(s, "launch")["current"] = true;
                 Assert(LauncherBridge.LaunchSummary(s, x => x) == "launchCancelled", "cancellation concealed");
             });
+            Test("external launch progress and cancellation require current correlated worker state", () =>
+            {
+                var s = Json.Read<Dictionary<string, object>>(Json.Write(new { gameRunning = false,
+                    job = new { kind = "launch", running = false, code = 0 },
+                    launch = new { current = true, running = true, cancellable = true, phase = "waiting-game", message = "Waiting for Steam" } }));
+                Assert(LauncherBridge.CanCancelLaunch(s) && LauncherBridge.LaunchWorkerRunning(s) && LauncherBridge.LaunchSummary(s, x => x) == "Waiting for Steam", "worker lost after dispatch job completed");
+                Json.Child(s, "launch")["current"] = false;
+                Assert(!LauncherBridge.CanCancelLaunch(s) && !LauncherBridge.LaunchWorkerRunning(s), "stale worker exposed cancel");
+                Json.Child(s, "launch")["phase"] = "failed";
+                Assert(LauncherBridge.LaunchSummary(s, x => x) == "gameNotRunning", "stale failure overwrote new state");
+            });
+            BridgeDeadlineTests();
             Test("backend launch errors reach the UI with authenticated request", () => WithBridge((bridge, http) =>
             {
                 http.Intercept = async (request, token) =>
@@ -1292,6 +1398,7 @@ class Tests
             });
             Console.WriteLine(passed + " tests passed. Evidence: " + root);
             ControllerDiagnosticsTests.Run();
+            ProcessRecoveryTests.Run(root);
             LauncherUpdateTests.Run(root);
             WindowTests.Run(root); return 0;
         }

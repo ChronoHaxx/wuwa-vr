@@ -31,6 +31,7 @@ namespace WuWaVR.Manager
         bool connectionReady;
         string connectionProblem = "";
         string lastJobSnapshot, lastNativeError = "";
+        bool allowClose, closeChecking, unresolvedStartup;
         ComboBox languages, releases, installed, source, fps, size, purpose;
         ContentControl pageHost;
         ScrollViewer setupPage, troubleshootingPage;
@@ -49,6 +50,16 @@ namespace WuWaVR.Manager
         Func<CancellationToken, Task<ControllerDiagnostics.Report>> controllerProbeOverride;
         Action<string> controllerCopyOverride;
         TimeSpan controllerTimeout = TimeSpan.FromSeconds(10);
+        Expander processRecoveryPanel;
+        StackPanel processRecoveryRows;
+        TextBlock processRecoveryState;
+        RecoveryReport processRecoveryReport;
+        bool processRecoveryFresh;
+        string processRecoveryNotice = "processRecoveryNotScanned";
+        readonly HashSet<int> processRecoverySelected = new HashSet<int>();
+        Func<CancellationToken, Task<RecoveryReport>> processRecoveryScanOverride;
+        Func<RecoveryReport, IEnumerable<int>, CancellationToken, Task<RecoveryReport>> processRecoveryStopOverride;
+        Func<string, bool> processRecoveryConfirmOverride;
         FrameworkElement versionConsent;
         Border connectionPanel;
         TextBlock connectionMessage;
@@ -96,12 +107,49 @@ namespace WuWaVR.Manager
                 poll.Start();
                 await CheckLauncherUpdates(updateLifetime.Token, true);
             };
-            Closing += (s, e) =>
+            Closing += async (s, e) =>
             {
-                if (operation != null) { MessageBox.Show(text["closeBusy"], text["title"]); e.Cancel = true; return; }
+                if (!allowClose && !preview)
+                {
+                    e.Cancel = true;
+                    if (closeChecking) return;
+                    closeChecking = true;
+                    try { if (await PrepareToClose()) { allowClose = true; Dispatcher.BeginInvoke(new Action(Close)); } }
+                    finally { closeChecking = false; }
+                    return;
+                }
                 closing = true; controllerOperation?.Cancel(); updateLifetime.Cancel(); this.launcherUpdates.Dispose();
                 poll.Stop(); repo.Dispose(); bridge.Dispose();
             };
+        }
+        async Task<bool> PrepareToClose()
+        {
+            if (operation != null || unresolvedStartup || Json.Flag(Json.Child(status, "job"), "running") ||
+                Json.Flag(Json.Child(status, "recording"), "running"))
+            {
+                operationText.Text = text[unresolvedStartup ? "closeStartup" : "closeBusy"];
+                details.Text = operationText.Text + Environment.NewLine + StartupDetails(Json.Child(status, "launch"));
+                feedbackPanel.Visibility = Visibility.Visible; feedbackPanel.IsExpanded = true;
+                return false;
+            }
+            // Closing never starts a replacement helper and never kills by process
+            // name. A helper already identified as another package is not ours to stop.
+            if (bridge.Conflict != null || store.Selected == null) return true;
+            bool stopped = false;
+            await Run(async c => {
+                try { await bridge.CloseHelper(store.Folder(store.Selected), c); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception error) { throw new InvalidOperationException(text["closeHelperBlocked"] + Environment.NewLine + error.Message, error); }
+                Disconnected(); stopped = true;
+            });
+            return stopped;
+        }
+        string StartupDetails(Dictionary<string, object> launch)
+        {
+            string message = Json.Text(launch, "message"); int pid;
+            if (LauncherBridge.CurrentLaunch(status) && int.TryParse(Json.Text(launch, "ownerPid"), out pid) && pid > 0)
+                message += Environment.NewLine + String.Format(text["startupProcess"], pid);
+            return message;
         }
         static SolidColorBrush Color(string hex) { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); }
         Style ButtonStyle()
@@ -271,7 +319,7 @@ namespace WuWaVR.Manager
                 advancedOpen = advancedPanel?.IsExpanded == true;
             bool recoveryOpen = recoveryPanel?.IsExpanded == true,
                 feedbackOpen = feedbackPanel?.IsExpanded == true, recordingOptionsOpen = recordingOptions?.IsExpanded == true,
-                controllerOpen = controllerPanel?.IsExpanded == true;
+                controllerOpen = controllerPanel?.IsExpanded == true, processRecoveryOpen = processRecoveryPanel?.IsExpanded == true;
             string savedDetails = details?.Text, savedFeedback = operationText?.Text;
             rendering = true; actions.Clear();
             var outer = new DockPanel { Margin = new Thickness(24, 16, 24, 12), Background = background };
@@ -316,7 +364,7 @@ namespace WuWaVR.Manager
             cancelButton.Click += async (s, e) =>
             {
                 if (operation != null) operation.Cancel();
-                else if (bridge.Address != null && LauncherPresentation.CanCancelBackend(Json.Child(status, "job"))) await Run(async c => await bridge.Post("/api/cancel", new { }, c));
+                else if (bridge.Address != null && LauncherBridge.CanCancelLaunch(status)) await Run(async c => await bridge.Post("/api/cancel", new { }, c));
             };
             var launchBar = new DockPanel(); DockPanel.SetDock(launchButton, Dock.Right); launchBar.Children.Add(launchButton);
             DockPanel.SetDock(cancelButton, Dock.Right); launchBar.Children.Add(cancelButton); launchBar.Children.Add(launchState); footer.Children.Add(launchBar);
@@ -351,6 +399,7 @@ namespace WuWaVR.Manager
                 advancedPanel.IsExpanded = advancedOpen;
                 recoveryPanel.IsExpanded = recoveryOpen; recordingOptions.IsExpanded = recordingOptionsOpen;
                 controllerPanel.IsExpanded = controllerOpen;
+                processRecoveryPanel.IsExpanded = processRecoveryOpen;
                 details.Text = savedDetails ?? ""; operationText.Text = savedFeedback ?? text["ready"];
                 feedbackPanel.IsExpanded = feedbackOpen;
             }
@@ -540,6 +589,7 @@ namespace WuWaVR.Manager
             panel.Children.Add(Label(text["troubleshootingIntro"], 12, muted));
             panel.Children.Add(ControllerCheck());
             panel.Children.Add(Wrap(runtimeCheck, Action("copyDiagnostics", async c => await CopyDiagnostics(c)), GuideLink("report", "feedback.html")));
+            panel.Children.Add(ProcessRecovery());
             installed = Choice(); foreach (var item in store.State.installed) installed.Items.Add(item);
             installed.SelectedItem = store.Selected;
             installed.SelectionChanged += (s, e) => ShowStatus();
@@ -588,6 +638,101 @@ namespace WuWaVR.Manager
             ToolTipService.SetShowOnDisabled(button, true);
             button.Click += async (s, e) => { if (!preview && !closing) await action(); };
             actions.Add(button); return button;
+        }
+        UIElement ProcessRecovery()
+        {
+            processRecoveryState = Label("", 12, teal); processRecoveryRows = new StackPanel();
+            var rows = new ScrollViewer { Content = processRecoveryRows, MaxHeight = 300,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            processRecoveryPanel = new Expander { Header = text["processRecoveryTitle"], Foreground = foreground, Margin = new Thickness(0, 6, 0, 12),
+                Content = Card(text["processRecoveryTitle"], Label(text["processRecoveryIntro"], 12, muted),
+                    Wrap(Action("processRecoveryScan", ScanStuckProcesses), Action("processRecoveryStop", StopStuckProcesses)), processRecoveryState, rows) };
+            DrawProcessRecoveryRows(); return processRecoveryPanel;
+        }
+        string RecoveryRole(RecoveryCandidate item)
+        {
+            return text[item.Kind == "Startup worker" ? "processRoleStartup" : item.Kind == "Launcher helper" ? "processRoleHelper" :
+                item.Kind == "Runtime/profile worker" ? "processRoleRuntime" : "processRoleUnknown"];
+        }
+        string RecoveryIdentity(RecoveryCandidate item)
+        { return "PID " + item.Pid + " · " + RecoveryRole(item) + " · " + String.Format(text["processRecoveryStarted"], item.StartedUtc ?? "?"); }
+        void DrawProcessRecoveryRows()
+        {
+            if (processRecoveryRows == null) return;
+            processRecoveryRows.Children.Clear();
+            if (processRecoveryReport != null && processRecoveryReport.Candidates != null)
+                foreach (var item in processRecoveryReport.Candidates)
+                {
+                    var row = new StackPanel { Margin = new Thickness(0, 7, 0, 7) };
+                    var select = new CheckBox { Tag = item, Content = Label(RecoveryIdentity(item), 12), Foreground = foreground,
+                        IsChecked = processRecoverySelected.Contains(item.Pid), IsEnabled = operation == null && processRecoveryFresh && item.Eligible };
+                    select.Checked += (s, e) => { if (item.Eligible && processRecoveryFresh) processRecoverySelected.Add(item.Pid); ShowStatus(); };
+                    select.Unchecked += (s, e) => { processRecoverySelected.Remove(item.Pid); ShowStatus(); };
+                    row.Children.Add(select);
+                    row.Children.Add(Label((item.Executable ?? "") + (String.IsNullOrWhiteSpace(item.Script) ? "" : Environment.NewLine + item.Script), 11, muted));
+                    string outcome = String.IsNullOrEmpty(item.Outcome) ? text[item.Eligible ? "processRecoveryEligible" : "processRecoveryExcluded"] :
+                        text[item.Outcome == "Stopped" ? "processOutcomeStopped" : item.Outcome == "Exited" ? "processOutcomeExited" : item.Outcome == "Refused" ? "processOutcomeRefused" : "processOutcomeFailed"];
+                    row.Children.Add(Label(outcome + (String.IsNullOrWhiteSpace(item.Reason) ? "" : ": " + item.Reason), 11, muted));
+                    processRecoveryRows.Children.Add(row);
+                }
+            UpdateProcessRecovery();
+        }
+        void UpdateProcessRecovery()
+        {
+            if (processRecoveryState == null) return;
+            processRecoveryState.Text = text[processRecoveryNotice] +
+                (String.IsNullOrWhiteSpace(processRecoveryReport?.Message) ? "" : Environment.NewLine + processRecoveryReport.Message);
+            foreach (var row in processRecoveryRows.Children.OfType<StackPanel>())
+                foreach (var select in row.Children.OfType<CheckBox>())
+                    select.IsEnabled = operation == null && processRecoveryFresh && ((RecoveryCandidate)select.Tag).Eligible;
+        }
+        async Task ScanStuckProcesses(CancellationToken c)
+        {
+            processRecoveryFresh = false; processRecoverySelected.Clear(); processRecoveryReport = null;
+            processRecoveryNotice = "processRecoveryScanning"; DrawProcessRecoveryRows();
+            try
+            {
+                processRecoveryReport = await (processRecoveryScanOverride != null ? processRecoveryScanOverride(c) :
+                    LauncherProcessRecovery.ScanAsync(store.Root, bridge.Data, store.State.installed.Select(item => store.Folder(item)).ToArray(), c));
+                if (processRecoveryReport == null) throw new InvalidDataException(text["processRecoveryFailed"]);
+                processRecoveryFresh = !processRecoveryReport.Cancelled;
+                processRecoveryNotice = processRecoveryReport.Cancelled ? "processRecoveryCancelled" :
+                    processRecoveryReport.Candidates == null || processRecoveryReport.Candidates.Count == 0 ? "processRecoveryEmpty" : "processRecoveryChoose";
+                operationText.Text = text[processRecoveryNotice];
+            }
+            catch { processRecoveryNotice = "processRecoveryFailed"; throw; }
+            finally { DrawProcessRecoveryRows(); }
+        }
+        async Task StopStuckProcesses(CancellationToken c)
+        {
+            var selected = processRecoveryReport?.Candidates?.Where(item => item.Eligible && processRecoverySelected.Contains(item.Pid)).ToArray();
+            if (!processRecoveryFresh || selected == null || selected.Length == 0) throw new InvalidOperationException(text["processRecoveryChoose"]);
+            string prompt = text["processRecoveryConfirm"] + Environment.NewLine + Environment.NewLine +
+                String.Join(Environment.NewLine, selected.Select(RecoveryIdentity)) + Environment.NewLine + Environment.NewLine + text["processRecoveryEffect"];
+            bool confirmed = processRecoveryConfirmOverride != null ? processRecoveryConfirmOverride(prompt) :
+                MessageBox.Show(this, prompt, text["processRecoveryStop"], MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
+            if (!confirmed) { operationText.Text = text["notChanged"]; return; }
+            processRecoveryFresh = false; processRecoverySelected.Clear();
+            processRecoveryNotice = "processRecoveryStopping"; DrawProcessRecoveryRows();
+            var pids = selected.Select(item => item.Pid).ToArray();
+            try
+            {
+                processRecoveryReport = await (processRecoveryStopOverride != null ? processRecoveryStopOverride(processRecoveryReport, pids, c) :
+                    LauncherProcessRecovery.StopAsync(processRecoveryReport, pids, c));
+                if (processRecoveryReport == null) throw new InvalidDataException(text["processRecoveryFailed"]);
+                bool allStopped = pids.All(pid => processRecoveryReport.Candidates != null && processRecoveryReport.Candidates.Any(item =>
+                    item.Pid == pid && (item.Outcome == "Stopped" || item.Outcome == "Exited")));
+                processRecoveryNotice = processRecoveryReport.Cancelled ? "processRecoveryCancelled" : allStopped ? "processRecoveryStopped" : "processRecoveryPartial";
+                operationText.Text = text[processRecoveryNotice] + " " + text["processRecoveryReconnect"];
+            }
+            catch { processRecoveryNotice = "processRecoveryFailed"; throw; }
+            finally
+            {
+                // A stop request may partially succeed even when elevation/cancellation
+                // prevents receiving its final report. Never keep the old attachment.
+                bridge.ForgetConnection(); Disconnected(); connectionProblem = text["processRecoveryReconnect"];
+                DrawProcessRecoveryRows();
+            }
         }
         UIElement ControllerCheck()
         {
@@ -731,13 +876,18 @@ namespace WuWaVR.Manager
             if (diagnosticsCopyOverride != null) diagnosticsCopyOverride(report); else Clipboard.SetText(report);
             operationText.Text = text[backendAvailable ? "diagnosticsCopied" : "diagnosticsLocalOnly"];
         }
-        static string JobSnapshot(Dictionary<string, object> job)
+        static string JobSnapshot(Dictionary<string, object> status)
         {
+            var job = Json.Child(status, "job");
+            var launch = LauncherBridge.CurrentLaunch(status) ? Json.Child(status, "launch") : new Dictionary<string, object>();
             return Json.Write(new { kind = Json.Text(job, "kind"), running = Json.Flag(job, "running"),
-                message = Json.Text(job, "message"), output = Json.Text(job, "output"), error = Json.Flag(job, "error"), code = Json.Text(job, "code") });
+                message = Json.Text(job, "message"), output = Json.Text(job, "output"), error = Json.Flag(job, "error"), code = Json.Text(job, "code"),
+                attempt = Json.Text(launch, "attemptId"), phase = Json.Text(launch, "phase"), workerRunning = Json.Flag(launch, "running"),
+                workerMessage = Json.Text(launch, "message"), cancellable = Json.Flag(launch, "cancellable") });
         }
         async Task SubmitJob(string path, object body, CancellationToken c)
         {
+            if (path == "/api/launch") unresolvedStartup = true;
             await bridge.Post(path, body, c);
             submittedJob = true; operationText.Text = text["requestSent"];
             // A job can finish between polls with exactly the same result as its predecessor.
@@ -946,20 +1096,21 @@ namespace WuWaVR.Manager
         async Task Run(Func<CancellationToken, Task> action)
         {
             if (preview || operation != null) return;
-            lastJobSnapshot = JobSnapshot(Json.Child(status, "job"));
+            lastJobSnapshot = JobSnapshot(status);
             preserveActionFeedback = false; submittedJob = false;
             operation = new CancellationTokenSource(); foreach (var button in actions) button.IsEnabled = false; languages.IsEnabled = false; cancelButton.IsEnabled = true; cancelButton.Visibility = Visibility.Visible; progress.Visibility = Visibility.Visible;
-            operationText.Text = text["busy"];
+            operationText.Text = text["busy"]; progress.IsIndeterminate = true;
             try
             {
                 await action(operation.Token);
                 preserveActionFeedback = !submittedJob && operationText.Text != text["busy"];
                 if (!preserveActionFeedback && !submittedJob) operationText.Text = text["actionComplete"];
             }
-            catch (OperationCanceledException) { operationText.Text = text["cancelled"]; preserveActionFeedback = true; }
+            catch (OperationCanceledException) when (operation.IsCancellationRequested) { operationText.Text = text["cancelled"]; preserveActionFeedback = true; }
             catch (Exception e)
             {
-                operationText.Text = text["failed"] + ": " + e.Message; details.Text = e.Message; feedbackPanel.IsExpanded = true; lastNativeError = e.ToString(); preserveActionFeedback = true;
+                string message = e is OperationCanceledException ? text["requestInterrupted"] : e.Message;
+                operationText.Text = text["failed"] + ": " + message; details.Text = message; feedbackPanel.IsExpanded = true; lastNativeError = e.ToString(); preserveActionFeedback = true;
                 if (!connectionReady && !String.IsNullOrEmpty(connectionProblem)) ShowPage(false);
             }
             finally
@@ -984,7 +1135,7 @@ namespace WuWaVR.Manager
                 connectionReady = false; connectionProblem = e.Message;
                 status = new Dictionary<string, object>();
                 lastNativeError = e.ToString();
-                if (!preserveActionFeedback) { operationText.Text = text["failed"] + ": " + e.Message; details.Text = e.Message; }
+                if (!preserveActionFeedback) { operationText.Text = text["failed"] + ": " + e.Message; details.Text = e.Message; feedbackPanel.IsExpanded = true; }
                 ShowStatus();
             }
             finally { polling = false; }
@@ -1010,7 +1161,13 @@ namespace WuWaVR.Manager
             gameHint.ToolTip = discovery != null && discovery.Candidates.Count > 1 ? String.Join(Environment.NewLine, discovery.Candidates) : gameHint.Text;
             runtime.Text = store.Selected != null && !connectionReady ? text["connectionRequired"] : LauncherPresentation.RuntimeSummary(bridge.Address != null, status, k => text[k]);
             runtimeCheck.IsEnabled = operation == null && store.Selected != null;
-            var job = Json.Child(status, "job"); bool running = Json.Flag(job, "running");
+            var job = Json.Child(status, "job"); var launch = Json.Child(status, "launch");
+            bool workerRunning = LauncherBridge.LaunchWorkerRunning(status), running = Json.Flag(job, "running") || workerRunning;
+            // A connection loss clears status for display but cannot prove that its
+            // previously observed startup worker stopped. Resolve only from fresh status.
+            if (connectionReady && status.ContainsKey("job")) unresolvedStartup = workerRunning || (Json.Flag(job, "running") && Json.Text(job, "kind") == "launch");
+            bool workerFailed = LauncherBridge.CurrentLaunch(status) && Json.Text(launch, "phase") == "failed";
+            bool workerCancelled = LauncherBridge.CurrentLaunch(status) && Json.Text(launch, "phase") == "cancelled";
             bool hasPackage = store.Selected != null, recording = Json.Flag(Json.Child(status, "recording"), "running");
             bool conflict = bridge.Conflict != null;
             connectionPanel.Visibility = hasPackage && !connectionReady && operation == null ? Visibility.Visible : Visibility.Collapsed;
@@ -1022,8 +1179,8 @@ namespace WuWaVR.Manager
             versionConsent.Visibility = wantsInstall ? Visibility.Visible : Visibility.Collapsed;
             risk.Visibility = wantsInstall ? Visibility.Collapsed : Visibility.Visible;
             gameVersion.Text = text["targetGame"] + " " + (wantsInstall ? SelectedRelease().gameVersion : store.Selected.release.gameVersion);
-            runtimeHint.Text = text[!hasPackage ? "runtimeInstallHint" : !connectionReady ? "connectionRequired" : gameRunning || injectorRunning ? "runtimeCloseFirst" : !Json.Flag(xr, "canHeadset") || !Json.Flag(xr, "canSimulator") ? "runtimeUnavailableHint" : "runtimeChoiceHint"];
-            launchState.Text = gameRunning || running ? LauncherBridge.LaunchSummary(status, k => text[k]) :
+            runtimeHint.Text = text[!hasPackage ? "runtimeInstallHint" : !connectionReady ? "connectionRequired" : gameRunning || injectorRunning ? "runtimeCloseFirst" : Json.Flag(xr, "canSimulator") && !Json.Flag(xr, "canHeadset") ? "runtimeSimulatorOnlyHint" : !Json.Flag(xr, "canHeadset") || !Json.Flag(xr, "canSimulator") ? "runtimeUnavailableHint" : "runtimeChoiceHint"];
+            launchState.Text = gameRunning || running || workerFailed || workerCancelled ? LauncherBridge.LaunchSummary(status, k => text[k]) :
                 text[wantsInstall ? "installNext" : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : injectorRunning ? "runtimeCloseFirst" : risk.IsChecked != true ? "riskNext" : Json.Text(game, "mode") == "steam" ? "launchNextSteam" : "launchNext"];
             feedbackPanel.Visibility = String.IsNullOrWhiteSpace(details.Text) ? Visibility.Collapsed : Visibility.Visible;
             var capture = Json.Child(status, "recording");
@@ -1045,6 +1202,9 @@ namespace WuWaVR.Manager
                 {
                     switch (key)
                     {
+                        case "processRecoveryScan": break; // Deliberately independent of helper connection/job state.
+                        case "processRecoveryStop": reason = processRecoveryFresh && processRecoveryReport?.Candidates != null &&
+                            processRecoveryReport.Candidates.Any(item => item.Eligible && processRecoverySelected.Contains(item.Pid)) ? null : "processRecoveryChoose"; break;
                         case "useGameLocation": reason = running ? "busy" : gameLocations.SelectedItem == null ? "gameChooseHint" : null; break;
                         case "browse": case "browseGameFile": reason = running ? "busy" : null; break;
                         case "install": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : compatible.IsChecked != true ? "compatRequired" : null; break;
@@ -1074,22 +1234,35 @@ namespace WuWaVR.Manager
                 if (key == "openExisting" || key == "switchLauncher") button.Visibility = conflict ? Visibility.Visible : Visibility.Collapsed;
             }
             UpdateControllerCheck();
+            UpdateProcessRecovery();
             foreach (var choice in new[] { releases, installed, source, fps, size, purpose, gameLocations }) choice.IsEnabled = operation == null && !running;
             bool active = operation != null || running;
-            bool canCancel = operation != null || (bridge.Address != null && LauncherPresentation.CanCancelBackend(job));
+            bool canCancel = operation != null || (bridge.Address != null && LauncherBridge.CanCancelLaunch(status));
+            cancelButton.Content = text[operation == null && canCancel ? "stopWaiting" : "cancel"];
             cancelButton.IsEnabled = canCancel; cancelButton.Visibility = canCancel ? Visibility.Visible : Visibility.Collapsed;
             progress.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
             if (operation == null)
             {
                 progress.IsIndeterminate = running;
-                string snapshot = JobSnapshot(job);
+                string snapshot = JobSnapshot(status);
                 if (snapshot != lastJobSnapshot)
                 {
                     // Consume each update once, including updates hidden by newer local feedback.
                     lastJobSnapshot = snapshot;
                     if (!preserveActionFeedback)
                     {
-                        if (running) operationText.Text = Json.Text(job, "message");
+                        if (running)
+                        {
+                            operationText.Text = workerRunning && !String.IsNullOrWhiteSpace(Json.Text(launch, "message")) ? Json.Text(launch, "message") : Json.Text(job, "message");
+                            if (workerRunning) { details.Text = StartupDetails(launch); feedbackPanel.Visibility = Visibility.Visible; }
+                        }
+                        else if (workerFailed || workerCancelled)
+                        {
+                            string message = Json.Text(launch, "message");
+                            operationText.Text = text[workerFailed ? "launchFailed" : "launchCancelled"] + (String.IsNullOrWhiteSpace(message) ? "" : " " + message);
+                            details.Text = operationText.Text;
+                            feedbackPanel.Visibility = Visibility.Visible; feedbackPanel.IsExpanded = workerFailed;
+                        }
                         else if (Json.Flag(job, "error") || !String.IsNullOrEmpty(Json.Text(job, "code")))
                         {
                             string kind = Json.Text(job, "kind");

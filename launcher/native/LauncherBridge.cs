@@ -26,21 +26,37 @@ namespace WuWaVR.Manager
         readonly HttpClient http;
         readonly Func<string[]> processNames;
         readonly Func<int, bool?> pidAlive;
+        readonly TimeSpan requestTimeout, connectTimeout;
+        readonly Func<ProcessStartInfo, Process> startHelper;
         public readonly string Data;
         readonly string isolatedAppData;
         public string Address { get; private set; }
         public string AppRoot { get; private set; }
         public ExistingLauncher Conflict { get; private set; }
         string token;
+        // Recovery invalidates only this connection. Starting a replacement
+        // helper remains an explicit Retry connection action.
+        public void ForgetConnection()
+        { Address = null; AppRoot = null; token = null; Conflict = null; }
         public LauncherBridge(string data, string isolatedAppData = null, HttpMessageHandler handler = null)
             : this(data, isolatedAppData, handler, ReadProcessNames, ReadPidAlive) { }
         internal LauncherBridge(string data, string isolatedAppData, HttpMessageHandler handler,
             Func<string[]> processNames, Func<int, bool?> pidAlive)
+            : this(data, isolatedAppData, handler, processNames, pidAlive,
+                TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20), Process.Start) { }
+        internal LauncherBridge(string data, string isolatedAppData, HttpMessageHandler handler,
+            Func<string[]> processNames, Func<int, bool?> pidAlive, TimeSpan requestTimeout,
+            TimeSpan connectTimeout, Func<ProcessStartInfo, Process> startHelper)
         {
             Data = Path.GetFullPath(data); this.isolatedAppData = isolatedAppData;
             this.processNames = processNames ?? throw new ArgumentNullException(nameof(processNames));
             this.pidAlive = pidAlive ?? throw new ArgumentNullException(nameof(pidAlive));
-            http = new HttpClient(handler ?? new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(10) };
+            if (requestTimeout <= TimeSpan.Zero || connectTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException("timeout");
+            this.requestTimeout = requestTimeout; this.connectTimeout = connectTimeout;
+            this.startHelper = startHelper ?? throw new ArgumentNullException(nameof(startHelper));
+            // One explicit deadline covers headers AND streamed content, rather than
+            // HttpClient's ResponseHeadersRead timeout ending as soon as headers arrive.
+            http = new HttpClient(handler ?? new HttpClientHandler { UseProxy = false, AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
         }
         static string[] ReadProcessNames()
         {
@@ -89,11 +105,20 @@ namespace WuWaVR.Manager
             if (ReadReceiptText(path) != before)
                 throw new InvalidOperationException("The launcher changed while preparing the package. Retry before changing packages.");
         }
-        public async Task PreparePackageChange(string package, CancellationToken cancel)
+        public Task PreparePackageChange(string package, CancellationToken cancel)
+        { return PrepareHelperStop(package, cancel, false); }
+        // App exit may stop an idle launcher service while the already-started game
+        // continues. Package replacement retains its stricter game/injector guard.
+        public Task CloseHelper(string package, CancellationToken cancel)
+        { return PrepareHelperStop(package, cancel, true); }
+        async Task PrepareHelperStop(string package, CancellationToken cancel, bool allowRunningGame)
         {
             string expected = Path.GetFullPath(Path.Combine(package, "app"));
-            RequireNativeIdle(cancel);
+            cancel.ThrowIfCancellationRequested();
+            if (!allowRunningGame) RequireNativeIdle(cancel);
             string receiptPath = Path.Combine(Data, "launcher.json"), before = ReadReceiptText(receiptPath);
+            if (before == null && Address != null)
+                throw new InvalidOperationException("The connected helper receipt is missing. Retry connection before stopping it.");
             if (before != null)
             {
                 var receipt = Json.Read<Dictionary<string, object>>(before);
@@ -108,9 +133,9 @@ namespace WuWaVR.Manager
                     var existing = new ExistingLauncher(Address, AppRoot, pid);
                     string accessToken = token;
                     var current = await Status(cancel);
-                    RequireKnownIdle(current);
+                    RequireKnownIdle(current, allowRunningGame);
                     await ValidateIdentity(existing, cancel);
-                    RequireNativeIdle(cancel);
+                    if (!allowRunningGame) RequireNativeIdle(cancel);
                     RequireUnchangedReceipt(receiptPath, before);
                     var reply = await PostTo(existing.Address, accessToken, "/api/stop", new { }, cancel);
                     if (reply == null || !Json.Flag(reply, "ok")) throw new IOException("The launcher did not confirm the stop request.");
@@ -125,16 +150,17 @@ namespace WuWaVR.Manager
                     cancel.ThrowIfCancellationRequested();
                     if (pidAlive(pid) != false)
                         throw new InvalidOperationException("The launcher process is still running or its state is unknown. Retry connection before changing packages.");
-                    RequireNativeIdle(cancel);
+                    if (!allowRunningGame) RequireNativeIdle(cancel);
                     RequireUnchangedReceipt(receiptPath, before);
                 }
             }
             else
             {
-                RequireNativeIdle(cancel);
+                if (!allowRunningGame) RequireNativeIdle(cancel);
                 RequireUnchangedReceipt(receiptPath, null);
             }
-            RequireNativeIdle(cancel);
+            cancel.ThrowIfCancellationRequested();
+            if (!allowRunningGame) RequireNativeIdle(cancel);
             Address = null; AppRoot = null; token = null; Conflict = null;
         }
         // An app update must be safe even before a mod is selected, or when
@@ -186,6 +212,16 @@ namespace WuWaVR.Manager
         }
         public async Task Connect(string package, CancellationToken cancel)
         {
+            using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel))
+            {
+                deadline.CancelAfter(connectTimeout);
+                try { await ConnectWithinDeadline(package, deadline.Token); }
+                catch (OperationCanceledException e) when (!cancel.IsCancellationRequested)
+                { throw new TimeoutException("The launcher helper did not become ready in time. Use Retry connection; if it fails again, open Troubleshooting and copy diagnostics.", e); }
+            }
+        }
+        async Task ConnectWithinDeadline(string package, CancellationToken cancel)
+        {
             cancel.ThrowIfCancellationRequested();
             var expected = Path.GetFullPath(Path.Combine(package, "app"));
             if (Address != null && Conflict == null && String.Equals(AppRoot, expected, StringComparison.OrdinalIgnoreCase))
@@ -193,6 +229,7 @@ namespace WuWaVR.Manager
                 try { await Status(cancel); Conflict = null; return; }
                 catch (HttpRequestException) { }
                 catch (TaskCanceledException) { cancel.ThrowIfCancellationRequested(); }
+                catch (TimeoutException) { cancel.ThrowIfCancellationRequested(); }
                 // A stopped helper may have a new address. Revalidate its identity
                 // before attaching or restarting. Retain the old connection on
                 // recovery failure so package changes still require an idle check.
@@ -203,19 +240,20 @@ namespace WuWaVR.Manager
                 "-I -B -X utf8 \"" + Paths.Inside(package, "app/dev/wuwa_player.py") + "\" --no-open")
             { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = expected, WindowStyle = ProcessWindowStyle.Hidden };
             start.EnvironmentVariables["WUWA_VR_DATA"] = Data;
+            start.EnvironmentVariables["WUWA_VR_NO_DIALOG"] = "1";
             if (isolatedAppData != null) start.EnvironmentVariables["APPDATA"] = Path.GetFullPath(isolatedAppData);
             cancel.ThrowIfCancellationRequested();
-            using (var process = Process.Start(start))
+            using (var process = startHelper(start))
             {
-                for (int i = 0; i < 80; i++)
+                if (process == null) throw new IOException("The launcher helper could not be started. Open Troubleshooting and copy diagnostics.");
+                while (true)
                 {
                     cancel.ThrowIfCancellationRequested();
                     if (await Attach(receiptPath, expected, cancel)) return;
-                    if (process.HasExited) throw new IOException("Launcher helper stopped before becoming ready. Check its logs.");
-                    await Task.Delay(250, cancel);
+                    if (process.HasExited) throw new IOException("Launcher helper stopped before becoming ready (exit " + process.ExitCode + "). Open Troubleshooting and copy diagnostics.");
+                    await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(250, connectTimeout.TotalMilliseconds / 4)), cancel);
                 }
             }
-            throw new IOException("Launcher helper did not become ready. Check diagnostics before retrying.");
         }
         async Task<bool> Attach(string receiptPath, string expected, CancellationToken cancel)
         {
@@ -232,6 +270,7 @@ namespace WuWaVR.Manager
             try { identity = Json.Read<Dictionary<string, object>>(await GetText(address + "/api/identity", cancel)); }
             catch (HttpRequestException) { return false; }
             catch (TaskCanceledException) { cancel.ThrowIfCancellationRequested(); return false; }
+            catch (TimeoutException) { cancel.ThrowIfCancellationRequested(); return false; }
             if (Json.Text(identity, "app") != "wuwa-vr-player-launcher" || Json.Text(identity, "pid") != Json.Text(receipt, "pid")) return false;
             string actualRoot = Path.GetFullPath(Json.Text(identity, "root"));
             if (!String.Equals(actualRoot, expected, StringComparison.OrdinalIgnoreCase))
@@ -306,12 +345,13 @@ namespace WuWaVR.Manager
                 throw new InvalidOperationException("Cannot confirm whether the existing launcher is idle. Retry after checking its status.");
             return (bool)activity;
         }
-        static void RequireKnownIdle(Dictionary<string, object> current)
+        static void RequireKnownIdle(Dictionary<string, object> current, bool allowRunningGame = false)
         {
             bool game = KnownActivity(current, "gameRunning"), injector = KnownActivity(current, "injectorRunning"),
                 job = KnownActivity(Json.Child(current, "job"), "running"), recording = KnownActivity(Json.Child(current, "recording"), "running");
-            if (game || injector || job || recording)
-                throw new InvalidOperationException("Close WuWa and its injector, and finish the current operation and recording before switching launchers.");
+            if ((!allowRunningGame && (game || injector)) || job || recording || LaunchWorkerRunning(current))
+                throw new InvalidOperationException(allowRunningGame ? "Startup, recording or another operation is still active. Use Stop waiting or finish the operation before closing." :
+                    "Close WuWa and its injector, and finish the current operation and recording before switching launchers.");
         }
         public async Task StopConflict(CancellationToken cancel)
         {
@@ -329,21 +369,61 @@ namespace WuWaVR.Manager
             if (Address == existing.Address) { Address = null; AppRoot = null; token = null; }
             if (Object.ReferenceEquals(existing, Conflict)) Conflict = null;
         }
+        // Cancellation also bounds a handler/stream that fails to observe its token.
+        // Observe/dispose a late response without permitting any automatic retry of POST.
+        static async Task<T> BoundedAwait<T>(Task<T> work, CancellationToken cancel, Action<T> discard = null)
+        {
+            var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using (cancel.Register(() => cancelled.TrySetResult(true)))
+            {
+                if (await Task.WhenAny(work, cancelled.Task) != work)
+                {
+                    work.ContinueWith(done => {
+                        if (done.IsFaulted) { var observed = done.Exception; }
+                        else if (done.Status == TaskStatus.RanToCompletion && discard != null) discard(done.Result);
+                    }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                    throw new OperationCanceledException(cancel);
+                }
+                return await work;
+            }
+        }
+        async Task<T> Request<T>(HttpRequestMessage request,
+            Func<HttpResponseMessage, CancellationToken, Task<T>> read, CancellationToken cancel)
+        {
+            using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel))
+            {
+                deadline.CancelAfter(requestTimeout);
+                try
+                {
+                    using (var response = await BoundedAwait(http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token), deadline.Token, r => r.Dispose()))
+                        return await BoundedAwait(read(response, deadline.Token), deadline.Token);
+                }
+                catch (OperationCanceledException e) when (!cancel.IsCancellationRequested)
+                {
+                    string recovery = request.Method == HttpMethod.Post ?
+                        "The request may still be running. Check launcher status before retrying; use Stop waiting if a launch is still pending." :
+                        "Use Retry connection; if it fails again, open Troubleshooting and copy diagnostics.";
+                    throw new TimeoutException("The launcher helper timed out at " + request.RequestUri.AbsolutePath + ". " + recovery, e);
+                }
+            }
+        }
         async Task<string> GetText(string url, CancellationToken cancel)
         {
-            using (var response = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancel))
-            { response.EnsureSuccessStatusCode(); return await RepoClient.BoundedText(response, 1024 * 1024, cancel); }
+            using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+                return await Request(request, async (response, token) => {
+                    response.EnsureSuccessStatusCode(); return await RepoClient.BoundedText(response, 1024 * 1024, token);
+                }, cancel);
         }
         public async Task<Dictionary<string, object>> Status(CancellationToken cancel)
         {
             if (Address == null) throw new InvalidOperationException("Connect the installed package first.");
-            using (var response = await http.GetAsync(Address + "/api/status", cancel))
-            {
+            using (var request = new HttpRequestMessage(HttpMethod.Get, Address + "/api/status"))
+                return await Request(request, async (response, token) => {
                 // An HTTP error still proves a server answered. Do not mistake it
                 // for a dead helper and start another process during Connect.
                 if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Launcher helper status failed: HTTP " + (int)response.StatusCode + ".");
-                return Json.Read<Dictionary<string, object>>(await RepoClient.BoundedText(response, 1024 * 1024, cancel));
-            }
+                return Json.Read<Dictionary<string, object>>(await RepoClient.BoundedText(response, 1024 * 1024, token));
+            }, cancel);
         }
         public async Task<Dictionary<string, object>> Post(string path, object body, CancellationToken cancel)
         {
@@ -356,18 +436,16 @@ namespace WuWaVR.Manager
             {
                 request.Headers.Add("Origin", address); request.Headers.Add("X-WuWa-Token", accessToken);
                 request.Content = new StringContent(Json.Write(body), Encoding.UTF8, "application/json");
-                using (var response = await http.SendAsync(request, cancel))
-                {
-                    var value = Json.Read<Dictionary<string, object>>(await RepoClient.BoundedText(response, 1024 * 1024, cancel));
+                return await Request(request, async (response, token) => {
+                    var value = Json.Read<Dictionary<string, object>>(await RepoClient.BoundedText(response, 1024 * 1024, token));
                     if (!response.IsSuccessStatusCode) throw new InvalidOperationException(Json.Text(value, "error"));
                     return value;
-                }
+                }, cancel);
             }
         }
         public async Task<string> Diagnostics(CancellationToken cancel)
         {
-            using (var response = await http.GetAsync(Address + "/api/diagnostics", cancel))
-            { response.EnsureSuccessStatusCode(); return await RepoClient.BoundedText(response, 1024 * 1024, cancel); }
+            return await GetText(Address + "/api/diagnostics", cancel);
         }
         public async Task Stop(CancellationToken cancel)
         {
@@ -376,7 +454,7 @@ namespace WuWaVR.Manager
             // package connection and obtain fresh activity before allowing stop.
             await Connect(Path.GetDirectoryName(AppRoot), cancel);
             var status = await Status(cancel);
-            if (Json.Flag(status, "gameRunning") || Json.Flag(status, "injectorRunning") || Json.Flag(Json.Child(status, "job"), "running") || Json.Flag(Json.Child(status, "recording"), "running"))
+            if (Json.Flag(status, "gameRunning") || Json.Flag(status, "injectorRunning") || Json.Flag(Json.Child(status, "job"), "running") || Json.Flag(Json.Child(status, "recording"), "running") || LaunchWorkerRunning(status))
                 throw new InvalidOperationException("Close WuWa and its injector, and finish recording before changing packages.");
             int pid = 0;
             try { var identity = Json.Read<Dictionary<string, object>>(await GetText(Address + "/api/identity", cancel)); int.TryParse(Json.Text(identity, "pid"), out pid); } catch (HttpRequestException) { }
@@ -405,12 +483,29 @@ namespace WuWaVR.Manager
                 (Json.Flag(status, "originalBackup") &&
                 (String.IsNullOrEmpty(Json.Text(status, "restoredOriginalAt")) || !String.IsNullOrEmpty(Json.Text(status, "selected"))));
         }
+        public static bool CurrentLaunch(Dictionary<string, object> status)
+        {
+            var launch = Json.Child(status, "launch");
+            if (launch.ContainsKey("current")) return Json.Flag(launch, "current");
+            // Older helpers have no worker correlation. Never revive a saved terminal
+            // state, but retain progress/cancel support for their active launch job.
+            var job = Json.Child(status, "job");
+            return Json.Text(job, "kind") == "launch" && Json.Flag(job, "running");
+        }
+        public static bool LaunchWorkerRunning(Dictionary<string, object> status)
+        { return CurrentLaunch(status) && Json.Flag(Json.Child(status, "launch"), "running"); }
+        public static bool CanCancelLaunch(Dictionary<string, object> status)
+        {
+            return LauncherPresentation.CanCancelBackend(Json.Child(status, "job")) ||
+                (LaunchWorkerRunning(status) && Json.Flag(Json.Child(status, "launch"), "cancellable"));
+        }
         public static string LaunchSummary(Dictionary<string, object> status, Func<string, string> text)
         {
             var launch = Json.Child(status, "launch");
             var job = Json.Child(status, "job");
-            if (Json.Text(launch, "phase") == "failed" || (Json.Text(job, "kind") == "launch" && Json.Flag(job, "error"))) return text("launchFailed");
-            if (Json.Text(launch, "phase") == "cancelled") return text("launchCancelled");
+            if ((CurrentLaunch(status) && Json.Text(launch, "phase") == "failed") || (Json.Text(job, "kind") == "launch" && Json.Flag(job, "error"))) return text("launchFailed");
+            if (CurrentLaunch(status) && Json.Text(launch, "phase") == "cancelled") return text("launchCancelled");
+            if (LaunchWorkerRunning(status) && !String.IsNullOrWhiteSpace(Json.Text(launch, "message"))) return Json.Text(launch, "message");
             if (!Json.Flag(status, "gameRunning")) return text("gameNotRunning");
             // A saved first-frame flag alone is historical evidence. Match its build and
             // injector PID to the current status before presenting it as this launch.

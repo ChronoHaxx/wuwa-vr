@@ -1,6 +1,6 @@
-# WuWa VR desktop manager — public beta 1.0.0
+# WuWa VR desktop manager — public beta 1.0.3
 
-Release **beta-2026-10-04-launcher**, backend **npc-rim-20261004**, game **3.7**.
+Release **beta-2026-10-06-recovery**, backend **steam-20261006**, game **3.7**.
 Players run **WuWa-VR-Setup.exe** once for a per-user installation, then open the
 normal **WuWa VR** shortcut. The thin installer does not bundle the VR mod:
 first installation needs internet for the separate approximately **54 MB** ZIP.
@@ -8,16 +8,24 @@ The portable **WuWa-VR-Launcher.zip** remains an advanced fallback using the old
 web interface; it does not install or self-update the desktop app.
 
 Use **01 Game → 02 Install VR → 03 Headset or simulator**, then **Launch in VR**,
-Windows permission and **Play** in the official game launcher. For updates, use
-**02 → Versions & updates → Check updates**. **Update launcher** applies a
-launcher update only while idle and restarts the app. VR package updates remain
+Windows permission and, for Kuro, **Play** in its launcher. Steam dispatches through Steam. For updates, use
+**02 → Versions & updates → Check updates**. **Update launcher** downloads and verifies an update; explicit **Restart to update**
+applies it while idle. VR package updates remain
 separate in step 02. Settings, backups, logs and recordings are preserved.
 
 The new NPC rim option starts off and removes intended nearby toon-rim lighting
 too. Its underlying stereo fault remains unresolved and headset checking is
 pending. The owner confirmed retained 2D-brightness and ultimate-camera fixes in
 earlier builds. This documentation does not assert public installer acceptance;
-fresh-PC and Steam/Epic game injection remain unverified.
+other-PC recovery and Epic game injection remain unverified. The previous Steam
+beta started on the owner's PC but failed the affected Windows 11 PC trial.
+
+Troubleshooting includes a native process-recovery panel: scan with visible
+identities, explicitly select eligible helpers/startup workers and confirm before
+stopping. The elevated worker revalidates identity and eligibility before each
+stop; game/Steam/runtime processes and protected operations are excluded. It
+works without a healthy web helper. This requires both the 1.0.3 desktop app and
+the new recovery payload for the complete startup fix; updates preserve selection.
 
 A small Windows x64/.NET Framework 4.8 app. The English and Simplified Chinese
 screens reuse the portable launcher's Python/PowerShell backend for detection,

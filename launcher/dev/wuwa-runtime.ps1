@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][ValidateSet('simulator','headset')][string]$Mode,
-      [Parameter(Mandatory)][string]$ExpectedActive,[switch]$Elevated,[string]$DataRoot,
+      [Parameter(Mandatory)][AllowEmptyString()][string]$ExpectedActive,[switch]$Elevated,[string]$DataRoot,
       [ValidatePattern('^[a-f0-9]{32}$')][string]$RequestId=([guid]::NewGuid().ToString('N')))
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'WuWaOpenXR.ps1')
@@ -15,7 +15,7 @@ if ($ExpectedActive -match '["\r\n]') { throw 'Invalid active runtime path.' }
 function Assert-RuntimeReady {
     Assert-WuWaProfileIdle
     $v=Get-WuWaOpenXRValues
-    if ($v.Active -ne $ExpectedActive) { throw 'The runtime changed. Refresh the dashboard and choose again.' }
+    Assert-WuWaExpectedRuntime $ExpectedActive $v
     Get-WuWaRuntimePlan $Mode $runtimeRoot $v
 }
 $lock=$null
@@ -26,7 +26,10 @@ try {
     if (-not $admin) {
         if ($Elevated) { throw 'Windows did not grant permission. Nothing changed.' }
         $lock=Enter-LaunchLock -Name 'Local\WuWaVRRenderingTestElevationRequest'
-        if ($lock.Status -eq 'Busy') { throw 'Another Windows launch/runtime prompt is already open.' }
+        if ($lock.Status -eq 'Busy') {
+            if ($lock.Reason -eq 'AccessDenied') { throw 'Windows denied access to the WuWa permission-request lock. A waiting administrator prompt could not be confirmed. No runtime change was made. Open Troubleshooting and copy diagnostics; if this persists after closing WuWa VR, restart Windows.' }
+            throw 'Another Windows launch/runtime prompt is already open. Answer or cancel that prompt, then retry.'
+        }
         # A fixed script and enum are the only operation. Manifest paths are
         # validated before quoting and compared again after elevation.
         $info=[Diagnostics.ProcessStartInfo]::new((Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'))
@@ -42,10 +45,13 @@ try {
         exit 0
     }
     $lock=Enter-LaunchLock -Name 'Local\WuWaVRRenderingTestLaunch'
-    if ($lock.Status -eq 'Busy') { throw 'A WuWa launch or runtime change is already running.' }
+    if ($lock.Status -eq 'Busy') { throw (Format-LaunchLockBlockedMessage -AccessDenied ($lock.Reason -eq 'AccessDenied') -State $null) }
     $profileLock=Enter-LaunchLock -Name 'Local\WuWaVRBuildProfileSwitch'
     try {
-        if ($profileLock.Status -eq 'Busy') { throw 'A build/profile change is already running.' }
+        if ($profileLock.Status -eq 'Busy') {
+            if ($profileLock.Reason -eq 'AccessDenied') { throw 'Windows denied access to the WuWa profile lock. A running profile change could not be confirmed. No runtime change was made. Open Troubleshooting and copy diagnostics; if this persists after closing WuWa VR, restart Windows.' }
+            throw 'A build/profile change is already running. No runtime change was made. Open Troubleshooting and copy diagnostics if it does not finish.'
+        }
         $plan=Assert-RuntimeReady
         Invoke-WuWaRuntimePlan $plan
     } finally { if ($profileLock) { Exit-LaunchLock $profileLock } }

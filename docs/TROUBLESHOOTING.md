@@ -1,10 +1,11 @@
 # Known issues and recovery
 
 Status: 6 October 2026. The current public release is
-[beta-2026-10-06-steam](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam):
-desktop app **1.0.2**, VR build **steam-20261006**, for game **3.7**.
-Fresh-PC installation and the new optional features' physical-headset acceptance
-remain pending; a published package is not proof of those checks.
+[beta-2026-10-06-recovery](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-recovery):
+desktop app **1.0.3**, VR build **steam-20261006**, for game **3.7**.
+Version 1.0.2 failed to start on a remote Windows 11 Steam PC. The startup-recovery
+changes have background test coverage; the 1.0.3 remote retest and physical-headset
+acceptance remain pending. Renderer and injector are unchanged.
 
 The dated observations below retain their original checkpoint scope. References
 to **WuWa VR Launcher.exe**, a browser dashboard or **Apply & launch** describe
@@ -17,8 +18,9 @@ checkpoint does not automatically apply to another.
 | Symptom | What to do / current finding |
 | --- | --- |
 | Steam or Kuro installation is missing or wrong | Use **01 → Change** to choose the installation. For Steam, select **Wuthering Waves.exe**, not the inner Shipping executable, and keep Steam installed and signed in. Saved choices are preserved; several detected installations require a choice. The owner confirmed Steam startup/backend activity on one PC; other PCs and headset use remain pending. |
-| Updated launcher but Steam is unavailable | The desktop app and VR package are separate. Update the app to **1.0.2**, then install/select **beta-2026-10-06-steam** in step 02. An older VR package does not gain Steam support just from updating the app. |
-| Progress still says waiting for UEVR while the game is running | This status can lag behind actual backend startup. Check whether the VR view and UEVR menu work before retrying; do not start a second injector. Include the selected build and copied diagnostics in a report if it persists. |
+| Updated app but recovery helpers are still old | From 1.0.2, update the launcher to **1.0.3** and restart it. Then explicitly select **beta-2026-10-06-recovery** in step 02 and install it. Check updates keeps the old package selected; updating the app alone does not replace its helpers. If the old app blocks updating, close it and use the new Setup from the website. A stalled worker may still need review. |
+| Launch spinner, permission accepted, or “already running” with no useful progress | Use **Stop waiting** when offered, then inspect **View details** and **Copy diagnostics**. In **Troubleshooting → Stuck launcher processes**, choose **Find stuck launcher processes** and review names, PIDs, roles, start times, paths and eligibility. Nothing is preselected. **Stop selected** requires confirmation and only accepts verified launcher helper/startup targets; game, Steam, headset/runtime and injector processes are excluded. Runtime/profile changes and active/unknown recordings stay protected. Review each result, then explicitly choose **Retry connection** when ready; this does not launch the game. Inconclusive processes may need manual handling. The remote Windows 11 Steam failure still needs retesting. |
+| Simulator belongs to another package, or no runtime is registered | With game/injector closed, explicitly select **Use bundled simulator** and accept Windows permission. The current package replaces the old registration while preserving any headset backup. If missing CRT files are reported, install Microsoft Visual C++ 2015–2022 Redistributable **x64** from Microsoft and retry. A detected manifest alone is not proof the runtime can load. A live startup/runtime-change lock must settle before switching. |
 | Graphics quality changes unexpectedly after launch | This release keeps the game’s graphics choices and removes only recognized inherited/generated overrides once, with a backup and receipt. Custom edits are kept; it no longer writes a forced low or medium preset at startup. Use the game’s graphics menu for quality changes. The timing correction is separate. |
 | Unequal cinematic letterbox heights in immersive VR | Cinematic framing is on by default in this release. The owner confirmed the simulator replay of private screen-comfort-r1, and sampled frames from the latest 68-second recording match across eyes. Headset comfort and other scenes remain pending. Keep a manual screen shortcut available if another scene differs. |
 | Need a manual screen for a cutscene or menu | Fully hold LT + RT first, then click R3 for mono theatre (same scene and HUD for both eyes), or hold L3 for 0.8 seconds for a stereo screen. Close UEVR and HUD/mouse adjustment; release all controls before repeating. |

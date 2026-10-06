@@ -1,8 +1,20 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][ValidatePattern('^[a-z0-9-]+$')][string]$Id,[switch]$CheckOnly,[switch]$Elevated,[switch]$NoDialog,[string]$DataRoot)
+param([Parameter(Mandatory)][ValidatePattern('^[a-z0-9-]+$')][string]$Id,[switch]$CheckOnly,[switch]$Elevated,[switch]$NoDialog,[string]$DataRoot,
+    [ValidatePattern("^[a-fA-F0-9]{32}$")][string]$AttemptId,
+    [ValidatePattern("^S-1-[0-9-]+$")][string]$OriginUserSid)
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'WuWaBuildProfiles.ps1')
+$statePath=$null
+if($DataRoot) { $statePath=Join-Path ([IO.Path]::GetFullPath($DataRoot)) 'launch-state.json' }
+if(-not $AttemptId) { $AttemptId=[guid]::NewGuid().ToString('N') }
+try {
+# Load lifecycle reporting first so later module/context failures can be retained.
 . (Join-Path $PSScriptRoot 'WuWaLaunchLifecycle.ps1')
+$currentUserSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+if($Elevated) {
+    if(-not $OriginUserSid) { throw 'Launch through WuWa VR so Windows user identity can be checked before starting the game.' }
+    Assert-LaunchUserIdentity -ExpectedSid $OriginUserSid -CurrentSid $currentUserSid
+} else { $OriginUserSid=$currentUserSid }
+. (Join-Path $PSScriptRoot 'WuWaBuildProfiles.ps1')
 . (Join-Path $PSScriptRoot 'WuWaOpenXR.ps1')
 $ctx=Get-WuWaBuildContext -DataRoot $DataRoot
 $statePath=Join-Path $ctx.Data 'launch-state.json'
@@ -23,6 +35,7 @@ function Test-WuWaBuildReady {
     # A previous portable package can still own the active simulator. Identify
     # that runtime without replacing its registration or saved headset target.
     $script:wuwaUseHeadset=-not ($selectedRuntime -eq $simulator -or (Test-WuWaSimulatorManifest $selectedRuntime))
+    if(-not $wuwaUseHeadset) { Assert-WuWaSimulatorPrerequisites -ManifestPath $selectedRuntime }
     $script:wuwaSelectedOpenXR=$selectedRuntime
     $script:wuwaGameStart=Get-WuWaLaunchSettings $ctx
     if($wuwaGameStart.Mode -eq 'steam') {
@@ -35,12 +48,13 @@ $isAdmin=([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 # dispatch the worker separately, even if the caller is elevated. Dashboard
 # requests report progress/errors on the page instead of opening a console.
 if($CheckOnly -or -not $Elevated) {
-    $result=Invoke-LaunchFrontEnd -WorkerLockName $workerLock -RequestLockName $requestLock -StatePath $statePath -CheckOnly:$CheckOnly -Preflight { Test-WuWaBuildReady } -Elevate {
+    $result=Invoke-LaunchFrontEnd -WorkerLockName $workerLock -RequestLockName $requestLock -StatePath $statePath -AttemptId $AttemptId -BuildId $Id -CheckOnly:$CheckOnly -Preflight { Test-WuWaBuildReady } -Elevate {
         $info=[Diagnostics.ProcessStartInfo]::new((Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'))
-        $info.Arguments='-NoProfile -ExecutionPolicy Bypass -File "' + $scriptPath + '" -Id ' + $Id + ' -Elevated'
+        $info.Arguments='-NoProfile -ExecutionPolicy Bypass -File "' + $scriptPath + '" -Id ' + $Id + ' -Elevated -AttemptId ' + $AttemptId + ' -OriginUserSid ' + $OriginUserSid
         if($NoDialog) { $info.Arguments+=' -NoDialog' }
         # UAC does not pass this environment through; name the data folder.
-        if($DataRoot) { $info.Arguments+=' -DataRoot "' + $ctx.Data + '"' }
+        $info.Arguments+=' -DataRoot "' + $ctx.Data + '"'
+        $info.WorkingDirectory=$PSScriptRoot
         $info.Verb='runas'; $info.UseShellExecute=$true
         $info.WindowStyle=if($NoDialog) { [Diagnostics.ProcessWindowStyle]::Hidden } else { [Diagnostics.ProcessWindowStyle]::Normal }
         [Diagnostics.Process]::Start($info)
@@ -52,17 +66,25 @@ if($CheckOnly -or -not $Elevated) {
 }
 if(-not $isAdmin) { throw 'Windows did not grant the launch permission. Nothing started.' }
 $lock=Enter-LaunchLock -Name $workerLock
-if($lock.Status -eq 'Busy') { Write-Output 'A WuWa startup is already running.'; exit 2 }
+if($lock.Status -eq 'Busy') {
+    Write-Output (Format-LaunchLockBlockedMessage -AccessDenied ($lock.Reason -eq 'AccessDenied') -State (Read-LaunchState -Path $statePath))
+    exit 2
+}
 $failed=$true
 $observerStop=$null
+$run=$null
 try {
-    Test-WuWaBuildReady
-    $Host.UI.RawUI.WindowTitle='WuWa VR - ' + $build.name
-    $run=Join-Path $ctx.Data ('runs\' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    New-Item -ItemType Directory -Path $run | Out-Null
+    $attempt=Read-LaunchState -Path $statePath
+    if(-not $attempt -or -not $attempt.PSObject.Properties['attemptId'] -or $attempt.attemptId -ne $AttemptId) {
+        throw 'Launch attempt changed before Windows permission completed. No game was started. Retry from the launcher.'
+    }
+    $run=[string]$attempt.runDir
+    $cancel=[string]$attempt.cancelPath
+    Update-LaunchState -Path $statePath -Values @{pid=$PID;started=(Get-Process -Id $PID).StartTime.ToString('o');ownerPid=$PID;ownerStartedUtc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o');phase='preflight';message=('Launching ' + $build.name);elevated=$isAdmin}
     Start-Transcript -LiteralPath (Join-Path $run 'startup.log') | Out-Null
-    $cancel=Join-Path $run 'cancel.request'
-    Write-LaunchState -Path $statePath -State ([ordered]@{pid=$PID;started=(Get-Process -Id $PID).StartTime.ToString('o');runDir=$run;cancelPath=$cancel;phase='preflight';message=('Launching ' + $build.name);buildId=$Id;elevated=$isAdmin;injectorStarted=$false})
+    Assert-LaunchNotCancelled -CancelPath $cancel
+    Test-WuWaBuildReady
+    try { $Host.UI.RawUI.WindowTitle='WuWa VR - ' + $build.name } catch { }
     $build | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'build.json') -Encoding UTF8
     [ordered]@{mode=$(if($wuwaUseHeadset){'headset'}else{'simulator'});manifest=$wuwaSelectedOpenXR} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'openxr.json') -Encoding UTF8
     Write-Host ('OpenXR runtime: '+$wuwaSelectedOpenXR)
@@ -86,15 +108,16 @@ try {
             }
         } else { Write-Warning 'Automatic recording Python is unavailable; manual capture remains available.' }
     }
-    $simArguments=@{GameStart=$wuwaGameStart.Mode;RuntimeName=(Split-Path -Leaf $runtime);Headset=$wuwaUseHeadset;WaitSeconds=600;SettleSeconds=30;StatePath=$statePath;CancelPath=$cancel}
+    $simArguments=@{GameStart=$wuwaGameStart.Mode;RuntimeName=(Split-Path -Leaf $runtime);Headset=$wuwaUseHeadset;WaitSeconds=600;SettleSeconds=30;StatePath=$statePath;CancelPath=$cancel;DiagnosticDirectory=$run}
     if(-not $wuwaUseHeadset) { $simArguments.SimulatorPath=Split-Path -Parent $wuwaSelectedOpenXR }
     if($wuwaGameStart.Mode -eq 'manual') {
-        Write-Host 'Start Wuthering Waves in your chosen launcher and press Play. Steam/Epic injection is unverified; Steam previously failed and has not been retested.'
+        Write-Host 'Start Wuthering Waves in your chosen launcher and press Play. Manual startup does not verify this storefront or installation.'
     } else {
         $simArguments.StartLauncher=$true
         $simArguments.PromptOnLauncherClosed=(!$NoDialog -and $wuwaGameStart.Mode -ne 'steam')
         if($wuwaGameStart.Launcher) { $simArguments.LauncherPath=$wuwaGameStart.Launcher }
     }
+    Assert-LaunchNotCancelled -CancelPath $cancel
     & (Join-Path $PSScriptRoot 'sim-run.ps1') @simArguments
     $after=Read-LaunchState -Path $statePath
     $done=Get-LaunchCompletion -Continuity ([string]$after.continuity) -ChecksFailed ([int]$after.checksFailed) -ChecksPending ([int]$after.checksPending)
@@ -103,7 +126,12 @@ try {
     $failed=$done.Failed
     Write-Host $done.Message
 } catch {
-    Update-LaunchState -Path $statePath -Values @{pid=$PID;phase='failed';message=$_.Exception.Message}
+    $lastState=Read-LaunchState -Path $statePath
+    $failurePhase=if($_.Exception -is [OperationCanceledException] -or ($lastState -and $lastState.phase -eq 'cancelled')){'cancelled'}else{'failed'}
+    if($lastState -and $lastState.PSObject.Properties['attemptId'] -and $lastState.attemptId -eq $AttemptId) {
+        Update-LaunchState -Path $statePath -Values @{pid=$PID;phase=$failurePhase;message=$_.Exception.Message}
+    }
+    if($run) { [IO.File]::WriteAllText((Join-Path $run 'startup-error.txt'),$_.Exception.ToString()) }
     Write-Host $_.Exception.Message -ForegroundColor Red
 } finally {
     if($failed -and $observerStop) { Set-Content -LiteralPath $observerStop -Value 'Startup did not complete.' -Encoding UTF8 }
@@ -112,5 +140,23 @@ try {
 }
 if($failed) {
     if(-not $NoDialog) { Write-Host 'Press any key to close.'; $null=Read-LaunchKey -TimeoutSeconds 0 }
+    exit 1
+}
+
+} catch {
+    $failure=$_.Exception.Message
+    $failureDetail=$_.Exception.ToString()
+    # A hidden worker can fail while loading modules or checking its user, before
+    # it owns the worker lock. Only update its own pre-created attempt.
+    try {
+        if($statePath -and (Get-Command Read-LaunchState -ErrorAction SilentlyContinue)) {
+            $prior=Read-LaunchState -Path $statePath
+            if($prior -and $prior.PSObject.Properties['attemptId'] -and $prior.attemptId -eq $AttemptId) {
+                Update-LaunchState -Path $statePath -Values @{phase='failed';outcome='StartupFailed';message=$failure}
+                if($prior.runDir) { [IO.File]::WriteAllText((Join-Path $prior.runDir 'startup-error.txt'),$failureDetail) }
+            }
+        }
+    } catch { }
+    Write-Output ('Startup failed: '+$failure+' Open Troubleshooting and copy diagnostics.')
     exit 1
 }

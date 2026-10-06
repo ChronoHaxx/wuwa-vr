@@ -1,7 +1,7 @@
 # Start playing
 
-**Beta for game 3.7 · desktop app 1.0.2.**
-[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-steam/WuWa-VR-Setup.exe)
+**Beta for game 3.7 · desktop app 1.0.3.**
+[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-recovery/WuWa-VR-Setup.exe)
 and run it to install **WuWa VR** for your Windows user. Open **WuWa VR** from
 the Start menu. The small installer does not bundle the VR mod: the first
 **Install VR** needs internet to download about **54 MB**. No separate Python
@@ -33,24 +33,34 @@ GitHub Releases and compare the published checksum if unsure. Do not disable
 antivirus, SmartScreen or anti-cheat. Game injection asks for Windows permission
 separately from installing the app for your user.
 
-The owner has confirmed Steam startup with the VR backend running on this PC.
-The existing Kuro route remains available. This does not verify the current build
-on other PCs or in a headset; Epic injection and fresh-PC installation remain
+The owner previously confirmed Steam startup/backend activity on Windows 10.
+Version 1.0.2 failed to start on a remote Windows 11 Steam PC. This 1.0.3 recovery
+update has background test coverage; that PC’s retest is still pending. Renderer
+and injector are unchanged. Epic injection and current headset acceptance remain
 unverified. SteamVR is headset software, separate from the Steam-store game route.
 
 Choosing a simulator or restoring the headset runtime changes the system OpenXR
 runtime and may ask for Windows permission. Close the game and injector first.
-Opening or updating the app does not automatically select the simulator.
+Opening or updating the app does not automatically select the simulator. A missing
+registration or an old package’s simulator can be replaced through this explicit
+choice. If the simulator reports missing Visual C++ 2015–2022 x64 dependencies,
+follow the prerequisite message; the launcher does not install them automatically.
 
 ## Updates
 
 - Open **02 → Versions & updates → Check updates**.
-- **Desktop app 1.0.2:** choose **Update launcher** to download and verify the update;
+- **From installed 1.0.2 to desktop app 1.0.3:** choose **Update launcher** to download and verify the update;
   this does not restart the app. When it is ready, close the game and injector,
   stop recording and finish other operations, then choose **Restart to update**
   and confirm. Installing or updating the desktop app preserves your selected VR package.
-- **VR package:** in **step 02**, choose **beta-2026-10-06-steam** and install it,
-  or select it if already installed, to use **steam-20261006**. Older installed VR versions remain available for rollback.
+- **VR package:** in **step 02**, choose **beta-2026-10-06-recovery** and install it,
+  or select it if already installed, to use the updated helpers with the unchanged
+  **steam-20261006** renderer. **Explicitly select the new package after the app
+  restarts:** Check updates preserves the old selection. Both updates are needed.
+  Older installed VR versions remain available for rollback.
+- If the old launcher blocks updating, close it and run the new **WuWa-VR-Setup.exe**
+  from this website. This updates the app but does not guarantee a stalled worker
+  has stopped. Review remaining processes before changing the VR package/runtime.
 
 Updating keeps settings, backups, logs and recordings. The manager uses
 `%LOCALAPPDATA%\WuWa VR Manager`; the existing launcher data stays in
@@ -58,7 +68,12 @@ Updating keeps settings, backups, logs and recordings. The manager uses
 
 ## What this beta changes
 
-The **steam-20261006** VR build adds Steam selection and keeps your game’s
+This release adds visible startup stages, error/cancellation feedback and guarded
+process recovery. It also supports explicit simulator setup without an existing
+OpenXR registration. These launcher/helper changes have background test coverage;
+the remote Windows 11 Steam retest remains pending. Renderer and injector are unchanged.
+
+The retained **steam-20261006** VR build supports Steam selection and keeps your game’s
 graphics choices. It stops recreating inherited low/medium graphics overrides,
 with a one-time cleanup of recognized generated settings; custom edits are kept.
 The accepted timing correction remains separate from graphics quality.
@@ -73,9 +88,9 @@ foliage, far indirect-lighting, main Resonators reflection, ultimate-camera and
 Automatic cinema remains **off by default and unverified**. It did not activate
 for the latest reported in-engine scene; a prerendered movie has not been tested.
 Long scene/dialogue stalls, HUD-aspect refresh and moving backgrounds behind
-flat menus remain open. Manual mono theatre is a menu workaround. Launch progress
-may still say **waiting for UEVR** after the backend starts; check the actual game
-view before retrying or starting another launcher.
+flat menus remain open. Manual mono theatre is a menu workaround. Check the actual
+view and copied startup diagnostics when the outcome is unclear; do not start a
+second injector or assume the remote startup failure is resolved.
 
 **VR → WuWa Controls → Suppress mismatched NPC rim lighting** starts **off**.
 It suppresses the toon-rim effect that produced extra bright contours in the
@@ -106,6 +121,23 @@ See the [controller guide](CONTROLS.md), [comfort settings](COMFORT.md) and
 [recovery reference](TROUBLESHOOTING.md). The older browser-launcher instructions
 in that reference apply to the portable fallback.
 
+## Startup and process recovery
+
+If a launch stalls, use **Stop waiting** when offered. It cancels the startup
+wait, not the running game. **View details** and **Copy diagnostics** retain the
+reported stage and failure reason.
+
+Open **Troubleshooting → Stuck launcher processes → Find stuck launcher processes**.
+Review the name, PID, role, start time, path and eligibility of each candidate; Windows may request elevation. Nothing is selected
+automatically. Select only a verified launcher helper/startup worker, choose
+**Stop selected**, then confirm the listed processes. The panel does not terminate
+the game, Steam, headset/runtime or injector, or kill by name/process tree.
+Runtime/profile changes and active or unknown recording state remain protected.
+Review the per-process results, then explicitly choose **Retry connection** when
+ready. Recovery does not reconnect or launch the game automatically.
+Inconclusive processes may still need manual handling; copy diagnostics and check
+what the process belongs to before acting.
+
 ## Rollback, repair and removal
 
 Close the game, injector and recorder before switching or repairing VR packages.
@@ -119,12 +151,12 @@ Keep the data folders if you want to retain recordings, backups and settings.
 
 ## Portable fallback
 
-[WuWa-VR-Launcher.zip](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-steam/WuWa-VR-Launcher.zip)
+[WuWa-VR-Launcher.zip](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-recovery/WuWa-VR-Launcher.zip)
 is an advanced fallback. Extract the whole archive, keep `app` and `python`
 together, and open **WuWa VR Launcher.exe**. It uses the older browser interface;
 it does not install or self-update the desktop app. Choose **Apply & launch**,
 accept Windows permission, then follow the selected Steam or Kuro launch route.
 
-The [previous 4 October cinematic beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-04-cinematic)
-remains available. [Release notes and checksums](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam)
+The [previous 6 October Steam beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam)
+remains available. [Release notes and checksums](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-recovery)
 identify each download. Versions for older game releases may be incompatible.

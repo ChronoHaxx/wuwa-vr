@@ -976,6 +976,28 @@ class Tests
                 Json.Child(s, "openxr")["isBundledSimulator"] = true;
                 Assert(LauncherPresentation.RuntimeSummary(true, s, k => k).Contains("runtimeBundledSimulator"), "selected bundled simulator not distinguished");
             });
+            Test("launch runtime gating keeps foreign simulators separate from valid headset runtimes", () =>
+            {
+                foreach (bool available in new[] { false, true })
+                foreach (bool simulator in new[] { false, true })
+                foreach (bool current in new[] { false, true })
+                {
+                    var state = Json.Read<Dictionary<string, object>>(Json.Write(new { openxr = new { available, isSimulator = simulator, isBundledSimulator = current } }));
+                    Assert((LauncherPresentation.RuntimeLaunchBlock(true, state) == null) == (available && (!simulator || current)), "runtime enablement accepted a broken/foreign runtime or rejected a headset");
+                    Assert(LauncherPresentation.RuntimeLaunchBlock(false, state) == "connectionRequired", "unconnected runtime accepted");
+                    Json.Child(state, "openxr")["launchReady"] = false;
+                    Assert(LauncherPresentation.RuntimeLaunchBlock(true, state) != null, "server runtime refusal bypassed");
+                }
+            });
+            Test("friendly release names preserve immutable package identities", () =>
+            {
+                var friendlyRelease = new Release { id = "beta-1.1.0", displayName = "1.1.0 beta", gameVersion = "3.7" };
+                Assert(friendlyRelease.ToString() == "1.1.0 beta  ·  WuWa 3.7", "semantic version not shown");
+                var roundtrip = Json.Read<Release>(Json.Write(friendlyRelease));
+                Assert(roundtrip.id == "beta-1.1.0" && roundtrip.displayName == "1.1.0 beta", "friendly label changed identity or was not retained");
+                friendlyRelease.displayName = null;
+                Assert(friendlyRelease.DisplayLabel == friendlyRelease.id, "old metadata loses its fallback identity");
+            });
             Test("choosing another release never labels it installed", () =>
             {
                 Assert(LauncherPresentation.PackageSummary("old", "candidate", true, k => k) == "otherInstalled", "wrong selected release labelled installed");

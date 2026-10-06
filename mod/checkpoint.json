@@ -1,37 +1,37 @@
 {
   "schema": 3,
-  "build": "enum-startup-20261006",
+  "build": "player-ready-1-1-0",
   "privateCandidate": false,
-  "launcherVersion": "1.0.10",
+  "launcherVersion": "1.1.0",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "26b32f2c6cc2d52c29fa786ca932806b53469cc3b0a3a2f32b8ed174fffbe3b6",
-  "frozenPatchSha256": "e98c4f8e8e2b7526fecbbf754b4862526fb1af028c058ec405ac8b79456ace7b",
-  "sourceReconstructedTree": "bd1d16b43675165b1001812e6f95e874313ee036",
-  "buildCompleted": "2026-10-06T20:06:23+0100",
+  "backendSha256": "c3ea3c7b5a33e64c9d559d7ae592aa3e27e02a425e9cf794c79b4f1139d47eb1",
+  "frozenPatchSha256": "5f06d4cb153309433c1f43e49d6fbe136285477cc2499130664df04de25efc62",
+  "sourceReconstructedTree": "b89a06e241f7ba91c7e08172fd3ec18360092e04",
+  "buildCompleted": "2026-10-06T20:58:28+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 54282355,
-    "sha256": "1531c0fc9b07b350e2b5a85b97655070450b95d0b95e60cfedbc32adf5107599",
+    "bytes": 54267020,
+    "sha256": "8145de66c0425dcd688327ed4753dc2237d25cf1d313b487fbccd6e8b8e70a16",
     "public": true
   },
-  "liveAcceptance": "Native build verified by receipt; see release notes for background checks. Affected-PC startup and headset retest pending.",
+  "liveAcceptance": "Prior 1.0.10 startup user-confirmed on affected Windows 11 Steam simulator PC. Current changes have component tests; PlayStation hardware and headset acceptance pending.",
   "previousPublicRelease": {
-    "tag": "beta-2026-10-06-device-dispatch",
-    "backendSha256": "a999659464f394f5072e8abc1c670b3811fba9457854f19ca3290deb3d16ccc8"
+    "tag": "beta-2026-10-06-enum-startup",
+    "backendSha256": "26b32f2c6cc2d52c29fa786ca932806b53469cc3b0a3a2f32b8ed174fffbe3b6"
   },
-  "sourceIdentity": "Enum object validation and guarded renderer resize recovery. See ENUM-STARTUP-20261006.md. Injector, accepted scene rendering, DX12 dispatch and graphics policy retained.",
+  "sourceIdentity": "Runtime readiness checks, clearer version flow and native PlayStation shortcuts. See PLAYER-READY-1.1.0.md. Accepted startup, rendering and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "enum-startup-20261006",
+  "rendererBuild": "player-ready-1-1-0",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-2026-10-06-enum-startup",
+  "releaseTag": "beta-1-1-0",
   "sdkPatchSha256": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
   "sdkReconstructedTree": "0ad1702a10fec58469ec88265fa7297365fffab6",
-  "launcherSha256": "e6cb12ec0b46dafea278d18ea782d9f9c716c196a36ece305cb98e904861d31b",
-  "setupSha256": "659b182b3cd16456ebc0e1d7e89b2ba7da9346fa454b4d5b3a2fac774ec29b1f"
+  "launcherSha256": "278d56b42bf6ecb741572d29d7df5c76387c1888a2f90ed8eab52634ae4374a7",
+  "setupSha256": "e5cc3a9817dca8eba76caa156b28f5a1d3b801fee13f3fb16835106455a28404"
 }

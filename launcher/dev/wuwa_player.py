@@ -235,22 +235,33 @@ def injector_runtime():
     return ""
 
 
-def runtime_manifest(path):
+def runtime_library(path):
     if not path:
-        return False
+        return None
     try:
         file = Path(path)
+        if not file.is_absolute():
+            return None
         manifest = json.loads(file.read_text(encoding="utf-8-sig"))
         library = Path(manifest["runtime"]["library_path"])
-        return (library if library.is_absolute() else file.parent / library).is_file()
+        library = (library if library.is_absolute() else file.parent / library).resolve()
+        return library if library.is_file() else None
     except (OSError, ValueError, KeyError, TypeError):
-        return False
+        return None
+
+
+def runtime_manifest(path):
+    return runtime_library(path) is not None
 
 
 def simulator_manifest(path):
     try:
         runtime = json.loads(Path(path).read_text(encoding="utf-8-sig"))["runtime"]
-        return runtime.get("name") == "OpenXR Simulator" and Path(runtime["library_path"]).name.lower() == "openxr_simulator.dll"
+        if not isinstance(runtime, dict):
+            return False
+        return (runtime.get("name") == "OpenXR Simulator" or
+                Path(runtime["library_path"]).name.lower() == "openxr_simulator.dll" or
+                Path(path).name.lower() == "openxr_simulator.json")
     except (OSError, ValueError, KeyError, TypeError):
         return False
 
@@ -278,12 +289,26 @@ def openxr_status():
     ok = runtime_manifest(active)
     simulator = config().app / "dev-tools/OpenXR-Simulator/openxr_simulator.json"
     is_simulator = simulator_manifest(active) or (not Path(active).is_file() and Path(active).name.lower() == "openxr_simulator.json")
+    bundled = (is_simulator and Path(active).resolve() == simulator.resolve() and
+               runtime_library(active) == (simulator.parent / "openxr_simulator.dll").resolve())
+    launch_ready = ok and (not is_simulator or bundled)
+    message = ""
+    if is_simulator and not bundled:
+        message = "This simulator is not the current installed VR package's runtime. Choose Use bundled simulator, or Use headset, before launching. Repair this package if its simulator files are missing."
+    elif not ok:
+        message = "No working OpenXR runtime is selected. Choose the bundled simulator for a desktop preview, or select your headset runtime in its own app."
     headset = previous if is_simulator else active
     return {"available": ok, "name": name if active else "", "manifest": active,
-            "isSimulator": is_simulator, "canSimulator": runtime_manifest(simulator) and (ok or is_simulator or not has_active),
-            "isBundledSimulator": is_simulator and Path(active).resolve() == simulator.resolve(),
+            "isSimulator": is_simulator, "canSimulator": runtime_library(simulator) == (simulator.parent / "openxr_simulator.dll").resolve() and (ok or is_simulator or not has_active),
+            "isBundledSimulator": bundled, "launchReady": launch_ready,
             "canHeadset": runtime_manifest(headset) and not simulator_manifest(headset),
-            "message": "" if ok else "No working OpenXR runtime is selected. Choose the bundled simulator for a desktop preview, or select your headset runtime in its own app."}
+            "message": message}
+
+
+def require_launch_runtime():
+    current = openxr_status()
+    if not current.get("launchReady"):
+        raise ValueError(current.get("message") or "Select a valid headset runtime or this package's bundled simulator before launching.")
 
 
 def require_runtime(mode, expected):
@@ -761,6 +786,7 @@ def apply_build(build_id, reset=False):
 
 
 def launch_build(build_id):
+    require_launch_runtime()
     apply_build(build_id)
     JOB["message"] = "Waiting for Windows permission. Choose Yes in the Windows prompt."
     result = powershell(*build_command("Launch", build_id), encoding="utf-8")
@@ -773,6 +799,7 @@ def launch_build(build_id):
 
 
 def check_ready(build_id):
+    require_launch_runtime()
     apply_needed = ""
     build = require_build(build_id)
     active = injector_runtime()
@@ -1399,6 +1426,7 @@ class Handler(BaseHTTPRequestHandler):
             if not settings().get("riskAcknowledgedAt"):
                 raise ValueError("Read the account-risk notice and tick the box before launching.")
             require_idle()
+            require_launch_runtime()
             game = game_status()
             if game["problem"]:
                 raise ValueError(game["problem"])

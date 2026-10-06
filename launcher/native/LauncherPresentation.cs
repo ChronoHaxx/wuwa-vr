@@ -7,6 +7,15 @@ namespace WuWaVR.Manager
     // registration as proof of headset output.
     public static class LauncherPresentation
     {
+        public static string RuntimeLaunchBlock(bool connected, Dictionary<string, object> status)
+        {
+            if (!connected) return "connectionRequired";
+            var runtime = Json.Child(status, "openxr");
+            if (!Json.Flag(runtime, "available")) return "runtimeUnavailableHint";
+            if (Json.Flag(runtime, "isSimulator") && !Json.Flag(runtime, "isBundledSimulator")) return "runtimeSelectCurrentSimulator";
+            if (runtime.ContainsKey("launchReady") && !Json.Flag(runtime, "launchReady")) return "runtimeUnavailableHint";
+            return null;
+        }
         public static string RuntimeSummary(bool connected, Dictionary<string, object> status, Func<string, string> text)
         {
             if (!connected) return text("runtimeHint");

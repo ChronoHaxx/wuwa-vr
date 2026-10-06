@@ -159,16 +159,14 @@ function Test-SelectedSimulatorGuard {
  function Assert-WuWaBuildFiles { param($Context,$Build) $runtime }
  function Get-WuWaSelectedRuntime { param($Context) $runtime }
  function Get-ItemPropertyValue { param($LiteralPath,$Name) $fixtureManifest }
- function Assert-WuWaRuntimeManifest { param($Path) }
- function Test-WuWaSimulatorManifest { param($Path) $true }
- function Assert-WuWaSimulatorPrerequisites { param($ManifestPath) $script:preflightManifest=$ManifestPath;throw 'fixture simulator dependency missing' }
+ function Assert-WuWaLaunchRuntime { param($Path,$Root) $script:preflightManifest=$Path;throw 'fixture simulator belongs to another package' }
  function Get-WuWaLaunchSettings { throw 'Settings should not be reached after missing simulator dependencies' }
  $tokens=$null;$errors=$null
  $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $checkout 'launcher/dev/start-wuwa-build.ps1'),[ref]$tokens,[ref]$errors)
  $definition=$ast.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Test-WuWaBuildReady'},$true)
  $blocked=$false
- try {& $definition.Body.GetScriptBlock()}catch{$blocked=$_.Exception.Message -like '*fixture simulator dependency missing*'}
- Check ($blocked -and $script:preflightManifest -eq $fixtureManifest) 'already-selected simulator gets dependency preflight before launch'
+ try {& $definition.Body.GetScriptBlock()}catch{$blocked=$_.Exception.Message -like '*fixture simulator belongs to another package*'}
+ Check ($blocked -and $script:preflightManifest -eq $fixtureManifest) 'actual startup preflight enforces current-package runtime before launch'
 }
 Test-SelectedSimulatorGuard
 # Run the actual worker script with a deliberately broken packaged catalog.

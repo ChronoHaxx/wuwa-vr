@@ -1,179 +1,57 @@
 # Start playing
 
-**Beta for game 3.7 · desktop app 1.0.10.**
-[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-enum-startup/WuWa-VR-Setup.exe)
-and run it to install **WuWa VR** for your Windows user. Open **WuWa VR** from
-the Start menu. The small installer does not bundle the VR mod: the first
-**Install VR** needs internet to download about **54 MB**. No separate Python
-installation is needed.
-[简体中文安装与更新指南](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html).
+**1.1.0 beta · Wuthering Waves 3.7 · Windows x64.**
+[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-1-0/WuWa-VR-Setup.exe), install it for your Windows user, then open **WuWa VR** from the Start menu. The first VR package installation needs internet. No separate Python installation is needed.
 
-You need your own copy of Wuthering Waves, a Windows PC, a PC VR headset/runtime
-and an Xbox/XInput controller connected to the PC. The simulator is an optional
-way to inspect the view without a headset; it does not demonstrate headset behaviour.
+1. **01 · Game.** Choose your Steam or Kuro installation. For Steam, browse to **Wuthering Waves.exe** if necessary; sign into Steam first.
+2. **02 · WuWa VR.** Read and accept the account-risk notice, then install **1.1.0 beta**. This is the VR package; the launcher app has its own version shown separately.
+3. **03 · Headset or simulator.** Start your headset software and choose its valid OpenXR runtime, or explicitly select **Use bundled simulator**. Select **Launch in VR** and accept Windows permission. Steam starts through Steam; Kuro users press **Play** in its launcher.
 
-**Account risk:** this unofficial mod injects into the game. Anti-cheat may
-restrict or ban an account. It is not approved by Kuro Games.
-[Read the risk notice](RISK.md) before launching.
+Your choices are saved, so later sessions can go straight to **Launch in VR** when ready. A simulator from an older package or an invalid/missing runtime blocks launch and shows what to fix. Close the game and injector before switching runtimes. Updating the app never changes the system runtime automatically.
 
-## Install and launch
+The simulator lets you inspect the view without a headset. It does not establish headset comfort or compatibility. See [controller shortcuts](CONTROLS.md) for Xbox and PlayStation support.
 
-1. **01 · Game.** Choose the detected Kuro or Steam installation. Saved choices
-   are kept; if several installations are found, choose one. For Steam, browse to
-   **Wuthering Waves.exe** if needed, not the inner Shipping executable.
-2. **02 · Install VR.** Read and accept the account-risk notice, then install the
-   selected VR version. Existing settings and backups are kept.
-3. **03 · Headset or simulator.** Start your headset software and check the
-   displayed runtime, or deliberately choose the simulator. Select **Launch in VR**,
-   accept the Windows permission prompt. Steam opens the selected game through
-   Steam; for Kuro, press **Play** in its launcher.
+**Account risk:** unofficial injection can trigger anti-cheat or account restrictions. Not approved by Kuro Games. [Read the risk notice](RISK.md). The installer is unsigned; download from the project release and check its checksum. Do not disable antivirus, SmartScreen or anti-cheat.
 
-The installer is unsigned, so Windows may warn. Download from this project's
-GitHub Releases and compare the published checksum if unsure. Do not disable
-antivirus, SmartScreen or anti-cheat. Game injection asks for Windows permission
-separately from installing the app for your user.
+## Updates and versions
 
-The owner previously confirmed Steam startup/backend activity on Windows 10.
-The affected Windows 11 Steam PC reached OpenXR with 1.0.9, then the game exited. This candidate validates enum objects before reading their class metadata and guards cached resize calls after renderer-hook replacement. It preserves the working DX12 dispatch path. The last SDK message matches the unsafe enum discovery code, but no crash dump establishes the exact cause. The backend build, 15 enum-discovery cases and renderer resize/dispatch regressions passed. Successful startup on the affected PC and physical-headset acceptance remain unverified. SteamVR is headset software, separate
-from the Steam-store game route.
+**Launcher app** is the installed desktop application. **VR package** contains the game integration, scripts and bundled simulator. The two statuses are separate: an up-to-date app can still be using an older VR package.
 
-Choosing a simulator or restoring the headset runtime changes the system OpenXR
-runtime and may ask for Windows permission. Close the game and injector first.
-Opening or updating the app does not automatically select the simulator. A missing
-registration or an old package’s simulator can be replaced through this explicit
-choice. If the simulator reports missing Visual C++ 2015–2022 x64 dependencies,
-follow the prerequisite message; the launcher does not install them automatically.
+- **Update launcher:** download and verify the app update. When game, injector, recording and other operations are idle, select **Restart to update** and confirm.
+- **VR package update:** use the package update option or **02 → Versions & updates**, deliberately choose **1.1.0 beta**, then install it. Checking for updates preserves your current choice, including rollback.
+- **Rollback:** when idle, use **Troubleshooting → Repair & recovery → Use previous installed version**. This changes the VR package, not the app. If using the simulator, select the restored package's simulator before launching.
+- If the app cannot update, close it and run the latest installer from the website. Reinstallation preserves settings and does not stop existing workers.
 
-## Updates
+Older date-and-fix-name packages are historical builds. New releases use a readable version such as **1.1.0 beta**; exact package IDs remain in diagnostics for bug reports.
 
-- Open **02 → Versions & updates → Check updates**.
-- **From an older app, including 1.0.9, to desktop app 1.0.10:** choose **Update launcher** to download and verify the update;
-  this does not restart the app. When it is ready, close the game and injector,
-  stop recording and finish other operations, then choose **Restart to update**
-  and confirm. Installing or updating the desktop app preserves your selected VR package.
-- **VR package:** in **step 02**, choose **beta-2026-10-06-enum-startup** and install it,
-  or select it if already installed, to use VR build **enum-startup-20261006**.
-  **Explicitly select the new package after the app
-  restarts:** Check updates preserves the old selection. Both updates are needed.
-  Older installed VR versions remain available for rollback.
-- **Rollback, if needed:** close the game/injector and stop recording, then use
-  **Troubleshooting → Repair & recovery → Use previous installed version**.
-  This changes the VR package, not the desktop app. Keep the old package; its
-  renderer-startup problem may return on the affected PC.
-- If the old launcher blocks updating, close it and run the new **WuWa-VR-Setup.exe**
-  from this website. This updates the app but does not guarantee a stalled worker
-  has stopped. Review remaining processes before changing the VR package/runtime.
+## Controls and current limits
 
-Updating keeps settings, backups, logs and recordings. The manager uses
-`%LOCALAPPDATA%\WuWa VR Manager`; the existing launcher data stays in
-`%LOCALAPPDATA%\WuWa VR Launcher`. Do not delete these folders to update.
+Open UEVR with **L3 + R3**, then **VR → WuWa Controls**. Both stick clicks are L3/R3 on Xbox and PlayStation.
 
-Uninstall: **Troubleshooting → Prepare uninstall** checks and removes verified
-downloads first, with confirmation. Use process recovery for a stalled worker, then
-retry cleanup. Windows Apps uninstall also runs a bounded cleanup hook. Active
-OpenXR packages, busy/unverified files and user data are retained with reasons in
-`%LOCALAPPDATA%\WuWa VR Manager\uninstall-result.txt`; retained-file reports
-open after Windows uninstall. Recordings, backups and settings are preserved.
+- Hold both triggers first, then click **R3** for **mono theatre**: the same scene and HUD in both eyes.
+- Hold both triggers first, then hold **L3 for 0.8 seconds** for a **stereoscopic screen**.
+- Release all controls before repeating, with UEVR and HUD/mouse adjustment closed.
 
-## What this beta changes
+Cinematic framing is on by default and was accepted in a simulator replay. Automatic cinematic switching is experimental, **off by default**, and has not been verified with a real prerendered movie. Keep the manual shortcuts available.
 
-The candidate validates enum objects before reading class metadata, avoiding
-the unsafe interpretation of unrelated property pointers. It also guards cached
-resize callbacks after renderer-hook replacement and makes startup failure
-reporting consistent. The DX12 dispatch repair from 1.0.9 is retained.
-The backend build, 15 enum-discovery cases and renderer resize/dispatch regressions passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
+The optional NPC rim-light suppression starts off and also removes intended rim lighting nearby; the **underlying stereo rendering fault is unresolved**. Scene/dialogue stalls, HUD-aspect refresh failures, some reflections/fog and moving flat-menu backgrounds remain open. Manual mono theatre can help with menus. See [troubleshooting](TROUBLESHOOTING.md).
 
-Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. No affected-PC or headset acceptance is implied.
+The user confirmed successful startup on the previously affected Windows 11 Steam PC with the bundled simulator in 1.0.10. This release retains that startup repair. PlayStation hardware, headset comfort and the updated launcher flow still need user testing.
 
-Startup attempts preserve available **backend.log** through **Copy diagnostics**.
-Uncertain process identity remains **TargetUnverified**. A shutdown reported by
-the current backend ends the wait; it does not prove why the game closed. Existing
-recovery and **Close launcher only** remain available.
+## Recovery, recording and uninstall
 
-The **enum-startup-20261006** VR build retains Steam selection and keeps your game’s
-graphics choices. It stops recreating inherited low/medium graphics overrides,
-with a one-time cleanup of recognized generated settings; custom edits are kept.
-The accepted timing correction remains separate from graphics quality.
+Use **Troubleshooting → Copy diagnostics** when launch stalls. **Stop waiting** cancels the startup wait; it does not close the game. **Find stuck launcher processes** lists identities and reasons. Review eligible launcher workers, then explicitly confirm **Stop selected**. Game, Steam, headset/runtime and injector processes are excluded.
 
-Cinematic framing is **on by
-default**. The owner confirmed the simulator replay on private build
-**screen-comfort-r1**; sampled frames from the latest 68-second recording show
-matching letterbox heights. **Headset comfort remains pending.** Earlier accepted
-foliage, far indirect-lighting, main Resonators reflection, ultimate-camera and
-2D-brightness fixes are retained.
+**Close launcher only** closes an unresponsive launcher connection while leaving background work untouched. It does not claim that work stopped. Use **Retry connection** after reviewing recovery results. Do not start a second injector to resolve a stalled launch.
 
-Automatic cinema remains **off by default and unverified**. It did not activate
-for the latest reported in-engine scene; a prerendered movie has not been tested.
-Long scene/dialogue stalls, HUD-aspect refresh and moving backgrounds behind
-flat menus remain open. Manual mono theatre is a menu workaround. Check the actual
-view and copied startup diagnostics when the outcome is unclear; do not start a
-second injector or assume the remote startup failure is resolved.
+**Developer tools** in the footer holds recording and advanced diagnostics. These are optional for normal play.
 
-**VR → WuWa Controls → Suppress mismatched NPC rim lighting** starts **off**.
-It suppresses the toon-rim effect that produced extra bright contours in the
-tested NPC scene. It also removes that intended effect from nearby characters
-that use it. Turning it off restores the prior value if the workaround still
-owns it. The underlying stereo rendering fault is unresolved; this is a
-workaround, not a claim that every NPC or scene is fixed.
+**Prepare uninstall** checks removable verified downloads and asks for confirmation. Windows Apps uninstall also attempts bounded cleanup. Active runtime files, busy/unverified files, settings, backups and recordings may be retained; the remaining-file report gives exact reasons. Updates preserve user data under `%LOCALAPPDATA%\WuWa VR Manager` and `%LOCALAPPDATA%\WuWa VR Launcher`.
 
-Weapon/Echo submenu reflections and full-animation first-person aiming remain
-open. Keep **Native Stereo**, **Native Stereo Fix** and **Same Pass** on for this
-build's stereo fixes.
+## Portable fallback and source
 
-## First-minute controls and recovery
+The [portable ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-1-0/WuWa-VR-Launcher.zip) uses the older browser interface and does not self-update the desktop app. Extract the whole archive and keep its folders together.
 
-- **L3 + R3** or Insert opens UEVR settings; custom options are under
-  **VR → WuWa Controls**. Close settings before using gameplay shortcuts.
-- **L3 + B** shows or hides the game UI. A blurred menu with no buttons can mean
-  the UI is hidden. **Show game UI now** is also available in WuWa Controls.
-- **L3 + A** recenters. **L3 + Menu** shows the shortcut sheet.
-- Fully hold **LT + RT first**, then **click R3** for mono theatre: both eyes see
-  the same scene and HUD. For a screen with stereo depth, hold **L3 for 0.8 seconds**
-  instead. Release all controls before repeating; close UEVR and HUD/mouse adjustment.
-- For a squashed HUD after leaving screen mode, try **Reset HUD aspect** and read
-  its result. It can report unavailable; opening and closing ESC has helped when
-  the game allows it. It is not a guaranteed dialogue-safe recovery.
+The launcher is MIT open source. The mod's source changes and build instructions are public; upstream components retain their own licences. [Source repository](https://github.com/ChronoHaxx/wuwa-vr) · [component licences](../LICENSE.md).
 
-See the [controller guide](CONTROLS.md), [comfort settings](COMFORT.md) and
-[recovery reference](TROUBLESHOOTING.md). The older browser-launcher instructions
-in that reference apply to the portable fallback.
-
-## Startup and process recovery
-
-If a launch stalls, use **Stop waiting** when offered. It cancels the startup
-wait, not the running game. **View details** and **Copy diagnostics** retain the
-reported stage and failure reason.
-
-Open **Troubleshooting → Stuck launcher processes → Find stuck launcher processes**.
-Review the name, PID, role, start time, path and eligibility of each candidate; Windows may request elevation. Nothing is selected
-automatically. Select only a verified launcher helper/startup worker, choose
-**Stop selected**, then confirm the listed processes. The panel does not terminate
-the game, Steam, headset/runtime or injector, or kill by name/process tree.
-Runtime/profile changes and active or unknown recording state remain protected.
-Review the per-process results, then explicitly choose **Retry connection** when
-ready. Recovery does not reconnect or launch the game automatically.
-Inconclusive processes may still need manual handling; copy diagnostics and check
-what the process belongs to before acting.
-
-## Rollback, repair and removal
-
-Close the game, injector and recorder before switching or repairing VR packages.
-Use step 02 to choose an installed older version; repair creates a fresh verified
-copy. Personal settings and recordings are not replaced with package defaults.
-
-Before removing the app, restore the headset runtime if you selected the bundled
-simulator, and use **Restore my settings from before WuWa VR** in recovery if you
-want to undo the profile changes. Then uninstall **WuWa VR** through Windows.
-Keep the data folders if you want to retain recordings, backups and settings.
-
-## Portable fallback
-
-[WuWa-VR-Launcher.zip](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-enum-startup/WuWa-VR-Launcher.zip)
-is an advanced fallback. Extract the whole archive, keep `app` and `python`
-together, and open **WuWa VR Launcher.exe**. It uses the older browser interface;
-it does not install or self-update the desktop app. Choose **Apply & launch**,
-accept Windows permission, then follow the selected Steam or Kuro launch route.
-
-The [previous 6 October beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-device-dispatch)
-remains available. [Release notes and checksums](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-enum-startup)
-identify each download. Versions for older game releases may be incompatible.
+[Previous 1.0.10 beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-enum-startup) is available for rollback.

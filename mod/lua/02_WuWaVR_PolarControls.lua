@@ -6,6 +6,7 @@ local cb = uevr.sdk.callbacks
 local B = {UP=1, DOWN=2, LEFT=4, RIGHT=8, MENU=16, VIEW=32, L3=64, R3=128,
     LB=256, RB=512, A=4096, B=8192, X=16384, Y=32768}
 local slots, actions = {}, {}
+local input_source=nil
 local selected, selected_at, mode, prior_mode = nil, -100, 0, 0
 local input, frame, base, free, owner, mesh_cache = nil, nil, nil, nil, nil, nil
 local context_mouse, focused, camera_active = false, false, false
@@ -448,7 +449,12 @@ local function first_person_anchor(pawn,pos,known_mesh,allow_calibration)
     return pos
 end
 
-cb.on_xinput_get_state(function(_,index,state,result)
+local function choose_input_source(source)
+    if input_source~=source then
+        input_source=source; slots={}; actions={}; selected=nil; input=nil
+    end
+end
+local function process_pad(index,state,result)
     -- New native callback provides a value copy of the result, avoiding a raw
     -- pointer read. A disconnected pad's undefined state must never be consumed.
     if result~=0 or not state then
@@ -624,7 +630,40 @@ cb.on_xinput_get_state(function(_,index,state,result)
     end
     state.Gamepad.wButtons=b & (~consumed)
     s.previous=b
+end
+
+cb.on_xinput_get_state(function(_,index,state,result)
+    -- A real raw XInput poll makes the native HID snapshot unavailable before
+    -- this callback. Ignore only VR-generated duplicate input while HID owns
+    -- the shortcut route. Switching back requires a neutral sample.
+    local ps=get("WuWaControls_PlayStationState") or ""
+    if ps:sub(1,6)=="ps-v1," then return end
+    if result==0 and state then choose_input_source("xinput") end
+    process_pad(index,state,result)
 end)
+
+local function poll_playstation()
+    local raw=get("WuWaControls_PlayStationState") or ""
+    local generation,stamp,buttons,lt,rt,lx,ly,rx,ry=raw:match(
+        "^ps%-v1,(%d+),(%d+),(%d+),(%d+),(%d+),(-?%d+),(-?%d+),(-?%d+),(-?%d+)$")
+    local values={tonumber(buttons),tonumber(lt),tonumber(rt),tonumber(lx),tonumber(ly),tonumber(rx),tonumber(ry)}
+    local valid_report=generation and tonumber(stamp) and now()*1000>=tonumber(stamp) and now()*1000-tonumber(stamp)<=250
+    for i,v in ipairs(values) do
+        local lo,hi=i==1 and 0 or i<=3 and 0 or -32768,i==1 and 65535 or i<=3 and 255 or 32767
+        if v<lo or v>hi then valid_report=false end
+    end
+    if not valid_report then
+        if input_source and input_source:sub(1,3)=="ps:" then
+            input_source=nil; slots={}; actions={}; selected=nil; input=nil
+        end
+        return
+    end
+    choose_input_source("ps:"..generation)
+    local pad={}; for i,k in ipairs(fields) do pad[k]=values[i] end
+    -- This private copy is never returned to the game. Native HID input cannot
+    -- consume the game's buttons; mapped XInput remains the preferred route.
+    process_pad(4,{Gamepad=pad},0)
+end
 
 -- Camera-only acro dynamics. Sticks command body angular rates; releasing them
 -- stops rotation without auto-levelling. No pawn/actor physics are modified.
@@ -967,6 +1006,7 @@ local function move_freecam(p,delta,pawn)
 end
 
 local function tick(_,delta)
+    poll_playstation()
     tick_sequence=tick_sequence+1
     local t=now(); delta=math.max(0,math.min(delta,0.05))
     -- Observe the real menu/cursor signal even when camera/input controls are

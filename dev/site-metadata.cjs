@@ -11,19 +11,19 @@ const pages = [
 const entryPages = {
   'index.html': {
     title: 'Wuthering Waves VR mod for Windows | WuWa VR community beta',
-    description: 'Download the free, unofficial Wuthering Waves VR community beta for Windows. Find the installer, Xbox controls, headset setup, known issues and account-risk notice.'
+    description: 'Download the free, unofficial Wuthering Waves VR community beta for Windows. Find the installer, controller shortcuts, headset setup, known issues and account-risk notice.'
   },
   'guide.html': {
     title: 'Wuthering Waves VR player guide | WuWa VR',
-    description: 'Set up the unofficial Wuthering Waves VR community beta on Windows. Read installation steps, Xbox controls, comfort settings, recovery advice and account risks.'
+    description: 'Set up the unofficial Wuthering Waves VR community beta on Windows. Read installation steps, controller shortcuts, comfort settings, recovery advice and account risks.'
   },
   'l/en.html': {
     title: 'Wuthering Waves VR setup for Windows | WuWa VR beta',
-    description: 'Start the free, unofficial Wuthering Waves VR community beta on Windows: install the launcher, choose a runtime, use Xbox controls and review known risks.'
+    description: 'Start the free, unofficial Wuthering Waves VR community beta on Windows: install the launcher, choose a runtime, use controller shortcuts and review known risks.'
   },
   'l/zh-Hans.html': {
     title: '鸣潮 VR 安装与手柄指南 | WuWa VR Windows 社区测试版',
-    description: '免费的非官方《鸣潮》VR Windows 社区测试版。简体中文指南介绍启动器安装与更新、头显运行时选择、Xbox 手柄操作、已知问题及账号风险。'
+    description: '免费的非官方《鸣潮》VR Windows 社区测试版。简体中文指南介绍启动器安装与更新、头显运行时选择、手柄快捷键、已知问题及账号风险。'
   }
 };
 const sharePoster = 'media/feature-portal.jpg';

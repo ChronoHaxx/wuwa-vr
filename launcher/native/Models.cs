@@ -21,10 +21,13 @@ namespace WuWaVR.Manager
         public string sha256 { get; set; }
         public long size { get; set; }
         public string notesUrl { get; set; }
-        public override string ToString() { return id + "  ·  WuWa " + gameVersion; }
+        public string displayName { get; set; }
+        [ScriptIgnore] public string DisplayLabel { get { return String.IsNullOrWhiteSpace(displayName) ? id : displayName; } }
+        public override string ToString() { return DisplayLabel + "  ·  WuWa " + gameVersion; }
         public void Validate()
         {
             Paths.Id(id); Paths.Id(buildId);
+            if (displayName != null && (displayName.Length > 100 || displayName.Any(Char.IsControl))) throw new InvalidDataException("Invalid release display name.");
             if (!Regex.IsMatch(gameVersion ?? "", @"^\d+\.\d+(\.\d+)?$") || (channel != "beta" && channel != "candidate")) throw new InvalidDataException("Unsupported release metadata.");
             RepoClient.ValidateSha256(sha256);
             if (size < 1 || size > 536870912) throw new InvalidDataException("Invalid download size.");
@@ -59,7 +62,7 @@ namespace WuWaVR.Manager
         public Release release { get; set; }
         public string folder { get; set; }
         public string installedUtc { get; set; }
-        public override string ToString() { return release.id; }
+        public override string ToString() { return release.DisplayLabel; }
     }
     public sealed class ManagerState
     {

@@ -202,7 +202,7 @@ class LaunchRecovery(unittest.TestCase):
                 player.require_idle()
 
     def test_child_rejection_keeps_precise_reason(self):
-        with patch.object(player, 'apply_build'), patch.object(player, 'powershell', return_value=subprocess.CompletedProcess([], 4, 'Wrong Windows account for this launch')):
+        with patch.object(player, 'require_launch_runtime'), patch.object(player, 'apply_build'), patch.object(player, 'powershell', return_value=subprocess.CompletedProcess([], 4, 'Wrong Windows account for this launch')):
             with self.assertRaisesRegex(player.OperationError, 'Wrong Windows account'):
                 player.launch_build('steam')
 
@@ -244,6 +244,59 @@ class LaunchRecovery(unittest.TestCase):
             result = player.openxr_status()
             self.assertTrue(result['isSimulator'] and result['canSimulator'])
             self.assertFalse(result['available'] or result['isBundledSimulator'])
+
+    def test_only_current_simulator_manifest_and_library_allow_launch(self):
+        current = self.simulator()
+        foreign = self.root / 'older package/openxr_simulator.json'
+        foreign.parent.mkdir()
+        (foreign.parent / 'openxr_simulator.dll').write_bytes(b'inert')
+        foreign.write_text(current.read_text())
+        values = {'ActiveRuntime': str(current), 'PreviousActiveRuntime': ''}
+        with patch.object(player.winreg, 'OpenKey'), patch.object(player.winreg, 'QueryValueEx', side_effect=lambda k, name: (values[name], 1)):
+            self.assertTrue(player.openxr_status()['launchReady'])
+            player.require_launch_runtime()
+            values['ActiveRuntime'] = str(foreign)
+            status = player.openxr_status()
+            self.assertTrue(status['available'] and status['canSimulator'])
+            self.assertFalse(status['launchReady'] or status['isBundledSimulator'])
+            with self.assertRaisesRegex(ValueError, 'current installed VR package'):
+                player.require_launch_runtime()
+            values['ActiveRuntime'] = str(current)
+            current.write_text(json.dumps({'runtime': {'name': 'OpenXR Simulator', 'library_path': str(foreign.parent / 'openxr_simulator.dll')}}))
+            status = player.openxr_status()
+            self.assertFalse(status['launchReady'] or status['isBundledSimulator'] or status['canSimulator'])
+
+    def test_valid_third_party_headset_remains_supported_but_missing_library_is_blocked(self):
+        manifest = self.root / 'independent-vendor.json'
+        library = self.root / 'headset.dll'
+        library.write_bytes(b'inert')
+        manifest.write_text(json.dumps({'runtime': {'name': 'Independent headset', 'library_path': library.name}}))
+        values = {'ActiveRuntime': str(manifest), 'PreviousActiveRuntime': ''}
+        with patch.object(player.winreg, 'OpenKey'), patch.object(player.winreg, 'QueryValueEx', side_effect=lambda k, name: (values[name], 1)):
+            self.assertTrue(player.openxr_status()['launchReady'])
+            library.unlink()
+            self.assertFalse(player.openxr_status()['launchReady'])
+            manifest.write_text('{broken')
+            self.assertFalse(player.openxr_status()['launchReady'])
+            manifest.write_text('{"runtime": []}')
+            self.assertFalse(player.openxr_status()['launchReady'])
+            values['ActiveRuntime'] = ''
+            self.assertFalse(player.openxr_status()['launchReady'])
+
+    def test_launch_and_readiness_recheck_runtime_before_profile_or_process_work(self):
+        with patch.object(player, 'openxr_status', return_value={'launchReady': False, 'message': 'Fixture old simulator'}), \
+                patch.object(player, 'apply_build') as apply, patch.object(player, 'powershell') as command:
+            for action in (player.launch_build, player.check_ready):
+                with self.assertRaisesRegex(ValueError, 'old simulator'):
+                    action('steam')
+            apply.assert_not_called()
+            command.assert_not_called()
+            handler = object.__new__(player.Handler)
+            with patch.object(player, 'require_build', return_value={'id': 'steam'}), patch.object(player, 'require_idle'), \
+                    patch.object(player, 'settings', return_value={'riskAcknowledgedAt': 'fixture'}), patch.object(player, 'begin_job') as job:
+                with self.assertRaisesRegex(ValueError, 'old simulator'):
+                    handler.post_action('/api/launch', {'id': 'steam'})
+                job.assert_not_called()
 
     def test_existing_but_empty_registration_does_not_mean_absent(self):
         self.simulator()

@@ -123,6 +123,7 @@ public static class WindowTests
         public string SettingsFile;
         public readonly List<string> Writes = new List<string>();
         public Dictionary<string, object> Status = new Dictionary<string, object> {
+            { "openxr", new Dictionary<string, object> { { "available", true }, { "name", "Fixture headset" }, { "isSimulator", false }, { "launchReady", true } } },
             { "game", new Dictionary<string, object> { { "saved", true }, { "mode", "manual" }, { "launcher", "" }, { "problem", "" } } },
             { "job", new Dictionary<string, object> { { "running", false } } }, { "recording", new Dictionary<string, object> { { "running", false }, { "available", true }, { "sources", new Dictionary<string, object> { { "simulator", true }, { "steamvr", true } } } } },
             { "gameRunning", false }, { "injectorRunning", false }
@@ -710,7 +711,7 @@ public static class WindowTests
                     f.Http.Status[activity] = false;
                 }
                 Json.Child(f.Http.Status, "openxr")["canSimulator"] = false; Refresh(w);
-                Check(!Button(w, "useSimulator").IsEnabled && Field<TextBlock>(w, "runtimeHint").Text.Contains("OpenXR runtime"), "missing simulator capability silently enabled");
+                Check(!Button(w, "useSimulator").IsEnabled && Button(w, "launch").IsEnabled, "missing optional simulator capability enabled its switch or blocked the valid headset");
                 Click(w, Button(w, "check"));
                 Check(f.Http.ReadinessChecks == 1 && Field<TextBlock>(w, "operationText").Text.Contains("not applied yet") && Field<Expander>(w, "feedbackPanel").IsExpanded, "readiness result is hidden or conflated with headset success");
                 f.Http.Status["openxr"] = new Dictionary<string, object> { { "name", "" }, { "available", false }, { "manifest", "" }, { "canHeadset", false }, { "canSimulator", true } }; Refresh(w);
@@ -722,7 +723,38 @@ public static class WindowTests
                     "first runtime registration lost its explicit empty expectedActive guard");
                 Json.Child(f.Http.Status, "openxr")["isBundledSimulator"] = false; Refresh(w);
                 Check(Button(w, "useSimulator").IsEnabled && Field<TextBlock>(w, "runtime").Text.Contains(new Strings()["runtimeOtherSimulator"]), "foreign simulator conceals package switch");
+                Check(!Button(w, "launch").IsEnabled && Field<TextBlock>(w, "runtimeHint").Text.Contains("another package"), "foreign simulator still allows launch or lacks recovery instruction");
+                Click(w, Button(w, "useSimulator"));
+                Check(Button(w, "launch").IsEnabled, "explicit current simulator selection did not recover launch readiness");
                 Console.WriteLine("PASS WINDOW headset/simulator roundtrip, decline, capability/activity gates and visible readiness result (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; f.Http.AllowLaunch = true; f.Http.Status["riskAcknowledged"] = true; Connect(w);
+                Check(Button(w, "launch").IsEnabled, "valid independent headset did not enable launch");
+                // Change only the server state after enablement: action must re-read
+                // runtime readiness before even writing the risk acknowledgement.
+                f.Http.Status["openxr"] = new Dictionary<string, object> { { "available", true }, { "isSimulator", true }, { "isBundledSimulator", false } };
+                Click(w, Button(w, "launch"));
+                Check(f.Http.Launches == 0 && f.Http.RiskAcknowledgements == 0 && !Button(w, "launch").IsEnabled &&
+                    Field<TextBlock>(w, "operationText").Text.Contains("another package"), "runtime change after enablement bypassed action guard");
+                f.Http.Status["openxr"] = new Dictionary<string, object> { { "available", false }, { "name", "Broken headset" } }; Refresh(w);
+                Check(!Button(w, "launch").IsEnabled && Button(w, "repair").IsEnabled, "missing library allows launch or prevents package repair");
+                Console.WriteLine("PASS WINDOW runtime rechecked at click, missing library blocks launch, repair remains available (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w);
+                var newer = new Release { id = "beta-1.1.0", displayName = "1.1.0 beta", channel = "beta", gameVersion = "3.7", published = "2026-10-07T00:00:00Z" };
+                Field<Catalog>(w, "catalog").releases.Add(newer); Field<ComboBox>(w, "releases").Items.Add(newer); Refresh(w);
+                Check(Field<TextBlock>(w, "packageUpdateState").Text.Contains("1.1.0 beta") && Button(w, "selectLatestPackage").Visibility == Visibility.Visible &&
+                    f.Store.Selected.release.id == f.B.release.id, "VR package update is hidden or silently migrated rollback selection");
+                Click(w, Button(w, "selectLatestPackage"));
+                Check(((Release)Field<ComboBox>(w, "releases").SelectedItem).id == newer.id && f.Store.Selected.release.id == f.B.release.id &&
+                    Field<TextBlock>(w, "packageState").Text.Contains("1.1.0 beta") && Field<TextBlock>(w, "packageState").ToolTip.ToString().Contains(newer.id) &&
+                    Convert.ToString(Button(w, "launch").Content) == new Strings()["installSelected"] && f.Http.Launches == 0,
+                    "choosing latest package lost the immutable identity or installed/launched without consent");
+                Console.WriteLine("PASS WINDOW separate VR package update and friendly name preserve rollback; choosing update only selects it");
             }
             using (var f = new Fixture(root))
             {

@@ -1200,7 +1200,8 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
     }
 
     // L3 + R3 to open the menu
-    if ((state.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_THUMB) != 0 && (state.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_THUMB) != 0) {
+    if ((!is_gamepad || !wuwa_ps_hid::suppress_xinput_menu()) &&
+        (state.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_THUMB) != 0 && (state.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_THUMB) != 0) {
         if (!FrameworkConfig::get()->is_enable_l3_r3_toggle()) {
             return;
         }
@@ -2665,7 +2666,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             if (get_runtime()->is_openxr()) m_openxr->draw_hand_demo();
             else wuwa_ui::TextWrapped("The hand demo needs OpenXR with optical hand tracking. Xbox gameplay is unchanged.");
         }
-        if (wuwa_ui::CollapsingHeader("Xbox shortcuts")) {
+        if (wuwa_ui::CollapsingHeader("Controller shortcuts")) {
             m_wuwa_controls.on_draw_shortcuts();
         }
         if (wuwa_ui::CollapsingHeader("First person")) {

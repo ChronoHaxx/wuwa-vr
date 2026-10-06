@@ -36,9 +36,26 @@ function Test-WuWaSimulatorManifest([string]$Path) {
     # that simulator as the headset when switching to a new package's copy.
     try {
         $manifest=Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
-        return ($manifest.runtime.name -eq 'OpenXR Simulator' -and
-            [IO.Path]::GetFileName([string]$manifest.runtime.library_path) -eq 'openxr_simulator.dll')
+        return ($manifest.runtime.name -eq 'OpenXR Simulator' -or
+            [IO.Path]::GetFileName([string]$manifest.runtime.library_path) -eq 'openxr_simulator.dll' -or
+            [IO.Path]::GetFileName($Path) -eq 'openxr_simulator.json')
     } catch { return $false }
+}
+function Assert-WuWaLaunchRuntime([string]$Path,[string]$Root) {
+    Assert-WuWaRuntimeManifest $Path
+    $simulator=[IO.Path]::GetFullPath((Join-Path $Root 'dev-tools\OpenXR-Simulator\openxr_simulator.json'))
+    $isSimulator=$Path -eq $simulator -or (Test-WuWaSimulatorManifest $Path)
+    if ($isSimulator) {
+        $manifest=Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+        $library=[string]$manifest.runtime.library_path
+        if (-not [IO.Path]::IsPathRooted($library)) { $library=Join-Path (Split-Path -Parent $Path) $library }
+        $expectedLibrary=Join-Path (Split-Path -Parent $simulator) 'openxr_simulator.dll'
+        if ([IO.Path]::GetFullPath($Path) -ne $simulator -or [IO.Path]::GetFullPath($library) -ne $expectedLibrary) {
+            throw 'The selected simulator belongs to another package. Choose Use bundled simulator in this launcher, or select your headset runtime, before launching. No runtime was changed.'
+        }
+        Assert-WuWaSimulatorPrerequisites -ManifestPath $Path
+    }
+    return [bool]$isSimulator
 }
 function Assert-WuWaSimulatorPrerequisites([string]$ManifestPath,
         [string]$SystemDirectory=[Environment]::GetFolderPath([Environment+SpecialFolder]::System)) {
@@ -67,7 +84,7 @@ function Get-WuWaRuntimePlan([ValidateSet('simulator','headset')][string]$Mode,[
     $target=if ($Mode -eq 'simulator') { $simulator } elseif ($isSimulator) { $Values.Previous } else { $Values.Active }
     if (-not $target -or ($Mode -eq 'headset' -and ($target -eq $simulator -or (Test-WuWaSimulatorManifest $target)))) { throw 'No saved headset runtime is available. Set SteamVR, Quest Link or Virtual Desktop as OpenXR runtime in its own app first.' }
     Assert-WuWaRuntimeManifest $target
-    if ($Mode -eq 'simulator') { Assert-WuWaSimulatorPrerequisites $target }
+    if ($Mode -eq 'simulator') { $null=Assert-WuWaLaunchRuntime -Path $target -Root $Root }
     if ($Mode -eq 'simulator' -and $hasActive -and -not $isSimulator) { Assert-WuWaRuntimeManifest $Values.Active }
     [pscustomobject]@{Mode=$Mode;Before=$Values.Active;HasActive=$hasActive;Previous=$Values.Previous;HasPrevious=$Values.HasPrevious;Target=$target;Changed=(-not $hasActive -or $target -ne $Values.Active);SavePrevious=($Mode -eq 'simulator' -and $hasActive -and -not $isSimulator);ClearPrevious=($Mode -eq 'headset' -and $isSimulator)}
 }

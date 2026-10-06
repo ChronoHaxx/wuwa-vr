@@ -17,6 +17,7 @@
 #include "mods/VR.hpp"
 #include "utility/WuWaInputTrace.hpp"
 #include "utility/WuWaInputSequenceBridge.hpp"
+#include "utility/WuWaPlayStationHid.hpp"
 
 namespace {
 void trace_xinput(uint32_t api, uint32_t index, uint32_t raw_result, const XINPUT_STATE& raw,
@@ -317,6 +318,8 @@ uint32_t XInputHook::get_state_hook_1_4(uint32_t user_index, XINPUT_STATE* state
     const auto trace = wuwa_test::observing_input() || (wuwa && wuwa_input_sequence_bridge::active.load());
     const auto raw_result = ret;
     const XINPUT_STATE raw = ret == ERROR_SUCCESS && state != nullptr ? *state : XINPUT_STATE{};
+    if (wuwa && raw_result == ERROR_SUCCESS && state && user_index < XUSER_MAX_COUNT)
+        wuwa_ps_hid::observe_xinput(raw.Gamepad, GetTickCount64());
 
     uint32_t changed_by{};
     const auto passthrough = VR::get()->physical_gamepad_passthrough();
@@ -369,6 +372,8 @@ uint32_t XInputHook::get_state_hook_1_3(uint32_t user_index, XINPUT_STATE* state
     const auto trace = wuwa_test::observing_input() || (wuwa && wuwa_input_sequence_bridge::active.load());
     const auto raw_result = ret;
     const XINPUT_STATE raw = ret == ERROR_SUCCESS && state != nullptr ? *state : XINPUT_STATE{};
+    if (wuwa && raw_result == ERROR_SUCCESS && state && user_index < XUSER_MAX_COUNT)
+        wuwa_ps_hid::observe_xinput(raw.Gamepad, GetTickCount64());
 
     uint32_t changed_by{};
     const auto passthrough = VR::get()->physical_gamepad_passthrough();

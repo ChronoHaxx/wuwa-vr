@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "note": "Only verified reports for exact public release file hashes belong here. A scan is not a safety guarantee.",
+  "releases": []
+}

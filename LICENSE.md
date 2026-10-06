@@ -26,6 +26,14 @@ Copyright (c) 2026 ChronoHaxx. The [MIT license](LICENSES/MIT.md) applies to:
 This is an explicit scope list, not a grant for everything in this workspace.
 Preserve the copyright and license notice when sharing covered work.
 
+## Open-source desktop launcher
+
+The desktop manager source under `launcher/native/` is MIT open source under
+[its own licence](launcher/native/LICENSE.txt), with dependency notices in
+[THIRD-PARTY-NOTICES.txt](launcher/native/THIRD-PARTY-NOTICES.txt). Downloaded VR
+packages retain their separate component terms. Public source availability
+does not mean every bundled component has an open-source licence.
+
 ## Not covered by that MIT grant
 
 - UEVR backend, native adaptations/patches and bundled dependencies.

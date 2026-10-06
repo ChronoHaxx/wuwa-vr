@@ -1,91 +1,40 @@
-WUWA VR — ENUM STARTUP BETA CHECKS
-Desktop app 1.0.10 | beta-2026-10-06-enum-startup
-VR build enum-startup-20261006 | game 3.7
+WUWA VR — 1.1.0 BETA / FOCUSED USER CHECKS
+App 1.1.0 | Package beta-1-1-0 | Build player-ready-1-1-0 | Game 3.7
 
-The affected Windows 11 Steam PC reached OpenXR with 1.0.9, then the game exited. This candidate validates enum objects before reading their class metadata and guards cached resize calls after renderer-hook replacement. It preserves the working DX12 dispatch path. The last SDK message matches the unsafe enum discovery code, but no crash dump establishes the exact cause. The backend build, 15 enum-discovery cases and renderer resize/dispatch regressions passed. Successful startup on the affected PC and physical-headset acceptance remain unverified.
+Record Pass / Fail / Blocked / Not tested. No need to create faults deliberately.
+1.0.10 startup was user-confirmed on the affected Windows 11 Steam simulator PC;
+that does not automatically accept the new controller or launcher behavior.
 
-Record Pass / Fail / Blocked / Not tested, with Windows version, game store,
-app/package/build versions and the exact visible result. No need to manufacture
-failures or repeat every earlier feature check just to try this update.
+[ ] Update app to 1.1.0, then choose/install VR package 1.1.0 beta in step 02.
+    Verify the two version statuses are distinct; checking updates preserves
+    a deliberately selected older package until you choose the new package.
+[ ] If Windows still points at the old simulator, Launch in VR is disabled
+    with a recovery message. Close game/injector, choose Use bundled simulator,
+    accept Windows permission, then verify the current package is ready.
+    A valid headset runtime should also enable launch without auto-switching.
+[ ] Launch once using the intended Steam/Kuro route. Confirm actual VR remains
+    running, open UEVR, then exit normally. Copy diagnostics if startup fails.
+[ ] With a PS4/PS5 controller, check the input-source status in WuWa Controls.
+    Verify L3+R3 menu, L3+Cross recenter, L3+Circle HUD, L2+R2 then R3 mono,
+    and L2+R2 then hold L3 for 0.8 seconds stereo screen. Release between chords.
+    Check USB/Bluetooth only if available. Record which connection was tested.
+[ ] Hold a shortcut during Alt-Tab/disconnect, then return/reconnect. No toggle
+    should happen until controls are released and pressed again. If using
+    Steam Input, each chord should toggle once, not once per input path.
+    Direct HID does not consume the game's own native PlayStation input.
+[ ] Check ordinary Xbox use still works if available. Test headset comfort
+    separately; stop if uncomfortable. Roll back when idle only if needed.
 
-[ ] 1. Update BOTH parts. Step 02 > Versions & updates > Check updates >
-    Update launcher, then Restart to update when the game, injector, recording
-    and other operations are idle. Confirm app 1.0.10. Explicitly select and
-    install beta-2026-10-06-enum-startup in Step 02; confirm VR build
-    enum-startup-20261006. An app update preserves the old package selection;
-    Check updates does not select the new VR package automatically.
-    If the old app blocks updating, close it and use the new WuWa-VR-Setup.exe
-    from https://chronohaxx.github.io/wuwa-vr/. Reinstallation preserves data
-    and does not guarantee that a stuck worker has stopped.
-[ ] 2. One controlled launch. Keep your intended Steam/Kuro install and runtime.
-    Click Launch in VR once and accept Windows permission if requested. For
-    Kuro, press Play in its launcher. Check the actual game/VR view, not just
-    a loaded-DLL message or a spinner. Confirm UEVR settings open with L3+R3.
-    If it still fails, use Troubleshooting > Copy diagnostics before retrying;
-    include the attempt's backend.log if available. No second injector in parallel.
-[ ] 3. Clear failure/recovery. If startup fails or waits indefinitely, its stage
-    and reason should stay visible. Stop waiting requests cancellation; it does
-    not stop the game. If the worker does not acknowledge cancellation, use
-    Troubleshooting > Stuck launcher processes > Find stuck launcher processes.
-    Scan stops nothing; review PID, role, time, path and eligibility. Select only
-    the verified helper/startup worker you intend to stop, then confirm Stop
-    selected. Game/Steam/runtime/injector processes are not termination targets;
-    runtime/profile work and active/unknown recording remain protected.
-    Review individual results before Retry connection. Close launcher only exits
-    the window without claiming the background worker stopped.
-[ ] 4. Normal use. Check L3+A recenter, L3+B HUD toggle and your existing view
-    mode. Exit normally; another intentional launch should remain available.
-    Test headset output separately and stop if uncomfortable. Optional walking,
-    rim-light suppression and automatic cinema keep their existing limits.
-[ ] 5. Rollback, only if needed. Close the game and injector and stop recording.
-    Troubleshooting > Repair & recovery > Use previous installed version selects the previous retained
-    VR package; it does not downgrade the desktop app. Keep the old package and
-    backups. Its known renderer-startup problem may return on the affected PC.
+No live game, device or runtime changes are made by the automated checks.
+See PlayerGuide.html for recovery and remaining rendering limitations.
 
-Existing safeguards remain: runtime selection is explicit, Copy diagnostics is
-local, and no diagnostic upload is automatic. Prepare uninstall confirms cleanup
-of verified idle downloads; Windows uninstall also attempts bounded cleanup.
-Active OpenXR packages, busy/unverified files, settings, backups and recordings
-are retained with reasons. Do not delete data folders to work around an update.
-
-PlayerGuide.html / README.txt describe all controls and known limits. Far NPC
-rim lighting, scene/dialogue stalls, HUD refresh and flat-menu backgrounds are
-not claimed fixed by this renderer-startup change.
-
-鸣潮 VR — 渲染器启动测试版检查
-桌面应用 1.0.10 | beta-2026-10-06-enum-startup
-VR 构建 enum-startup-20261006 | 游戏 3.7
-
-受影响的 Windows 11 Steam 电脑使用 1.0.9 已进入 OpenXR，但随后游戏退出。本候选版本先验证枚举对象身份，再读取其类信息，并保护渲染钩子替换后的缓存调整窗口大小回调。现有 DX12 回调路径予以保留。SDK 最后一条日志与不安全的枚举探测代码吻合，但尚无崩溃转储确认具体原因。后端编译、15 项枚举探测测试及渲染调整大小和分派回归测试已通过。受影响电脑的成功启动和实体头显体验仍未验证。
-
-记录通过／失败／受阻／未测试，并注明 Windows、游戏平台、应用／包／构建版本
-及实际结果。无需刻意制造故障，也无需为本次更新重复所有旧功能检查。
-
-[ ] 1. 两项都更新。第 02 步 > 版本与更新 > 检查更新 > 更新启动器，待游戏、
-    注入器、录制及其他操作结束后重启并更新，确认应用为 1.0.10。再明确选择
-    并安装 beta-2026-10-06-enum-startup，确认构建 enum-startup-20261006。
-    更新应用会保留旧 VR 包选择；检查更新不会自动改选新包。旧应用阻止更新时，
-    关闭后运行网站的新 WuWa-VR-Setup.exe。重装保留数据，也不保证卡住的任务已停止。
-[ ] 2. 启动一次。保留所需的 Steam／库洛安装及运行时，点击一次“以 VR 模式启动”，
-    按需同意 Windows 授权；库洛版在其启动器点击开始。检查实际游戏／VR 画面，
-    不只看 DLL 载入提示或转圈。确认 L3+R3 可打开 UEVR 设置。仍失败时先在
-    故障排查中复制诊断，并附上该次启动的 backend.log（若有），再考虑重试。
-    不要同时运行第二个注入器。
-[ ] 3. 失败与恢复。应明确显示启动阶段及原因。“停止等待”仅请求取消等待，不结束
-    游戏。未收到取消确认时，在故障排查 > 卡住的启动器进程中执行查找。扫描不停止
-    进程；核对 PID、角色、时间、路径及可停止状态，只选择确实想停止且已验证归属的
-    辅助程序／启动任务，再确认停止所选进程。游戏、Steam、运行时及注入器不属于
-    终止目标；运行时／配置任务及正在录制或状态不明的录制受保护。
-    查看逐项结果后再重试连接。“仅关闭启动器窗口”不表示后台任务已停止。
-[ ] 4. 正常使用。检查 L3+A 重新居中、L3+B 界面开关及原有视图模式。正常退出后
-    应能再次明确启动。头显输出另行验收，不适时停止。可选漫游、边缘光抑制及
-    自动影院的原有限制不变。
-[ ] 5. 仅在需要时回退。关闭游戏及注入器、停止录制后，在故障排查 > 修复与恢复
-    点击“使用上一个已安装版本”，选回上一个保留的 VR 包；不会降级桌面应用。保留旧包及备份。
-    受影响电脑回退后可能重新出现旧版的渲染器启动问题。
-
-运行时仍需明确选择，诊断只保存在本机，不自动上传。“准备卸载”确认后清理空闲且
-已验证的下载文件，Windows 卸载也会尝试限时清理。使用中的 OpenXR 包、忙碌或
-无法验证的文件、设置、备份及录像会保留并说明原因。不要删除数据目录来更新。
-完整控制和限制见 PlayerGuide.html／README.txt。本次不宣称修复远处 NPC 轮廓光、
-场景／对话停顿、HUD 刷新或平面菜单背景问题。
+中文测试要点（通过／失败／受阻／未测试）
+[ ] 应用和 VR 包均更新到 1.1.0；分别显示状态，检查更新保留主动选择。
+[ ] 旧模拟器阻止启动并显示处理方法；明确选择当前包模拟器后恢复。
+    有效头显运行时同样可启动，不会自动切换系统运行时。
+[ ] 正常启动一次，确认 VR 持续运行、菜单和退出正常。
+[ ] 查看 PlayStation 输入来源状态；测试菜单、回中、HUD 和两种屏幕快捷键。
+    分别记录 USB／蓝牙测试情况，每次快捷键后松开所有按键。
+[ ] 切出窗口／重连时按住快捷键不会自动触发，松开再按后恢复。
+    Steam Input 不应造成重复切换；直接 HID 不会吞掉游戏本身的手柄输入。
+[ ] 如有 Xbox 则做回归检查；头显舒适度单独确认。

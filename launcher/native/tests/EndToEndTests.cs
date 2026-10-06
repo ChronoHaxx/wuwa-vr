@@ -96,9 +96,10 @@ public static class EndToEndTests
             Check(File.ReadAllText(Path.Combine(data, "settings.json")) == settingsBefore, "handover rewrote saved game choice");
             Check(!File.Exists(Path.Combine(data, "launch-state.json")), "handover dispatched a launch");
             Get<CheckBox>(window, "risk").IsChecked = true;
-            Check(Button(window, "launch").IsEnabled, "actual recovered helper still cannot reach launch action");
+            var runtimeBlock = LauncherPresentation.RuntimeLaunchBlock(true, Get<Dictionary<string, object>>(window, "status"));
+            Check(Button(window, "launch").IsEnabled == (runtimeBlock == null), "actual helper runtime readiness is not reflected in launch action");
             window.SavePreview(Path.Combine(folder, "02-recovered.png"));
-            Console.WriteLine("PASS E2E actual WPF recovery stops A gracefully, starts B and preserves settings; Launch becomes available");
+            Console.WriteLine("PASS E2E actual WPF recovery stops A gracefully, starts B and preserves settings; Launch follows actual runtime readiness");
 
             Click(window, "check");
             // Wait for real PowerShell readiness, without applying the profile.
@@ -110,7 +111,7 @@ public static class EndToEndTests
                 Await(Task.Delay(150));
             }
             var job = Json.Child(Get<Dictionary<string, object>>(window, "status"), "job");
-            Check(!Json.Flag(job, "running") && !Json.Flag(job, "error"), "real readiness failed: " + Json.Text(job, "output"));
+            Check(!Json.Flag(job, "running") && Json.Flag(job, "error") == (runtimeBlock != null), "real readiness disagrees with runtime validity: " + Json.Text(job, "output"));
             Check(Get<Expander>(window, "feedbackPanel").IsExpanded && !String.IsNullOrWhiteSpace(Get<TextBox>(window, "details").Text), "readiness result not presented");
             Console.WriteLine("PASS E2E real PowerShell readiness returns its actual result in the native UI: " + Json.Text(job, "output"));
 

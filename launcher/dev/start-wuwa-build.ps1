@@ -30,12 +30,9 @@ function Test-WuWaBuildReady {
     $null=Assert-WuWaBuildFiles $ctx $build
     if((Get-WuWaSelectedRuntime $ctx) -ne [IO.Path]::GetFullPath($runtime)) { throw 'Apply this build before launching it.' }
     $selectedRuntime=Get-ItemPropertyValue -LiteralPath 'HKLM:\SOFTWARE\Khronos\OpenXR\1' -Name ActiveRuntime
-    $simulator=Join-Path $ctx.Root 'dev-tools\OpenXR-Simulator\openxr_simulator.json'
-    Assert-WuWaRuntimeManifest $selectedRuntime
-    # A previous portable package can still own the active simulator. Identify
-    # that runtime without replacing its registration or saved headset target.
-    $script:wuwaUseHeadset=-not ($selectedRuntime -eq $simulator -or (Test-WuWaSimulatorManifest $selectedRuntime))
-    if(-not $wuwaUseHeadset) { Assert-WuWaSimulatorPrerequisites -ManifestPath $selectedRuntime }
+    # Rechecked before UAC and in the elevated worker: never silently run with
+    # a retained simulator from another installed/portable package.
+    $script:wuwaUseHeadset=-not (Assert-WuWaLaunchRuntime -Path $selectedRuntime -Root $ctx.Root)
     $script:wuwaSelectedOpenXR=$selectedRuntime
     $script:wuwaGameStart=Get-WuWaLaunchSettings $ctx
     if($wuwaGameStart.Mode -eq 'steam') {

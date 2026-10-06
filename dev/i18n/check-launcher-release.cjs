@@ -39,7 +39,8 @@ const server = http.createServer((req, res) => {
         assert(await page.locator(`a[href$="/tag/${release.previousTag}"]`).count() > 0);
         assert.equal(await page.locator('.visual-steps img').count(), 0, 'Obsolete launcher screenshots remain');
         assert.equal(await page.locator(name === 'index.html' ? '#get-started ol li' : '#start > ol:first-of-type > li').count(), 3);
-        const text = await page.locator('main').innerText();
+        // Caveats can be collapsed for a quieter page; they must remain in the document.
+        const text = await page.locator('main').textContent();
         assert(text.includes(release.appVersion) && text.includes(release.game));
         assert(text.includes(name.includes('zh-Hans') ? '默认关闭' : 'off by default'));
         assert(text.includes(name.includes('zh-Hans') ? '预渲染' : 'prerendered'));

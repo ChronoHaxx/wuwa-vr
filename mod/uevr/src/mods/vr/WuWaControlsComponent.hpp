@@ -14,6 +14,7 @@
 #include "utility/WuWaMenuSignals.hpp"
 #include "utility/WuWaPosePair.hpp"
 #include "utility/WuWaAutoCinema.hpp"
+#include "utility/WuWaPlayStationHid.hpp"
 
 namespace vrmod {
 
@@ -27,6 +28,7 @@ public:
     bool steady_desktop_view() const { return m_steady_desktop->value(); }
     float steady_desktop_seconds() const { return m_steady_desktop_seconds->value(); }
     WuWaControlsComponent();
+    ~WuWaControlsComponent() override;
     std::string_view get_name() const override { return "WuWaControls"; }
     void on_draw_ui() override;
     void on_config_load(const utility::Config& cfg, bool set_defaults) override;
@@ -63,6 +65,21 @@ public:
     void override_auto_cinema();
 
 private:
+    std::unique_ptr<wuwa_ps_hid::Reader> m_playstation{std::make_unique<wuwa_ps_hid::Reader>()};
+    wuwa_ps::MenuGesture m_playstation_menu;
+    uint64_t m_playstation_generation{};
+    void advance_playstation();
+    struct PlayStationValue : ModString {
+        WuWaControlsComponent& owner;
+        bool status;
+        PlayStationValue(WuWaControlsComponent& o, const char* name, bool s)
+            : ModString{name, ""}, owner{o}, status{s} {}
+        std::string get() const override;
+        void set(const std::string&) override {}
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    } m_playstation_state{*this, "WuWaControls_PlayStationState", false},
+      m_playstation_status{*this, "WuWaControls_PlayStationStatus", true};
     mutable std::mutex m_cinema_mutex;
     wuwa_auto_cinema::Lease m_cinema_lease;
     std::atomic<wuwa_auto_cinema::Presentation> m_cinema_presentation{wuwa_auto_cinema::Presentation::none};

@@ -123,6 +123,20 @@ try {
         Invoke-WuWaRuntimePlan (Get-WuWaRuntimePlan simulator $root (Get-WuWaOpenXRValues))
         Check ($script:writes -eq 0) 'No-op wrote registry'
     }
+    Test 'launch allows current simulator and valid independent headset but rejects another package' {
+        Reset-Registry $oldSim $headset $true
+        Check (Assert-WuWaLaunchRuntime $sim $root) 'Current simulator rejected'
+        Check (-not (Assert-WuWaLaunchRuntime $headset $root)) 'Independent headset rejected or called simulator'
+        Throws { Assert-WuWaLaunchRuntime $oldSim $root } 'another package'
+        Check ($script:writes -eq 0 -and $script:values.ActiveRuntime -eq $oldSim) 'Readiness silently changed the runtime'
+    }
+    Test 'current simulator manifest cannot redirect launch to an old package library' {
+        Make-Manifest $sim (Join-Path (Split-Path -Parent $oldSim) 'openxr_simulator.dll') 'OpenXR Simulator'
+        Throws { Assert-WuWaLaunchRuntime $sim $root } 'another package'
+        Throws { Get-WuWaRuntimePlan simulator $root (Get-WuWaOpenXRValues) } 'another package'
+        Check ($script:writes -eq 0) 'Rejected simulator redirect changed registry'
+        Make-Manifest $sim 'openxr_simulator.dll' 'OpenXR Simulator'
+    }
     Test 'missing CRT is actionable and detected before any registry mutation' {
         Reset-Registry
         $crt=Join-Path $script:fakeSystem 'MSVCP140.dll'

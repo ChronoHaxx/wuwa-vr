@@ -48,6 +48,8 @@ namespace WuWaVR.Manager
         TextBlock controllerState;
         TextBlock launcherVersion;
         Button launcherUpdateButton;
+        TextBlock packageUpdateState;
+        Button packageUpdateButton;
         TextBox controllerDetails;
         ProgressBar controllerProgress;
         Func<CancellationToken, Task<ControllerDiagnostics.Report>> controllerProbeOverride;
@@ -114,7 +116,7 @@ namespace WuWaVR.Manager
                     }
                 });
                 poll.Start();
-                await CheckLauncherUpdates(updateLifetime.Token, true);
+                await Task.WhenAll(CheckLauncherUpdates(updateLifetime.Token, true), UpdateCatalog(updateLifetime.Token, true));
             };
             Closing += async (s, e) =>
             {
@@ -426,6 +428,9 @@ namespace WuWaVR.Manager
                 // as a side effect of installing or selecting a runtime.
                 if (WantsInstall()) { await Install(c); return; }
                 await EnsureConnected(c);
+                status = await bridge.Status(c);
+                var runtimeBlock = LauncherPresentation.RuntimeLaunchBlock(connectionReady, status);
+                if (runtimeBlock != null) throw new InvalidOperationException(text[runtimeBlock]);
                 if (SteamChoiceNeedsPackage()) { OfferSteamPackageUpdate(); ShowStatus(); return; }
                 if (discovery != null && discovery.Message == "gameMultiple" &&
                     String.IsNullOrEmpty(store.State.launcherPath) && !Json.Flag(Json.Child(status, "game"), "saved"))
@@ -619,8 +624,14 @@ namespace WuWaVR.Manager
             var notice = new Border { Child = consent, Padding = new Thickness(10, 4, 10, 5), CornerRadius = new CornerRadius(7), Background = Color("#272921"), Margin = new Thickness(0, 3, 0, 2) };
             launcherVersion = Label("", 12, muted);
             launcherUpdateButton = Action("updateLauncher", async c => await UpdateLauncher(c));
+            packageUpdateState = Label("", 12, teal);
+            packageUpdateButton = Action("selectLatestPackage", c => {
+                var newer = NewerPackage();
+                if (newer != null) { releases.SelectedItem = newer; advancedPanel.IsExpanded = true; operationText.Text = text["installNext"]; }
+                return Task.CompletedTask;
+            });
             panel.Children.Add(Step("02", text["package"], null, packageState, launcherVersion,
-                Wrap(launcherUpdateButton), gameVersion, notice, advancedPanel));
+                Wrap(launcherUpdateButton), packageUpdateState, Wrap(packageUpdateButton), gameVersion, notice, advancedPanel));
             panel.Children.Add(runtimeStep);
             return panel;
         }
@@ -1138,19 +1149,34 @@ namespace WuWaVR.Manager
                 releases.SelectedItem = active;
             }
         }
-        async Task UpdateCatalog(CancellationToken c)
+        Release NewerPackage()
+        {
+            if (store.Selected == null) return null;
+            DateTimeOffset installedDate;
+            if (!DateTimeOffset.TryParse(store.Selected.release.published ?? store.Selected.release.created, out installedDate)) return null;
+            return catalog.releases.Where(r => r.channel == "beta" && r.id != store.Selected.release.id)
+                .Where(r => { DateTimeOffset date; return DateTimeOffset.TryParse(r.published, out date) && date > installedDate; })
+                .OrderByDescending(r => DateTimeOffset.Parse(r.published)).FirstOrDefault();
+        }
+        async Task UpdateCatalog(CancellationToken c, bool quiet = false)
         {
             string chosen = SelectedRelease().id;
             try { catalog = RepoClient.KeepBundledCandidates(await repo.FetchCatalog(c), RepoClient.BundledCatalog()); catalogKey = "catalogOnline"; }
-            catch (Exception e) when (!(e is OperationCanceledException)) { catalogKey = "catalogOffline"; details.Text = e.Message; lastNativeError = e.ToString(); }
+            catch (OperationCanceledException) when (quiet) { return; }
+            catch (Exception e) when (!(e is OperationCanceledException)) { catalogKey = "catalogOffline"; if (!quiet) { details.Text = e.Message; lastNativeError = e.ToString(); } }
+            if (closing) return;
+            if (quiet) chosen = SelectedRelease().id;
             releases.Items.Clear(); foreach (var release in catalog.releases) releases.Items.Add(release);
             if (store.Selected != null && !releases.Items.Cast<Release>().Any(r => r.id == store.Selected.release.id)) releases.Items.Add(store.Selected.release);
             releases.SelectedItem = releases.Items.Cast<Release>().FirstOrDefault(r => r.id == chosen) ??
                 releases.Items.Cast<Release>().FirstOrDefault(r => store.Selected != null && r.id == store.Selected.release.id) ?? (Release)releases.Items[0];
-            catalogState.Text = text[catalogKey]; operationText.Text = text[catalogKey];
-            advancedPanel.IsExpanded = true;
-            if (catalogKey == "catalogOffline") feedbackPanel.IsExpanded = true;
-            OfferSteamPackageUpdate();
+            catalogState.Text = text[catalogKey];
+            if (!quiet) {
+                operationText.Text = text[catalogKey]; advancedPanel.IsExpanded = true;
+                if (catalogKey == "catalogOffline") feedbackPanel.IsExpanded = true;
+                OfferSteamPackageUpdate();
+            }
+            ShowStatus();
         }
         async Task CheckUpdates(CancellationToken c)
         {
@@ -1275,10 +1301,15 @@ namespace WuWaVR.Manager
         {
             if (rendering || gamePath == null) return;
             ShowLauncherUpdate();
-            packageState.Text = store.Selected == null ? String.Format(text["versionSelected"], SelectedRelease().id) :
-                String.Format(text["versionInstalled"], store.Selected.release.id) + (WantsInstall() ? Environment.NewLine +
-                String.Format(text["versionSelected"], SelectedRelease().id) : "");
-            packageState.ToolTip = store.Selected == null ? text["none"] : store.Selected.release.id;
+            packageState.Text = store.Selected == null ? String.Format(text["versionSelected"], SelectedRelease().DisplayLabel) :
+                String.Format(text["versionInstalled"], store.Selected.release.DisplayLabel) + (WantsInstall() ? Environment.NewLine +
+                String.Format(text["versionSelected"], SelectedRelease().DisplayLabel) : "");
+            packageState.ToolTip = (store.Selected == null ? "" : store.Selected.release.id + Environment.NewLine) + SelectedRelease().id;
+            releases.ToolTip = SelectedRelease().id;
+            var newerPackage = NewerPackage();
+            packageUpdateState.Text = newerPackage == null ? "" : String.Format(text["packageUpdateAvailable"], newerPackage.DisplayLabel);
+            packageUpdateState.Visibility = newerPackage == null ? Visibility.Collapsed : Visibility.Visible;
+            packageUpdateButton.Visibility = newerPackage == null || WantsInstall() ? Visibility.Collapsed : Visibility.Visible;
             var game = Json.Child(status, "game"); string launcher = Json.Text(game, "launcher");
             bool pendingChoice = !String.IsNullOrWhiteSpace(store.State.pendingLauncherPath);
             gamePath.Text = pendingChoice ? store.State.pendingLauncherPath : Json.Flag(game, "saved") && Json.Text(game, "mode") == "manual" ? text["manualStart"] : String.IsNullOrEmpty(launcher) ? (discovery == null ? store.State.launcherPath : discovery.Path) : launcher;
@@ -1306,14 +1337,15 @@ namespace WuWaVR.Manager
             connectionMessage.Text = conflict ? text["launcherConflict"] + Environment.NewLine + bridge.Conflict.AppRoot : text["connectionRetryInfo"] + Environment.NewLine + connectionProblem;
             bool gameRunning = Json.Flag(status, "gameRunning"), injectorRunning = Json.Flag(status, "injectorRunning");
             var xr = Json.Child(status, "openxr"); bool simulator = Json.Flag(xr, "isSimulator");
+            string runtimeBlock = LauncherPresentation.RuntimeLaunchBlock(connectionReady, status);
             bool wantsInstall = WantsInstall();
             launchButton.Content = text[wantsInstall ? hasPackage ? "installSelected" : "install" : "launch"];
             versionConsent.Visibility = wantsInstall ? Visibility.Visible : Visibility.Collapsed;
             risk.Visibility = wantsInstall ? Visibility.Collapsed : Visibility.Visible;
             gameVersion.Text = text["targetGame"] + " " + (wantsInstall ? SelectedRelease().gameVersion : store.Selected.release.gameVersion);
-            runtimeHint.Text = text[!hasPackage ? "runtimeInstallHint" : !connectionReady ? "connectionRequired" : gameRunning || injectorRunning ? "runtimeCloseFirst" : Json.Flag(xr, "canSimulator") && !Json.Flag(xr, "canHeadset") ? "runtimeSimulatorOnlyHint" : !Json.Flag(xr, "canHeadset") || !Json.Flag(xr, "canSimulator") ? "runtimeUnavailableHint" : "runtimeChoiceHint"];
+            runtimeHint.Text = text[!hasPackage ? "runtimeInstallHint" : !connectionReady ? "connectionRequired" : gameRunning || injectorRunning ? "runtimeCloseFirst" : runtimeBlock ?? (Json.Flag(xr, "canSimulator") && !Json.Flag(xr, "canHeadset") ? "runtimeSimulatorOnlyHint" : "runtimeChoiceHint")];
             launchState.Text = gameRunning || running || workerFailed || workerCancelled ? LauncherBridge.LaunchSummary(status, k => text[k]) :
-                text[wantsInstall ? "installNext" : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : injectorRunning ? "runtimeCloseFirst" : risk.IsChecked != true ? "riskNext" : Json.Text(game, "mode") == "steam" ? "launchNextSteam" : "launchNext"];
+                text[wantsInstall ? "installNext" : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : injectorRunning ? "runtimeCloseFirst" : runtimeBlock ?? (risk.IsChecked != true ? "riskNext" : Json.Text(game, "mode") == "steam" ? "launchNextSteam" : "launchNext")];
             feedbackPanel.Visibility = String.IsNullOrWhiteSpace(details.Text) ? Visibility.Collapsed : Visibility.Visible;
             var capture = Json.Child(status, "recording");
             bool canRecord = CaptureAvailability.HasSource(status, new[] { "auto", "steamvr", "simulator" }[Math.Max(0, source.SelectedIndex)]);
@@ -1340,9 +1372,10 @@ namespace WuWaVR.Manager
                         case "useGameLocation": reason = running ? "busy" : gameLocations.SelectedItem == null ? "gameChooseHint" : null; break;
                         case "browse": case "browseGameFile": reason = running ? "busy" : null; break;
                         case "install": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : compatible.IsChecked != true ? "compatRequired" : null; break;
+                        case "selectLatestPackage": reason = running ? "busy" : NewerPackage() == null ? "noPackageUpdate" : null; break;
                         case "updateLauncher": reason = launcherUpdates.Busy ? "busy" : launcherUpdates.AvailableVersion == null ? "launcherUpdateHint" :
                             launcherUpdates.ReadyToRestart && (running || recording || gameRunning || injectorRunning) ? "launcherRestartIdle" : null; break;
-                        case "launch": reason = running ? "busy" : gameRunning ? "alreadyRunning" : injectorRunning ? "runtimeCloseFirst" : wantsInstall ? (conflict ? "connectionRequired" : compatible.IsChecked != true ? "compatRequired" : null) : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : risk.IsChecked != true ? "riskAccept" : null; break;
+                        case "launch": reason = running ? "busy" : gameRunning ? "alreadyRunning" : injectorRunning ? "runtimeCloseFirst" : wantsInstall ? (conflict ? "connectionRequired" : compatible.IsChecked != true ? "compatRequired" : null) : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : runtimeBlock ?? (risk.IsChecked != true ? "riskAccept" : null); break;
                         case "recordStart": reason = !hasPackage ? "chooseVersion" : running || recording ? "busy" : !gameRunning ? "recordNeedsGame" : !canRecord ? "recordUnavailable" : null; break;
                         case "recordStop": reason = !recording ? "noRecording" : null; break;
                         case "repair": case "useVersion": case "remove": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : installed.SelectedItem == null ? "chooseVersion" : null; break;

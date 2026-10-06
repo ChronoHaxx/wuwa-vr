@@ -1,13 +1,13 @@
-# Mod source — enum discovery startup beta
+# Mod source — 1.1.0 beta
 
 The release target is
-[beta-2026-10-06-enum-startup](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-enum-startup),
-launcher **1.0.10**, backend/package build **enum-startup-20261006**, for game
-**3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. No affected-PC or headset acceptance is implied.
+[beta-1-1-0](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-0),
+launcher **1.1.0**, backend/package build **player-ready-1-1-0**, for game
+**3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. The previous 1.0.10 startup was user-confirmed; new controller and headset acceptance remain pending.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The affected Windows 11 Steam PC reached OpenXR with 1.0.9, then the game exited. This candidate validates enum objects before reading their class metadata and guards cached resize calls after renderer-hook replacement. It preserves the working DX12 dispatch path. The last SDK message matches the unsafe enum discovery code, but no crash dump establishes the exact cause. The backend build, 15 enum-discovery cases and renderer resize/dispatch regressions passed. Successful startup on the affected PC and physical-headset acceptance remain unverified. See [the enum startup report](../docs/launch-kit/ENUM-STARTUP-20261006.md).
+The user confirmed successful startup on the previously affected Windows 11 Steam PC with the bundled simulator in 1.0.10. This release retains that startup repair. PlayStation hardware, headset comfort and the updated launcher flow still need user testing. See [the enum startup report](../docs/launch-kit/ENUM-STARTUP-20261006.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

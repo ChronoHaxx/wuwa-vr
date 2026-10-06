@@ -11,6 +11,7 @@
 #include "utility/WuWaShortcutSheet.hpp"
 #include "utility/WuWaStereoBasePose.hpp"
 #include "utility/WuWaPlaytestControl.hpp"
+#include "utility/WuWaLguiProbe.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
@@ -317,10 +318,16 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
         *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status,
+        m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};
+}
+
+WuWaControlsComponent::~WuWaControlsComponent() {
+    wuwa_ps_hid::release_on_process_exit(m_playstation,
+        wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
 }
 
 void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_defaults) {
@@ -447,10 +454,13 @@ bool WuWaControlsComponent::game_focused() {
 }
 
 void WuWaControlsComponent::on_draw_shortcuts() {
-    wuwa_ui::draw(*m_enabled,"Enable WuWa Xbox shortcuts");
-    wuwa_ui::draw(*m_mouse,"Enable Xbox mouse shortcuts");
+    wuwa_ui::draw(*m_enabled,"Enable WuWa controller shortcuts");
+    wuwa_ui::draw(*m_mouse,"Enable controller mouse shortcuts");
     wuwa_ui::TextWrapped("Close UEVR before using these shortcuts. L3/R3 mean clicking the sticks; View is the two-squares button and Menu is the three-lines button.");
-    if (ImGui::BeginTable("Everyday Xbox shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+    wuwa_ui::TextWrapped("PlayStation: L1/R1 = LB/RB, L2/R2 = LT/RT, Cross/Circle/Square/Triangle = A/B/X/Y, Share/Create = View, Options = Menu.");
+    wuwa_ui::TextWrapped("%s", m_playstation_status.get().c_str());
+    wuwa_ui::TextWrapped("Direct PlayStation shortcuts are experimental. The game still receives their buttons. Steam Input is preferred when available; release all controls after changing input sources.");
+    if (ImGui::BeginTable("Everyday controller shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
         wuwa_ui::TableSetupColumn("Action");
         for (const auto& row : std::array<std::array<const char*,2>,12>{{
@@ -862,6 +872,7 @@ nlohmann::json WuWaControlsComponent::diagnostic_status() {
     result["motion_active"]=VR::get()->is_using_controllers();
     result["passthrough"]=VR::get()->physical_gamepad_passthrough();
     result["slot_filter"]=VR::get()->gamepad_slot_filter();
+    result["playstation_shortcuts"]=m_playstation_status.get();
     // "Eligible" is deliberately not a claim that the user can see/read it.
     result["sheet_state"] = !m_sheet->value() ? "off"
         : g_framework->is_drawing_ui() ? "hidden_by_uevr_menu"
@@ -1097,7 +1108,49 @@ void WuWaControlsComponent::release_input() {
     m_mouse_x = m_mouse_y = m_scroll = 0.0f;
 }
 
+std::string WuWaControlsComponent::PlayStationValue::get() const {
+    if (status) {
+        if (!owner.m_enabled->value()) return "PlayStation shortcuts paused: WuWa shortcuts disabled";
+        if (VR::get()->physical_gamepad_passthrough()) return "PlayStation shortcuts paused: controller passthrough enabled";
+        if (VR::get()->gamepad_slot_filter() != 0) return "PlayStation shortcuts paused: an XInput slot is selected";
+        return owner.m_playstation->status();
+    }
+    const auto s = owner.m_playstation->snapshot();
+    if (!owner.m_enabled->value() || !game_focused() || VR::get()->physical_gamepad_passthrough() ||
+        VR::get()->gamepad_slot_filter() != 0 || !owner.m_playstation->active(s, GetTickCount64())) return "unavailable";
+    const auto& p = s.pad;
+    return "ps-v1," + std::to_string(s.generation) + "," + std::to_string(s.stamp) + "," +
+        std::to_string(p.buttons) + "," + std::to_string(p.lt) + "," + std::to_string(p.rt) + "," +
+        std::to_string(p.lx) + "," + std::to_string(p.ly) + "," + std::to_string(p.rx) + "," + std::to_string(p.ry);
+}
+
+void WuWaControlsComponent::advance_playstation() {
+    if (!wuwa_test::is_wuwa()) return;
+    if (m_enabled->value()) m_playstation->start();
+    const auto s = m_playstation->snapshot(); const auto now = GetTickCount64();
+    // Menu closing must work while UEVR itself is open; game_focused() excludes
+    // that state intentionally for ordinary gameplay shortcuts.
+    const bool window_focused = g_framework->get_window() && GetForegroundWindow() == g_framework->get_window();
+    const bool active = m_enabled->value() && window_focused && !VR::get()->physical_gamepad_passthrough() &&
+        VR::get()->gamepad_slot_filter() == 0 && m_playstation->active(s, now);
+    if (s.generation != m_playstation_generation) { m_playstation_generation = s.generation; m_playstation_menu.reset(); }
+    if (!active) {
+        m_playstation_menu.reset();
+        // Keep the old menu gesture fenced until its physical release. A
+        // neutral second Xbox pad must not rearm the newly mapped PS chord.
+        if (!wuwa_ps::recent(s.stamp, now, 250) || (s.pad.buttons & 0xc0) != 0xc0)
+            wuwa_ps_hid::hid_menu_held.store(false);
+        return;
+    }
+    wuwa_ps_hid::hid_menu_held.store((s.pad.buttons & 0xc0) == 0xc0);
+    if (m_playstation_menu.update(s.pad, now, FrameworkConfig::get()->is_enable_l3_r3_toggle(),
+        FrameworkConfig::get()->is_l3_r3_long_press() && !g_framework->is_drawing_ui())) {
+        g_framework->set_draw_ui(!g_framework->is_drawing_ui());
+    }
+}
+
 void WuWaControlsComponent::on_frame() {
+    advance_playstation();
     if (wuwa_motion::active()) wuwa_test::input_watch_until=GetTickCount64()+1000;
     const auto now = std::chrono::steady_clock::now();
     const float delta = std::clamp(std::chrono::duration<float>(now - m_last_frame).count(), 0.0f, 0.05f);

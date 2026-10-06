@@ -17,10 +17,20 @@ function downloads(t) {
 }
 function steps(t) { return `<p>${t.install}</p><ol class="steps launcher-steps">${t.steps.map(s => `<li>${s}</li>`).join('')}</ol>`; }
 function details(t, heading = 'h2') {
-  return `<section id="launcher-updates"><${heading}>${t.updatesTitle}</${heading}><p>${t.updates}</p><p>${t.updateFallback}</p><p>${t.recovery}</p><p>${t.runtime}</p></section><section id="launcher-beta"><${heading}>${t.betaTitle}</${heading}><p>${t.accepted}</p><p>${t.rim}</p><p>${t.limits}</p><p>${t.cutscenes}</p></section>`;
+  const recovery = t === locales.en ? 'Recovery and runtime details' : '恢复与运行时详情';
+  return `<section id="launcher-updates"><${heading}>${t.updatesTitle}</${heading}><p>${t.updates}</p><details><summary>${recovery}</summary><p>${t.updateFallback}</p><p>${t.recovery}</p><p>${t.runtime}</p></details></section><section id="launcher-beta"><${heading}>${t.betaTitle}</${heading}><p>${t.accepted}</p><p>${t.limits}</p><details><summary>${t === locales.en ? 'Rendering and cinematic caveats' : '渲染与过场说明'}</summary><p>${t.rim}</p><p>${t.cutscenes}</p></details></section>`;
+}
+function sourceAndChecks() {
+  const record = JSON.parse(fs.readFileSync(path.join(root, 'release/security-reports.json'), 'utf8'));
+  const reports = record.releases.find(r => r.tag === status.tag);
+  const rows = reports ? reports.files.filter(f => f.status === 'reported').map(f => {
+    if (!/^[a-f0-9]{64}$/.test(f.sha256) || !/^[A-Za-z0-9 ._-]+$/.test(f.name)) throw Error('Invalid scan identity');
+    return `<li><a href="https://www.virustotal.com/gui/file/${f.sha256}">${f.name}: VirusTotal report</a></li>`;
+  }).join('') : '';
+  return `<section id="source-and-checks"><h2>Open-source launcher. Public mod source.</h2><p>The <a href="${repo}/tree/main/launcher/native">desktop launcher is MIT open source</a>. Our <a href="${repo}/tree/main/mod">mod changes, scripts and build instructions</a> are public too. Upstream and community components keep their own licences; <a href="license.html">the combined package has mixed licence terms</a>.</p><p><a href="${release}">Matching source and SHA-256 checksums</a> accompany every release. Check the exact file and version when comparing a download.</p>${rows ? `<ul>${rows}</ul><p class="small">Scan reports describe those exact file hashes. Detections can change; a clean report does not guarantee safety or account compatibility.</p>` : '<p class="small">VirusTotal reports have not yet been verified for this release. No clean-scan or safety certification is claimed.</p>'}</section>`;
 }
 function banner(text) {
-  const value = `<aside class="notice" data-launcher-release><strong>6 October startup compatibility beta:</strong> <a href="${release}">WuWa VR ${status.appVersion} · game ${status.game}</a> · <a href="understanding.html">60-second explainer, timeline and code guide</a>. ${locales.en.banner}</aside>`;
+  const value = `<aside class="notice" data-launcher-release><strong>Community beta:</strong> <a href="${release}">WuWa VR ${status.appVersion} · game ${status.game}</a>. ${locales.en.banner}</aside>`;
   return text.replace(/(<main[^>]+id="main"[^>]*>)\s*(?:<aside class="notice"(?: data-launcher-release)?>([\s\S]*?)<\/aside>)?/, (_, main) => main + value);
 }
 async function build() {
@@ -32,7 +42,8 @@ async function build() {
     'COMFORT.md': 'guide.html#comfort', 'CHECKPOINTS.md': 'testing.html#checkpoints',
     'LICENSE.md': 'license.html', 'SUPPORT.md': 'support.html'};
   function render(file, controls = false) {
-    let html = marked.parse(fs.readFileSync(path.join(root, file), 'utf8').replace(/^# .+\r?\n/, ''), {gfm: true});
+    let html = marked.parse(fs.readFileSync(path.join(root, file), 'utf8').replace(/^# .+\r?\n/, ''), {gfm: true})
+      .replaceAll('href="../launcher/native/PlayerGuide.html"', 'href="guide.html#start"');
     html = html.replace(/href="([^"#]+\.md)(#[^"]*)?"/g, (match, target, anchor) => {
       if (/^https?:/.test(target)) return match;
       const page = links[path.basename(target)]; if (!page) throw Error(`Unmapped guide link in ${file}: ${target}`);
@@ -56,12 +67,14 @@ async function build() {
   };
   update('index.html', text => {
     text = banner(text);
-    text = text.replace(/<section><h2>Known problems<\/h2>[\s\S]*?<\/section>/, `<section><h2>Known problems</h2><p>${locales.en.limits}</p><p>Native Stereo Fix and Same Pass remain on in this build. <a href="guide.html#recovery">Recovery steps</a>.</p></section>`);
+    text = text.replace('<strong>Xbox controls and adjustable HUD.</strong> Show, hide or move the UI; open an in-VR shortcut sheet.', '<strong>Controller shortcuts and adjustable HUD.</strong> Xbox/XInput plus experimental native PS4/PS5 shortcuts. Show, hide or move the UI; open an in-VR shortcut sheet.');
+    text = text.replace(/<section><h2>Known problems<\/h2>[\s\S]*?<\/section>/, '');
+    text = text.replace(/<section id="source-and-checks">[\s\S]*?<\/section>/, '');
     text = replace(text, /<div id="release-download">[\s\S]*?<\/div>|<p><a class="button primary"[^>]*>Download[\s\S]*?<\/p><p class="small">[\s\S]*?<\/p>/, downloads(locales.en), 'home download');
     text = replace(text, /<section id="get-started">[\s\S]*?<\/section>/,
       `<section id="get-started"><h2>${locales.en.start}</h2>${steps(locales.en)}<p>${locales.en.controls}</p><a href="guide.html#start">${locales.en.guide}</a></section>`, 'home steps');
     text = text.replace(/<section id="launcher-updates">[\s\S]*?<\/section><section id="launcher-beta">[\s\S]*?<\/section>/, '');
-    return text.replace('<section><h2>Current features</h2>', details(locales.en) + '<section><h2>Current features</h2>');
+    return text.replace('<section><h2>Current features</h2>', details(locales.en) + sourceAndChecks() + '<section><h2>Current features</h2>');
   });
   update('guide.html', text => {
     text = banner(text);
@@ -71,7 +84,7 @@ async function build() {
     const filter = /<div class="control-filter"[\s\S]*?<p id="control-count"[^>]*><\/p>/.exec(text);
     if (!filter) throw Error('Missing guide controls filter');
     text = replace(text, /<section id="controls">[\s\S]*?<\/section>/,
-      `<section id="controls"><h2>All Xbox shortcuts</h2>${filter[0]}${render('docs/CONTROLS.md', true)}</section>`, 'guide controls');
+      `<section id="controls"><h2>Controller shortcuts</h2>${filter[0]}${render('docs/CONTROLS.md', true)}</section>`, 'guide controls');
     text = replace(text, /<section id="recovery">[\s\S]*?<\/section>/,
       `<section id="recovery"><h2>Problems and recovery</h2><p>${locales.en.cutscenes}</p>${render('docs/TROUBLESHOOTING.md')}</section>`, 'guide recovery');
     text = replace(text, /(<h1>Player guide<\/h1>)<p>[\s\S]*?<\/p>/,
@@ -81,6 +94,10 @@ async function build() {
   });
   update('risk.html', text => replace(text, /<div class="guide-content">[\s\S]*?<\/div>/,
     `<div class="guide-content">${render('docs/RISK.md')}</div>`, 'risk notice'));
+  update('license.html', text => {
+    text = text.replace(/<section id="launcher-license">[\s\S]*?<\/section>/, '');
+    return text.replace('<section><h2>What our MIT grant covers</h2>', `<section id="launcher-license"><h2>Open-source desktop launcher</h2><p>The <a href="${repo}/tree/main/launcher/native">desktop manager source</a> is MIT open source under <a href="${repo}/blob/main/launcher/native/LICENSE.txt">its own licence</a>. The mod source changes are public, with <a href="${repo}/blob/main/mod/BUILD.md">pinned build instructions</a>. Downloaded mod components keep their own terms; public source availability does not make the combined package uniformly open source.</p></section><section><h2>What our MIT grant covers</h2>`);
+  });
   // Refresh current-download references without rewriting historical technical notes.
   update('developers.html', banner);
   update('understanding.html', text => {
@@ -104,7 +121,7 @@ async function build() {
   for (const [code, t] of Object.entries(locales)) {
     update(`l/${code}.html`, text => {
       text = replace(text, /<section id="start">[\s\S]*?<\/section>/,
-        `<section id="start"><h2>${t.start}</h2>${downloads(t)}${steps(t)}<p>${t.controls}</p><p>${t.risk}</p></section>`, `${code} steps`);
+        `<section id="start"><h2>${t.start}</h2>${downloads(t)}${steps(t)}<p>${t.controls.replaceAll('href="guide.html', 'href="../guide.html')}</p><p>${t.risk}</p></section>`, `${code} steps`);
       text = text.replace(/<section id="launcher-updates">[\s\S]*?<\/section><section id="launcher-beta">[\s\S]*?<\/section><section id="launcher-portable">[\s\S]*?<\/section>/, '');
       text = text.replace('<section id="controls">', details(t) + `<section id="launcher-portable"><h2>${t.fallback}</h2><p>${t.portable}</p></section><section id="controls">`);
       return text;

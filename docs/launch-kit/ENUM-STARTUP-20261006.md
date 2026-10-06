@@ -96,3 +96,10 @@ against their pinned bases. The full backend build finished successfully at
   brief simulator window as success.
 - [ ] If stable, check the UEVR menu and normal exit. If it exits again, copy
   diagnostics before another attempt. Headset comfort remains a separate check.
+
+## User result — 6 October 2026
+
+The user reported "finally this works" for 1.0.10 on the previously affected
+Windows 11 Steam PC using the bundled simulator. Startup is now user-confirmed
+for that setup. Menu/exit details, PS controller input and physical-headset
+comfort were not separately reported; the checklist above is retained as written.

@@ -2,8 +2,11 @@
 
 #include <functional>
 #include <cstdint>
+#include <chrono>
 
 #include <d3d11.h>
+#include <d3d12.h>
+#include <dxgi1_4.h>
 #include <dxgi.h>
 #include <wrl.h>
 
@@ -62,6 +65,13 @@ protected:
     uint64_t m_probe_callbacks{}, m_probe_filtered{}, m_probe_selected{};
     uint64_t m_probe_device_queries{}, m_probe_device_ok{};
     void** m_probe_present_slot{};
+
+    // A retained DX11 callback can outlive its shared-slot hook. Record only
+    // positively identified DX12 sources, never infer the API from a failure.
+    ComPtr<IDXGISwapChain3> m_observed_dx12_chain{};
+    ComPtr<ID3D12Device4> m_observed_dx12_device{};
+    std::chrono::steady_clock::time_point m_dx12_next_source_probe{};
+    unsigned m_dx12_source_logs{};
 
     std::optional<uint32_t> m_next_present_interval{};
 

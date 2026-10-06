@@ -19,6 +19,29 @@ static D3D12Hook* g_d3d12_hook = nullptr;
 
 namespace {
 std::atomic_uint64_t g_d3d12_probe_generation{};
+thread_local bool g_d3d11_bridge_present{};
+
+// The queue offset is discovered on the dummy, not trusted for another object.
+// This guard probes only that one candidate. No memory scan or fallback offset.
+HRESULT guarded_queue_info(IUnknown* candidate, ID3D12CommandQueue** queue,
+    IUnknown** owner, D3D12_COMMAND_QUEUE_DESC* desc) {
+    __try {
+        auto result = candidate->QueryInterface(IID_PPV_ARGS(queue));
+        if (FAILED(result) || *queue == nullptr) return FAILED(result) ? result : E_NOINTERFACE;
+        result = (*queue)->GetDevice(IID_PPV_ARGS(owner));
+        if (FAILED(result) || *owner == nullptr) return FAILED(result) ? result : E_NOINTERFACE;
+        *desc = (*queue)->GetDesc();
+        return S_OK;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return E_FAIL;
+    }
+}
+
+bool read_own_pointer(const void* address, void** result) {
+    SIZE_T bytes{};
+    return address != nullptr && ReadProcessMemory(GetCurrentProcess(), address,
+        result, sizeof(*result), &bytes) && bytes == sizeof(*result);
+}
 
 // All Present/Resize callers hold Framework's hook-monitor mutex.
 void log_window_probe(uint64_t generation, unsigned& budget, const char* stage, IDXGISwapChain3* chain,
@@ -43,6 +66,7 @@ void log_window_probe(uint64_t generation, unsigned& budget, const char* stage, 
 
 D3D12Hook::~D3D12Hook() {
     unhook();
+    if (g_d3d12_hook == this) g_d3d12_hook = nullptr;
 }
 
 bool D3D12Hook::hook() {
@@ -53,6 +77,11 @@ bool D3D12Hook::hook() {
     m_probe_device_queries = m_probe_device_ok = 0;
     m_probe_filtered_logs = m_probe_selected_logs = m_probe_other_logs = m_probe_resize_logs = 0;
     m_probe_present_slot = m_probe_present1_slot = nullptr;
+    m_bridge_attempted = false;
+    m_probe_bridge_calls = 0;
+    m_bridge_swapchain.Reset();
+    m_bridge_device.Reset();
+    m_bridge_queue.Reset();
 
     g_d3d12_hook = this;
 
@@ -418,14 +447,14 @@ bool D3D12Hook::unhook() {
     bytes = 0;
     const bool slot1_read = m_probe_present1_slot != nullptr && ReadProcessMemory(GetCurrentProcess(),
         m_probe_present1_slot, &slot1_value, sizeof(slot1_value), &bytes) && bytes == sizeof(slot1_value);
-    spdlog::info("[WuWaD3DProbeSummary] api=12 probe={} callbacks={} filtered={} selected={} other_instance={} device_queries={} device_ok={} slot={:x} slot_read={} slot_value={:x} slot_owned={} original={:x} slot1={:x} slot1_read={} slot1_value={:x} slot1_owned={} original1={:x}",
+    spdlog::info("[WuWaD3DProbeSummary] api=12 probe={} callbacks={} filtered={} selected={} other_instance={} device_queries={} device_ok={} slot={:x} slot_read={} slot_value={:x} slot_owned={} original={:x} slot1={:x} slot1_read={} slot1_value={:x} slot1_owned={} original1={:x} bridge_calls={}",
         m_probe_generation, m_probe_callbacks, m_probe_filtered, m_probe_selected, m_probe_other_instance,
         m_probe_device_queries, m_probe_device_ok, (uintptr_t)m_probe_present_slot, slot_read,
         (uintptr_t)slot_value, slot_read && slot_value == (void*)&D3D12Hook::present,
         (uintptr_t)(m_present_hook ? m_present_hook->get_original<void*>() : nullptr),
         (uintptr_t)m_probe_present1_slot, slot1_read, (uintptr_t)slot1_value,
         slot1_read && slot1_value == (void*)&D3D12Hook::present1,
-        (uintptr_t)(m_present1_hook ? m_present1_hook->get_original<void*>() : nullptr));
+        (uintptr_t)(m_present1_hook ? m_present1_hook->get_original<void*>() : nullptr), m_probe_bridge_calls);
 
     // A callback may already have entered and be waiting for Framework's
     // hook-monitor mutex. Restore the slots but retain their original targets
@@ -443,20 +472,97 @@ bool D3D12Hook::unhook() {
 
 thread_local int32_t g_present_depth = 0;
 
-HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags, DXGI_PRESENT_PARAMETERS* params, bool present1) {
+std::optional<HRESULT> D3D12Hook::present_from_d3d11(IDXGISwapChain3* observed,
+    ID3D12Device4* proven_device, PresentFn original, UINT sync_interval, UINT flags) {
+    // The retired DX11 callback already owns Framework's recursive mutex.
+    auto d3d12 = g_d3d12_hook;
+    if (d3d12 == nullptr || !d3d12->m_hooked || observed == nullptr || proven_device == nullptr ||
+        original == nullptr || g_d3d11_bridge_present) return std::nullopt;
+
+    if (!d3d12->m_bridge_attempted) {
+        d3d12->m_bridge_attempted = true;
+        auto rejected = [&](const char* reason, HRESULT hr = E_FAIL) {
+            spdlog::info("[WuWaD3DBridge] stage=rejected probe={} chain={:x} reason={} hr={:x}",
+                d3d12->m_probe_generation, (uintptr_t)observed, reason, (uint32_t)hr);
+        };
+        if (d3d12->m_swap_chain != nullptr && d3d12->m_swap_chain != observed) {
+            rejected("different_selected_chain");
+            return std::nullopt;
+        }
+        if (d3d12->m_using_proton_swapchain || d3d12->m_using_frame_generation_swapchain ||
+            d3d12->m_command_queue_offset == 0 || d3d12->m_command_queue_offset > 0x1000) {
+            rejected("unsupported_queue_layout");
+            return std::nullopt;
+        }
+        void* candidate{};
+        if (!read_own_pointer(reinterpret_cast<const char*>(observed) + d3d12->m_command_queue_offset, &candidate) || candidate == nullptr) {
+            rejected("queue_pointer_unreadable");
+            return std::nullopt;
+        }
+        Microsoft::WRL::ComPtr<ID3D12CommandQueue> queue;
+        Microsoft::WRL::ComPtr<IUnknown> owner, expected;
+        D3D12_COMMAND_QUEUE_DESC desc{};
+        const auto queue_result = guarded_queue_info(static_cast<IUnknown*>(candidate), queue.GetAddressOf(), owner.GetAddressOf(), &desc);
+        if (FAILED(queue_result) || queue == nullptr || owner == nullptr) {
+            rejected("queue_interface_unverified", queue_result);
+            return std::nullopt;
+        }
+        const auto expected_result = proven_device->QueryInterface(IID_PPV_ARGS(&expected));
+        if (FAILED(expected_result) || expected == nullptr || expected.Get() != owner.Get()) {
+            rejected("queue_device_mismatch", expected_result);
+            return std::nullopt;
+        }
+        if (desc.Type != D3D12_COMMAND_LIST_TYPE_DIRECT) {
+            rejected("queue_not_direct");
+            return std::nullopt;
+        }
+        d3d12->m_bridge_swapchain = observed;
+        d3d12->m_bridge_device = proven_device;
+        d3d12->m_bridge_queue = std::move(queue);
+
+        void* table{};
+        void* slot{};
+        void* slot1{};
+        const bool table_read = read_own_pointer(observed, &table);
+        const bool slot_read = table_read && table != nullptr && read_own_pointer(static_cast<void**>(table) + 8, &slot);
+        const bool slot1_read = table_read && table != nullptr && read_own_pointer(static_cast<void**>(table) + 22, &slot1);
+        spdlog::info("[WuWaD3DBridge] stage=accepted probe={} chain={:x} device={:x} queue={:x} queue_offset={:x} table_read={} table={:x} slot_read={} actual_present={:x} slot1_read={} actual_present1={:x} original={:x}",
+            d3d12->m_probe_generation, (uintptr_t)observed, (uintptr_t)proven_device,
+            (uintptr_t)d3d12->m_bridge_queue.Get(), d3d12->m_command_queue_offset, table_read, (uintptr_t)table,
+            slot_read, (uintptr_t)slot, slot1_read, (uintptr_t)slot1, (uintptr_t)original);
+    }
+
+    if (d3d12->m_bridge_swapchain.Get() != observed || d3d12->m_bridge_device.Get() != proven_device ||
+        d3d12->m_bridge_queue == nullptr) return std::nullopt;
+    struct BridgeScope {
+        BridgeScope() { g_d3d11_bridge_present = true; }
+        ~BridgeScope() { g_d3d11_bridge_present = false; }
+    } scope;
+    ++d3d12->m_probe_bridge_calls;
+    return present_internal(observed, sync_interval, flags, nullptr, false, original);
+}
+
+HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags, DXGI_PRESENT_PARAMETERS* params, bool present1, PresentFn original_override) {
     auto d3d12 = g_d3d12_hook;
 
     using Present1Fn = HRESULT(*)(IDXGISwapChain3*, UINT, UINT, DXGI_PRESENT_PARAMETERS*);
     Present1Fn present_fn{nullptr};
 
-    if (!present1) {
+    if (original_override != nullptr) {
+        present_fn = reinterpret_cast<Present1Fn>(original_override);
+    } else if (!present1) {
         present_fn = d3d12->m_present_hook->get_original<Present1Fn>();
     } else {
         present_fn = d3d12->m_present1_hook->get_original<Present1Fn>();
     }
 
+    auto call_original = [&] {
+        return original_override != nullptr ? original_override(swap_chain, sync_interval, flags) :
+            present_fn(swap_chain, sync_interval, flags, params);
+    };
+
     if (!d3d12->m_hooked) {
-        return present_fn(swap_chain, sync_interval, flags, params);
+        return call_original();
     }
 
     ++d3d12->m_probe_callbacks;
@@ -465,7 +571,7 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
     if (d3d12->m_is_phase_1 && WindowFilter::get().is_filtered(window.window)) {
         ++d3d12->m_probe_filtered;
         log_window_probe(d3d12->m_probe_generation, d3d12->m_probe_filtered_logs, "filtered", swap_chain, window, present1, true);
-        return present_fn(swap_chain, sync_interval, flags, params);
+        return call_original();
     }
 
     if (!d3d12->m_is_phase_1 && swap_chain != d3d12->m_swapchain_hook->get_instance()) {
@@ -480,7 +586,7 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
         if (!d3d12->m_is_phase_1) {
             ++d3d12->m_probe_other_instance;
             log_window_probe(d3d12->m_probe_generation, d3d12->m_probe_other_logs, "other_instance", swap_chain, window, present1, false, og_instance.as<void*>());
-            return present_fn(swap_chain, sync_interval, flags, params);
+            return call_original();
         }
     }
 
@@ -514,7 +620,9 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
     }
 
     if (d3d12->m_device != nullptr) {
-        if (d3d12->m_using_proton_swapchain) {
+        if (d3d12->m_bridge_swapchain.Get() == swap_chain && d3d12->m_bridge_queue != nullptr) {
+            d3d12->m_command_queue = d3d12->m_bridge_queue.Get();
+        } else if (d3d12->m_using_proton_swapchain) {
             const auto real_swapchain = *(uintptr_t*)((uintptr_t)swap_chain + d3d12->m_proton_swapchain_offset);
             d3d12->m_command_queue = *(ID3D12CommandQueue**)(real_swapchain + d3d12->m_command_queue_offset);
         } else {
@@ -546,7 +654,7 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
             spdlog::info("Attempting to call real present function");
 
             ++g_present_depth;
-            const auto result = present_fn(swap_chain, sync_interval, flags, params);
+            const auto result = call_original();
             --g_present_depth;
 
             if (result != S_OK) {
@@ -587,7 +695,7 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
     auto result = S_OK;
     
     if (!d3d12->m_ignore_next_present) {
-        result = present_fn(swap_chain, sync_interval, flags, params);
+        result = call_original();
 
         if (result != S_OK) {
             spdlog::error("Present failed: {:x}", result);

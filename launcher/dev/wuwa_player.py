@@ -909,7 +909,7 @@ def compact_backend_rows(rows):
         return compact
     middle = list(enumerate(compact[40:-80], 40))
     transitions = [i for i, line in middle if re.search(
-        r'WuWaD3D(?:Probe|Window|Device|Bootstrap)|Framework shutting down|Attempting to initialize DirectX|Device or SwapChain null|'
+        r'WuWaD3D(?:Probe|Window|Device|Bootstrap|Bridge|Dispatch)|Framework shutting down|Attempting to initialize DirectX|Device or SwapChain null|'
         r'Hook(?:ed|ing) DirectX|Framework initialized|xrCreateSession|xrBeginSession|'
         r'xrGetD3D(?:11|12)GraphicsRequirements|FEnumProperty.*(?:offset|candidate)', line, re.IGNORECASE)]
     # Keep distinct errors, not dozens of timestamp variants of the same error.

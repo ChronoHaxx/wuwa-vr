@@ -1,13 +1,13 @@
-# Mod source — window-filter startup repair beta
+# Mod source — renderer handoff beta
 
 The release target is
-[beta-2026-10-06-window-filter](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-filter),
-launcher **1.0.7**, backend/package build **window-filter-20261006**, for game
-**3.7**. Native compilation, isolated graphics-hook checks, launcher tests and isolated package installation passed.
+[beta-2026-10-06-renderer-handoff](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-handoff),
+launcher **1.0.8**, backend/package build **renderer-handoff-20261006**, for game
+**3.7**. Native compilation, graphics-hook regression checks and packaging verification are pending for this candidate.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The affected Windows 11 Steam PC still failed to reach VR with 1.0.6, after all three injection DLLs loaded. This update repairs two reproduced window-filter defects: its worker could exit while idle, and a window-title query could deadlock the rendering thread. Title queries are now bounded and performed outside the filter lock. Startup reports distinguish normal graphics warmup from an actual failure and stop waiting when the current backend shuts down. Per-attempt graphics-hook evidence now separates missing callbacks from rejected windows. These repairs passed background tests; successful startup on the affected PC and headset acceptance are still unverified. See [the window-filter repair report](../docs/launch-kit/WINDOW-FILTER-20261006.md).
+The affected Windows 11 Steam PC still started flat with 1.0.7 despite verified DLL loading and process identity. Its new logs show rendering calls reaching the wrong graphics probe while the DX12 probe receives no frames. This candidate targets callbacks retained from an earlier probe: a handoff to DX12 is allowed only after that exact rendering chain positively exposes a DX12 device. It retains the window-filter and startup-recovery repairs. The backend build and background tests passed: retained callbacks reached DX12 with a verified device and queue, original presentation ran once per call, and ordinary DX11/DX12 paths and refused handoffs were checked. Successful startup on the affected PC and physical-headset acceptance remain unverified. See [the renderer handoff report](../docs/launch-kit/RENDERER-HANDOFF-20261006.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

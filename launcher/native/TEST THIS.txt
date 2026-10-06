@@ -1,8 +1,8 @@
-WUWA VR — WINDOW-FILTER STARTUP REPAIR BETA CHECKS
-Desktop app 1.0.7 | beta-2026-10-06-window-filter
-VR build window-filter-20261006 | game 3.7
+WUWA VR — RENDERER HANDOFF BETA CHECKS
+Desktop app 1.0.8 | beta-2026-10-06-renderer-handoff
+VR build renderer-handoff-20261006 | game 3.7
 
-The affected Windows 11 Steam PC still failed to reach VR with 1.0.6, after all three injection DLLs loaded. This update repairs two reproduced window-filter defects: its worker could exit while idle, and a window-title query could deadlock the rendering thread. Title queries are now bounded and performed outside the filter lock. Startup reports distinguish normal graphics warmup from an actual failure and stop waiting when the current backend shuts down. Per-attempt graphics-hook evidence now separates missing callbacks from rejected windows. These repairs passed background tests; successful startup on the affected PC and headset acceptance are still unverified.
+The affected Windows 11 Steam PC still started flat with 1.0.7 despite verified DLL loading and process identity. Its new logs show rendering calls reaching the wrong graphics probe while the DX12 probe receives no frames. This candidate targets callbacks retained from an earlier probe: a handoff to DX12 is allowed only after that exact rendering chain positively exposes a DX12 device. It retains the window-filter and startup-recovery repairs. The backend build and background tests passed: retained callbacks reached DX12 with a verified device and queue, original presentation ran once per call, and ordinary DX11/DX12 paths and refused handoffs were checked. Successful startup on the affected PC and physical-headset acceptance remain unverified.
 
 Record Pass / Fail / Blocked / Not tested, with Windows version, game store,
 app/package/build versions and the exact visible result. No need to manufacture
@@ -10,9 +10,9 @@ failures or repeat every earlier feature check just to try this update.
 
 [ ] 1. Update BOTH parts. Step 02 > Versions & updates > Check updates >
     Update launcher, then Restart to update when the game, injector, recording
-    and other operations are idle. Confirm app 1.0.7. Explicitly select and
-    install beta-2026-10-06-window-filter in Step 02; confirm VR build
-    window-filter-20261006. An app update preserves the old package selection;
+    and other operations are idle. Confirm app 1.0.8. Explicitly select and
+    install beta-2026-10-06-renderer-handoff in Step 02; confirm VR build
+    renderer-handoff-20261006. An app update preserves the old package selection;
     Check updates does not select the new VR package automatically.
     If the old app blocks updating, close it and use the new WuWa-VR-Setup.exe
     from https://chronohaxx.github.io/wuwa-vr/. Reinstallation preserves data
@@ -53,21 +53,17 @@ rim lighting, scene/dialogue stalls, HUD refresh and flat-menu backgrounds are
 not claimed fixed by this renderer-startup change.
 
 鸣潮 VR — 渲染器启动测试版检查
-桌面应用 1.0.7 | beta-2026-10-06-window-filter
-VR 构建 window-filter-20261006 | 游戏 3.7
+桌面应用 1.0.8 | beta-2026-10-06-renderer-handoff
+VR 构建 renderer-handoff-20261006 | 游戏 3.7
 
-受影响的远程 Windows 11 Steam 电脑在 1.0.4 中已载入 VR DLL，但没有接收到
-实际游戏渲染帧。新后端在尚未识别实际渲染器时尝试另一种图形挂钩，并为每次
-启动保存 backend.log；不改变已识别到的渲染器，也不能证明问题由显卡品牌造成。
-原生后端已编译，隔离图形挂接测试已通过；远程电脑启动及头显验收仍待完成。
-载入 DLL 本身不等于 VR 启动成功。
+受影响的 Windows 11 Steam 电脑在 1.0.7 中仍显示平面画面，但 DLL 加载及游戏进程身份均已验证。新日志显示渲染调用进入了不匹配的图形探测，而 DX12 探测未收到画面。本候选版针对程序仍调用较早探测回调的情况：只有同一个渲染交换链明确提供 DX12 设备时，才允许将调用交给 DX12。此前的窗口过滤和启动恢复修复继续保留。后端编译及后台测试已通过：保留的回调能够通过已验证的设备和命令队列进入 DX12，每次调用只执行一次原始画面提交，并已检查正常的 DX11／DX12 路径及拒绝交接的情况。受影响电脑的启动和实体头显体验仍未验证。
 
 记录通过／失败／受阻／未测试，并注明 Windows、游戏平台、应用／包／构建版本
 及实际结果。无需刻意制造故障，也无需为本次更新重复所有旧功能检查。
 
 [ ] 1. 两项都更新。第 02 步 > 版本与更新 > 检查更新 > 更新启动器，待游戏、
-    注入器、录制及其他操作结束后重启并更新，确认应用为 1.0.7。再明确选择
-    并安装 beta-2026-10-06-window-filter，确认构建 window-filter-20261006。
+    注入器、录制及其他操作结束后重启并更新，确认应用为 1.0.8。再明确选择
+    并安装 beta-2026-10-06-renderer-handoff，确认构建 renderer-handoff-20261006。
     更新应用会保留旧 VR 包选择；检查更新不会自动改选新包。旧应用阻止更新时，
     关闭后运行网站的新 WuWa-VR-Setup.exe。重装保留数据，也不保证卡住的任务已停止。
 [ ] 2. 启动一次。保留所需的 Steam／库洛安装及运行时，点击一次“以 VR 模式启动”，

@@ -9,6 +9,7 @@
 
 #include <d3d12.h>
 #include <dxgi1_4.h>
+#include <wrl.h>
 
 #include "utility/PointerHook.hpp"
 #include "utility/VtableHook.hpp"
@@ -30,6 +31,11 @@ public:
     bool is_hooked() {
         return m_hooked;
     }
+
+    using PresentFn = HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT);
+    // nullopt means the retired caller must forward its original normally.
+    static std::optional<HRESULT> present_from_d3d11(IDXGISwapChain3* observed,
+        ID3D12Device4* proven_device, PresentFn original, UINT sync_interval, UINT flags);
 
     void on_present(OnPresentFn fn) {
         m_on_present = fn;
@@ -132,6 +138,11 @@ protected:
     unsigned m_probe_filtered_logs{}, m_probe_selected_logs{}, m_probe_other_logs{}, m_probe_resize_logs{};
     void** m_probe_present_slot{};
     void** m_probe_present1_slot{};
+    bool m_bridge_attempted{};
+    uint64_t m_probe_bridge_calls{};
+    Microsoft::WRL::ComPtr<IDXGISwapChain3> m_bridge_swapchain{};
+    Microsoft::WRL::ComPtr<ID3D12Device4> m_bridge_device{};
+    Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_bridge_queue{};
 
     std::unique_ptr<PointerHook> m_present_hook{};
     std::unique_ptr<PointerHook> m_present1_hook{};
@@ -144,7 +155,7 @@ protected:
     OnResizeTargetFn m_on_resize_target{ nullptr };
     //OnCreateSwapChainFn m_on_create_swap_chain{ nullptr };
     
-    static HRESULT present_internal(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags, DXGI_PRESENT_PARAMETERS* params, bool present1 = false);
+    static HRESULT present_internal(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags, DXGI_PRESENT_PARAMETERS* params, bool present1 = false, PresentFn original_override = nullptr);
 
     static HRESULT WINAPI present(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags);
     static HRESULT WINAPI present1(IDXGISwapChain3* swap_chain, UINT sync_interval, UINT flags, DXGI_PRESENT_PARAMETERS* params);

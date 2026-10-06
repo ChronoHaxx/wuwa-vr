@@ -2,7 +2,7 @@
 
 Free, unofficial Wuthering Waves VR mod, built on praydog's UEVR and community work.
 
-**[Download the Windows installer · beta 1.0.7 · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-window-filter/WuWa-VR-Setup.exe)** · [Release notes & source](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-filter) · [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html)
+**[Download the Windows installer · beta 1.0.8 · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-renderer-handoff/WuWa-VR-Setup.exe)** · [Release notes & source](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-handoff) · [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html)
 
 Install **WuWa VR**, then follow **01 Game → 02 Install VR → 03 Headset or simulator**.
 The small installer downloads the separate VR mod (about **54 MB**) in step 02,
@@ -11,20 +11,20 @@ Choose **Launch in VR** and accept Windows permission. Steam starts the selected
 game through Steam; with Kuro, press **Play** in its launcher. The installed app offers launcher updates while idle;
 VR package updates are in step 02. Updates preserve settings, backups and recordings.
 
-Update both the app to **1.0.7** and the step 02 package to
-**beta-2026-10-06-window-filter** / build **window-filter-20261006**.
+Update both the app to **1.0.8** and the step 02 package to
+**beta-2026-10-06-renderer-handoff** / build **renderer-handoff-20261006**.
 Updating the app preserves the selected VR package; explicitly select/install
 the new package after restarting. Existing recovery, cancellation, **Close
 launcher only** and guarded process stopping remain under **Troubleshooting**.
 Game, Steam and VR runtime processes are excluded from confirmed recovery stops.
 
-The affected Windows 11 Steam PC still failed to reach VR with 1.0.6, after all three injection DLLs loaded. This update repairs two reproduced window-filter defects: its worker could exit while idle, and a window-title query could deadlock the rendering thread. Title queries are now bounded and performed outside the filter lock. Startup reports distinguish normal graphics warmup from an actual failure and stop waiting when the current backend shuts down. Per-attempt graphics-hook evidence now separates missing callbacks from rejected windows. These repairs passed background tests; successful startup on the affected PC and headset acceptance are still unverified.
+The affected Windows 11 Steam PC still started flat with 1.0.7 despite verified DLL loading and process identity. Its new logs show rendering calls reaching the wrong graphics probe while the DX12 probe receives no frames. This candidate targets callbacks retained from an earlier probe: a handoff to DX12 is allowed only after that exact rendering chain positively exposes a DX12 device. It retains the window-filter and startup-recovery repairs. The backend build and background tests passed: retained callbacks reached DX12 with a verified device and queue, original presentation ran once per call, and ordinary DX11/DX12 paths and refused handoffs were checked. Successful startup on the affected PC and physical-headset acceptance remain unverified.
 
 [Watch / guide](https://chronohaxx.github.io/wuwa-vr/) · [Report an issue](https://github.com/ChronoHaxx/wuwa-vr/issues)
 
-[Portable ZIP (advanced fallback)](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-window-filter/WuWa-VR-Launcher.zip)
+[Portable ZIP (advanced fallback)](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-renderer-handoff/WuWa-VR-Launcher.zip)
 uses the older browser launcher: extract everything, then open **WuWa VR Launcher.exe**.
-No separate Python installation is needed. [Previous beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-startup).
+No separate Python installation is needed. [Previous beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-filter).
 Keep older packages for **Troubleshooting → Repair & recovery → Use previous
 installed version**. Close the game/injector and stop recording first. This rolls
 back the VR package, not the desktop app; the old renderer-startup issue may return.

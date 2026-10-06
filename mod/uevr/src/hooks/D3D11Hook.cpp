@@ -8,6 +8,7 @@
 #include "Framework.hpp"
 
 #include "D3D11Hook.hpp"
+#include "D3D12Hook.hpp"
 #include "utility/WuWaSwapchainWindow.hpp"
 
 using namespace std;
@@ -39,6 +40,10 @@ bool D3D11Hook::hook() {
     m_probe_callbacks = m_probe_filtered = m_probe_selected = 0;
     m_probe_device_queries = m_probe_device_ok = 0;
     m_probe_present_slot = nullptr;
+    m_observed_dx12_chain.Reset();
+    m_observed_dx12_device.Reset();
+    m_dx12_next_source_probe = {};
+    m_dx12_source_logs = 0;
 
     g_d3d11_hook = this;
 
@@ -157,7 +162,14 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
 
     // Unhook restores the slot but keeps the original callable for an already
     // dispatched callback that waited while Framework switched API probes.
-    if (!d3d11->m_hooked) return present_fn(swap_chain, sync_interval, flags);
+    if (!d3d11->m_hooked) {
+        if (swap_chain == d3d11->m_observed_dx12_chain.Get()) {
+            const auto bridged = D3D12Hook::present_from_d3d11(d3d11->m_observed_dx12_chain.Get(),
+                d3d11->m_observed_dx12_device.Get(), present_fn, sync_interval, flags);
+            if (bridged.has_value()) return *bridged;
+        }
+        return present_fn(swap_chain, sync_interval, flags);
+    }
 
     ++d3d11->m_probe_callbacks;
 
@@ -173,6 +185,17 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
 
     if (++d3d11->m_probe_selected <= 3) {
         log_probe_window(d3d11->m_probe_generation, "accepted", swap_chain, desc_result, swap_desc.OutputWindow);
+        void** table{};
+        void* actual_present{};
+        SIZE_T bytes{};
+        const bool table_read = ReadProcessMemory(GetCurrentProcess(), swap_chain, &table, sizeof(table), &bytes) && bytes == sizeof(table);
+        bytes = 0;
+        const bool slot_read = table_read && table != nullptr && ReadProcessMemory(GetCurrentProcess(),
+            table + 8, &actual_present, sizeof(actual_present), &bytes) && bytes == sizeof(actual_present);
+        spdlog::info("[WuWaD3DDispatch] api=11 probe={} chain={:x} table_read={} table={:x} actual_slot={:x} actual_read={} actual_present={:x} dummy_slot={:x}",
+            d3d11->m_probe_generation, (uintptr_t)swap_chain, table_read, (uintptr_t)table,
+            table_read && table ? (uintptr_t)(table + 8) : 0, slot_read, (uintptr_t)actual_present,
+            (uintptr_t)d3d11->m_probe_present_slot);
     }
 
     d3d11->m_inside_present = true;
@@ -195,6 +218,28 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
     if (d3d11->m_probe_device_queries <= 3) {
         spdlog::info("[WuWaD3DDevice] api=11 probe={} chain={:x} hr={:x} device={:x}",
             d3d11->m_probe_generation, (uintptr_t)swap_chain, (uint32_t)device_result, (uintptr_t)d3d11->m_device);
+    }
+
+    if (FAILED(device_result) && d3d11->m_observed_dx12_chain == nullptr &&
+        std::chrono::steady_clock::now() >= d3d11->m_dx12_next_source_probe) {
+        // Limit failed capability queries, not the number of future chains.
+        d3d11->m_dx12_next_source_probe = std::chrono::steady_clock::now() + std::chrono::milliseconds{250};
+        ComPtr<ID3D12Device4> device12;
+        ComPtr<IDXGISwapChain3> chain3;
+        const auto device12_result = swap_chain->GetDevice(IID_PPV_ARGS(&device12));
+        const auto chain3_result = swap_chain->QueryInterface(IID_PPV_ARGS(&chain3));
+        const bool accepted = SUCCEEDED(device12_result) && device12 != nullptr &&
+            SUCCEEDED(chain3_result) && chain3 != nullptr && chain3.Get() == swap_chain;
+        if (accepted) {
+            d3d11->m_observed_dx12_chain = std::move(chain3);
+            d3d11->m_observed_dx12_device = std::move(device12);
+        }
+        if (accepted || d3d11->m_dx12_source_logs < 3) {
+            ++d3d11->m_dx12_source_logs;
+            spdlog::info("[WuWaD3DBridge] stage=observe probe={} chain={:x} device12_hr={:x} chain3_hr={:x} same_interface={} accepted={}",
+                d3d11->m_probe_generation, (uintptr_t)swap_chain, (uint32_t)device12_result,
+                (uint32_t)chain3_result, accepted || chain3.Get() == swap_chain, accepted);
+        }
     }
 
     /*if (d3d11->m_set_render_targets_hook == nullptr) {

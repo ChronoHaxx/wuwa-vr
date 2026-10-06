@@ -1,4 +1,8 @@
-param([Parameter(Mandatory=$true)][string]$OutputRoot)
+param(
+    [Parameter(Mandatory=$true)][string]$OutputRoot,
+    [ValidateSet('Standard','Retained','RetainedFixed')][string]$Mode = 'Standard',
+    [string]$ProductionSnapshot = ''
+)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $upstream = Join-Path (Split-Path $repo -Parent) 'upstream\UEVR'
@@ -22,6 +26,10 @@ $inputs = [ordered]@{}
 foreach ($relative in @('hooks\D3D11Hook.cpp','hooks\D3D12Hook.cpp','hooks\D3D11Hook.hpp','hooks\D3D12Hook.hpp','WindowFilter.cpp','WindowFilter.hpp','utility\WuWaSwapchainWindow.hpp')) {
     $path = Join-Path $repo ('mod\uevr\src\' + $relative)
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { $path = Join-Path $upstream ('src\' + $relative) }
+    if ($ProductionSnapshot) {
+        $name = if ($relative.StartsWith('hooks\')) { Split-Path $relative -Leaf } else { $relative }
+        $path = Join-Path $ProductionSnapshot $name
+    }
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Production source missing: $relative" }
     $inputs[$relative] = $path
 }
@@ -31,7 +39,9 @@ foreach ($path in @($output,$vcvars,$source,$kananInclude,$spdInclude) + $libPat
 foreach ($path in $libPaths) { if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Built dependency missing: $path" } }
 Add-Type -AssemblyName Microsoft.VisualBasic
 $memory = New-Object Microsoft.VisualBasic.Devices.ComputerInfo
-if ($memory.AvailablePhysicalMemory -lt 3GB) { throw 'Insufficient memory headroom for isolated hook compilation.' }
+if ($memory.AvailablePhysicalMemory -lt 8GB -or ($memory.AvailablePhysicalMemory / $memory.TotalPhysicalMemory) -lt 0.15) {
+    throw 'Defer isolated compiler: require at least8GiB free and memory load at most85%.'
+}
 New-Item -ItemType Directory -Path $output | Out-Null
 $fixture = Join-Path $output 'source'
 New-Item -ItemType Directory -Path $fixture | Out-Null
@@ -98,9 +108,14 @@ $receipt = [ordered]@{
     stub=[ordered]@{path=$frameworkPath;sha256=(Get-FileHash -LiteralPath $frameworkPath -Algorithm SHA256).Hash;scope='Only Framework recursive hook-monitor mutex; no lifecycle, monitor or renderer initialization.'}
     executable=$exe; executableSha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
     scope='Actual production hooks/filter and built kananlib; hidden own-process hardware DXGI. Not full Framework, remote Windows11/AMD, game or headset acceptance.'
+    mode=$Mode
+    productionSnapshot=$ProductionSnapshot
+    expectedBehavior=$(if ($Mode -eq 'Retained') { 'Reproduce missing active DX12 callbacks when fixture deliberately retains retired DX11 dispatch; not evidence remote software does this.' } elseif ($Mode -eq 'RetainedFixed') { 'Positively observed retained DX11 dispatch reaches active DX12, original Present exactly once, actual DX11 and retired hooks do not bridge.' } else { 'Active hook callbacks and restoration succeed.' })
 }
 $info = New-Object Diagnostics.ProcessStartInfo
 $info.FileName=$exe; $info.WorkingDirectory=$output; $info.UseShellExecute=$false; $info.CreateNoWindow=$true
+if ($Mode -eq 'Retained') { $info.Arguments='--retained-dispatch' }
+if ($Mode -eq 'RetainedFixed') { $info.Arguments='--retained-fixed' }
 $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
 $child=New-Object Diagnostics.Process; $child.StartInfo=$info
 if (-not $child.Start()) { throw 'Could not start actual-hook test.' }

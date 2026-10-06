@@ -356,10 +356,14 @@ class LaunchRecovery(unittest.TestCase):
     def test_bootstrap_counts_and_shutdown_survive_middle_truncation(self):
         rows = [f'header {i}' for i in range(60)]
         rows += ['[info] [WuWaD3DBootstrap] api=12 callbacks=8 filtered=8',
+                 '[info] [WuWaD3DDispatch] actual_present=111 dummy_slot=222',
+                 '[info] [WuWaD3DBridge] stage=accepted queue=333',
                  '[info] Framework shutting down...']
         rows += [f'tail {i}' for i in range(200)]
         result = '\n'.join(player.compact_backend_rows(rows))
         self.assertIn('callbacks=8 filtered=8', result)
+        self.assertIn('actual_present=111 dummy_slot=222', result)
+        self.assertIn('stage=accepted queue=333', result)
         self.assertIn('Framework shutting down...', result)
         self.assertLess(len(result.splitlines()), 181)
 

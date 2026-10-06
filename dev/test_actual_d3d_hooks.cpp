@@ -12,6 +12,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <thread>
+#include <atomic>
 
 using Microsoft::WRL::ComPtr;
 std::unique_ptr<Framework> g_framework = std::make_unique<Framework>();
@@ -75,9 +76,24 @@ static Chain make12(HWND hwnd, IDXGIFactory4* factory, ID3D12CommandQueue* queue
     return result;
 }
 static void* slot_value(IUnknown* chain, unsigned index) { return (*reinterpret_cast<void***>(chain))[index]; }
+using PresentFn = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain*, UINT, UINT);
+static PresentFn native_present{};
+static std::atomic_uint original_presents{};
+static HRESULT STDMETHODCALLTYPE counted_present(IDXGISwapChain* chain, UINT interval, UINT flags) {
+    ++original_presents;
+    return native_present(chain, interval, flags);
+}
+class TestD3D12Hook final : public D3D12Hook {
+public:
+    // Fault injection in fixture state only, never in the real COM allocation.
+    void reject_queue_offset_for_test() { m_command_queue_offset = UINT32_MAX; }
+};
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        const bool repaired_dispatch = argc == 2 && std::string(argv[1]) == "--retained-fixed";
+        const bool retained_dispatch = repaired_dispatch || (argc == 2 && std::string(argv[1]) == "--retained-dispatch");
+        require(argc == 1 || retained_dispatch, "Use no arguments, --retained-dispatch or --retained-fixed");
         spdlog::set_pattern("[%l] %v");
         std::cout << "scope\tactual_D3D11Hook_D3D12Hook_WindowFilter=true\tkananlib=actual_built_library"
             "\tFramework=mutex_only_stub\tfull_Framework_initialized=false\tgame_injected=false" << std::endl;
@@ -104,7 +120,7 @@ int main() {
             // Same ordering as Framework::hook_d3d12, including destruction of
             // the previously retired object BEFORE installing replacement hooks.
             hook12.reset();
-            hook12 = std::make_unique<D3D12Hook>();
+            hook12 = std::make_unique<TestD3D12Hook>();
             hook12->on_present([&](D3D12Hook& current) {
                 ++callbacks12;
                 if (current.get_device() && current.get_swap_chain() == chain12.version3.Get()) ++matching12;
@@ -140,6 +156,135 @@ int main() {
             }
             require(counter >= expected, std::string("No actual callback: ") + label);
         };
+        if (retained_dispatch) {
+            // Pre-resolve the real title so no filter delay affects counts.
+            WindowFilter::get().is_filtered(window12.handle);
+            pump_for(std::chrono::milliseconds{450});
+            require(!WindowFilter::get().is_filtered(window12.handle), "Target title remained filtered");
+            using Present1Fn = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain1*, UINT, UINT, const DXGI_PRESENT_PARAMETERS*);
+            // Instrument the original call without replacing any production
+            // callback. The actual PointerHook forwards to the real DXGI entry.
+            auto** native_slot = &(*reinterpret_cast<void***>(chain12.base.Get()))[8];
+            PointerHook count_original{native_slot, reinterpret_cast<void*>(&counted_present)};
+            native_present = count_original.get_original<PresentFn>();
+            std::cout << "instrumentation\toriginal_Present_counter=PointerHook_forwarding_real_DXGI" << std::endl;
+            for (const bool clone_vtable : {true, false}) {
+                install11();
+                const auto priming11 = callbacks11, priming_mismatch = mismatch11;
+                const auto priming_originals = original_presents.load();
+                for (unsigned i = 0; i < 61; ++i) checked(chain12.base->Present(0, DXGI_PRESENT_TEST), "Prime real DX11 observation of DX12 chain");
+                require(callbacks11 - priming11 == 61 && mismatch11 - priming_mismatch == 61,
+                    "Priming must deliver 61 actual DX11 wrong-device callbacks");
+                require(original_presents - priming_originals == 61, "Priming did not present exactly once per call");
+                const auto retained11 = reinterpret_cast<PresentFn>(slot_value(chain12.base.Get(), 8));
+                require(reinterpret_cast<void*>(retained11) != saved12,
+                    "Local driver did not route the target through the production DX11 probe");
+                auto** global_slot = &(*reinterpret_cast<void***>(chain12.base.Get()))[8];
+                std::unique_ptr<VtableHook> copied;
+                if (clone_vtable) {
+                    // Simulate another component copying a COM instance table
+                    // while DX11 is active. No production hook code is changed.
+                    copied = std::make_unique<VtableHook>(chain12.base.Get());
+                }
+                require(hook11->unhook(), "Retaining DX11 dispatch: unhook failed");
+                install12();
+                const auto before12 = callbacks12, before11 = callbacks11, before_matching12 = matching12;
+                const auto before_originals = original_presents.load();
+                auto dispatch = [&] {
+                    return clone_vtable ? chain12.base->Present(0, DXGI_PRESENT_TEST) :
+                        retained11(chain12.base.Get(), 0, DXGI_PRESENT_TEST);
+                };
+                auto** target_slot = &(*reinterpret_cast<void***>(chain12.base.Get()))[8];
+                std::cout << "retained_dispatch_setup\tkind=" << (clone_vtable ? "private_vtable" : "captured_function")
+                    << "\tglobal_slot=" << global_slot << "\tglobal_value=" << *global_slot
+                    << "\ttarget_slot=" << target_slot << "\ttarget_value=" << *target_slot
+                    << "\tretained_DX11=" << reinterpret_cast<void*>(retained11) << std::endl;
+                for (unsigned i = 0; i < 61; ++i) checked(dispatch(), "Retained DX11 while DX12 active");
+                require(original_presents - before_originals == 61, "Retained dispatch must call original Present exactly once per call");
+                require(callbacks11 == before11, "Retired DX11 delivered an active DX11 callback");
+                if (repaired_dispatch) {
+                    require(callbacks12 - before12 == 61 && matching12 - before_matching12 == 61,
+                        "Retained DX11 dispatch did not reach matching active DX12 callbacks");
+                } else {
+                    require(callbacks12 == before12,
+                        "Baseline retained-dispatch failure absent: an active DX12 callback received the presents");
+                }
+                require(hook12->unhook(), "Retained dispatch DX12 retirement failed");
+                install11();
+                const auto next11 = callbacks11, mismatch_before = mismatch11, retired12 = callbacks12;
+                const auto next_originals = original_presents.load();
+                for (unsigned i = 0; i < 61; ++i) checked(dispatch(), "Retained DX11 while DX11 active");
+                require(callbacks11 - next11 == 61 && mismatch11 - mismatch_before == 61 && callbacks12 == retired12,
+                    "Retained dispatch did not reproduce 61 wrong-device DX11 callbacks");
+                require(original_presents - next_originals == 61, "Active DX11 did not call original exactly once");
+                // Restore the private instance table before removing the global
+                // hook, so fixture cleanup itself cannot create stale dispatch.
+                if (copied) { require(copied->remove(), "Fixture private vtable restore failed"); copied.reset(); }
+                require(hook11->unhook(), "Retained dispatch final DX11 retirement failed");
+                const auto fully_retired11 = callbacks11, fully_retired12 = callbacks12;
+                const auto retired_originals = original_presents.load();
+                checked(retained11(chain12.base.Get(), 0, DXGI_PRESENT_TEST), "Both hooks retired");
+                require(callbacks11 == fully_retired11 && callbacks12 == fully_retired12 && original_presents - retired_originals == 1,
+                    "Retired bridge must only call original once");
+                std::cout << (repaired_dispatch ? "PASS" : "REPRODUCED") << "\tretained_dispatch\tkind=" << (clone_vtable ? "private_vtable" : "captured_function")
+                    << "\tpriming_DX11_wrong_device_callbacks=61\twhile_DX12_active_calls=61\tDX12_callbacks=" << callbacks12 - before12
+                    << "\twhile_DX11_active_callbacks=61\toriginals_exactly_once=true\tretired_bridge_inactive=true" << std::endl;
+            }
+            if (repaired_dispatch) {
+                install11();
+                checked(chain12.base->Present(0, DXGI_PRESENT_TEST), "Prime rejected bridge source");
+                const auto rejected_retained = reinterpret_cast<PresentFn>(slot_value(chain12.base.Get(), 8));
+                require(hook11->unhook(), "Rejected bridge DX11 retirement failed");
+                install12();
+                static_cast<TestD3D12Hook*>(hook12.get())->reject_queue_offset_for_test();
+                const auto rejected12 = callbacks12, rejected11 = callbacks11;
+                const auto rejected_originals = original_presents.load();
+                for (unsigned i = 0; i < 61; ++i) checked(rejected_retained(chain12.base.Get(), 0, DXGI_PRESENT_TEST), "Invalid queue offset fallback");
+                require(callbacks12 == rejected12 && callbacks11 == rejected11 && original_presents - rejected_originals == 61,
+                    "Invalid queue offset must refuse bridge and forward original once");
+                require(hook12->unhook(), "Invalid queue offset cleanup failed");
+                std::cout << "PASS\tinvalid_queue_offset_refuses_bridge\trepeated_calls=61\toriginal_once=true" << std::endl;
+            }
+            // A positively identified DX11 chain must never enter the DX12
+            // handoff, even if it retains the identical DX11 function address.
+            WindowFilter::get().is_filtered(window11.handle);
+            pump_for(std::chrono::milliseconds{450});
+            install11();
+            const auto before_real11 = matching11;
+            checked(chain11.base->Present(0, DXGI_PRESENT_TEST), "Prime actual DX11 chain");
+            require(matching11 == before_real11 + 1, "Actual DX11 device not identified");
+            const auto real11_retained = reinterpret_cast<PresentFn>(slot_value(chain11.base.Get(), 8));
+            require(hook11->unhook(), "Actual DX11 retirement failed");
+            install12();
+            const auto negative12 = callbacks12, negative11 = callbacks11;
+            const auto negative_originals = original_presents.load();
+            checked(real11_retained(chain11.base.Get(), 0, DXGI_PRESENT_TEST), "Retained real DX11 must not bridge");
+            require(callbacks12 == negative12 && callbacks11 == negative11 && original_presents - negative_originals == 1,
+                "Real DX11 was bridged or did not forward original exactly once");
+            require(hook12->unhook(), "Real DX11 negative cleanup failed");
+            std::cout << "PASS\tactual_DX11_never_bridged\toriginal_once=true" << std::endl;
+            // DX11 has no Present1 hook. Test the appropriate separate case:
+            // a captured real DX12 Present1 remains callable after replacing its
+            // retired hook object with a new active DX12 object.
+            install12();
+            const auto retained12_1 = reinterpret_cast<Present1Fn>(slot_value(chain12.extended.Get(), 22));
+            require(hook12->unhook(), "Captured Present1 retirement failed");
+            install12();
+            const auto before12_1 = matching12;
+            DXGI_PRESENT_PARAMETERS params{};
+            checked(retained12_1(chain12.extended.Get(), 0, DXGI_PRESENT_TEST, &params), "Retained DX12 Present1 after replacement");
+            require(matching12 == before12_1 + 1, "Captured DX12 Present1 did not reach replacement hook");
+            require(hook12->unhook(), "Captured Present1 cleanup failed");
+            hook11.reset(); hook12.reset();
+            require(count_original.remove(), "Original-call instrumentation removal failed");
+            require(slot_value(chain12.base.Get(), 8) == saved12 && slot_value(chain12.extended.Get(), 22) == saved12_1,
+                "Retained dispatch final restoration failed");
+            require(!IsWindowVisible(window11.handle) && !IsWindowVisible(window12.handle), "Test window became visible");
+            std::cout << "PASS\tcaptured_DX12_Present1_after_same_API_replacement\tfinal_restoration=true" << std::endl;
+            std::cout << "LIMIT\tFixture_intentionally_retains_dispatch\tRemote_retention_NOT_established"
+                "\tFull_Framework_not_linked\tNo_game_or_headset" << std::endl;
+            return 0;
+        }
         {
             std::scoped_lock lock{g_framework->get_hook_monitor_mutex()};
             install12();

@@ -1,101 +1,100 @@
-WUWA VR — STARTUP-RECOVERY BETA CHECKS
-Desktop app 1.0.4 | beta-2026-10-06-stalled-launch | VR build steam-20261006 | game 3.7
+WUWA VR — RENDERER-STARTUP BETA CHECKS
+Desktop app 1.0.5 | beta-2026-10-06-renderer-startup
+VR build renderer-startup-20261006 | game 3.7
 
-The renderer and injector are unchanged from beta-2026-10-06-steam.
-Startup/runtime changes have background test coverage. The previous apps 1.0.2 and 1.0.3
-failed to start on a remote Windows 11 Steam PC; 1.0.4 still needs a retest there.
-Do not treat these notes as a successful UAC, game-launch or headset acceptance.
+On the affected remote Windows 11 Steam PC, 1.0.4 loaded the VR DLL but never
+reached a real game-renderer frame. This backend adds a graphics-hook fallback
+before a renderer is detected and preserves backend.log for each startup attempt.
+It does not change an already detected renderer or establish a GPU-brand cause.
+Native compilation and isolated graphics-hook tests passed. Remote-PC startup and
+headset acceptance remain pending; loading DLLs alone is not a successful launch.
 
-For each relevant group, record Pass / Fail / Blocked / Not tested, with the
-Windows version, game store, app/package version and exact visible result.
-Skip deliberately exercising failures if you only want to play.
+Record Pass / Fail / Blocked / Not tested, with Windows version, game store,
+app/package/build versions and the exact visible result. No need to manufacture
+failures or repeat every earlier feature check just to try this update.
 
-[ ] 1. Update both parts. From installed 1.0.2 or 1.0.3, Step 02 > Versions & updates >
-    Check updates > Update launcher. When idle, Restart to update and confirm.
-    After reopening, explicitly select beta-2026-10-06-stalled-launch in Step 02 and
-    install it. The old selection, saved settings and recordings are preserved
-    by the app update; Check updates does not select the new VR package.
+[ ] 1. Update BOTH parts. Step 02 > Versions & updates > Check updates >
+    Update launcher, then Restart to update when the game, injector, recording
+    and other operations are idle. Confirm app 1.0.5. Explicitly select and
+    install beta-2026-10-06-renderer-startup in Step 02; confirm VR build
+    renderer-startup-20261006. An app update preserves the old package selection;
+    Check updates does not select the new VR package automatically.
     If the old app blocks updating, close it and use the new WuWa-VR-Setup.exe
-    from https://chronohaxx.github.io/wuwa-vr/. A stalled worker can remain;
-    the installer does not promise to stop it.
-[ ] 2. Startup feedback. Launch in VR once with your intended Steam/Kuro choice.
-    Confirm the real startup stage is visible. If Windows permission is declined
-    or startup fails, the reason should remain visible and a safe retry should
-    become available. Stop waiting, when offered, cancels startup waiting; it
-    must not terminate the running game. Inspect View details / Copy diagnostics
-    before retrying an unknown result. Do not start another injector in parallel.
-[ ] 3. Explicit runtime choice. With game and injector closed, select the intended
-    headset runtime or Use bundled simulator. No runtime or an old package's
-    simulator should allow an explicit simulator choice. Missing Visual C++
-    2015–2022 x64 dependencies should show a useful message. Opening/updating the
-    app alone must not switch runtimes. Only change runtime if you intend to.
-[ ] 4. Recovery, only if needed. Troubleshooting > Stuck launcher processes >
-    Find stuck launcher processes may request Windows permission. Scan alone
-    stops nothing. Review name, PID, role, start time, path and eligibility;
-    no row should be selected automatically. Select only an eligible verified
-    launcher helper/startup worker you intend to stop. Stop selected must list
-    the exact targets for confirmation, then show individual results. WuWa,
-    Steam, headset/runtime and injector processes are excluded. Runtime/profile
-    workers and active/unknown recording state stay protected. Inconclusive
-    processes may need manual handling; copy diagnostics instead of guessing.
-    Choose Retry connection explicitly when ready; no automatic game launch.
-[ ] 5. Ordinary use. After one successful launch, check the actual game view,
-    L3+R3 settings, L3+A recenter and L3+B HUD toggle. Exit normally and check that
-    another intentional launch is available. Headset comfort remains a separate
-    user check; stop if uncomfortable. No rendering change is claimed here.
+    from https://chronohaxx.github.io/wuwa-vr/. Reinstallation preserves data
+    and does not guarantee that a stuck worker has stopped.
+[ ] 2. One controlled launch. Keep your intended Steam/Kuro install and runtime.
+    Click Launch in VR once and accept Windows permission if requested. For
+    Kuro, press Play in its launcher. Check the actual game/VR view, not just
+    a loaded-DLL message or a spinner. Confirm UEVR settings open with L3+R3.
+    If it still fails, use Troubleshooting > Copy diagnostics before retrying;
+    include the attempt's backend.log if available. No second injector in parallel.
+[ ] 3. Clear failure/recovery. If startup fails or waits indefinitely, its stage
+    and reason should stay visible. Stop waiting requests cancellation; it does
+    not stop the game. If the worker does not acknowledge cancellation, use
+    Troubleshooting > Stuck launcher processes > Find stuck launcher processes.
+    Scan stops nothing; review PID, role, time, path and eligibility. Select only
+    the verified helper/startup worker you intend to stop, then confirm Stop
+    selected. Game/Steam/runtime/injector processes are not termination targets;
+    runtime/profile work and active/unknown recording remain protected.
+    Review individual results before Retry connection. Close launcher only exits
+    the window without claiming the background worker stopped.
+[ ] 4. Normal use. Check L3+A recenter, L3+B HUD toggle and your existing view
+    mode. Exit normally; another intentional launch should remain available.
+    Test headset output separately and stop if uncomfortable. Optional walking,
+    rim-light suppression and automatic cinema keep their existing limits.
+[ ] 5. Rollback, only if needed. Close the game and injector and stop recording.
+    Troubleshooting > Repair & recovery > Use previous installed version selects the previous retained
+    VR package; it does not downgrade the desktop app. Keep the old package and
+    backups. Its known renderer-startup problem may return on the affected PC.
 
-Known limits and all optional controls remain in PlayerGuide.html / README.txt.
-The rim-light workaround stays OFF by default and removes intended nearby rim
-lighting when enabled. Scene stalls, HUD refresh and flat-menu background issues
-remain open. Keep the previous Steam beta for rollback; do not overwrite an
-installed app by hand or delete its data folders to update.
+Existing safeguards remain: runtime selection is explicit, Copy diagnostics is
+local, and no diagnostic upload is automatic. Prepare uninstall confirms cleanup
+of verified idle downloads; Windows uninstall also attempts bounded cleanup.
+Active OpenXR packages, busy/unverified files, settings, backups and recordings
+are retained with reasons. Do not delete data folders to work around an update.
 
-鸣潮 VR — 启动恢复测试版检查
-桌面应用 1.0.4 | beta-2026-10-06-stalled-launch | VR 构建 steam-20261006 | 游戏 3.7
+PlayerGuide.html / README.txt describe all controls and known limits. Far NPC
+rim lighting, scene/dialogue stalls, HUD refresh and flat-menu backgrounds are
+not claimed fixed by this renderer-startup change.
 
-渲染器和注入器与上一个 Steam 测试版相同。启动／运行时改动已有后台测试覆盖，
-但此前 1.0.2 和 1.0.3 在远程 Windows 11 Steam 电脑上启动失败，1.0.4 的复测仍待进行。
-这些说明不代表 Windows 授权、实际启动或头显验收通过。
-按相关分组记录：通过／失败／受阻／未测试，并注明 Windows、游戏平台、应用和包版本。
-只想正常游玩时，无需刻意制造故障。
+鸣潮 VR — 渲染器启动测试版检查
+桌面应用 1.0.5 | beta-2026-10-06-renderer-startup
+VR 构建 renderer-startup-20261006 | 游戏 3.7
 
-[ ] 1. 两项都更新。第 02 步 > 版本与更新 > 检查更新 > 更新启动器，空闲时
-    重启并更新。重新打开后，明确选择 beta-2026-10-06-stalled-launch 并安装。
-    更新应用保留旧 VR 包选择、设置和录像；检查更新不会自动改选新包。
-    旧应用阻止更新时，关闭后运行网站的新 WuWa-VR-Setup.exe；卡住的任务
-    可能仍在运行，安装程序不能保证将其停止。
-[ ] 2. 启动反馈。确认所选 Steam／库洛安装，点击一次 Launch in VR。
-    应显示实际启动阶段；拒绝 Windows 授权或启动失败后应保留原因并允许
-    安全重试。“停止等待”只取消启动等待，不结束游戏。结果不明时先查看详情／
-    复制诊断，不要并行启动另一个注入器。
-[ ] 3. 明确选择运行时。关闭游戏和注入器后，再按需选择头显或内置模拟器。
-    没有运行时注册或旧包模拟器路径时，应能明确选择内置模拟器。
-    缺少 Visual C++ 2015–2022 x64 依赖时应有明确提示。仅打开或更新应用
-    不应切换运行时；不需要更改时无需测试此项。
-[ ] 4. 仅在需要时恢复。故障排查 > 卡住的启动器进程 > 查找卡住的启动器进程，
-    可能请求 Windows 授权；扫描本身不会停止进程。核对名称、PID、角色、
-    启动时间、路径和可停止状态，默认不勾选。只选择确实想停止且已验证归属、
-    允许停止的辅助程序／启动任务。“停止所选进程”应列出确切目标并要求确认，
-    随后显示逐项结果。游戏、Steam、头显／运行时、注入器不属于终止目标。
-    运行时／配置任务和正在录制或状态不明的录制仍受保护。无法判断时先复制
-    诊断，不要猜测。准备好后明确点击“重试连接”；不会自动启动游戏。
-[ ] 5. 正常使用。成功启动后检查实际画面、L3+R3 设置、L3+A 重置中心和
-    L3+B 界面开关。正常退出后应能再次明确启动。头显舒适度另行验收，
-    不适时停止。本版不宣称新增渲染修复。
+受影响的远程 Windows 11 Steam 电脑在 1.0.4 中已载入 VR DLL，但没有接收到
+实际游戏渲染帧。新后端在尚未识别实际渲染器时尝试另一种图形挂钩，并为每次
+启动保存 backend.log；不改变已识别到的渲染器，也不能证明问题由显卡品牌造成。
+原生后端已编译，隔离图形挂接测试已通过；远程电脑启动及头显验收仍待完成。
+载入 DLL 本身不等于 VR 启动成功。
 
-完整可选功能和限制见 PlayerGuide.html／README.txt。NPC 轮廓光临时方案默认关闭，
-开启后也会移除附近角色原有轮廓光。场景停顿、HUD 刷新和平面菜单背景问题仍未解决。
-保留上一 Steam 测试版以便回退；不要手动覆盖已安装应用或删除数据目录来更新。
+记录通过／失败／受阻／未测试，并注明 Windows、游戏平台、应用／包／构建版本
+及实际结果。无需刻意制造故障，也无需为本次更新重复所有旧功能检查。
 
-1.0.4 follow-up: old live workers are identified as stalled rather than shown as
-a new launch. Cancellation is a request until acknowledged. Close refreshes
-state; if it cannot stop the helper, an explicit Close launcher only confirmation
-allows the window to exit without terminating background work. Recovery can
-recognize verified older portable workers; unverified identities remain read-only.
-Reinstalling preserves saved data and does not stop existing workers.
+[ ] 1. 两项都更新。第 02 步 > 版本与更新 > 检查更新 > 更新启动器，待游戏、
+    注入器、录制及其他操作结束后重启并更新，确认应用为 1.0.5。再明确选择
+    并安装 beta-2026-10-06-renderer-startup，确认构建 renderer-startup-20261006。
+    更新应用会保留旧 VR 包选择；检查更新不会自动改选新包。旧应用阻止更新时，
+    关闭后运行网站的新 WuWa-VR-Setup.exe。重装保留数据，也不保证卡住的任务已停止。
+[ ] 2. 启动一次。保留所需的 Steam／库洛安装及运行时，点击一次“以 VR 模式启动”，
+    按需同意 Windows 授权；库洛版在其启动器点击开始。检查实际游戏／VR 画面，
+    不只看 DLL 载入提示或转圈。确认 L3+R3 可打开 UEVR 设置。仍失败时先在
+    故障排查中复制诊断，并附上该次启动的 backend.log（若有），再考虑重试。
+    不要同时运行第二个注入器。
+[ ] 3. 失败与恢复。应明确显示启动阶段及原因。“停止等待”仅请求取消等待，不结束
+    游戏。未收到取消确认时，在故障排查 > 卡住的启动器进程中执行查找。扫描不停止
+    进程；核对 PID、角色、时间、路径及可停止状态，只选择确实想停止且已验证归属的
+    辅助程序／启动任务，再确认停止所选进程。游戏、Steam、运行时及注入器不属于
+    终止目标；运行时／配置任务及正在录制或状态不明的录制受保护。
+    查看逐项结果后再重试连接。“仅关闭启动器窗口”不表示后台任务已停止。
+[ ] 4. 正常使用。检查 L3+A 重新居中、L3+B 界面开关及原有视图模式。正常退出后
+    应能再次明确启动。头显输出另行验收，不适时停止。可选漫游、边缘光抑制及
+    自动影院的原有限制不变。
+[ ] 5. 仅在需要时回退。关闭游戏及注入器、停止录制后，在故障排查 > 修复与恢复
+    点击“使用上一个已安装版本”，选回上一个保留的 VR 包；不会降级桌面应用。保留旧包及备份。
+    受影响电脑回退后可能重新出现旧版的渲染器启动问题。
 
-Uninstall: Troubleshooting > Prepare uninstall shows a confirmation and removes
-verified downloads when idle. Use process recovery first for a blocked worker.
-Windows Apps uninstall also runs bounded cleanup. Active OpenXR packages and
-busy/unverified files are retained with reasons in WuWa VR Manager/uninstall-result.txt.
-The report opens after uninstall if files remain. Settings, backups and recordings stay.
+运行时仍需明确选择，诊断只保存在本机，不自动上传。“准备卸载”确认后清理空闲且
+已验证的下载文件，Windows 卸载也会尝试限时清理。使用中的 OpenXR 包、忙碌或
+无法验证的文件、设置、备份及录像会保留并说明原因。不要删除数据目录来更新。
+完整控制和限制见 PlayerGuide.html／README.txt。本次不宣称修复远处 NPC 轮廓光、
+场景／对话停顿、HUD 刷新或平面菜单背景问题。

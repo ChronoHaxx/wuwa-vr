@@ -120,10 +120,31 @@ function Get-WuWaSteamProcesses {
 function Get-WuWaSteamProcessSnapshot {
     param([Parameter(Mandatory)]$Game, [AllowNull()]$Injector)
     $snapshot = Get-LaunchProcessSnapshot -TargetName 'Client-Win64-Shipping' -Injector $Injector
-    $target = @(Get-WuWaSteamProcesses $Game.Shipping)
+    $candidates = @(Get-Process -Name 'Client-Win64-Shipping' -ErrorAction SilentlyContinue)
+    $target = @(); $unverified = 0; $evidence = @()
+    foreach ($process in $candidates) {
+        $path = $null
+        try { $path = $process.Path } catch { }
+        $matches = $false
+        if ($path) {
+            try { $matches = [string]::Equals([IO.Path]::GetFullPath($path), $Game.Shipping, [StringComparison]::OrdinalIgnoreCase) } catch { $path = $null }
+        }
+        if (-not $path) { $unverified++ }
+        if ($matches) { $target += $process }
+        if ($evidence.Count -lt 8) {
+            $processId = $null
+            if ($process.PSObject.Properties['Id']) { $processId = $process.Id }
+            # Sharing diagnostics does not require disclosing executable paths.
+            $evidence += [pscustomobject]@{pid=$processId;pathReadable=[bool]$path;matchesSelected=$matches}
+        }
+    }
     $bootstrap = @(Get-WuWaSteamProcesses $Game.Bootstrap)
     $snapshot.GameRunning = $target.Count -gt 0 -or $bootstrap.Count -gt 0
     $snapshot.TargetRunning = $target.Count -eq 1
+    $snapshot.SteamTargetCount = $target.Count
+    $snapshot.SteamTargetCandidateCount = $candidates.Count
+    $snapshot.SteamTargetUnverifiedCount = $unverified
+    $snapshot.SteamTargetProcesses = $evidence
     $snapshot.LauncherRunning = $false # Steam is not a game-specific Play window.
     return $snapshot
 }

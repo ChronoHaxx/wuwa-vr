@@ -31,6 +31,7 @@
 #include "utility/WuWaLguiRedirect.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
 #include "utility/WuWaLocalization.hpp"
+#include "utility/WuWaD3DProbePolicy.hpp"
 
 #include "WindowFilter.hpp"
 
@@ -122,11 +123,34 @@ void Framework::hook_monitor() {
             if (!m_has_last_chance && now - m_last_chance_time > std::chrono::seconds(1)) {
                 spdlog::info("Sending rehook request for D3D");
 
-                // hook_d3d12 always gets called first.
-                if (m_is_d3d11) {
-                    hook_d3d11();
-                } else {
-                    hook_d3d12();
+                // Dummy DX12 composition and the real game's swapchain need
+                // not share a vtable. Without any real Present, initialize()
+                // never runs its existing DX11 fallback. Try the other API
+                // here, but never switch an already observed real renderer.
+                using ProbeApi = wuwa_d3d_probe::Api;
+                const auto current = m_is_d3d11 ? ProbeApi::D3D11 :
+                    m_is_d3d12 ? ProbeApi::D3D12 : ProbeApi::None;
+                const auto next = wuwa_d3d_probe::next_probe(current, m_initialized, m_real_present_seen);
+                bool can_hook = true;
+                if (current != ProbeApi::None && next != current) {
+                    can_hook = current == ProbeApi::D3D11 ?
+                        (m_d3d11_hook != nullptr && m_d3d11_hook->unhook()) :
+                        (m_d3d12_hook != nullptr && m_d3d12_hook->unhook());
+                    if (can_hook) {
+                        m_is_d3d11 = false;
+                        m_is_d3d12 = false;
+                        m_valid = false;
+                        m_first_initialize = true;
+                        spdlog::info("[WuWaD3DProbe] No real Present reached the {} probe; trying {}",
+                            current == ProbeApi::D3D11 ? "D3D11" : "D3D12",
+                            next == ProbeApi::D3D11 ? "D3D11" : "D3D12");
+                    } else {
+                        spdlog::error("[WuWaD3DProbe] Could not remove the previous probe; refusing to install a competing hook");
+                    }
+                }
+                if (can_hook) {
+                    if (next == ProbeApi::D3D11) hook_d3d11();
+                    else hook_d3d12();
                 }
 
                 // so we don't immediately go and hook it again
@@ -502,6 +526,11 @@ void Framework::on_frame_d3d11() {
 
     spdlog::debug("on_frame (D3D11)");
 
+    if (!m_real_present_seen && m_d3d11_hook->get_device() != nullptr && m_d3d11_hook->get_swap_chain() != nullptr) {
+        m_real_present_seen = true;
+        spdlog::info("[WuWaD3DProbe] First real D3D11 Present with a matching device and swapchain");
+    }
+
     m_renderer_type = RendererType::D3D11;
 
     if (!m_initialized) {
@@ -598,6 +627,11 @@ void Framework::on_post_present_d3d11() {
 // D3D12 Draw funciton
 void Framework::on_frame_d3d12() {
     std::scoped_lock _{ m_imgui_mtx };
+
+    if (!m_real_present_seen && m_d3d12_hook->get_device() != nullptr && m_d3d12_hook->get_swap_chain() != nullptr) {
+        m_real_present_seen = true;
+        spdlog::info("[WuWaD3DProbe] First real D3D12 Present with a matching device and swapchain");
+    }
 
     m_renderer_type = RendererType::D3D12;
 

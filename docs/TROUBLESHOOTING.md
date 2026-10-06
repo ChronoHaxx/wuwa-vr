@@ -1,11 +1,13 @@
 # Known issues and recovery
 
 Status: 6 October 2026. The current public release is
-[beta-2026-10-06-stalled-launch](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-stalled-launch):
-desktop app **1.0.4**, VR build **steam-20261006**, for game **3.7**.
-Versions 1.0.2 and 1.0.3 failed to start on a remote Windows 11 Steam PC. The follow-up
-changes have background test coverage; the 1.0.4 remote retest and physical-headset
-acceptance remain pending. Renderer and injector are unchanged.
+[beta-2026-10-06-renderer-startup](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-startup):
+desktop app **1.0.5**, VR build **renderer-startup-20261006**, for game **3.7**.
+On the affected remote Windows 11 Steam PC, 1.0.4 loaded the VR DLL but received
+no real game-renderer frame. This backend adds a startup graphics-hook fallback
+and per-attempt backend logs. Native build, isolated callback and background
+observer checks passed. Packaging and isolated package-installation checks passed; remote-PC
+startup and physical-headset acceptance remain pending.
 
 Uninstall: **Troubleshooting → Prepare uninstall** checks and removes verified
 downloads first, with confirmation. Use process recovery for a stalled worker, then
@@ -26,7 +28,10 @@ checkpoint does not automatically apply to another.
 | --- | --- |
 | Close keeps refusing, or Stop waiting does not end a launch | Version 1.0.4 refreshes the actual worker state on Close and reports whether cancellation was acknowledged. Use the visible process recovery panel when a verified old worker remains. If the helper still cannot close, the explicit **Close launcher only** confirmation exits the window without terminating background work. Closing the window is not confirmation that the worker stopped. Uninstall/reinstall also does not stop existing workers. |
 | Steam or Kuro installation is missing or wrong | Use **01 → Change** to choose the installation. For Steam, select **Wuthering Waves.exe**, not the inner Shipping executable, and keep Steam installed and signed in. Saved choices are preserved; several detected installations require a choice. The owner confirmed Steam startup/backend activity on one PC; other PCs and headset use remain pending. |
-| Updated app but recovery helpers are still old | From 1.0.2, update the launcher to **1.0.4** and restart it. Then explicitly select **beta-2026-10-06-stalled-launch** in step 02 and install it. Check updates keeps the old package selected; updating the app alone does not replace its helpers. If the old app blocks updating, close it and use the new Setup from the website. A stalled worker may still need review. |
+| Updated app but backend/helpers are still old | Update the launcher to **1.0.5** and restart it. Then explicitly select **beta-2026-10-06-renderer-startup** in step 02 and install it; confirm build **renderer-startup-20261006**. Check updates keeps the old package selected; updating the app alone does not replace its backend/helpers. If the old app blocks updating, close it and use the new Setup from the website. A stalled worker may still need review. |
+| VR DLL loaded, but no VR view or real renderer frames | Loading DLLs is not proof of VR startup. This backend tries the other graphics hook before a renderer is detected, and keeps an already detected renderer. Copy diagnostics includes available **backend.log** from that startup attempt, so the next launch does not erase that evidence. No GPU-brand cause or successful remote-PC fix is established yet. |
+| TargetUnverified after Steam startup | The selected process could not be continuously identified, even though renderer initialization was observed. The launcher preserves that same-session evidence instead of declaring that VR definitely failed. Check the actual game view and copy diagnostics before retrying. Exact-process safety checks still apply; this is not permission to target a different game process. |
+| Need to undo this VR update | Close the game and injector and stop recording, then use **Troubleshooting → Repair & recovery → Use previous installed version**. Keep an older package installed. This rolls back the VR package, not the desktop app; the old renderer-startup problem may return on the affected PC. |
 | Launch spinner, permission accepted, or “already running” with no useful progress | Use **Stop waiting** when offered, then inspect **View details** and **Copy diagnostics**. In **Troubleshooting → Stuck launcher processes**, choose **Find stuck launcher processes** and review names, PIDs, roles, start times, paths and eligibility. Nothing is preselected. **Stop selected** requires confirmation and only accepts verified launcher helper/startup targets; game, Steam, headset/runtime and injector processes are excluded. Runtime/profile changes and active/unknown recordings stay protected. Review each result, then explicitly choose **Retry connection** when ready; this does not launch the game. Inconclusive processes may need manual handling. The remote Windows 11 Steam failure still needs retesting. |
 | Simulator belongs to another package, or no runtime is registered | With game/injector closed, explicitly select **Use bundled simulator** and accept Windows permission. The current package replaces the old registration while preserving any headset backup. If missing CRT files are reported, install Microsoft Visual C++ 2015–2022 Redistributable **x64** from Microsoft and retry. A detected manifest alone is not proof the runtime can load. A live startup/runtime-change lock must settle before switching. |
 | Graphics quality changes unexpectedly after launch | This release keeps the game’s graphics choices and removes only recognized inherited/generated overrides once, with a backup and receipt. Custom edits are kept; it no longer writes a forced low or medium preset at startup. Use the game’s graphics menu for quality changes. The timing correction is separate. |

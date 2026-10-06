@@ -1,4 +1,4 @@
-# Startup lifecycle shared by start-wuwa-rendering-test.ps1 and sim-run.ps1.
+﻿# Startup lifecycle shared by start-wuwa-rendering-test.ps1 and sim-run.ps1.
 #
 # September 23: a launcher closed eight seconds after opening left a hidden
 # elevated script polling log.txt for ten minutes while a hidden injector waited
@@ -369,6 +369,83 @@ function Invoke-LaunchFrontEnd {
         } catch { }
         return (New-LaunchFrontEndResult $outcome $code $message)
     } finally { Exit-LaunchLock $request }
+}
+
+# Bounded read-only evidence capture. Keep the start (initialization) and the
+# end (last error) rather than repeatedly reading an unbounded session log.
+function Read-LaunchBackendLogWindow {
+    param([Parameter(Mandatory)][string]$Path, [long]$From = 0,
+        [ValidateRange(1024,1048576)][int]$MaxBytes = 524288)
+    $stream = [IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
+    try {
+        $length = $stream.Length
+        $from = [Math]::Max(0, $From)
+        $count = [Math]::Max(0, $length - $from)
+        $truncated = $count -gt $MaxBytes
+        $first = [int][Math]::Min($count, $MaxBytes)
+        if ($truncated) { $first = [int]($MaxBytes / 4) }
+        $buffer = New-Object byte[] $first
+        $null = $stream.Seek($from, 'Begin')
+        $read = 0
+        while ($read -lt $first) {
+            $n = $stream.Read($buffer, $read, $first - $read)
+            if ($n -eq 0) { break }; $read += $n
+        }
+        $text = [Text.Encoding]::UTF8.GetString($buffer, 0, $read)
+        if ($truncated) {
+            $last = $MaxBytes - $first
+            $buffer = New-Object byte[] $last
+            $null = $stream.Seek($length - $last, 'Begin')
+            $read = 0
+            while ($read -lt $last) {
+                $n = $stream.Read($buffer, $read, $last - $read)
+                if ($n -eq 0) { break }; $read += $n
+            }
+            $text += "`r`n[launcher: middle of backend log omitted; bounded head and tail follow]`r`n" + [Text.Encoding]::UTF8.GetString($buffer, 0, $read)
+        }
+        return [pscustomobject]@{Text=$text;From=$from;Length=$length;Truncated=$truncated;MaxBytes=$MaxBytes}
+    } finally { $stream.Dispose() }
+}
+
+function Save-LaunchBackendLogSnapshot {
+    param([Parameter(Mandatory)][string]$Directory, [Parameter(Mandatory)]$Window,
+        [Parameter(Mandatory)][string]$Header, [string]$SourcePath)
+    if (-not (Test-Path -LiteralPath $Directory -PathType Container)) { throw 'Launch diagnostics folder is missing.' }
+    # Called only after the observer has attributed new log data to this attempt.
+    # A later attempt cannot replace this saved copy when profile/log.txt rotates.
+    $encoding = [Text.UTF8Encoding]::new($false)
+    [IO.File]::WriteAllText((Join-Path $Directory 'backend.log'), $Window.Text, $encoding)
+    $metadata = [ordered]@{schema=1;capturedAt=[DateTime]::UtcNow.ToString('o');sourcePath=$SourcePath;
+        sourceHeader=$Header;sourceLength=$Window.Length;readFrom=$Window.From;truncated=$Window.Truncated;
+        maxSourceBytes=$Window.MaxBytes;attribution='new data observed during this launch attempt; not proof of a rendered frame'}
+    [IO.File]::WriteAllText((Join-Path $Directory 'backend-log.json'), ($metadata | ConvertTo-Json), $encoding)
+}
+
+function Get-LaunchBackendError {
+    param([AllowEmptyString()][string]$Text)
+    # OpenVR failure is a normal precursor to OpenXR fallback. Even these more
+    # specific errors are observations, not terminal decisions: runtime retry
+    # may succeed and no process is stopped just because a line says 'error'.
+    $matches = [regex]::Matches($Text, '(?im)^.*\[error\].*(?:Initialization of mods failed\. Reason:|Could not create openxr (?:instance|system|session|stage space):|Failed to initialize Framework on DirectX|Exception occurred in VR::on_initialize\(\)).*$')
+    if ($matches.Count) {
+        $last = $matches[$matches.Count - 1].Value.Trim()
+        return $last.Substring(0, [Math]::Min(512, $last.Length))
+    }
+    # A successful hook on a dummy DXGI swapchain does not mean the game's
+    # Present was reached. Repeated monitor retries with no real initialization
+    # are the observable symptom; the RTTI warning alone does not establish a
+    # failure, and this stage is earlier than OpenXR initialization.
+    $progress = [regex]::Matches($Text, '(?im)^.*\[info\].*(?:Attempting to initialize DirectX (?:11|12)|Framework initialized|Creating OpenXR swapchains|texture bounds right eye).*$')
+    $pending = $Text
+    if ($progress.Count) {
+        $lastProgress = $progress[$progress.Count - 1]
+        $pending = $Text.Substring($lastProgress.Index + $lastProgress.Length)
+    }
+    $retries = [regex]::Matches($pending, '(?im)^.*\[info\].*Sending rehook request for D3D\s*$').Count
+    if ($retries -ge 3) {
+        return ('UEVR loaded but has not attached to the game renderer. Graphics-hook retries: {0}; startup is still waiting. Open Troubleshooting and copy diagnostics.' -f $retries)
+    }
+    return ''
 }
 
 # ------------------------------------------------------ wait-for-game loop ---

@@ -279,6 +279,7 @@ private:
     bool m_first_frame_d3d_initialize{true};
     bool m_is_d3d12{false};
     bool m_is_d3d11{false};
+    bool m_real_present_seen{false}; // Protected by the existing hook-monitor mutex.
     bool m_valid{false};
     bool m_initialized{false};
     bool m_created_default_cfg{false};

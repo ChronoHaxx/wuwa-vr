@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Run Wuthering Waves + UEVR against the OpenXR Simulator, with no headset.
 
@@ -387,21 +387,15 @@ function Get-LogHeader {
         try {
             $buf = New-Object byte[] 160
             $n = $fs.Read($buf, 0, 160)
-            return [System.Text.Encoding]::ASCII.GetString($buf, 0, $n)
+            # Do not include later lines in a short log's identity: appending
+            # an error must not look like a different game session.
+            return ([System.Text.Encoding]::ASCII.GetString($buf, 0, $n) -split "`n", 2)[0].TrimEnd("`r")
         } finally { $fs.Dispose() }
     } catch { return '' }
 }
 
 function Read-LogSlice($from) {
-    # Share ReadWrite: UEVR holds this file open for writing.
-    $fs = [System.IO.File]::Open($profileLog, 'Open', 'Read', 'ReadWrite')
-    try {
-        $null = $fs.Seek($from, 'Begin')
-        $sr = New-Object System.IO.StreamReader($fs)
-        return $sr.ReadToEnd()
-    } finally {
-        $fs.Dispose()
-    }
+    return (Read-LaunchBackendLogWindow -Path $profileLog -From $from).Text
 }
 
 $logOffset = 0
@@ -416,6 +410,24 @@ $injectorProcess = $null
 $watchedInjector = $null
 $injectorHandled = $false
 $progress = @{ Message = '' }
+$backendEvidence = @{ Header = ''; ReadFrom = 0; Captured = $false; Error = ''; RendererInitialized = $false; ProjectionSeen = $false; TargetVerificationLost = $false }
+function Save-ObservedBackendLog {
+    if (-not $DiagnosticDirectory -or -not $backendEvidence.Header) { return }
+    try {
+        # Preserve the prior snapshot if the profile log now belongs to a new
+        # game process, disappears or is temporarily unreadable during shutdown.
+        if ((Get-LogHeader) -cne $backendEvidence.Header) { return }
+        $window = Read-LaunchBackendLogWindow -Path $profileLog -From $backendEvidence.ReadFrom
+        if ((Get-LogHeader) -cne $backendEvidence.Header) { return }
+        Save-LaunchBackendLogSnapshot -Directory $DiagnosticDirectory -Window $window -Header $backendEvidence.Header -SourcePath $profileLog
+        $backendEvidence.Captured = $true
+    } catch { Write-Warning ('Could not snapshot this attempt backend log: ' + $_.Exception.Message) }
+}
+$effectiveStart = if ($steamGame) { 'steam' } elseif ($StartLauncher) { 'launcher' } else { 'manual' }
+$effectiveTarget = if ($steamGame) { $steamGame.Shipping } else { $gameProcName }
+Write-Output ('Startup selection: requested={0}; effective={1}; startLauncher={2}; target={3}' -f $GameStart, $effectiveStart, [bool]$StartLauncher, $effectiveTarget)
+Update-LaunchState -Path $StatePath -Values @{gameStartRequested=$GameStart;gameStartEffective=$effectiveStart;
+    gameStartLauncher=[bool]$StartLauncher;gameTarget=$effectiveTarget}
 $observe = {
     if ($steamGame) { $observation = Get-WuWaSteamProcessSnapshot -Game $steamGame -Injector $watchedInjector }
     else {
@@ -424,6 +436,12 @@ $observe = {
     }
     $observation.BackendLogStarted = $false
     $observation.FirstFrameSeen = $false
+    $observation.BackendError = ''
+    $observation.BackendEvidencePresent = $false
+    $observation.BackendRendererInitialized = $false
+    $observation.BackendProjectionSeen = $false
+    $observation.TargetVerificationLost = $false
+    $header = ''
     $observation.Slice = ''
     $observation.ReadFrom = $logOffset
     if (Test-Path -LiteralPath $profileLog) {
@@ -441,9 +459,29 @@ $observe = {
             $observation.FirstFrameSeen = $observation.Slice -match 'texture bounds right eye'
         }
     }
-    if ($steamGame -and -not $observation.TargetRunning) {
-        $observation.BackendLogStarted = $false; $observation.FirstFrameSeen = $false
+    # Once this attempt's log was attributed to the selected process, retain
+    # same-header evidence if Path becomes unreadable or multiple candidates
+    # appear. It cannot establish readiness while process identity is ambiguous.
+    $sameAttributedLog = $backendEvidence.Header -and $header -ceq $backendEvidence.Header
+    $canAttribute = -not $steamGame -or $observation.TargetRunning -or $sameAttributedLog
+    if ($observation.Slice -and $canAttribute) {
+        $backendEvidence.Header = $header
+        $backendEvidence.ReadFrom = $observation.ReadFrom
+        $observation.BackendEvidencePresent = $true
+        $observation.BackendRendererInitialized = $observation.Slice -match '(?im)^.*\[info\].*(?:Framework initialized|Creating OpenXR swapchains).*$'
+        $observation.BackendProjectionSeen = $observation.Slice -match 'texture bounds right eye'
+        $backendEvidence.RendererInitialized = $observation.BackendRendererInitialized
+        $backendEvidence.ProjectionSeen = $observation.BackendProjectionSeen
+        $observation.BackendError = Get-LaunchBackendError -Text $observation.Slice
+        $backendEvidence.Error = $observation.BackendError
+        Save-ObservedBackendLog
     }
+    if ($steamGame -and -not $observation.TargetRunning) {
+        $observation.FirstFrameSeen = $false
+        $observation.BackendLogStarted = $observation.BackendEvidencePresent
+        $observation.TargetVerificationLost = [bool]$sameAttributedLog
+        $backendEvidence.TargetVerificationLost = [bool]$sameAttributedLog
+    } elseif ($steamGame) { $backendEvidence.TargetVerificationLost = $false }
     $observation
 }
 $onPoll = {
@@ -455,13 +493,29 @@ $onPoll = {
     if ($steamGame) { $message = 'Steam launch requested; waiting for the selected installation. VR compatibility is unverified.' }
     if ($seen) { $phase = 'game-starting'; $message = 'Game process detected; waiting for UEVR.' }
     if ($observation.BackendLogStarted) { $phase = 'injected'; $message = 'UEVR log started; waiting for the first stereo frame.' }
+    if ($observation.BackendError -and -not $observation.FirstFrameSeen) { $message = 'UEVR startup needs attention; still waiting in case it recovers. ' + $observation.BackendError }
+    if ($observation.TargetVerificationLost) {
+        $message = 'UEVR log evidence is present, but the selected Steam process can no longer be uniquely verified. Open Troubleshooting and copy diagnostics; do not start another injector.'
+        if ($observation.BackendRendererInitialized) { $message = 'UEVR reached renderer initialization, but the selected Steam process can no longer be uniquely verified. Open Troubleshooting and copy diagnostics; do not start another injector.' }
+    }
     if ($message -ne $progress.Message) {
         Write-Host ('  {0}  {1}' -f (Get-Date -Format 'HH:mm:ss'), $message)
         $progress.Message = $message
     }
     Update-LaunchState -Path $StatePath -Values @{ phase = $phase; message = $message;
         injectorRunning = [bool]$observation.InjectorRunning; backendLogStarted = [bool]$observation.BackendLogStarted;
-        firstFrameSeen = [bool]$observation.FirstFrameSeen }
+        firstFrameSeen = [bool]$observation.FirstFrameSeen; backendError = $observation.BackendError;
+        backendLogCaptured = [bool]$backendEvidence.Captured;
+        backendEvidencePresent = [bool]$observation.BackendEvidencePresent;
+        backendRendererInitialized = [bool]$observation.BackendRendererInitialized;
+        backendProjectionSeen = [bool]$observation.BackendProjectionSeen;
+        targetVerificationLost = [bool]$observation.TargetVerificationLost }
+    if ($steamGame) {
+        Update-LaunchState -Path $StatePath -Values @{steamTargetCount=$observation.SteamTargetCount;
+            steamTargetCandidateCount=$observation.SteamTargetCandidateCount;
+            steamTargetUnverifiedCount=$observation.SteamTargetUnverifiedCount;
+            steamTargetProcesses=$observation.SteamTargetProcesses}
+    }
 }
 $cancelCheck = {
     ($CancelPath -and (Test-Path -LiteralPath $CancelPath)) -or ($PromptOnLauncherClosed -and (Test-LaunchCancelKey))
@@ -535,7 +589,7 @@ try {
         $advice = switch ($outcome.Action) {
             'LauncherClosed' { ' Run the shortcut again and press Play in the launcher.' }
             'InjectorExited' { ' Open Troubleshooting and copy diagnostics; include injector.stdout.log and injector.stderr.log from this attempt if present. Check Windows Security protection history for a blocked file. Do not disable security software.' }
-            'GameExited'     { ' Check the game or launcher for an error, then run the shortcut again.' }
+            'GameExited'     { ' The game may have crashed or been closed manually; the launcher cannot distinguish them. Open Troubleshooting and copy diagnostics, including this attempt backend.log.' }
             'NotInjected'    { ' Open Troubleshooting > Copy diagnostics in the launcher. Include the injector log when reporting this failure. Close the game normally before retrying.' }
             default          { '' }
         }
@@ -543,8 +597,14 @@ try {
         if ($outcome.Action -eq 'Cancelled') { $phase = 'cancelled' }
         $exitDetail = ''
         if ($outcome.Action -eq 'InjectorExited' -and $watchedInjector) { $exitDetail = Get-LaunchProcessExitDetail -Process $watchedInjector }
-        $message = $outcome.Detail + $exitDetail + $cleanup + $advice
-        Update-LaunchState -Path $StatePath -Values @{ phase = $phase; outcome = $outcome.Action; message = $message }
+        $backendDetail = ''; if ($backendEvidence.Error -and $outcome.Action -ne 'Cancelled') { $backendDetail = ' Last backend startup error: ' + $backendEvidence.Error }
+        $message = $outcome.Detail + $exitDetail + $cleanup + $advice + $backendDetail
+        $reportedOutcome = $outcome.Action
+        if ($backendEvidence.TargetVerificationLost -and $backendEvidence.RendererInitialized -and $outcome.Action -in @('GameExited','TimedOut','NotInjected')) {
+            $reportedOutcome = 'TargetUnverified'
+            $message = 'UEVR reached renderer initialization, but the selected Steam process could not be continuously verified. This observation did not establish a renderer startup failure. Open Troubleshooting and copy diagnostics before retrying.' + $cleanup
+        }
+        Update-LaunchState -Path $StatePath -Values @{ phase = $phase; outcome = $reportedOutcome; message = $message }
         throw $message
     }
 
@@ -605,6 +665,8 @@ try {
     $phase=if($_.Exception -is [OperationCanceledException]){'cancelled'}else{'failed'}
     try { Update-LaunchState -Path $StatePath -Values @{ phase = $phase; outcome = 'Error'; message = $message } } catch { }
     throw $message
+} finally {
+    Save-ObservedBackendLog
 }
 
 if ([string]::IsNullOrWhiteSpace($slice)) {

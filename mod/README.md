@@ -1,13 +1,24 @@
-# Mod source — Steam and graphics settings beta
+# Mod source — renderer-startup beta
 
-The current release is
-[beta-2026-10-06-steam](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam),
-launcher **1.0.2**, package build **steam-20261006**, for game **3.7**.
-`checkpoint.json` identifies its exact artifacts and acceptance status. The renderer
-is unchanged from **graphics-20261006-r2**. Steam startup and backend activity were
-observed on the owner's PC; headset and other-PC checks remain pending. Graphics
-follow game preferences instead of inherited low/medium startup overrides.
-It retains the existing rendering
+The release target is
+[beta-2026-10-06-renderer-startup](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-startup),
+launcher **1.0.5**, backend/package build **renderer-startup-20261006**, for game
+**3.7**. Native compilation, isolated graphics-hook checks, launcher tests and isolated package installation passed.
+The matching `checkpoint.json` and release receipt must identify the final
+artifacts before publication.
+
+The **1.0.4** retest on the affected Windows 11 Steam PC loaded UEVR but repeatedly
+retried dummy graphics hooks without reaching the game renderer. This follow-up
+targets pre-initialization DirectX 12/11 probe selection and callback lifetime;
+it retains the earlier stalled-worker recovery fixes. The evidence does not
+establish Windows 11 as the cause. Successful startup on that PC, the owner's
+regression check and current headset acceptance remain pending. See
+[the renderer-startup report](../docs/launch-kit/RENDERER-STARTUP-20261006.md).
+
+Update the app, then explicitly install the new VR package in step 02: the app
+update preserves the existing selection. Keep the previous package for rollback.
+Graphics follow game preferences instead of inherited low/medium startup overrides.
+The candidate retains the existing rendering
 changes and includes portal, diorama and 2D-screen shortcuts, HUD recovery, and
 optional walking, optical-hand and menu-comfort features. See the
 [controller reference](../docs/CONTROLS.md) for controls and their limits.

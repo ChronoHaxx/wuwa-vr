@@ -531,7 +531,10 @@ def launch_state(state=None):
     if not isinstance(state, dict):
         return {}
     shown = {k: state.get(k) for k in ("phase", "message", "outcome", "buildId", "pid", "started", "heartbeat", "attemptId", "requestedAt", "ownerPid", "ownerStartedUtc",
-        "elevated", "injectorPid", "injectorStarted", "injectorRunning", "backendLogStarted", "firstFrameSeen") if k in state}
+        "elevated", "injectorPid", "injectorStarted", "injectorRunning", "backendLogStarted", "firstFrameSeen",
+        "gameStartRequested", "gameStartEffective", "gameStartLauncher", "gameTarget", "backendError", "backendLogCaptured",
+        "steamTargetCount", "steamTargetUnverifiedCount", "steamTargetCandidateCount", "steamTargetProcesses",
+        "targetVerificationLost", "backendEvidencePresent", "backendRendererInitialized", "backendProjectionSeen") if k in state}
     owner = launch_owner_status(state)
     nonterminal = state.get("phase") not in (None, "", "failed", "cancelled", "finished")
     active = nonterminal and owner["verified"]
@@ -868,7 +871,7 @@ def startup_diagnostics(launch):
     if folder.parent != runs:
         return []
     lines = []
-    for name in ("startup-error.txt", "startup.log", "injector.stdout.log", "injector.stderr.log"):
+    for name in ("startup-error.txt", "startup.log", "injector.stdout.log", "injector.stderr.log", "backend-log.json"):
         file = (folder / name).resolve()
         if file.parent != folder:
             continue
@@ -884,6 +887,51 @@ def startup_diagnostics(launch):
     return lines
 
 
+def backend_diagnostics(launch):
+    """Include the renderer's own evidence, with fixed paths and bounded reads.
+
+    Injector module loading is not OpenXR initialization or a submitted frame.
+    Prefer the saved attempt over log.txt, which UEVR truncates on the next run.
+    """
+    candidates = []
+    run_id = launch.get("runId")
+    if isinstance(run_id, str) and run_id:
+        runs = (config().data / "runs").resolve()
+        folder = (runs / run_id).resolve()
+        saved = (folder / "backend.log").resolve()
+        if folder.parent == runs and saved.parent == folder:
+            candidates.append((saved, f"UEVR backend log saved for attempt {run_id}"))
+    profile = config().profile.resolve()
+    current = (profile / "log.txt").resolve()
+    if current.parent == profile:
+        candidates.append((current, "UEVR backend log from current profile (overwritten by the next UEVR run; compare timestamps)"))
+    for path, title in candidates:
+        try:
+            with path.open("rb") as handle:
+                stat = os.fstat(handle.fileno())
+                if not stat.st_size:
+                    continue
+                head = handle.read(12288)
+                handle.seek(max(len(head), stat.st_size - 49152))
+                tail = handle.read(49152)
+            stamp = datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds")
+            if stat.st_size <= 61440:
+                text = (head + tail).decode("utf-8-sig", errors="replace")
+            else:
+                text = head.decode("utf-8-sig", errors="replace") + "\n[... middle of backend log omitted ...]\n" + tail.decode("utf-8", errors="replace")
+            rows = text.splitlines()
+            if len(rows) > 180:
+                markers = [line for line in rows[40:-140] if re.search(
+                    r"\[(?:error|critical)\]|exception occurred|could not create openxr|xrGetD3D(?:11|12)GraphicsRequirements|FEnumProperty.*(?:offset|candidate)",
+                    line, re.IGNORECASE)][-24:]
+                rows = rows[:40] + ["[... selected initialization/error lines from sampled log ...]"] + markers + ["[... intermediate backend lines omitted ...]"] + rows[-140:]
+            return ["", f"{title}; modified {stamp}; {stat.st_size} bytes:",
+                    *(redact(line) for line in rows)]
+        except (OSError, ValueError):
+            continue
+    return ["", "No readable UEVR backend log was found. Loaded injector DLLs alone do not confirm VR startup."]
+
+
 def diagnostics():
     info = status()
     lines = [f"WuWa VR Launcher diagnostics, {datetime.now().astimezone().isoformat(timespec='seconds')}",
@@ -896,7 +944,7 @@ def diagnostics():
              f"Game/injector processes: {', '.join(p['name'] for p in info['processes']) or 'none'}",
              f"Last job: {info['job'].get('message')} {redact(info['job'].get('output', ''))[:400]}",
              f"Helper workers: {json.dumps(info['job'].get('helpers', []))}",
-             f"Last launch: {json.dumps(info['launch'])}",
+             f"Last launch: {json.dumps({key: redact(value) if isinstance(value, str) else value for key, value in info['launch'].items()})}",
              f"Integrity: {json.dumps(info['integrity']) if info['integrity'] else 'not checked this session'}",
              f"Python: {sys.version.split()[0]}; Windows: {sys.getwindowsversion().major}.{sys.getwindowsversion().build}"]
     try:
@@ -914,6 +962,7 @@ def diagnostics():
     launch = info.get("launch") or {}
     lines += startup_diagnostics(launch)
     lines += injector_diagnostics(launch.get("buildId") or info["selected"])
+    lines += backend_diagnostics(launch)
     return "\n".join(lines) + "\n"
 
 

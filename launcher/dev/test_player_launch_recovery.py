@@ -54,6 +54,12 @@ class LaunchRecovery(unittest.TestCase):
         self.state()
         with patch.object(player, 'launch_owner_status', return_value={'verified': False, 'check': 'exited', 'legacy': True}):
             self.assertFalse(player.launch_state()['current'])
+            player.JOB.update(kind='launch', startedUtc=(self.now - timedelta(seconds=2)).isoformat())
+            result = player.launch_state()
+            self.assertTrue(result['current'])
+            self.assertFalse(result['running'] or result['cancellable'])
+            player.JOB['startedUtc'] = (self.now + timedelta(seconds=2)).isoformat()
+            self.assertFalse(player.launch_state()['current'])
             with self.assertRaisesRegex(ValueError, 'No launch'):
                 player.cancel_launch()
         self.assertFalse(self.cancel.exists())
@@ -157,12 +163,28 @@ class LaunchRecovery(unittest.TestCase):
         self.state(phase='failed', message='Injector rejected selected path')
         with patch.object(player, 'launch_owner_status', return_value={'verified': False, 'check': 'exited', 'legacy': True}):
             self.assertFalse(player.launch_state()['current'])
-            player.JOB.update(kind='launch', startedUtc=(self.now - timedelta(seconds=2)).isoformat())
+
+    def test_observed_startup_route_and_backend_problem_survive_status(self):
+        self.state(gameStartRequested='steam', gameStartEffective='manual', gameStartLauncher=False,
+                   gameTarget='fixture shipping executable', backendError='OpenXR fixture failure', backendLogCaptured=True,
+                   steamTargetCount=0, steamTargetUnverifiedCount=1, steamTargetCandidateCount=1,
+                   steamTargetProcesses=[{'pid':1234, 'pathReadable':False, 'matchesSelected':False}],
+                   targetVerificationLost=True, backendEvidencePresent=True, backendRendererInitialized=True,
+                   backendProjectionSeen=True)
+        with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
             result = player.launch_state()
-            self.assertTrue(result['current'])
-            self.assertFalse(result['running'] or result['cancellable'])
-            player.JOB['startedUtc'] = (self.now + timedelta(seconds=2)).isoformat()
-            self.assertFalse(player.launch_state()['current'])
+        self.assertEqual(result['gameStartRequested'], 'steam')
+        self.assertEqual(result['gameStartEffective'], 'manual')
+        self.assertFalse(result['gameStartLauncher'])
+        self.assertEqual(result['backendError'], 'OpenXR fixture failure')
+        self.assertTrue(result['backendLogCaptured'])
+        self.assertEqual(result['steamTargetCount'], 0)
+        self.assertEqual(result['steamTargetUnverifiedCount'], 1)
+        self.assertEqual(result['steamTargetCandidateCount'], 1)
+        self.assertEqual(result['steamTargetProcesses'][0]['pid'], 1234)
+        self.assertFalse(result['steamTargetProcesses'][0]['pathReadable'])
+        for key in ('targetVerificationLost', 'backendEvidencePresent', 'backendRendererInitialized', 'backendProjectionSeen'):
+            self.assertTrue(result[key])
 
     def test_foreign_cancel_path_and_terminal_states_never_written(self):
         with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
@@ -267,6 +289,45 @@ class LaunchRecovery(unittest.TestCase):
         self.assertNotIn('must not be copied', text)
         self.assertLess(len(text), 17000)
         self.assertEqual(player.startup_diagnostics({'runId': '../../'}), [])
+
+    def test_backend_diagnostics_preserve_init_and_error_in_bounded_log(self):
+        profile = player.config().profile
+        profile.mkdir()
+        text = '[UnrealVR] entry\n' + ('filler line\n' * 15000) + 'Could not create openxr session: XR_ERROR_RUNTIME_FAILURE\n'
+        (profile / 'log.txt').write_text(text, encoding='utf-8')
+        result = '\n'.join(player.backend_diagnostics({}))
+        self.assertIn('[UnrealVR] entry', result)
+        self.assertIn('XR_ERROR_RUNTIME_FAILURE', result)
+        self.assertIn('compare timestamps', result)
+        self.assertLess(len(result), 62000)
+        self.assertEqual((profile / 'log.txt').read_text(encoding='utf-8'), text)
+
+    def test_saved_backend_attempt_takes_precedence_over_new_game_run(self):
+        player.config().profile.mkdir()
+        (player.config().profile / 'log.txt').write_text('later unrelated game run')
+        (self.cancel.parent / 'backend.log').write_text('recorded attempt initialization failure')
+        result = '\n'.join(player.backend_diagnostics({'runId': 'attempt'}))
+        self.assertIn('saved for attempt attempt', result)
+        self.assertIn('recorded attempt initialization failure', result)
+        self.assertNotIn('later unrelated', result)
+
+    def test_backend_diagnostic_keeps_error_between_header_and_tail(self):
+        player.config().profile.mkdir()
+        content = 'line\n' * 55 + '[error] Could not create openxr session: fixture\n' + 'line\n' * 170
+        (player.config().profile / 'log.txt').write_text(content)
+        self.assertIn('Could not create openxr session: fixture', '\n'.join(player.backend_diagnostics({})))
+
+    def test_backend_log_missing_traversal_and_personal_path_redaction(self):
+        (self.root / 'backend.log').write_text('outside attempt secret')
+        result = '\n'.join(player.backend_diagnostics({'runId': '../../'}))
+        self.assertIn('No readable UEVR backend log', result)
+        self.assertNotIn('outside attempt secret', result)
+        player.config().profile.mkdir()
+        (player.config().profile / 'log.txt').write_text(r'C:\Users\PrivateFixture\game\backend.dll')
+        with patch.dict(os.environ, USERPROFILE=r'C:\Users\PrivateFixture', USERNAME='PrivateFixture'):
+            result = '\n'.join(player.backend_diagnostics({}))
+        self.assertNotIn('PrivateFixture', result)
+        self.assertIn('%USERPROFILE%', result)
 
 
 if __name__ == '__main__':

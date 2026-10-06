@@ -493,7 +493,12 @@ namespace WuWaVR.Manager
             return Json.Text(job, "kind") == "launch" && Json.Flag(job, "running");
         }
         public static bool LaunchWorkerRunning(Dictionary<string, object> status)
-        { return CurrentLaunch(status) && Json.Flag(Json.Child(status, "launch"), "running"); }
+        {
+            var launch = Json.Child(status, "launch");
+            // Inaccessible ownership is not proof of exit. Keep mutation/stop
+            // guards while the UI offers explicit recovery and window-only exit.
+            return CurrentLaunch(status) && (Json.Flag(launch, "running") || Json.Flag(launch, "activityUnknown"));
+        }
         public static bool CanCancelLaunch(Dictionary<string, object> status)
         {
             return LauncherPresentation.CanCancelBackend(Json.Child(status, "job")) ||

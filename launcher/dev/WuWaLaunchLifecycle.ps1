@@ -140,6 +140,22 @@ function Update-LaunchState {
     Write-LaunchState -Path $Path -State $table
 }
 
+# A legacy record also carries process creation time in started; PID alone is
+# never enough to identify an owner after a crash or reboot.
+function Get-LaunchStateOwner {
+    param([AllowNull()][object]$State)
+    if (-not $State) { return $null }
+    $ownerId = if ($State.PSObject.Properties['ownerPid']) { $State.ownerPid } elseif ($State.PSObject.Properties['pid']) { $State.pid } else { $null }
+    $ownerStart = if ($State.PSObject.Properties['ownerStartedUtc']) { $State.ownerStartedUtc } elseif ($State.PSObject.Properties['started']) { $State.started } else { $null }
+    if (-not $ownerId -or -not $ownerStart) { return $null }
+    try {
+        $candidate = Get-Process -Id ([int]$ownerId) -ErrorAction Stop
+        $started = [DateTimeOffset]::Parse([string]$ownerStart, [Globalization.CultureInfo]::InvariantCulture)
+        if (-not $candidate.HasExited -and [Math]::Abs(($candidate.StartTime.ToUniversalTime() - $started.UtcDateTime).TotalMilliseconds) -lt 10) { return $candidate }
+    } catch { }
+    return $null
+}
+
 # True while a non-terminal startup keeps its heartbeat fresh and its process is
 # alive. The worker lock is authoritative; this only explains who holds it.
 function Test-LaunchStateLive {
@@ -148,7 +164,8 @@ function Test-LaunchStateLive {
         [datetime]$Now = (Get-Date),
         [int]$StaleSeconds = 90
     )
-    if ($null -eq $State -or $State.phase -in @('finished', 'failed', 'cancelled')) { return $false }
+    if ($null -eq $State -or -not $State.PSObject.Properties['phase'] -or
+            $State.phase -in @('finished', 'failed', 'cancelled') -or -not $State.PSObject.Properties['heartbeat']) { return $false }
     # Windows PowerShell keeps ISO strings; PowerShell 7 converts them to DateTime.
     $heartbeat = $State.heartbeat
     if ($heartbeat -isnot [datetime]) {
@@ -157,8 +174,9 @@ function Test-LaunchStateLive {
                 [Globalization.DateTimeStyles]::RoundtripKind, [ref]$parsed)) { return $false }
         $heartbeat = $parsed
     }
-    if (($Now - $heartbeat.ToLocalTime()).TotalSeconds -gt $StaleSeconds) { return $false }
-    return $null -ne (Get-Process -Id ([int]$State.pid) -ErrorAction SilentlyContinue)
+    $age = ($Now - $heartbeat.ToLocalTime()).TotalSeconds
+    if ($age -gt $StaleSeconds -or $age -lt -5) { return $false }
+    return $null -ne (Get-LaunchStateOwner $State)
 }
 
 function Format-LaunchState {
@@ -192,21 +210,17 @@ function Format-LaunchLockBlockedMessage {
         $message = 'Another startup owns the WuWa launch lock. No second launch was started.'
     }
     # A reused PID or an old copied state file cannot identify a stoppable worker.
-    $owner = $null
-    if ($State -and $State.PSObject.Properties['ownerPid'] -and $State.PSObject.Properties['ownerStartedUtc'] -and
-            $State.phase -notin @('finished','failed','cancelled','first-frame','firstFrame')) {
-        try {
-            $candidate = Get-Process -Id ([int]$State.ownerPid) -ErrorAction Stop
-            $started = [DateTimeOffset]::Parse([string]$State.ownerStartedUtc, [Globalization.CultureInfo]::InvariantCulture)
-            if ([Math]::Abs(($candidate.StartTime.ToUniversalTime() - $started.UtcDateTime).TotalMilliseconds) -lt 10) { $owner = $candidate }
-        } catch { }
-    }
+    $owner = if ($State -and $State.phase -notin @('finished','failed','cancelled','first-frame','firstFrame')) { Get-LaunchStateOwner $State } else { $null }
     if ($owner -and $State.PSObject.Properties['cancelPath'] -and $State.cancelPath) {
-        $message += ' The recorded startup is still running (PID ' + $owner.Id + '). Use Stop waiting in the launcher to cancel that recorded wait; the game is not closed.'
+        if (Test-LaunchStateLive $State) {
+            $message += ' The recorded startup is still running (PID ' + $owner.Id + '). Use Stop waiting to request cancellation; this does not confirm it has stopped, and the game is not closed.'
+        } else {
+            $message += ' The previous startup worker is still alive (PID ' + $owner.Id + ') but has stopped reporting progress. A new launch has not started.'
+        }
     } else {
         $message += ' The lock owner could not be identified; an old saved launch status is not evidence of an active launch.'
     }
-    return ($message + ' Open Troubleshooting and copy diagnostics. If this persists after closing WuWa VR, restart Windows to clear leftover startup processes.')
+    return ($message + ' Open Troubleshooting > Stuck launcher processes to inspect the worker and confirm recovery. Copy diagnostics if no matching worker is found.')
 }
 
 # Process.Start returns once Windows has approved elevation, before the child
@@ -290,7 +304,7 @@ function Invoke-LaunchFrontEnd {
     $request = Enter-LaunchLock -Name $RequestLockName
     if ($request.Status -eq 'Busy') {
         if ($request.Reason -eq 'AccessDenied') {
-            return (New-LaunchFrontEndResult 'PromptPending' 3 'Windows denied access to the WuWa permission-request lock. A waiting administrator prompt could not be confirmed. Nothing was started. Open Troubleshooting and copy diagnostics; if the problem persists after closing WuWa VR, restart Windows.')
+            return (New-LaunchFrontEndResult 'PromptPending' 3 'Windows denied access to the WuWa permission-request lock. A waiting administrator prompt could not be confirmed. Nothing was started. Open Troubleshooting > Stuck launcher processes to inspect and confirm recovery, or copy diagnostics if no matching worker is found.')
         }
         return (New-LaunchFrontEndResult 'PromptPending' 3 'A Windows administrator prompt is already waiting for an answer. Answer or cancel that prompt; no second prompt was opened.')
     }

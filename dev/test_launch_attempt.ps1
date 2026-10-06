@@ -131,6 +131,15 @@ $live=Read-LaunchState $c.StatePath
 $live.ownerStartedUtc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')
 $message=Format-LaunchLockBlockedMessage -AccessDenied $false -State $live
 Check ($message -like '*Use Stop waiting*') 'verified recorded owner receives cancellation guidance'
+$legacy=[pscustomobject]@{pid=$PID;started=(Get-Process -Id $PID).StartTime.ToString('o');phase='preflight';
+ heartbeat=(Get-Date).AddDays(-2).ToString('o');cancelPath=(Join-Path $root 'legacy.cancel')}
+$message=Format-LaunchLockBlockedMessage -AccessDenied $false -State $legacy
+Check ($message -like '*previous startup worker*' -and $message -like '*Stuck launcher processes*' -and
+       $message -notlike '*Use Stop waiting*' -and -not (Test-LaunchStateLive $legacy)) 'old legacy worker remains identified without pretending its preflight is a new launch'
+$legacy.heartbeat=(Get-Date).ToString('o')
+Check (Test-LaunchStateLive $legacy) 'matching legacy process with fresh heartbeat is still active'
+$legacy.started=(Get-Date).AddYears(-1).ToString('o')
+Check (-not (Test-LaunchStateLive $legacy) -and $null -eq (Get-LaunchStateOwner $legacy)) 'fresh heartbeat cannot make a recycled legacy PID current'
 Assert-LaunchUserIdentity -ExpectedSid 'S-1-5-21-1' -CurrentSid 'S-1-5-21-1'
 $denied=$false;try {Assert-LaunchUserIdentity -ExpectedSid 'S-1-5-21-1' -CurrentSid 'S-1-5-21-2'}catch{$denied=$_.Exception.Message -like '*different user account*'}
 Check $denied 'different-account elevation is rejected explicitly'

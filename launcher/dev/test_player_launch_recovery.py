@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
@@ -33,14 +35,15 @@ class LaunchRecovery(unittest.TestCase):
     def state(self, **extra):
         value = {'phase': 'waiting-for-play', 'requestedAt': self.now.isoformat(),
                  'attemptId': 'test', 'buildId': 'steam', 'cancelPath': str(self.cancel),
-                 'runDir': str(self.cancel.parent), 'pid': 1234, 'started': self.now.isoformat()}
+                 'runDir': str(self.cancel.parent), 'pid': 1234, 'started': self.now.isoformat(),
+                 'heartbeat': self.now.isoformat()}
         value.update(extra)
         (self.data / 'launch-state.json').write_text(json.dumps(value))
         return value
 
     def test_worker_remains_visible_and_cancellable_after_frontend_finishes(self):
         self.state()
-        with patch.object(player, 'launch_owner_alive', return_value=True):
+        with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
             result = player.launch_state()
             self.assertTrue(result['current'] and result['running'] and result['cancellable'])
             self.assertEqual(result['runId'], 'attempt')
@@ -49,15 +52,110 @@ class LaunchRecovery(unittest.TestCase):
 
     def test_dead_or_recycled_worker_cannot_be_cancelled(self):
         self.state()
-        with patch.object(player, 'launch_owner_alive', return_value=False):
+        with patch.object(player, 'launch_owner_status', return_value={'verified': False, 'check': 'exited', 'legacy': True}):
             self.assertFalse(player.launch_state()['current'])
             with self.assertRaisesRegex(ValueError, 'No launch'):
                 player.cancel_launch()
         self.assertFalse(self.cancel.exists())
 
+    def test_legacy_live_worker_with_old_progress_is_recovery_not_new_launch(self):
+        # The real report has the legacy pid/started fields, an Oct 4 preflight,
+        # no current job, and a different currently selected build.
+        import psutil
+        created = datetime.fromtimestamp(psutil.Process(os.getpid()).create_time(), timezone.utc).isoformat()
+        self.state(attemptId=None, requestedAt=None, pid=os.getpid(), started=created,
+                   heartbeat='2026-10-04T15:54:55+01:00', buildId='lightfix2-20261001', phase='preflight',
+                   message='Launching 3.7 + reflection + far lighting fix v2')
+        result = player.launch_state()
+        self.assertTrue(result['running'] and result['ownerVerified'] and result['ownerLegacy'])
+        self.assertTrue(result['stalled'])
+        self.assertEqual(result['ownerCheck'], 'alive')
+        self.assertIn('Stuck launcher processes', result['message'])
+        self.assertIn('far lighting fix', result['lastMessage'])
+        with patch.object(player, 'processes', return_value=[]):
+            with self.assertRaisesRegex(ValueError, 'Stuck launcher processes'):
+                player.require_idle()
+
+    def test_cancellation_that_is_not_acknowledged_offers_recovery(self):
+        self.state()
+        with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
+            response = player.cancel_launch()
+            self.assertIn('does not confirm', response)
+            old = time.time() - 20
+            os.utime(self.cancel, (old, old))
+            result = player.launch_state()
+            self.assertTrue(result['cancelRequested'] and result['stalled'])
+            self.assertGreater(result['cancelRequestedAgeSeconds'], 10)
+
+    def test_future_heartbeat_cannot_keep_old_worker_progress_fresh(self):
+        self.state(heartbeat=(self.now + timedelta(days=1)).isoformat())
+        with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
+            result = player.launch_state()
+            self.assertTrue(result['stalled'])
+            self.assertLess(result['heartbeatAgeSeconds'], -5)
+
+    def test_inaccessible_identity_is_not_reported_exited_or_safe_to_mutate(self):
+        self.state()
+        with patch.object(player, 'launch_owner_status', return_value={'verified': False, 'check': 'inaccessible', 'legacy': True, 'error': 5}):
+            result = player.launch_state()
+            self.assertFalse(result['running'] or result['ownerVerified'] or result['cancellable'])
+            self.assertTrue(result['activityUnknown'])
+            self.assertEqual(result['ownerWin32Error'], 5)
+            with patch.object(player, 'processes', return_value=[]):
+                with self.assertRaisesRegex(ValueError, 'cannot be checked'):
+                    player.require_idle()
+            handler = object.__new__(player.Handler)
+            with self.assertRaisesRegex(ValueError, 'current operation'):
+                handler.post_action('/api/stop', {})
+
+    def test_real_owner_exit_clears_previous_busy_status_without_rewriting_receipt(self):
+        import psutil
+        child = subprocess.Popen([os.environ['SystemRoot'] + r'\System32\WindowsPowerShell\v1.0\powershell.exe',
+                                  '-NoProfile', '-NonInteractive', '-Command', 'Start-Sleep -Milliseconds 600'],
+                                 creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            created = datetime.fromtimestamp(psutil.Process(child.pid).create_time(), timezone.utc).isoformat()
+            self.state(pid=child.pid, started=created, heartbeat='2026-10-04T15:54:55+01:00')
+            original = (self.data / 'launch-state.json').read_bytes()
+            first = player.launch_state()
+            self.assertTrue(first['running'] and first['stalled'])
+            child.wait(timeout=10)
+            second = player.launch_state()
+            self.assertFalse(second['current'] or second['running'] or second['cancellable'] or second['activityUnknown'])
+            self.assertEqual(second['ownerCheck'], 'exited')
+            self.assertEqual((self.data / 'launch-state.json').read_bytes(), original)
+            with patch.object(player, 'processes', return_value=[]):
+                player.require_idle()
+        finally:
+            child.wait(timeout=10)
+
+    def test_real_helper_pid_visible_during_work_and_removed_after_exit(self):
+        fixture = self.app / 'inert metadata.ps1'
+        fixture.write_text("Start-Sleep -Milliseconds 800; Write-Output 'finished'", encoding='utf-8')
+        result = []
+        task = threading.Thread(target=lambda: result.append(player.powershell('-File', str(fixture), encoding='utf-8')))
+        task.start()
+        try:
+            deadline = time.time() + 5
+            workers = []
+            while time.time() < deadline and not workers:
+                workers = player.helper_worker_status()
+                time.sleep(.02)
+            self.assertEqual(len(workers), 1)
+            self.assertGreater(workers[0]['pid'], 0)
+            self.assertEqual(workers[0]['script'], fixture.name)
+            self.assertFalse(workers[0]['cancellable'])
+        finally:
+            task.join(timeout=10)
+        self.assertFalse(task.is_alive())
+        self.assertEqual(player.helper_worker_status(), [])
+        self.assertEqual(result[0].returncode, 0)
+        trace = next(self.data.joinpath('logs').glob('helper-*.log')).read_text(encoding='utf-8')
+        self.assertIn('Worker PID ', trace)
+
     def test_terminal_error_visible_only_for_current_launch(self):
         self.state(phase='failed', message='Injector rejected selected path')
-        with patch.object(player, 'launch_owner_alive', return_value=False):
+        with patch.object(player, 'launch_owner_status', return_value={'verified': False, 'check': 'exited', 'legacy': True}):
             self.assertFalse(player.launch_state()['current'])
             player.JOB.update(kind='launch', startedUtc=(self.now - timedelta(seconds=2)).isoformat())
             result = player.launch_state()
@@ -67,7 +165,7 @@ class LaunchRecovery(unittest.TestCase):
             self.assertFalse(player.launch_state()['current'])
 
     def test_foreign_cancel_path_and_terminal_states_never_written(self):
-        with patch.object(player, 'launch_owner_alive', return_value=True):
+        with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
             self.state(cancelPath=str(self.root / 'cancel.request'))
             self.assertFalse(player.launch_state()['cancellable'])
             for phase in ('failed', 'finished', 'cancelled'):
@@ -77,7 +175,7 @@ class LaunchRecovery(unittest.TestCase):
 
     def test_active_worker_blocks_duplicate_launch_and_runtime_mutation(self):
         self.state()
-        with patch.object(player, 'processes', return_value=[]), patch.object(player, 'launch_owner_alive', return_value=True):
+        with patch.object(player, 'processes', return_value=[]), patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
             with self.assertRaisesRegex(ValueError, 'Stop waiting'):
                 player.require_idle()
 
@@ -90,10 +188,10 @@ class LaunchRecovery(unittest.TestCase):
         handler = object.__new__(player.Handler)
         with patch.object(player.threading, 'Thread') as thread:
             self.state()
-            with patch.object(player, 'launch_owner_alive', return_value=True):
+            with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
                 with self.assertRaisesRegex(ValueError, 'current operation'):
                     handler.post_action('/api/stop', {})
-            with patch.object(player, 'launch_owner_alive', return_value=False), patch.dict(player.RECORDING, running=True):
+            with patch.object(player, 'launch_owner_status', return_value={'verified': False, 'check': 'exited', 'legacy': True}), patch.dict(player.RECORDING, running=True):
                 with self.assertRaisesRegex(ValueError, 'Stop recording'):
                     handler.post_action('/api/stop', {})
             thread.assert_not_called()
@@ -159,10 +257,12 @@ class LaunchRecovery(unittest.TestCase):
 
     def test_diagnostics_include_bounded_owned_startup_error_only(self):
         (self.cancel.parent / 'startup-error.txt').write_text('early preflight failure')
+        (self.cancel.parent / 'startup.log').write_text('reached preflight before becoming stuck')
         (self.cancel.parent / 'injector.stderr.log').write_text('x' * 32000 + '\nselected path was rejected')
         (self.cancel.parent / 'unrelated.txt').write_text('must not be copied')
         text = '\n'.join(player.startup_diagnostics({'runId': 'attempt'}))
         self.assertIn('early preflight failure', text)
+        self.assertIn('reached preflight before becoming stuck', text)
         self.assertIn('selected path was rejected', text)
         self.assertNotIn('must not be copied', text)
         self.assertLess(len(text), 17000)

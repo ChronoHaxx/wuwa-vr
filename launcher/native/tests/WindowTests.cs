@@ -113,11 +113,12 @@ public static class WindowTests
     sealed class HelperHttp : HttpMessageHandler
     {
         readonly PackageStore store;
-        public int Stops, RecordStarts, RecordStops, Cancels, RuntimeChanges, ReadinessChecks, Resets, Launches, RiskAcknowledgements;
+        public int Stops, RecordStarts, RecordStops, Cancels, RuntimeChanges, ReadinessChecks, Resets, Launches, RiskAcknowledgements, StatusReads;
         public string RuntimeBody, LaunchBody, RecordingBody, IdentityRoot, OfflineFolder, RejectedTokenFolder;
         public string DiagnosticsReply = "Fixture backend diagnostics", DiagnosticsFailure;
         public int IdentityPid = int.MaxValue;
         public bool RejectRecordStart, AllowRecordStart, AllowLaunch, RejectLaunch, AllowGameSettings, RejectGameSettings;
+        public bool RejectCancel, KeepCancelRunning, StallStatus;
         public int GameSettingsWrites;
         public string SettingsFile;
         public readonly List<string> Writes = new List<string>();
@@ -144,7 +145,7 @@ public static class WindowTests
                         return Reply(new { app = "wuwa-vr-player-launcher", root = IdentityRoot ?? Path.Combine(store.Folder(store.Selected), "app"), pid = IdentityPid });
                     case "/": return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
                         store.Selected != null && store.Selected.folder == RejectedTokenFolder ? "Fixture unsupported helper interface" : "<meta name=\"wuwa-token\" content=\"window_fixture\">") });
-                    case "/api/status": return Reply(Status);
+                    case "/api/status": StatusReads++; return StallStatus ? StalledReply(token) : Reply(Status);
                     case "/api/diagnostics":
                         if (DiagnosticsFailure != null) throw new HttpRequestException(DiagnosticsFailure);
                         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(DiagnosticsReply) });
@@ -207,6 +208,8 @@ public static class WindowTests
                     case "/api/cancel":
                         Check(LauncherBridge.CanCancelLaunch(Status), "cancellation sent outside a waiting launch");
                         Cancels++;
+                        if (RejectCancel) return Reply(new { error = "Fixture startup owner cannot be verified; use process recovery" }, HttpStatusCode.Conflict);
+                        if (KeepCancelRunning) return Reply(new { ok = true, message = "Cancellation requested; worker has not acknowledged" });
                         Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", false }, { "cancellable", false }, { "phase", "cancelled" }, { "message", "Fixture launch cancelled before the game started" }, { "firstFrameSeen", false } };
                         Status["job"] = new Dictionary<string, object> { { "kind", "launch" }, { "running", false }, { "code", 0 }, { "output", "Fixture launch cancelled before the game started" } };
                         return Reply(new { ok = true });
@@ -232,6 +235,8 @@ public static class WindowTests
             // write fails inside this handler before any real I/O is possible.
             throw new InvalidOperationException("Unexpected fixture request: " + request.Method + " " + request.RequestUri);
         }
+        static async Task<HttpResponseMessage> StalledReply(CancellationToken token)
+        { await Task.Delay(Timeout.Infinite, token); throw new Exception("Unreachable cancelled fixture request"); }
     }
     sealed class Fixture : IDisposable
     {
@@ -249,6 +254,7 @@ public static class WindowTests
             Json.Save(Path.Combine(data, "settings.json"), new { gameStart = "manual", gameLauncher = "" });
             Json.Save(Path.Combine(data, "launcher.json"), new { url = "http://127.0.0.1:34671/", pid = int.MaxValue });
             Window = new MainWindow(Store, data, false, "en");
+            Set(Window, "closeOnlyConfirmOverride", new Func<string, bool>(message => false));
             Set(Window, "guideDirectoryOverride", Store.Root);
             Field<LauncherBridge>(Window, "bridge").Dispose();
             Field<RepoClient>(Window, "repo").Dispose();
@@ -308,6 +314,66 @@ public static class WindowTests
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
         try
         {
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); int prepares = 0, writes = f.Http.Writes.Count; string prompt = null;
+                Set(w, "uninstallConfirmOverride", new Func<string, bool>(message => { prompt = message; return false; }));
+                Set(w, "uninstallPrepareOverride", new Func<string, string, CancellationToken, Task<UninstallResult>>((manager, helper, c) => {
+                    prepares++; throw new Exception("Declined cleanup must not run");
+                }));
+                Click(w, Button(w, "prepareUninstall"));
+                Check(prepares == 0 && f.Http.Writes.Count == writes && prompt.Contains(Path.Combine(f.Store.Root, "versions")) && prompt.Contains(f.Store.Cache) &&
+                    prompt.Contains("recordings, settings and backups are kept") && prompt.Contains("OpenXR") && f.Store.Selected != null,
+                    "uninstall confirmation omitted scope/preservation or ran cleanup after decline");
+                Console.WriteLine("PASS WINDOW Prepare uninstall confirms exact download paths and preservation; declining performs no cleanup (inert service only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); int prepares = 0, writes = f.Http.Writes.Count;
+                Set(w, "uninstallConfirmOverride", new Func<string, bool>(message => true));
+                Set(w, "uninstallPrepareOverride", new Func<string, string, CancellationToken, Task<UninstallResult>>((manager, helper, c) => {
+                    prepares++; Check(manager == f.Store.Root && helper == Field<LauncherBridge>(w, "bridge").Data && c.CanBeCanceled,
+                        "cleanup did not target manager/helper roots through the cancellable shared service");
+                    // Simulate the shared service committing its state update. No
+                    // app/profile/game files or real processes exist in this fixture.
+                    var updated = new PackageStore(manager); updated.State.installed.Clear(); updated.State.selected = null; updated.State.previous = null; updated.Save();
+                    return Task.FromResult(new UninstallResult { RemovedFiles = 5, Message = "Fixture unused packages removed",
+                        RetainedReasons = new List<string>(), ReportPath = Path.Combine(manager, "uninstall-report.txt") });
+                }));
+                Click(w, Button(w, "prepareUninstall"));
+                Check(prepares == 1 && Field<PackageStore>(w, "store").Selected == null && Field<ComboBox>(w, "installed").Items.Count == 0 &&
+                    Field<LauncherBridge>(w, "bridge").Address == null && !Field<bool>(w, "connectionReady") && f.Http.Writes.Count == writes &&
+                    !w.IsVisible && Field<TextBox>(w, "uninstallResultText").Text.Contains("Removed files: 5") &&
+                    Field<TextBox>(w, "uninstallResultText").Text.Contains("Windows Settings") && Field<Expander>(w, "uninstallPanel").IsExpanded,
+                    "successful cleanup kept stale package/connection, auto-uninstalled, or omitted explicit next steps");
+                string result = Field<TextBox>(w, "uninstallResultText").Text;
+                Field<ComboBox>(w, "languages").SelectedIndex = 1; Drain();
+                Check(Field<Expander>(w, "uninstallPanel").IsExpanded && Field<TextBox>(w, "uninstallResultText").Text == result && prepares == 1,
+                    "language change discarded cleanup evidence or repeated removal");
+                Console.WriteLine("PASS WINDOW shared uninstall preparation reloads committed package state, detaches helper and reports Windows uninstall as a separate step (inert service only)");
+            }
+            foreach (bool throws in new[] { false, true }) using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); int prepares = 0, writes = f.Http.Writes.Count;
+                f.Http.Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", true }, { "stalled", true }, { "message", "Fixture stalled worker" } };
+                Refresh(w); Set(w, "uninstallConfirmOverride", new Func<string, bool>(message => true));
+                Set(w, "uninstallPrepareOverride", new Func<string, string, CancellationToken, Task<UninstallResult>>((manager, helper, c) => {
+                    prepares++;
+                    if (throws) throw new IOException("Fixture cleanup report could not be completed");
+                    return Task.FromResult(new UninstallResult { TimedOut = true, RemovedFiles = 0,
+                        Message = "Fixture deadline reached", RetainedReasons = new List<string> { "Fixture active OpenXR package and busy startup retained" },
+                        ReportPath = Path.Combine(manager, "uninstall-report.txt") });
+                }));
+                Check(Button(w, "prepareUninstall").IsEnabled, "busy backend prevented native cleanup from explaining its guarded result");
+                Click(w, Button(w, "prepareUninstall"));
+                Check(prepares == 1 && Field<PackageStore>(w, "store").Selected != null && f.Http.Writes.Count == writes &&
+                    Field<LauncherBridge>(w, "bridge").Address == null && Field<bool>(w, "troubleshootingVisible") &&
+                    Field<Expander>(w, "processRecoveryPanel").IsExpanded && Button(w, "processRecoveryScan").IsEnabled &&
+                    Field<TextBox>(w, "uninstallResultText").Text.Contains(throws ? "could not be completed" : "OpenXR package and busy startup retained") &&
+                    !Field<TextBox>(w, "uninstallResultText").Text.Contains(new Strings()["uninstallReady"]),
+                    "failed/partial uninstall preparation claimed full removal, mutated helper or hid recovery/retention details");
+                Console.WriteLine("PASS WINDOW busy/partial/failed uninstall preparation preserves packages and exposes independent recovery with honest retained reasons (inert service only)");
+            }
             using (var f = new Fixture(root))
             {
                 var w = f.Window; var report = RecoveryFixture(); int scans = 0, stops = 0; string confirmation = null;
@@ -859,6 +925,98 @@ public static class WindowTests
             }
             using (var f = new Fixture(root))
             {
+                var w = f.Window; Connect(w);
+                f.Http.Status["launch"] = new Dictionary<string, object> {
+                    { "phase", "preflight" }, { "message", "Launching 3.7 + reflection + far lighting fix v2 · 1 Oct 18:17 BST" },
+                    { "buildId", "lightfix2-20261001" }, { "started", "2026-10-04T15:54:54.8465528+01:00" },
+                    { "current", true }, { "running", true }, { "cancellable", true }, { "runId", "20261004-155455" } };
+                Refresh(w); Check(Field<bool>(w, "unresolvedStartup"), "reported Oct4 receipt fixture did not reproduce sticky close state");
+                // The worker can exit after the last poll. Close must consult the
+                // corrected backend state, not reject from the old UI snapshot.
+                Json.Child(f.Http.Status, "launch")["current"] = false;
+                Json.Child(f.Http.Status, "launch")["running"] = false;
+                Json.Child(f.Http.Status, "launch")["ownerCheck"] = "exited";
+                int reads = f.Http.StatusReads, prompts = 0;
+                Set(w, "closeOnlyConfirmOverride", new Func<string, bool>(message => { prompts++; return false; }));
+                var close = (Task<bool>)Invoke(w, "PrepareToClose"); PumpUntil(() => close.IsCompleted, "stale receipt close refresh");
+                Check(close.GetAwaiter().GetResult() && f.Http.StatusReads > reads && f.Http.Stops == 1 && prompts == 0 && !Field<bool>(w, "unresolvedStartup"),
+                    "stale Oct4 launch receipt trapped Close or skipped safe verified idle-helper shutdown");
+                Console.WriteLine("PASS WINDOW reported Oct4 launch state is rechecked on Close; exited worker permits verified helper shutdown without confirmation (fake HTTP only)");
+            }
+            foreach (bool refuseCancel in new[] { false, true }) using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); f.Http.KeepCancelRunning = true; f.Http.RejectCancel = refuseCancel;
+                f.Http.Status["launch"] = new Dictionary<string, object> {
+                    { "phase", "preflight" }, { "message", "Previous startup stopped reporting. Review stuck launcher processes." },
+                    { "buildId", "lightfix2-20261001" }, { "started", "2026-10-04T15:54:54.8465528+01:00" },
+                    { "current", true }, { "running", true }, { "cancellable", true }, { "ownerPid", 98765 }, { "stalled", true }, { "ownerVerified", true } };
+                Refresh(w);
+                Check(Field<ProgressBar>(w, "progress").Visibility == Visibility.Collapsed && !Field<ProgressBar>(w, "progress").IsIndeterminate &&
+                    Button(w, "processRecoveryOpen").Visibility == Visibility.Visible && Button(w, "processRecoveryOpen").IsEnabled &&
+                    !Button(w, "repair").IsEnabled && !Button(w, "useSimulator").IsEnabled, "stalled worker looked healthy or allowed conflicting repair/runtime writes");
+                Click(w, Field<Button>(w, "cancelButton"));
+                Check(f.Http.Cancels == 1 && f.Http.Stops == 0 && Field<bool>(w, "troubleshootingVisible") && Field<Expander>(w, "processRecoveryPanel").IsExpanded &&
+                    Button(w, "processRecoveryScan").IsEnabled && Field<RecoveryReport>(w, "processRecoveryReport") == null &&
+                    Field<TextBox>(w, "details").Text.Contains(refuseCancel ? "owner cannot be verified" : new Strings()["cancelPending"]),
+                    "unacknowledged/refused cancellation hid recovery, claimed stop, scanned automatically or killed a helper");
+                string prompt = null; int prompts = 0;
+                Set(w, "closeOnlyConfirmOverride", new Func<string, bool>(message => { prompt = message; prompts++; return false; }));
+                var stay = (Task<bool>)Invoke(w, "PrepareToClose"); PumpUntil(() => stay.IsCompleted, "declined launcher-only close");
+                Check(!stay.GetAwaiter().GetResult() && prompts == 1 && prompt.Contains("98765") && prompt.Contains("keep running") && f.Http.Stops == 0,
+                    "declined close did not preserve worker/identity or disclose background activity");
+                Set(w, "closeOnlyConfirmOverride", new Func<string, bool>(message => true));
+                var leave = (Task<bool>)Invoke(w, "PrepareToClose"); PumpUntil(() => leave.IsCompleted, "confirmed launcher-only close");
+                Check(leave.GetAwaiter().GetResult() && f.Http.Stops == 0 && f.Http.Launches == 0 && f.Http.RuntimeChanges == 0 &&
+                    Json.Flag(Json.Child(f.Http.Status, "launch"), "running"), "explicit window-only exit stopped/mutated the background worker or trapped the user");
+                Console.WriteLine("PASS WINDOW stalled worker/refused cancellation exposes recovery; explicit launcher-only close discloses and preserves background activity (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w);
+                f.Http.Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", false }, { "cancellable", false },
+                    { "activityUnknown", true }, { "ownerCheck", "inaccessible" }, { "message", "Cannot check the previous startup owner. Review stuck launcher processes." } };
+                Refresh(w);
+                Check(!Button(w, "repair").IsEnabled && !Button(w, "useSimulator").IsEnabled && !Field<Button>(w, "launchButton").IsEnabled &&
+                    Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed && Field<ProgressBar>(w, "progress").Visibility == Visibility.Collapsed &&
+                    Button(w, "processRecoveryOpen").IsEnabled && Button(w, "processRecoveryOpen").Visibility == Visibility.Visible,
+                    "inaccessible owner was mistaken for idle or offered an unsafe/unusable cancel");
+                Click(w, Button(w, "processRecoveryOpen"));
+                Check(Field<Expander>(w, "processRecoveryPanel").IsExpanded && Button(w, "processRecoveryScan").IsEnabled && f.Http.Stops == 0,
+                    "inaccessible owner blocked independent recovery or automatically stopped a helper");
+                Set(w, "closeOnlyConfirmOverride", new Func<string, bool>(message => true));
+                var close = (Task<bool>)Invoke(w, "PrepareToClose"); PumpUntil(() => close.IsCompleted, "unknown owner explicit close");
+                Check(close.GetAwaiter().GetResult() && f.Http.Stops == 0, "unknown owner could not be left untouched through explicit window-only close");
+                Console.WriteLine("PASS WINDOW inaccessible owner remains protected without misleading spinner or cancel; independent recovery and explicit window-only exit remain available");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); f.Http.StallStatus = true;
+                Set(w, "closeTimeout", TimeSpan.FromMilliseconds(40)); string prompt = null;
+                Set(w, "closeOnlyConfirmOverride", new Func<string, bool>(message => { prompt = message; return true; }));
+                var elapsed = Stopwatch.StartNew(); var close = (Task<bool>)Invoke(w, "PrepareToClose");
+                PumpUntil(() => close.IsCompleted, "unresponsive helper close deadline");
+                Check(close.GetAwaiter().GetResult() && elapsed.Elapsed < TimeSpan.FromSeconds(2) && f.Http.Stops == 0 &&
+                    prompt.Contains(new Strings()["closeCheckTimeout"]) && Field<Expander>(w, "processRecoveryPanel").IsExpanded,
+                    "unresponsive helper trapped Close, retried outside the deadline or hid window-only exit");
+                Console.WriteLine("PASS WINDOW helper status hang reaches bounded explicit launcher-only close without killing anything (inert cancelled request)");
+            }
+            foreach (bool cooperate in new[] { true, false }) using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); int prompts = 0;
+                Set(w, "closeTimeout", TimeSpan.FromMilliseconds(60));
+                Set(w, "closeOnlyConfirmOverride", new Func<string, bool>(message => { prompts++; return true; }));
+                var heldWrite = new TaskCompletionSource<bool>();
+                var local = (Task)Invoke(w, "Run", new Func<CancellationToken, Task>(c => cooperate ? Task.Delay(Timeout.Infinite, c) : heldWrite.Task));
+                Check(Field<CancellationTokenSource>(w, "operation") != null, "inert local operation did not start");
+                var close = (Task<bool>)Invoke(w, "PrepareToClose"); PumpUntil(() => close.IsCompleted, "cancel local operation before close");
+                Check(close.GetAwaiter().GetResult() == cooperate && prompts == 0 && f.Http.Stops == (cooperate ? 1 : 0),
+                    "close failed to cancel a request cooperatively or allowed unsafe exit in a held package-write boundary");
+                heldWrite.TrySetResult(true); PumpUntil(() => local.IsCompleted, "inert local operation safe boundary");
+                local.GetAwaiter().GetResult();
+                Console.WriteLine("PASS WINDOW Close cancels local requests but preserves unfinished package-write boundary (inert tasks only)");
+            }
+            using (var f = new Fixture(root))
+            {
                 var w = f.Window; f.Http.AllowRecordStart = true; Connect(w);
                 f.Http.Status["gameRunning"] = true; Refresh(w);
                 Field<ComboBox>(w, "source").SelectedIndex = 1; Field<ComboBox>(w, "fps").SelectedIndex = 2;
@@ -1109,7 +1267,7 @@ public static class WindowTests
                     "clipboard failure stranded the report or hid retry guidance");
                 Console.WriteLine("PASS WINDOW controller probe and clipboard failures stay localized, private and retryable (fake probe/clipboard)");
             }
-            Console.WriteLine("29 offscreen WPF checks passed; no window was shown and no helper/game process was started.");
+        Console.WriteLine("Offscreen WPF checks passed; no window was shown and no helper/game process was started.");
         }
         finally { SynchronizationContext.SetSynchronizationContext(previousContext); }
     }

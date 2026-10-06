@@ -49,6 +49,15 @@ namespace WuWaVR.Manager
         const int Limit = 1024 * 1024;
         const uint Query = 0x1000, Terminate = 0x0001, Synchronize = 0x00100000;
         static readonly string[] LaunchScripts = { "start-wuwa-build.ps1", "start-wuwa-rendering-test.ps1", "sim-run.ps1" };
+        // Exact bytes from immutable public WuWa-VR-Launcher.zip assets, with
+        // each digest checked against that ZIP's manifest (2026-10-06 audit):
+        // beta-2026-10-04-launcher release-assets-final; beta-2026-10-06-steam portable.
+        // These authorize only the exact recorded process in a packaged app/dev
+        // layout. An arbitrary manifest or a development checkout is insufficient.
+        static readonly Dictionary<string, string[]> LegacyStartupHashes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase) {
+            { "start-wuwa-build.ps1", new[] { "4c10efcb73c183dcc9f68b154c4dab5a75222973033725aed19e2327f7271a48", "c3288281052ad097072fbd059b3ddd2d67588e869db84439c870bbb2f4977e1f" } },
+            { "sim-run.ps1", new[] { "060a30e30688ab45d8a48cbe48b1bd61acff56b26d575ec0fc17fd9c198e769b", "ba9e20e04a10742f6fa1b066f6bc976c50baa0306c737462747a15e97eca267a" } }
+        };
         internal sealed class Request
         {
             public Request() { }
@@ -213,7 +222,8 @@ namespace WuWaVR.Manager
                         if (!row.Eligible) throw new InvalidOperationException(row.Reason);
                         AssertForceStopSafe(row);
                         var final = Inspect(handle, pid, row.ParentPid);
-                        if (!Classify(final, Roots(request.ManagerData, request.HelperData)) || final.Kind != row.Kind || !SameIdentity(row, final))
+                        var finalRoots = Roots(request.ManagerData, request.HelperData);
+                        if (!(Classify(final, finalRoots) || ClassifyRecordedOwner(final, ReadRecordedOwner(request.HelperData), request.Sid, request.Session, finalRoots)) || final.Kind != row.Kind || !SameIdentity(row, final))
                             throw new InvalidOperationException("Process or package identity changed immediately before recovery.");
                         string newActivity = ActivityBlocker(row, Inventory());
                         if (newActivity != null) throw new InvalidOperationException(newActivity);
@@ -231,7 +241,8 @@ namespace WuWaVR.Manager
         static RecoveryReport Scan(Request request, List<Root> roots, List<ProcessEntry> entries, string folder)
         {
             var report = new RecoveryReport { ScannedUtc = DateTime.UtcNow.ToString("o") };
-            foreach (var entry in entries.Where(e => Interesting(e.Name)))
+            var recordedOwner = ReadRecordedOwner(request.HelperData);
+            foreach (var entry in entries.Where(e => Interesting(e.Name) || (recordedOwner != null && e.Pid == recordedOwner.Pid)))
             {
                 if (Cancelled(folder, request)) { report.Cancelled = true; break; }
                 if (report.Candidates.Count >= 32) break;
@@ -241,7 +252,15 @@ namespace WuWaVR.Manager
                     {
                         var row = Inspect(handle, entry.Pid, entry.Parent);
                         if (row.UserSid != request.Sid || row.SessionId != request.Session) continue;
-                        if (!Classify(row, roots)) continue;
+                        bool recorded = RecordedOwnerMatches(row, recordedOwner, request.Sid, request.Session);
+                        bool classified = false;
+                        try { classified = Classify(row, roots) || (recorded && ClassifyRecordedOwner(row, recordedOwner, request.Sid, request.Session, roots)); }
+                        catch (InvalidDataException) { }
+                        if (!classified)
+                        {
+                            if (recorded) report.Candidates.Add(UnverifiedRecordedOwner(row));
+                            continue;
+                        }
                         ApplyActivity(row, entries, request.HelperData); report.Candidates.Add(row);
                     }
                 }
@@ -276,15 +295,66 @@ namespace WuWaVR.Manager
             {
                 try
                 {
-                    var manifest = Read<PackageManifest>(Paths.Inside(path, "manifest.json"));
-                    var portable = Read<Dictionary<string, object>>(Paths.Inside(path, "app/portable.json"));
-                    if (manifest.files == null || manifest.files.Count > 20000 || !Regex.IsMatch(manifest.packageId ?? "", "^wuwa-vr-launcher-[a-z0-9-]+$") ||
-                        Json.Text(portable, "packageId") != manifest.packageId) continue;
-                    roots.Add(new Root { Path = path, Files = manifest.files });
+                    roots.Add(ReadPackageRoot(path));
                 }
                 catch (Exception error) when (error is IOException || error is InvalidDataException || error is UnauthorizedAccessException || error is ArgumentException || error is InvalidOperationException) { }
             }
             return roots;
+        }
+        static Root ReadPackageRoot(string path)
+        {
+            var manifest = Read<PackageManifest>(Paths.Inside(path, "manifest.json"));
+            var portable = Read<Dictionary<string, object>>(Paths.Inside(path, "app/portable.json"));
+            if (manifest == null || manifest.files == null || manifest.files.Count > 20000 || !Regex.IsMatch(manifest.packageId ?? "", "^wuwa-vr-launcher-[a-z0-9-]+$") || Json.Text(portable, "packageId") != manifest.packageId)
+                throw new InvalidDataException("Package identity is not verified.");
+            return new Root { Path = Canonical(path), Files = manifest.files };
+        }
+        static RecoveryCandidate ReadRecordedOwner(string helper)
+        {
+            try
+            {
+                var state = Read<Dictionary<string, object>>(Paths.Inside(helper, "launch-state.json"));
+                if (state == null) return null;
+                int pid; string pidText = Json.Text(state, state.ContainsKey("ownerPid") ? "ownerPid" : "pid");
+                string time = Json.Text(state, state.ContainsKey("ownerStartedUtc") ? "ownerStartedUtc" : "started");
+                DateTimeOffset parsed;
+                if (!int.TryParse(pidText, out pid) || pid <= 0 || !DateTimeOffset.TryParse(time, out parsed)) return null;
+                return new RecoveryCandidate { Pid = pid, StartedUtc = parsed.UtcDateTime.ToString("o") };
+            }
+            catch (Exception error) when (error is IOException || error is InvalidDataException || error is UnauthorizedAccessException || error is ArgumentException || error is InvalidOperationException) { return null; }
+        }
+        internal static bool RecordedOwnerMatches(RecoveryCandidate row, RecoveryCandidate recorded, string sid, int session)
+        { return row != null && recorded != null && row.Pid == recorded.Pid && SameTime(row.StartedUtc, recorded.StartedUtc) && row.UserSid == sid && row.SessionId == session; }
+        internal static RecoveryCandidate UnverifiedRecordedOwner(RecoveryCandidate row)
+        {
+            row.Kind = "Recorded launcher owner"; row.Eligible = false; row.Outcome = "";
+            row.Reason = "This live process matches the saved launch PID and creation time, but its packaged startup code cannot be verified. It is shown for diagnosis only; no stop is permitted.";
+            try { var args = SplitArguments(row.CommandLine); int file = Array.FindIndex(args, a => a.Equals("-File", StringComparison.OrdinalIgnoreCase)); if (file >= 0 && file + 1 < args.Length && Path.IsPathRooted(args[file + 1])) row.Script = Canonical(args[file + 1]); } catch (Exception error) when (error is IOException || error is InvalidDataException || error is ArgumentException) { }
+            return row;
+        }
+        internal static bool ClassifyRecordedOwner(RecoveryCandidate row, RecoveryCandidate recorded, string sid, int session, List<Root> knownRoots)
+        {
+            if (!RecordedOwnerMatches(row, recorded, sid, session) || !IsSystemPowerShell(row.Executable)) return false;
+            try
+            {
+                var args = SplitArguments(row.CommandLine);
+                int file = Array.FindIndex(args, a => a.Equals("-File", StringComparison.OrdinalIgnoreCase));
+                if (file < 1 || file + 1 >= args.Length || !Path.IsPathRooted(args[file + 1])) return false;
+                string script = Canonical(args[file + 1]), name = Path.GetFileName(script);
+                if (!LaunchScripts.Contains(name, StringComparer.OrdinalIgnoreCase)) return false;
+                string dev = Path.GetDirectoryName(script), app = Path.GetDirectoryName(dev);
+                if (!String.Equals(Path.GetFileName(dev), "dev", StringComparison.OrdinalIgnoreCase) || !String.Equals(Path.GetFileName(app), "app", StringComparison.OrdinalIgnoreCase)) return false;
+                var root = ReadPackageRoot(Path.GetDirectoryName(app));
+                string relative = "app/dev/" + name, digest;
+                if (!root.Files.TryGetValue(relative, out digest) || !VerifiedFile(root, relative)) return false;
+                string[] pinned;
+                bool known = LegacyStartupHashes.TryGetValue(name, out pinned) && pinned.Contains(digest, StringComparer.OrdinalIgnoreCase);
+                if (!known) known = knownRoots.Any(r => { string value; return r.Files.TryGetValue(relative, out value) && String.Equals(value, digest, StringComparison.OrdinalIgnoreCase) && VerifiedFile(r, relative); });
+                // Do not add this root to the general trust list: only this exact
+                // recorded startup owner is allowed to use the recovered package.
+                return known && Classify(row, new List<Root> { root });
+            }
+            catch (Exception error) when (error is IOException || error is InvalidDataException || error is UnauthorizedAccessException || error is ArgumentException || error is InvalidOperationException) { return false; }
         }
         internal static bool Classify(RecoveryCandidate row, List<Root> roots)
         {
@@ -429,14 +499,15 @@ namespace WuWaVR.Manager
             }
             return true;
         }
-        static void TryCancelOwnedLaunch(string helper, RecoveryCandidate row, Func<bool> cancelled)
+        internal static void TryCancelOwnedLaunch(string helper, RecoveryCandidate row, Func<bool> cancelled)
         {
             if (row.Kind != "Startup worker") return;
             try
             {
                 var state = Read<Dictionary<string, object>>(Paths.Inside(helper, "launch-state.json"));
-                int pid; string time = Json.Text(state, "ownerStartedUtc");
-                if (!int.TryParse(Json.Text(state, "ownerPid"), out pid) || pid != row.Pid || !SameTime(time, row.StartedUtc)) return;
+                if (state == null) return;
+                int pid; string time = Json.Text(state, state.ContainsKey("ownerStartedUtc") ? "ownerStartedUtc" : "started");
+                if (!int.TryParse(Json.Text(state, state.ContainsKey("ownerPid") ? "ownerPid" : "pid"), out pid) || pid != row.Pid || !SameTime(time, row.StartedUtc)) return;
                 var path = Canonical(Json.Text(state, "cancelPath")); string runs = Paths.Inside(helper, "runs") + Path.DirectorySeparatorChar;
                 if (!path.StartsWith(runs, StringComparison.OrdinalIgnoreCase) || Path.GetFileName(path) != "cancel.request" || !Directory.Exists(Path.GetDirectoryName(path))) return;
                 ThrowIfCancelled(cancelled);

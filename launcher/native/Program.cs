@@ -17,12 +17,15 @@ namespace WuWaVR.Manager
         [STAThread]
         public static int Main(string[] args)
         {
-            Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
             ConfigureRuntime();
-            if (LauncherProcessRecovery.TryRun(args)) return 0;
-            bool preview = args.Length >= 2 && args[0] == "--preview";
             string root = Environment.GetEnvironmentVariable("WUWA_VR_MANAGER_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WuWa VR Manager");
             string data = Environment.GetEnvironmentVariable("WUWA_VR_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WuWa VR Launcher");
+            // Velopack's uninstall callback has a hard 30-second lifetime. Cleanup
+            // has its own shorter budget and never displays a blocking prompt.
+            Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false)
+                .OnBeforeUninstallFastCallback(version => LauncherUninstall.BeforeUninstall(root, data)).Run();
+            if (LauncherProcessRecovery.TryRun(args)) return 0;
+            bool preview = args.Length >= 2 && args[0] == "--preview";
             try
             {
                 if (preview) root = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[1])), "preview-state");

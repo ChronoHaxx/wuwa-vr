@@ -47,6 +47,40 @@ public static class ProcessRecoveryTests
         Refuse(() => LauncherProcessRecovery.AssertForceStopSafe(helper), "helper becoming responsive again cannot bypass its normal voice/recording stop checks");
         helper.CommandLine = "pythonw.exe -cignored \"" + Path.Combine(root, "app/dev/wuwa_player.py") + "\"";
         Check(!LauncherProcessRecovery.Classify(helper, roots), "inline-python lookalike rejected");
+        // A prior portable copy outside manager records is trusted only for the
+        // exact saved owner, and only when its script bytes match verified code.
+        // Production additionally pins actual public Oct4/Oct6 ZIP digests; those
+        // were independently checked against the immutable ZIP manifests.
+        string legacyRoot = Path.Combine(root, "legacy-copy");
+        string legacyScript = Path.Combine(legacyRoot, "app/dev/start-wuwa-build.ps1");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyScript)); File.Copy(script, legacyScript);
+        var legacyFiles = new Dictionary<string, string> { { "app/dev/start-wuwa-build.ps1", RepoClient.Hash(legacyScript) } };
+        string legacyId = "wuwa-vr-launcher-candidate-legacy-fixture";
+        Json.Save(Path.Combine(legacyRoot, "manifest.json"), new { packageId = legacyId, files = legacyFiles });
+        Json.Save(Path.Combine(legacyRoot, "app/portable.json"), new { packageId = legacyId });
+        var legacy = Copy(row); legacy.CommandLine = row.CommandLine.Replace(script, legacyScript);
+        var recorded = new RecoveryCandidate { Pid = row.Pid, StartedUtc = row.StartedUtc };
+        Check(!LauncherProcessRecovery.Classify(Copy(legacy), roots) && LauncherProcessRecovery.ClassifyRecordedOwner(legacy, recorded, row.UserSid, row.SessionId, roots), "exact recorded owner can recover an unregistered copy of verified packaged startup code");
+        var wrongOwner = Copy(recorded); wrongOwner.StartedUtc = DateTime.UtcNow.AddDays(-1).ToString("o");
+        Check(!LauncherProcessRecovery.ClassifyRecordedOwner(Copy(legacy), wrongOwner, row.UserSid, row.SessionId, roots), "legacy package discovery refuses recycled PID creation time");
+        Check(!LauncherProcessRecovery.ClassifyRecordedOwner(Copy(legacy), recorded, "S-1-0-0", row.SessionId, roots) && !LauncherProcessRecovery.ClassifyRecordedOwner(Copy(legacy), recorded, row.UserSid, row.SessionId + 1, roots), "legacy package discovery refuses another SID or session");
+        var other = Copy(legacy); other.Pid++;
+        Check(roots.Count == 1 && !LauncherProcessRecovery.ClassifyRecordedOwner(other, recorded, row.UserSid, row.SessionId, roots), "discovered legacy root never becomes an arbitrary process allowlist");
+        File.AppendAllText(legacyScript, " different untrusted script");
+        legacyFiles["app/dev/start-wuwa-build.ps1"] = RepoClient.Hash(legacyScript);
+        Json.Save(Path.Combine(legacyRoot, "manifest.json"), new { packageId = legacyId, files = legacyFiles });
+        Check(!LauncherProcessRecovery.ClassifyRecordedOwner(Copy(legacy), recorded, row.UserSid, row.SessionId, roots), "self-consistent arbitrary manifest cannot authorize unknown startup code");
+        var diagnosticOnly = LauncherProcessRecovery.UnverifiedRecordedOwner(Copy(legacy));
+        Check(!diagnosticOnly.Eligible && diagnosticOnly.Pid == legacy.Pid && diagnosticOnly.Script == Path.GetFullPath(legacyScript) && diagnosticOnly.Kind == "Recorded launcher owner", "unverifiable recorded owner stays visible with exact path but cannot be stopped");
+        string legacyData = Path.Combine(root, "legacy-data"), marker = Path.Combine(legacyData, "runs/fixture/cancel.request");
+        Directory.CreateDirectory(Path.GetDirectoryName(marker));
+        Json.Save(Path.Combine(legacyData, "launch-state.json"), new { pid = row.Pid, started = row.StartedUtc, cancelPath = marker });
+        LauncherProcessRecovery.TryCancelOwnedLaunch(legacyData, row, () => false);
+        Check(File.Exists(marker), "matching legacy receipt receives graceful cancellation before force recovery");
+        File.Delete(marker);
+        var reused = Copy(row); reused.StartedUtc = DateTime.UtcNow.AddDays(-1).ToString("o");
+        LauncherProcessRecovery.TryCancelOwnedLaunch(legacyData, reused, () => false);
+        Check(!File.Exists(marker), "legacy cancellation refuses reused PID identity");
         File.AppendAllText(script, "modified");
         Check(!LauncherProcessRecovery.Classify(Copy(row), roots), "changed package script hash rejected");
         Check(LauncherProcessRecovery.ActivityBlocker(row, new List<LauncherProcessRecovery.ProcessEntry> { new LauncherProcessRecovery.ProcessEntry { Pid = 12, Parent = 2, Name = "Client-Win64-Shipping.exe" } }) != null, "running game blocks recovery without targeting it");
@@ -88,5 +122,17 @@ public static class ProcessRecoveryTests
             finally { if (!child.HasExited) { child.Kill(); child.WaitForExit(3000); } }
         }
         Console.WriteLine("PASS recovery checks: " + count + "; fixtures: " + root);
+    }
+    // Optional read-only artifact check run against an extracted *public* package,
+    // not a process. Exercises historical pins independently of installed roots.
+    public static void CheckShippedLegacyPackage(string packageRoot)
+    {
+        string script = Path.Combine(packageRoot, "app/dev/start-wuwa-build.ps1");
+        string ps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32/WindowsPowerShell/v1.0/powershell.exe");
+        var row = new RecoveryCandidate { Pid = 12345, StartedUtc = "2026-10-04T14:54:54.0000000Z", Executable = ps, UserSid = "S-1-5-21-1", SessionId = 1,
+            CommandLine = "\"" + ps + "\" -NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -Id lightfix2-20261001 -Elevated -NoDialog" };
+        if (!LauncherProcessRecovery.ClassifyRecordedOwner(row, Copy(row), row.UserSid, row.SessionId, new List<LauncherProcessRecovery.Root>()))
+            throw new Exception("Exact shipped legacy package failed its historical code pin: " + packageRoot);
+        Console.WriteLine("PASS public legacy package pin: " + packageRoot);
     }
 }

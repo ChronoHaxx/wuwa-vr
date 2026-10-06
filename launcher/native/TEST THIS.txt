@@ -1,18 +1,18 @@
 WUWA VR — STARTUP-RECOVERY BETA CHECKS
-Desktop app 1.0.3 | beta-2026-10-06-recovery | VR build steam-20261006 | game 3.7
+Desktop app 1.0.4 | beta-2026-10-06-stalled-launch | VR build steam-20261006 | game 3.7
 
 The renderer and injector are unchanged from beta-2026-10-06-steam.
-Startup/runtime changes have background test coverage. The previous app 1.0.2
-failed to start on a remote Windows 11 Steam PC; 1.0.3 still needs a retest there.
+Startup/runtime changes have background test coverage. The previous apps 1.0.2 and 1.0.3
+failed to start on a remote Windows 11 Steam PC; 1.0.4 still needs a retest there.
 Do not treat these notes as a successful UAC, game-launch or headset acceptance.
 
 For each relevant group, record Pass / Fail / Blocked / Not tested, with the
 Windows version, game store, app/package version and exact visible result.
 Skip deliberately exercising failures if you only want to play.
 
-[ ] 1. Update both parts. From installed 1.0.2, Step 02 > Versions & updates >
+[ ] 1. Update both parts. From installed 1.0.2 or 1.0.3, Step 02 > Versions & updates >
     Check updates > Update launcher. When idle, Restart to update and confirm.
-    After reopening, explicitly select beta-2026-10-06-recovery in Step 02 and
+    After reopening, explicitly select beta-2026-10-06-stalled-launch in Step 02 and
     install it. The old selection, saved settings and recordings are preserved
     by the app update; Check updates does not select the new VR package.
     If the old app blocks updating, close it and use the new WuWa-VR-Setup.exe
@@ -51,16 +51,16 @@ remain open. Keep the previous Steam beta for rollback; do not overwrite an
 installed app by hand or delete its data folders to update.
 
 鸣潮 VR — 启动恢复测试版检查
-桌面应用 1.0.3 | beta-2026-10-06-recovery | VR 构建 steam-20261006 | 游戏 3.7
+桌面应用 1.0.4 | beta-2026-10-06-stalled-launch | VR 构建 steam-20261006 | 游戏 3.7
 
 渲染器和注入器与上一个 Steam 测试版相同。启动／运行时改动已有后台测试覆盖，
-但此前 1.0.2 在远程 Windows 11 Steam 电脑上启动失败，1.0.3 的复测仍待进行。
+但此前 1.0.2 和 1.0.3 在远程 Windows 11 Steam 电脑上启动失败，1.0.4 的复测仍待进行。
 这些说明不代表 Windows 授权、实际启动或头显验收通过。
 按相关分组记录：通过／失败／受阻／未测试，并注明 Windows、游戏平台、应用和包版本。
 只想正常游玩时，无需刻意制造故障。
 
 [ ] 1. 两项都更新。第 02 步 > 版本与更新 > 检查更新 > 更新启动器，空闲时
-    重启并更新。重新打开后，明确选择 beta-2026-10-06-recovery 并安装。
+    重启并更新。重新打开后，明确选择 beta-2026-10-06-stalled-launch 并安装。
     更新应用保留旧 VR 包选择、设置和录像；检查更新不会自动改选新包。
     旧应用阻止更新时，关闭后运行网站的新 WuWa-VR-Setup.exe；卡住的任务
     可能仍在运行，安装程序不能保证将其停止。
@@ -86,3 +86,16 @@ installed app by hand or delete its data folders to update.
 完整可选功能和限制见 PlayerGuide.html／README.txt。NPC 轮廓光临时方案默认关闭，
 开启后也会移除附近角色原有轮廓光。场景停顿、HUD 刷新和平面菜单背景问题仍未解决。
 保留上一 Steam 测试版以便回退；不要手动覆盖已安装应用或删除数据目录来更新。
+
+1.0.4 follow-up: old live workers are identified as stalled rather than shown as
+a new launch. Cancellation is a request until acknowledged. Close refreshes
+state; if it cannot stop the helper, an explicit Close launcher only confirmation
+allows the window to exit without terminating background work. Recovery can
+recognize verified older portable workers; unverified identities remain read-only.
+Reinstalling preserves saved data and does not stop existing workers.
+
+Uninstall: Troubleshooting > Prepare uninstall shows a confirmation and removes
+verified downloads when idle. Use process recovery first for a blocked worker.
+Windows Apps uninstall also runs bounded cleanup. Active OpenXR packages and
+busy/unverified files are retained with reasons in WuWa VR Manager/uninstall-result.txt.
+The report opens after uninstall if files remain. Settings, backups and recordings stay.

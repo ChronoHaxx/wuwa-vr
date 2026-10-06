@@ -1399,6 +1399,7 @@ class Tests
             Console.WriteLine(passed + " tests passed. Evidence: " + root);
             ControllerDiagnosticsTests.Run();
             ProcessRecoveryTests.Run(root);
+            UninstallTests.Run(root);
             LauncherUpdateTests.Run(root);
             WindowTests.Run(root); return 0;
         }

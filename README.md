@@ -2,7 +2,7 @@
 
 Free, unofficial Wuthering Waves VR mod, built on praydog's UEVR and community work.
 
-**[Download the Windows installer · beta 1.0.3 · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-recovery/WuWa-VR-Setup.exe)** · [Release notes & source](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-recovery) · [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html)
+**[Download the Windows installer · beta 1.0.4 · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-stalled-launch/WuWa-VR-Setup.exe)** · [Release notes & source](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-stalled-launch) · [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html)
 
 Install **WuWa VR**, then follow **01 Game → 02 Install VR → 03 Headset or simulator**.
 The small installer downloads the separate VR mod (about **54 MB**) in step 02,
@@ -11,22 +11,23 @@ Choose **Launch in VR** and accept Windows permission. Steam starts the selected
 game through Steam; with Kuro, press **Play** in its launcher. The installed app offers launcher updates while idle;
 VR package updates are in step 02. Updates preserve settings, backups and recordings.
 
-Launcher **1.0.3** adds visible startup recovery and confirmed process stopping
+Launcher **1.0.4** repairs stalled launch reporting, cancellation feedback and
+the blocked Close path. It retains visible recovery and confirmed process stopping
 under **Troubleshooting**. Scan, review the process identities, select eligible
 launcher workers, then confirm before stopping them. Game, Steam and VR runtime
-processes are excluded. The paired **beta-2026-10-06-recovery** VR package adds
+processes are excluded. The paired **beta-2026-10-06-stalled-launch** VR package adds
 startup diagnostics and fresh-PC simulator checks; updating the app alone keeps
 the previously selected VR package, so select/install the new package in step 02.
 
-Renderer/injector **steam-20261006** are unchanged. Background checks and isolated
-package tests passed; the affected Windows 11 Steam PC and physical headset still
-need confirmation. This is a recovery beta, not a claim of universal compatibility.
+Renderer/injector **steam-20261006** are unchanged. Versions 1.0.2 and 1.0.3 failed
+the remote Windows 11 Steam trial. This follow-up has background checks; the
+affected PC and physical headset still need confirmation.
 
 [Watch / guide](https://chronohaxx.github.io/wuwa-vr/) · [Report an issue](https://github.com/ChronoHaxx/wuwa-vr/issues)
 
-[Portable ZIP (advanced fallback)](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-recovery/WuWa-VR-Launcher.zip)
+[Portable ZIP (advanced fallback)](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-stalled-launch/WuWa-VR-Launcher.zip)
 uses the older browser launcher: extract everything, then open **WuWa VR Launcher.exe**.
-No separate Python installation is needed. [Previous beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam).
+No separate Python installation is needed. [Previous beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-recovery).
 [Setup](docs/START-HERE.md) · [Xbox shortcuts](docs/CONTROLS.md) · [Recovery](docs/TROUBLESHOOTING.md)
 
 Stereo view, first person, Xbox controls, adjustable HUD, freecam and an optional
@@ -36,6 +37,13 @@ Stereo view, first person, Xbox controls, adjustable HUD, freecam and an optiona
 bans. Not affiliated with Kuro Games. [Risk notice](docs/RISK.md).
 Owner-PC Steam startup was confirmed in the previous beta. Other-PC recovery,
 Epic injection and fresh-PC compatibility remain unverified.
+
+Uninstall: **Troubleshooting → Prepare uninstall** checks and removes verified
+downloads first, with confirmation. Use process recovery for a stalled worker, then
+retry cleanup. Windows Apps uninstall also runs a bounded cleanup hook. Active
+OpenXR packages, busy/unverified files and user data are retained with reasons in
+`%LOCALAPPDATA%\WuWa VR Launcher\uninstall-result.txt`; retained-file reports
+open after Windows uninstall. Recordings, backups and settings are preserved.
 
 ## Source
 

@@ -85,6 +85,8 @@ TOKEN = secrets.token_urlsafe(32)
 BASE_URL = ""
 LOCK = threading.Lock()
 JOB = {"running": False, "kind": "", "message": "Ready", "output": "", "error": False, "code": None}
+HELPER_WORKERS = {}
+HELPER_WORKERS_LOCK = threading.Lock()
 RECORDING = {"running": False, "stopFile": "", "folder": "", "id": "", "pid": None, "stopping": False}
 LAST_REQUEST = time.monotonic()
 VERIFY_RESULT: dict = {}
@@ -473,12 +475,14 @@ def utc_timestamp(value):
         return None
 
 
-def launch_owner_alive(state):
-    """Match the process creation time, not a recyclable PID or an old phase."""
+def launch_owner_status(state):
+    """Read process provenance without confusing an inaccessible owner with exit."""
     pid = state.get("ownerPid", state.get("pid"))
     started = utc_timestamp(state.get("ownerStartedUtc", state.get("started")))
+    result = {"check": "unverified", "verified": False, "pid": pid,
+              "legacy": "ownerPid" not in state or "ownerStartedUtc" not in state}
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0 or started is None:
-        return False
+        return result
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel.OpenProcess.restype = wintypes.HANDLE
@@ -486,15 +490,25 @@ def launch_owner_alive(state):
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
     handle = kernel.OpenProcess(0x1000, False, pid)  # query limited information; never terminate
     if not handle:
-        return False
+        error = ctypes.get_last_error()
+        result.update(check="exited" if error == 87 else "inaccessible", error=error)
+        return result
     try:
         creation, exited, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
         if not kernel.GetProcessTimes(handle, ctypes.byref(creation), ctypes.byref(exited), ctypes.byref(kernel_time), ctypes.byref(user_time)):
-            return False
+            result.update(check="inaccessible", error=ctypes.get_last_error())
+            return result
         actual = ((creation.dwHighDateTime << 32) | creation.dwLowDateTime) / 10_000_000 - 11644473600
-        return not (exited.dwLowDateTime or exited.dwHighDateTime) and abs(actual - started) < 0.01
+        result["check"] = "reused" if abs(actual - started) >= 0.01 else "exited" if exited.dwLowDateTime or exited.dwHighDateTime else "alive"
+        result["verified"] = result["check"] == "alive"
+        return result
     finally:
         kernel.CloseHandle(handle)
+
+
+def launch_owner_alive(state):
+    """Compatibility helper: a matching creation time and an unexited process."""
+    return launch_owner_status(state)["verified"]
 
 
 def launch_cancel_path(state):
@@ -516,14 +530,38 @@ def launch_state(state=None):
         state = read_json(config().data / "launch-state.json")
     if not isinstance(state, dict):
         return {}
-    shown = {k: state.get(k) for k in ("phase", "message", "outcome", "buildId", "started", "attemptId", "requestedAt", "ownerPid", "ownerStartedUtc",
+    shown = {k: state.get(k) for k in ("phase", "message", "outcome", "buildId", "pid", "started", "heartbeat", "attemptId", "requestedAt", "ownerPid", "ownerStartedUtc",
         "elevated", "injectorPid", "injectorStarted", "injectorRunning", "backendLogStarted", "firstFrameSeen") if k in state}
-    active = state.get("phase") not in (None, "", "failed", "cancelled", "finished") and launch_owner_alive(state)
+    owner = launch_owner_status(state)
+    nonterminal = state.get("phase") not in (None, "", "failed", "cancelled", "finished")
+    active = nonterminal and owner["verified"]
+    unknown = nonterminal and owner["check"] == "inaccessible"
+    heartbeat = utc_timestamp(state.get("heartbeat"))
+    age = round(time.time() - heartbeat) if heartbeat is not None else None
+    cancel = launch_cancel_path(state)
+    cancelled_at = None
+    try:
+        if cancel is not None:
+            cancelled_at = cancel.stat().st_mtime
+    except OSError:
+        pass
+    cancel_age = max(0, round(time.time() - cancelled_at)) if cancelled_at is not None else None
+    stalled = bool((active or unknown) and (age is None or age < -5 or age > 90 or (cancel_age is not None and cancel_age > 10)))
     requested = utc_timestamp(state.get("requestedAt", state.get("started")))
     job_started = utc_timestamp(JOB.get("startedUtc"))
     recent = JOB.get("kind") == "launch" and requested is not None and job_started is not None and job_started <= requested <= time.time() + 5
-    shown.update(current=bool(active or recent), running=bool(active),
-                 cancellable=bool(active and launch_cancel_path(state)))
+    shown.update(current=bool(active or unknown or recent), running=bool(active),
+                 cancellable=bool(active and cancel), ownerVerified=owner["verified"],
+                 ownerCheck=owner["check"], ownerLegacy=owner["legacy"], activityUnknown=bool(unknown),
+                 heartbeatAgeSeconds=age, stalled=stalled, cancelRequested=cancelled_at is not None,
+                 cancelRequestedAgeSeconds=cancel_age)
+    if "error" in owner:
+        shown["ownerWin32Error"] = owner["error"]
+    if stalled or unknown:
+        shown["lastMessage"] = shown.get("message", "")
+        shown["message"] = ("A previous startup worker has stopped reporting progress. " if stalled else
+                            "The recorded startup worker cannot be checked. ") + \
+            "Open Troubleshooting > Stuck launcher processes to inspect it and confirm recovery. No new launch was started."
     run = state.get("runDir")
     if isinstance(run, str) and run:
         try:
@@ -563,7 +601,7 @@ def status():
         "openxr": openxr_status(),
         "game": game_status(),
         "riskAcknowledged": bool(saved.get("riskAcknowledgedAt")),
-        "job": dict(JOB),
+        "job": dict(JOB, helpers=helper_worker_status()),
         "launch": launch_state(),
         "integrity": dict(VERIFY_RESULT),
         "dataFolder": redact(config().data),
@@ -578,6 +616,12 @@ def status():
 
 
 # ------------------------------------------------------------ operations ---
+def helper_worker_status():
+    with HELPER_WORKERS_LOCK:
+        return [dict(worker, elapsedSeconds=max(0, round(time.time() - worker["requestedUnix"])))
+                for worker in HELPER_WORKERS.values()]
+
+
 def powershell(*arguments, encoding="oem"):
     """Run a packaged helper with Windows PowerShell 5.1, without a window."""
     environment = {key: value for key, value in os.environ.items() if key.upper() != "PSMODULEPATH"}
@@ -589,6 +633,7 @@ def powershell(*arguments, encoding="oem"):
     # Keep early failures visible before the elevated worker has a transcript.
     # Arguments may contain local paths; only record the helper's filename.
     trace = None
+    script = "PowerShell"
     try:
         config().logs.mkdir(parents=True, exist_ok=True)
         trace = config().logs / ("helper-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f") + "-" + secrets.token_hex(4) + ".log")
@@ -597,9 +642,26 @@ def powershell(*arguments, encoding="oem"):
     except (OSError, IndexError):
         trace = None
     try:
-        result = subprocess.run([str(executable), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", *arguments],
-                                cwd=config().app, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                                env=environment, text=True, encoding=encoding, errors="replace", creationflags=subprocess.CREATE_NO_WINDOW)
+        command = [str(executable), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", *arguments]
+        with subprocess.Popen(command, cwd=config().app, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                              env=environment, text=True, encoding=encoding, errors="replace", creationflags=subprocess.CREATE_NO_WINDOW) as worker:
+            observed = datetime.now(timezone.utc)
+            metadata = {"pid": worker.pid, "script": script, "requestedAt": observed.isoformat(),
+                        "requestedUnix": observed.timestamp(), "cancellable": False}
+            with HELPER_WORKERS_LOCK:
+                HELPER_WORKERS[worker.pid] = metadata
+            try:
+                if trace:
+                    try:
+                        with trace.open("a", encoding="utf-8") as handle:
+                            handle.write(f"Worker PID {worker.pid}; spawned at {observed.isoformat()}. No automatic termination.\n")
+                    except OSError:
+                        pass
+                output, _ = worker.communicate()
+                result = subprocess.CompletedProcess(command, worker.returncode, output)
+            finally:
+                with HELPER_WORKERS_LOCK:
+                    HELPER_WORKERS.pop(worker.pid, None)
     except Exception as error:
         if trace:
             try:
@@ -670,7 +732,10 @@ LAUNCH_RESULTS = {
 def require_idle():
     if processes():
         raise ValueError("Close Wuthering Waves and any waiting injector first. The launcher never closes the game for you.")
-    if launch_state().get("running"):
+    launch = launch_state()
+    if launch.get("stalled") or launch.get("activityUnknown"):
+        raise ValueError(launch["message"])
+    if launch.get("running"):
         raise ValueError("A launch is still waiting. Use Stop waiting before changing runtimes or launching again.")
 
 
@@ -729,7 +794,7 @@ def cancel_launch():
     if target is None:
         raise ValueError("The recorded launch is not from this launcher.")
     target.write_text("cancel\n", encoding="utf-8")
-    return "Asked the waiting startup to stop. The game is never closed by the launcher."
+    return "Cancellation requested; this does not confirm the worker has stopped. If it keeps waiting, open Troubleshooting > Stuck launcher processes to inspect and confirm recovery. The game is never closed by this request."
 
 
 def verify_package():
@@ -803,7 +868,7 @@ def startup_diagnostics(launch):
     if folder.parent != runs:
         return []
     lines = []
-    for name in ("startup-error.txt", "injector.stdout.log", "injector.stderr.log"):
+    for name in ("startup-error.txt", "startup.log", "injector.stdout.log", "injector.stderr.log"):
         file = (folder / name).resolve()
         if file.parent != folder:
             continue
@@ -828,8 +893,9 @@ def diagnostics():
              f"OpenXR: {info['openxr'].get('name', 'unavailable')} ({'ok' if info['openxr'].get('available') else info['openxr'].get('message')})",
              f"Active runtime: {redact(info['openxr'].get('manifest', 'none'))}; bundled simulator: {info['openxr'].get('isBundledSimulator', False)}",
              f"Game start: {info['game']['mode']} {redact(info['game']['launcher'])} {info['game']['problem']}".rstrip(),
-             f"Running: {', '.join(p['name'] for p in info['processes']) or 'none'}",
+             f"Game/injector processes: {', '.join(p['name'] for p in info['processes']) or 'none'}",
              f"Last job: {info['job'].get('message')} {redact(info['job'].get('output', ''))[:400]}",
+             f"Helper workers: {json.dumps(info['job'].get('helpers', []))}",
              f"Last launch: {json.dumps(info['launch'])}",
              f"Integrity: {json.dumps(info['integrity']) if info['integrity'] else 'not checked this session'}",
              f"Python: {sys.version.split()[0]}; Windows: {sys.getwindowsversion().major}.{sys.getwindowsversion().build}"]
@@ -1260,7 +1326,8 @@ class Handler(BaseHTTPRequestHandler):
             open_folder(body.get("folder"))
             return {"ok": True}
         if path == "/api/stop":
-            if JOB["running"] or launch_state().get("running"):
+            launch = launch_state()
+            if JOB["running"] or launch.get("running") or launch.get("activityUnknown"):
                 raise ValueError("Wait for the current operation to finish before stopping the launcher.")
             if RECORDING["running"]:
                 raise ValueError("Stop recording before closing the launcher.")
@@ -1281,7 +1348,8 @@ def idle_watch():
     """Exit when the page has been closed for a long time and nothing runs."""
     while True:
         time.sleep(30)
-        if JOB["running"] or RECORDING["running"] or launch_state().get("running") or playtest_busy() or time.monotonic() - LAST_REQUEST < IDLE_EXIT_SECONDS:
+        launch = launch_state()
+        if JOB["running"] or RECORDING["running"] or launch.get("running") or launch.get("activityUnknown") or playtest_busy() or time.monotonic() - LAST_REQUEST < IDLE_EXIT_SECONDS:
             continue
         try:
             if processes():

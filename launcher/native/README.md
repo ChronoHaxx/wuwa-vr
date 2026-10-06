@@ -1,6 +1,6 @@
-# WuWa VR desktop manager — public beta 1.0.3
+# WuWa VR desktop manager — public beta 1.0.4
 
-Release **beta-2026-10-06-recovery**, backend **steam-20261006**, game **3.7**.
+Release **beta-2026-10-06-stalled-launch**, backend **steam-20261006**, game **3.7**.
 Players run **WuWa-VR-Setup.exe** once for a per-user installation, then open the
 normal **WuWa VR** shortcut. The thin installer does not bundle the VR mod:
 first installation needs internet for the separate approximately **54 MB** ZIP.
@@ -24,7 +24,7 @@ Troubleshooting includes a native process-recovery panel: scan with visible
 identities, explicitly select eligible helpers/startup workers and confirm before
 stopping. The elevated worker revalidates identity and eligibility before each
 stop; game/Steam/runtime processes and protected operations are excluded. It
-works without a healthy web helper. This requires both the 1.0.3 desktop app and
+works without a healthy web helper. This requires both the 1.0.4 desktop app and
 the new recovery payload for the complete startup fix; updates preserve selection.
 
 A small Windows x64/.NET Framework 4.8 app. The English and Simplified Chinese

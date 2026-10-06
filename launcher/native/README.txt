@@ -1,5 +1,5 @@
-WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.3
-Release: beta-2026-10-06-recovery / VR build steam-20261006 / game 3.7
+WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.4
+Release: beta-2026-10-06-stalled-launch / VR build steam-20261006 / game 3.7
 
 Run WuWa-VR-Setup.exe once to install for your Windows user, then open the
 normal WuWa VR shortcut from the Start menu. No separate Python install is needed.
@@ -30,9 +30,9 @@ Updates: Step 02 > Versions & updates > Check updates. Update launcher downloads
 and verifies the desktop app update; it does not restart the app. When ready,
 close the game and injector, stop recording and finish other operations, then
 choose Restart to update and confirm. Installing or updating the desktop app
-preserves your selected VR package. In Step 02 choose beta-2026-10-06-recovery
+preserves your selected VR package. In Step 02 choose beta-2026-10-06-stalled-launch
 and install it, or select it if already installed, to use steam-20261006
-with the recovery helpers. From 1.0.2, update/restart the app first, then explicitly
+with the recovery helpers. From 1.0.2 or 1.0.3, update/restart the app first, then explicitly
 select and install the recovery package. Check updates does not select it for you.
 If the old app blocks updating, close it and use the new Setup from the website.
 This does not guarantee that a stalled worker has stopped; review remaining processes.
@@ -72,20 +72,20 @@ Advanced portable fallback: download WuWa-VR-Launcher.zip from the same release,
 extract the whole ZIP and open WuWa VR Launcher.exe. Keep its app and python
 folders together. This uses the older web interface and does not self-update
 the desktop app. Release downloads and previous versions:
-https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-recovery
+https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-stalled-launch
 https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam
 
 Steam and game graphics settings · 6 October public beta
-App 1.0.3 / VR build steam-20261006 / game 3.7.
+App 1.0.4 / VR build steam-20261006 / game 3.7.
 Choose Steam or Kuro in step 01; saved choices are preserved. The VR package
 keeps the game’s graphics choices instead of forcing low/medium values. A
 one-time cleanup removes only recognized generated overrides, preserving custom
 edits and backups. The accepted timing correction remains separate.
-Startup-recovery 1.0.3 adds visible startup stages, failure/cancellation feedback
+Startup-recovery 1.0.4 adds visible startup stages, failure/cancellation feedback
 and guarded process recovery. Fresh-PC simulator selection supports absent runtime
 registration and old-package replacement; missing VC++ 2015-2022 x64 dependencies
 produce a prerequisite message. These changes have background test coverage.
-The previous 1.0.2 failed on a remote Windows 11 Steam PC; its 1.0.3 retest is
+Versions 1.0.2 and 1.0.3 failed on a remote Windows 11 Steam PC; its 1.0.4 retest is
 pending. Renderer and injector are unchanged; no remote launch fix is claimed.
 Cinematic framing defaults on. The owner confirmed the simulator replay on
 private screen-comfort-r1; sampled frames in the latest 68-second recording show
@@ -194,8 +194,8 @@ Guide: https://chronohaxx.github.io/wuwa-vr/guide.html
 Feedback: https://github.com/ChronoHaxx/wuwa-vr/issues
 Optional support: https://ko-fi.com/chronohax
 
-鸣潮 VR — 桌面启动器 / 公开测试版 1.0.3
-发布版本 beta-2026-10-06-recovery／VR 构建 steam-20261006／游戏 3.7
+鸣潮 VR — 桌面启动器 / 公开测试版 1.0.4
+发布版本 beta-2026-10-06-stalled-launch／VR 构建 steam-20261006／游戏 3.7
 
 运行 WuWa-VR-Setup.exe，为当前 Windows 用户安装，然后从开始菜单打开
 普通 WuWa VR 快捷方式。无需另行安装 Python。小型安装程序不包含 VR 模组；
@@ -219,7 +219,7 @@ Optional support: https://ko-fi.com/chronohax
 更新：第 02 步 > 版本与更新 > 检查更新。“更新启动器”下载并校验桌面应用更新，
 此时不会重启。更新就绪后，关闭游戏和注入器、停止录制并完成其他操作，
 再选择“重启并更新”并确认。安装或更新桌面应用会保留当前选择的 VR 包。
-在第 02 步选择 beta-2026-10-06-recovery 并安装（已安装时直接选用），
+在第 02 步选择 beta-2026-10-06-stalled-launch 并安装（已安装时直接选用），
 即可使用更新的恢复辅助程序。1.0.2 用户须先更新并重启应用，再明确选择并安装
 恢复包；检查更新不会自动改选。如旧应用阻止更新，请关闭应用并运行网站的新 Setup。
 这不能保证卡住的启动任务已停止；仍需检查残留进程。设置、备份、日志和录像会保留；
@@ -247,13 +247,13 @@ WuWa VR Launcher.exe，保持 app 和 python 文件夹完整。这是旧版网�
 不会自动更新桌面应用。发布页及旧版本链接见上方英文部分。
 
 Steam 与游戏画质设置 · 10 月 6 日公开测试版
-应用 1.0.3／VR 构建 steam-20261006／游戏 3.7。
+应用 1.0.4／VR 构建 steam-20261006／游戏 3.7。
 第 01 步可选择 Steam 或库洛版本，保留已保存选择。VR 包保留游戏自身画质选择，
 不强制低／中画质；一次性清理仅移除已识别的旧生成覆盖项，保留自定义修改与备份。
-已接受的时序修正独立保留。1.0.3 更新启动阶段、错误／取消反馈及受保护的进程恢复。
+已接受的时序修正独立保留。1.0.4 更新启动阶段、错误／取消反馈及受保护的进程恢复。
 模拟器可在没有运行时注册时明确选用，也可替换旧包；缺少 VC++ 2015-2022 x64 时会提示。
-这些改动已有后台测试覆盖。此前 1.0.2 在远程 Windows 11 Steam 电脑启动失败；
-1.0.3 复测仍待进行。渲染器和注入器不变，不能宣称已修好该电脑的问题。
+这些改动已有后台测试覆盖。此前 1.0.2 和 1.0.3 在远程 Windows 11 Steam 电脑启动失败；
+1.0.4 复测仍待进行。渲染器和注入器不变，不能宣称已修好该电脑的问题。
 过场构图修正默认开启。作者已确认私测 screen-comfort-r1 的模拟器回放改善；
 最新 68 秒录像抽样中双眼黑边高度一致，头显舒适度仍待验证。
 此修正保留游戏原有黑边，不是可自由环顾的沉浸式过场镜头。
@@ -316,3 +316,16 @@ Comfort Lua 可选择临时菜单 HUD 位置及显示已隐藏的界面；默认
 语音备注每次需要选择麦克风并确认；本地转写需要已有模型，结束测试并关闭游戏后才能运行。
 安装后的指南/操作/反馈页提供本地中英文版本；安装前或缺失时会打开在线英文指南。
 后台检查不代表头显验收。中文界面不代表国服客户端或中国大陆下载连通性已验证。
+
+1.0.4 follow-up: old live workers are identified as stalled rather than shown as
+a new launch. Cancellation is a request until acknowledged. Close refreshes
+state; if it cannot stop the helper, an explicit Close launcher only confirmation
+allows the window to exit without terminating background work. Recovery can
+recognize verified older portable workers; unverified identities remain read-only.
+Reinstalling preserves saved data and does not stop existing workers.
+
+Uninstall: Troubleshooting > Prepare uninstall shows a confirmation and removes
+verified downloads when idle. Use process recovery first for a blocked worker.
+Windows Apps uninstall also runs bounded cleanup. Active OpenXR packages and
+busy/unverified files are retained with reasons in WuWa VR Manager/uninstall-result.txt.
+The report opens after uninstall if files remain. Settings, backups and recordings stay.

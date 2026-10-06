@@ -89,16 +89,26 @@ namespace WuWaVR.Manager
         Dictionary<string, object> status = new Dictionary<string, object>();
         readonly List<Button> actions = new List<Button>();
         readonly Brush background = Color("#10191D"), card = Color("#19262C"), foreground = Color("#EDF3F1"), muted = Color("#A5B8BE"), teal = Color("#82DFC7");
+        readonly Brush line = Color("#293C43"), activeLine = Color("#3F8F7C"), badge = Color("#263F3C");
+        // Step cards show where the player is: done (check), current (outlined) or still to come.
+        enum StepState { Pending, Current, Done }
+        readonly Border[] stepCards = new Border[3], stepBadges = new Border[3];
+        readonly TextBlock[] stepNumbers = new TextBlock[3];
+        Border launcherUpdateBar;
+        TextBlock launcherUpdateBarText;
         public MainWindow(PackageStore store, string backendData, bool preview = false, string language = null,
             LauncherUpdateService launcherUpdates = null)
         {
             this.store = store; this.preview = preview; bridge = new LauncherBridge(backendData);
             this.launcherUpdates = preview ? new LauncherUpdateService() : launcherUpdates ?? new LauncherUpdateService();
-            text.Language = language ?? store.State.language;
-            Title = "WuWa VR"; Width = 820; Height = 770; MinWidth = 720; MinHeight = 680;
+            text.Language = Strings.Supported(language ?? store.State.language);
+            Title = "WuWa VR"; Width = 860; Height = 800; MinWidth = 720; MinHeight = 640;
             Background = background; Foreground = foreground; FontFamily = new FontFamily("Segoe UI"); FontSize = 14;
             Resources.Add(typeof(Button), ButtonStyle());
             Resources.Add(typeof(ComboBox), ChoiceStyle());
+            Resources.Add(typeof(CheckBox), CheckStyle());
+            Resources.Add(typeof(Expander), ExpanderStyle());
+            Resources.Add(typeof(System.Windows.Controls.Primitives.ScrollBar), ScrollStyle());
             UseLayoutRounding = true;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Render();
@@ -268,12 +278,15 @@ namespace WuWaVR.Manager
             border.AppendChild(content); template.VisualTree = border;
             style.Setters.Add(new Setter(Control.TemplateProperty, template));
             var hover = new Trigger { Property = IsMouseOverProperty, Value = true };
-            hover.Setters.Add(new Setter(OpacityProperty, 0.85)); style.Triggers.Add(hover);
+            hover.Setters.Add(new Setter(OpacityProperty, 0.88)); style.Triggers.Add(hover);
+            var pressed = new Trigger { Property = Button.IsPressedProperty, Value = true };
+            pressed.Setters.Add(new Setter(OpacityProperty, 0.75)); style.Triggers.Add(pressed);
             var focused = new Trigger { Property = IsKeyboardFocusedProperty, Value = true };
             focused.Setters.Add(new Setter(Control.BorderBrushProperty, teal));
             focused.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(2))); style.Triggers.Add(focused);
+            // Disabled stays legible: the tooltip and status line explain why.
             var disabled = new Trigger { Property = IsEnabledProperty, Value = false };
-            disabled.Setters.Add(new Setter(OpacityProperty, 0.4));
+            disabled.Setters.Add(new Setter(OpacityProperty, 0.5));
             disabled.Setters.Add(new Setter(CursorProperty, System.Windows.Input.Cursors.Arrow)); style.Triggers.Add(disabled);
             return style;
         }
@@ -301,12 +314,19 @@ namespace WuWaVR.Manager
             if (page == "guide.html")
             {
                 var launcherGuide = Path.Combine(guideDirectoryOverride ?? AppDomain.CurrentDomain.BaseDirectory, "PlayerGuide.html");
-                if (File.Exists(launcherGuide)) return new Uri(launcherGuide).AbsoluteUri + (text.Language == "zh-Hans" ? "#zh" : "#en");
+                if (File.Exists(launcherGuide))
+                {
+                    // Sections are id'd en, zh, then by language code; a guide
+                    // without this language's section opens at English.
+                    string anchor = text.Language == "zh-Hans" ? "zh" : text.Language, guide = File.ReadAllText(launcherGuide);
+                    if (!guide.Contains("id=\"" + anchor + "\"") && !guide.Contains("id='" + anchor + "'")) anchor = "en";
+                    return new Uri(launcherGuide).AbsoluteUri + "#" + anchor;
+                }
             }
             if (store.Selected != null)
             {
                 var parts = page.Split(new[] { '#' }, 2);
-                string languageRoot = text.Language == "zh-Hans" ? "l/zh-Hans/" : "";
+                string languageRoot = text.Language == "en" ? "" : "l/" + text.Language + "/";
                 // Candidate instructions describe this desktop app; the full
                 // published guide remains a linked portable reference.
                 if (parts[0] == "guide.html" && File.Exists(Paths.Inside(store.Folder(store.Selected), "app/site/" + languageRoot + "quickstart.html")))
@@ -322,7 +342,7 @@ namespace WuWaVR.Manager
             var link = Action(key, c =>
             {
                 var url = GuideUrl(page); Open(url);
-                operationText.Text = text[text.Language == "zh-Hans" && !new Uri(url).IsFile ? "englishGuideFallback" : "browserOpened"];
+                operationText.Text = text[text.Language != "en" && !new Uri(url).IsFile ? "englishGuideFallback" : "browserOpened"];
                 return Task.CompletedTask;
             });
             if (footer) { link.Background = Brushes.Transparent; link.Foreground = muted; link.FontSize = 11;
@@ -338,9 +358,10 @@ namespace WuWaVR.Manager
         { var row = new WrapPanel(); foreach (var e in elements) row.Children.Add(e); return row; }
         Border Card(string title, params UIElement[] elements)
         {
-            var panel = new StackPanel(); panel.Children.Add(Label(title, 18));
+            var panel = new StackPanel(); var heading = Label(title, 16); heading.FontWeight = FontWeights.SemiBold; panel.Children.Add(heading);
             foreach (var e in elements) panel.Children.Add(e);
-            return new Border { Background = card, CornerRadius = new CornerRadius(10), Padding = new Thickness(20, 14, 20, 14), Margin = new Thickness(0, 0, 0, 12), Child = panel };
+            return new Border { Background = card, BorderBrush = line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(18, 12, 18, 14), Margin = new Thickness(0, 0, 0, 10), Child = panel };
         }
         Style ChoiceStyle()
         {
@@ -361,7 +382,7 @@ namespace WuWaVR.Manager
     <ToggleButton.Template><ControlTemplate TargetType='{x:Type ToggleButton}'><Border Background='{TemplateBinding Background}'/></ControlTemplate></ToggleButton.Template>
    </ToggleButton>
    <ContentPresenter Margin='11,8,30,8' IsHitTestVisible='False' VerticalAlignment='Center' Content='{TemplateBinding SelectionBoxItem}' ContentTemplate='{TemplateBinding SelectionBoxItemTemplate}' ContentTemplateSelector='{TemplateBinding ItemTemplateSelector}'/>
-   <TextBlock Text='⌄' Margin='0,0,11,3' Foreground='#A5B8BE' HorizontalAlignment='Right' VerticalAlignment='Center' IsHitTestVisible='False'/>
+   <TextBlock Text='&#xE70D;' FontFamily='Segoe MDL2 Assets' FontSize='10' Margin='0,0,12,0' Foreground='#A5B8BE' HorizontalAlignment='Right' VerticalAlignment='Center' IsHitTestVisible='False'/>
    <Popup x:Name='PART_Popup' Placement='Bottom' IsOpen='{TemplateBinding IsDropDownOpen}' AllowsTransparency='True' Focusable='False' PopupAnimation='Fade'>
     <Border Background='#19262C' BorderBrush='#526A72' BorderThickness='1' CornerRadius='6' MinWidth='{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}' MaxHeight='280' Padding='3' Margin='0,3,0,0'>
      <ScrollViewer CanContentScroll='True' HorizontalScrollBarVisibility='Disabled'><ItemsPresenter KeyboardNavigation.DirectionalNavigation='Contained'/></ScrollViewer>
@@ -369,6 +390,77 @@ namespace WuWaVR.Manager
    </Popup>
   </Grid>
   <ControlTemplate.Triggers><Trigger Property='IsKeyboardFocusWithin' Value='True'><Setter TargetName='Shell' Property='BorderBrush' Value='#82DFC7'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Shell' Property='BorderBrush' Value='#82DFC7'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers>
+ </ControlTemplate></Setter.Value></Setter>
+</Style>");
+        }
+        // Dark-theme checkbox and expander; the stock ones draw white boxes and circles.
+        static Style CheckStyle()
+        {
+            return (Style)System.Windows.Markup.XamlReader.Parse(@"
+<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='{x:Type CheckBox}'>
+ <Setter Property='Foreground' Value='#EDF3F1'/><Setter Property='Cursor' Value='Hand'/><Setter Property='FocusVisualStyle' Value='{x:Null}'/>
+ <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type CheckBox}'>
+  <Grid Background='Transparent'><Grid.ColumnDefinitions><ColumnDefinition Width='Auto'/><ColumnDefinition/></Grid.ColumnDefinitions>
+   <Border x:Name='Box' Width='18' Height='18' CornerRadius='4' Background='#223239' BorderBrush='#6B848C' BorderThickness='1' VerticalAlignment='Top' Margin='0,4,10,0'>
+    <TextBlock x:Name='Tick' Text='&#xE73E;' FontFamily='Segoe MDL2 Assets' FontSize='12' Foreground='#10191D' HorizontalAlignment='Center' VerticalAlignment='Center' Visibility='Collapsed'/>
+   </Border>
+   <ContentPresenter Grid.Column='1' VerticalAlignment='Top' RecognizesAccessKey='True'/>
+  </Grid>
+  <ControlTemplate.Triggers>
+   <Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Box' Property='BorderBrush' Value='#82DFC7'/></Trigger>
+   <Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='Box' Property='BorderBrush' Value='#82DFC7'/><Setter TargetName='Box' Property='BorderThickness' Value='2'/></Trigger>
+   <Trigger Property='IsChecked' Value='True'><Setter TargetName='Box' Property='Background' Value='#82DFC7'/><Setter TargetName='Box' Property='BorderBrush' Value='#82DFC7'/><Setter TargetName='Tick' Property='Visibility' Value='Visible'/></Trigger>
+   <Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.5'/></Trigger>
+  </ControlTemplate.Triggers>
+ </ControlTemplate></Setter.Value></Setter>
+</Style>");
+        }
+        static Style ScrollStyle()
+        {
+            // A thin vertical thumb; horizontal bars keep the stock template.
+            return (Style)System.Windows.Markup.XamlReader.Parse(@"
+<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='{x:Type ScrollBar}'>
+ <Style.Triggers><Trigger Property='Orientation' Value='Vertical'>
+  <Setter Property='Width' Value='10'/><Setter Property='MinWidth' Value='10'/>
+  <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type ScrollBar}'>
+   <Track x:Name='PART_Track' IsDirectionReversed='True'>
+    <Track.DecreaseRepeatButton><RepeatButton Command='ScrollBar.PageUpCommand' Opacity='0' Focusable='False'/></Track.DecreaseRepeatButton>
+    <Track.IncreaseRepeatButton><RepeatButton Command='ScrollBar.PageDownCommand' Opacity='0' Focusable='False'/></Track.IncreaseRepeatButton>
+    <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='{x:Type Thumb}'>
+     <Border x:Name='T' Background='#34494F' CornerRadius='3' Margin='3,2,3,2'/>
+     <ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='T' Property='Background' Value='#56717A'/></Trigger>
+      <Trigger Property='IsDragging' Value='True'><Setter TargetName='T' Property='Background' Value='#82DFC7'/></Trigger></ControlTemplate.Triggers>
+    </ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+   </Track>
+  </ControlTemplate></Setter.Value></Setter>
+ </Trigger></Style.Triggers>
+</Style>");
+        }
+        static Style ExpanderStyle()
+        {
+            return (Style)System.Windows.Markup.XamlReader.Parse(@"
+<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='{x:Type Expander}'>
+ <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type Expander}'>
+  <StackPanel>
+   <ToggleButton x:Name='Header' Content='{TemplateBinding Header}' Foreground='{TemplateBinding Foreground}' HorizontalAlignment='Left' Cursor='Hand'
+     IsChecked='{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}'>
+    <ToggleButton.Template><ControlTemplate TargetType='{x:Type ToggleButton}'>
+     <Border x:Name='Hit' Background='Transparent' Padding='0,5,10,5' BorderBrush='Transparent' BorderThickness='0,0,0,1'>
+      <StackPanel Orientation='Horizontal'>
+       <TextBlock x:Name='Chevron' Text='&#xE76C;' FontFamily='Segoe MDL2 Assets' FontSize='10' VerticalAlignment='Center' Margin='0,1,9,0' Foreground='{TemplateBinding Foreground}'/>
+       <ContentPresenter VerticalAlignment='Center' TextElement.Foreground='{TemplateBinding Foreground}'/>
+      </StackPanel>
+     </Border>
+     <ControlTemplate.Triggers>
+      <Trigger Property='IsChecked' Value='True'><Setter TargetName='Chevron' Property='Text' Value='&#xE70D;'/></Trigger>
+      <Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Chevron' Property='Foreground' Value='#82DFC7'/></Trigger>
+      <Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='Hit' Property='BorderBrush' Value='#82DFC7'/></Trigger>
+     </ControlTemplate.Triggers>
+    </ControlTemplate></ToggleButton.Template>
+   </ToggleButton>
+   <ContentPresenter x:Name='Body' Visibility='Collapsed' Margin='0,2,0,0'/>
+  </StackPanel>
+  <ControlTemplate.Triggers><Trigger Property='IsExpanded' Value='True'><Setter TargetName='Body' Property='Visibility' Value='Visible'/></Trigger></ControlTemplate.Triggers>
  </ControlTemplate></Setter.Value></Setter>
 </Style>");
         }
@@ -380,18 +472,29 @@ namespace WuWaVR.Manager
         Border Step(string number, string title, Button action, params UIElement[] elements)
         {
             var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(43) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(46) });
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var numberText = Label(number, 13, teal); numberText.HorizontalAlignment = HorizontalAlignment.Center; numberText.VerticalAlignment = VerticalAlignment.Center;
-            var badge = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(8), Background = Color("#263F3C"), Child = numberText, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 12, 0) };
-            grid.Children.Add(badge);
+            var numberText = Label(number, 13, teal); numberText.FontWeight = FontWeights.SemiBold; numberText.Margin = new Thickness(0);
+            numberText.HorizontalAlignment = HorizontalAlignment.Center; numberText.VerticalAlignment = VerticalAlignment.Center;
+            var stepBadge = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = badge, Child = numberText, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 14, 0) };
+            grid.Children.Add(stepBadge);
             var body = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
-            var heading = Label(title, 16); heading.FontWeight = FontWeights.SemiBold; body.Children.Add(heading);
+            var heading = Label(title, 16); heading.FontWeight = FontWeights.SemiBold; heading.Margin = new Thickness(0, 5, 0, 3); body.Children.Add(heading);
             foreach (var element in elements) body.Children.Add(element);
             Grid.SetColumn(body, 1); grid.Children.Add(body);
-            if (action != null) { action.Margin = new Thickness(0); action.VerticalAlignment = VerticalAlignment.Center; Grid.SetColumn(action, 2); grid.Children.Add(action); }
-            return new Border { Background = card, BorderBrush = Color("#293C43"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(9), Padding = new Thickness(16, 11, 16, 11), Margin = new Thickness(0, 0, 0, 9), Child = grid };
+            if (action != null) { action.Margin = new Thickness(0, 2, 0, 0); action.VerticalAlignment = VerticalAlignment.Top; Grid.SetColumn(action, 2); grid.Children.Add(action); }
+            var result = new Border { Background = card, BorderBrush = line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(18, 14, 18, 14), Margin = new Thickness(0, 0, 0, 10), Child = grid };
+            int index = int.Parse(number) - 1; stepCards[index] = result; stepBadges[index] = stepBadge; stepNumbers[index] = numberText;
+            return result;
+        }
+        void ShowStep(int index, StepState state)
+        {
+            if (stepCards[index] == null) return;
+            stepCards[index].BorderBrush = state == StepState.Current ? activeLine : line;
+            stepBadges[index].Background = state == StepState.Done ? teal : badge;
+            stepNumbers[index].Text = state == StepState.Done ? "✓" : "0" + (index + 1);
+            stepNumbers[index].Foreground = state == StepState.Done ? background : state == StepState.Current ? teal : muted;
         }
         Button FooterLink(string key, string url)
         {
@@ -416,28 +519,47 @@ namespace WuWaVR.Manager
                 uninstallOpen = uninstallPanel?.IsExpanded == true;
             string savedDetails = details?.Text, savedFeedback = operationText?.Text;
             rendering = true; actions.Clear();
-            var outer = new DockPanel { Margin = new Thickness(24, 16, 24, 12), Background = background };
-            var header = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+            FlowDirection = Strings.RightToLeft(text.Language) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+            var outer = new DockPanel { Margin = new Thickness(24, 18, 24, 12), Background = background };
+            var header = new Grid { Margin = new Thickness(0, 0, 0, 16) };
             System.Windows.Input.KeyboardNavigation.SetTabIndex(header, 0);
-            header.ColumnDefinitions.Add(new ColumnDefinition()); header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var heading = new StackPanel();
-            var title = Label(text["title"], 26); title.FontWeight = FontWeights.SemiBold; heading.Children.Add(title);
-            heading.Children.Add(Label(text["beta"], 10, teal));
-            header.Children.Add(heading);
-            languages = Choice("English", "简体中文"); languages.SelectedIndex = text.Language == "zh-Hans" ? 1 : 0;
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); header.ColumnDefinitions.Add(new ColumnDefinition());
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var logo = Mark(46); logo.VerticalAlignment = VerticalAlignment.Center; header.Children.Add(logo);
+            var heading = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 12, 0) };
+            var title = new TextBlock { Text = text["title"], FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = foreground, VerticalAlignment = VerticalAlignment.Center };
+            var pill = new Border { Background = badge, CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 2, 9, 3), Margin = new Thickness(12, 3, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock { Text = text["beta"], FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = teal } };
+            heading.Children.Add(Row(title, pill));
+            var tagline = Label(text["tagline"], 13, muted); tagline.Margin = new Thickness(0, 1, 0, 0); heading.Children.Add(tagline);
+            Grid.SetColumn(heading, 1); header.Children.Add(heading);
+            languages = Choice(Strings.Names); languages.SelectedIndex = Math.Max(0, Array.IndexOf(Strings.Codes, text.Language));
+            languages.MinWidth = 150; System.Windows.Automation.AutomationProperties.SetName(languages, text["language"]); languages.ToolTip = text["language"];
             languages.SelectionChanged += (s, e) =>
             {
                 if (rendering || operation != null) return;
-                text.Language = languages.SelectedIndex == 1 ? "zh-Hans" : "en";
+                text.Language = Strings.Codes[Math.Max(0, languages.SelectedIndex)];
                 if (!preview) { store.State.language = text.Language; store.Save(); }
                 Render();
             };
-            var languagePanel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            languagePanel.Children.Add(Label(text["language"], 12, muted)); languagePanel.Children.Add(languages); Grid.SetColumn(languagePanel, 1); header.Children.Add(languagePanel);
+            var globe = new TextBlock { Text = "", FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 15, Foreground = muted,
+                VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+            var languagePanel = Row(globe, languages); languagePanel.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(languagePanel, 2); header.Children.Add(languagePanel);
             DockPanel.SetDock(header, Dock.Top); outer.Children.Add(header);
+            // The app's own update is separate from the VR package: a slim bar
+            // appears only when there is something to do.
+            launcherVersion = Label("", 11, muted); launcherVersion.Margin = new Thickness(0, 3, 0, 0); launcherVersion.TextWrapping = TextWrapping.NoWrap;
+            launcherUpdateButton = Action("updateLauncher", async c => await UpdateLauncher(c), true);
+            launcherUpdateButton.Margin = new Thickness(0); launcherUpdateButton.Padding = new Thickness(14, 6, 14, 6);
+            launcherUpdateBarText = Label("", 13, foreground); launcherUpdateBarText.VerticalAlignment = VerticalAlignment.Center;
+            var updateRow = new DockPanel(); DockPanel.SetDock(launcherUpdateButton, Dock.Right); updateRow.Children.Add(launcherUpdateButton); updateRow.Children.Add(launcherUpdateBarText);
+            launcherUpdateBar = new Border { Background = Color("#17312C"), BorderBrush = activeLine, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(14, 7, 8, 7), Margin = new Thickness(0, 0, 0, 12), Child = updateRow, Visibility = Visibility.Collapsed };
+            DockPanel.SetDock(launcherUpdateBar, Dock.Top); outer.Children.Add(launcherUpdateBar);
             var footer = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
             System.Windows.Input.KeyboardNavigation.SetTabIndex(footer, 2);
-            footer.Children.Add(new Border { Height = 1, Background = Color("#293C43"), Margin = new Thickness(0, 0, 0, 9) });
+            footer.Children.Add(new Border { Height = 1, Background = line, Margin = new Thickness(0, 0, 0, 12) });
             launchButton = Action("launch", async c =>
             {
                 // First-run installation is the primary action. Never start the game
@@ -455,9 +577,10 @@ namespace WuWaVR.Manager
                 await bridge.Post("/api/settings", new { riskAcknowledged = true }, c);
                 await SubmitJob("/api/launch", new { id = CurrentBuild() }, c);
             }, true);
-            launchState = Label(text["gameNotRunning"], 12, muted); launchState.VerticalAlignment = VerticalAlignment.Center; launchState.Margin = new Thickness(0, 0, 18, 0);
-            launchButton.MinWidth = 160; launchButton.FontWeight = FontWeights.SemiBold; launchButton.Margin = new Thickness(0, 3, 0, 3);
-            cancelButton = new Button { Content = text["cancel"], Padding = new Thickness(14, 9, 14, 9), Margin = new Thickness(0, 6, 10, 6) };
+            launchState = Label(text["gameNotRunning"], 13, foreground); launchState.VerticalAlignment = VerticalAlignment.Center; launchState.Margin = new Thickness(0, 0, 18, 0);
+            launchButton.MinWidth = 190; launchButton.FontWeight = FontWeights.SemiBold; launchButton.FontSize = 15;
+            launchButton.Padding = new Thickness(24, 12, 24, 12); launchButton.Margin = new Thickness(0, 2, 0, 2);
+            cancelButton = new Button { Content = text["cancel"], Padding = new Thickness(16, 11, 16, 11), Margin = new Thickness(0, 2, 10, 2) };
             cancelButton.Click += async (s, e) => await CancelOrRecover();
             var launchBar = new DockPanel(); DockPanel.SetDock(launchButton, Dock.Right); launchBar.Children.Add(launchButton);
             DockPanel.SetDock(cancelButton, Dock.Right); launchBar.Children.Add(cancelButton); launchBar.Children.Add(launchState); footer.Children.Add(launchBar);
@@ -474,7 +597,9 @@ namespace WuWaVR.Manager
             web.Content = text["developerTools"]; StyleFooter(web);
             var footnotes = Wrap(GuideLink("guide", "guide.html", true), GuideLink("fullControls", "guide.html#controls", true),
                 PageLink("troubleshooting", true), web, FooterLink("support", "https://ko-fi.com/chronohax"));
-            footnotes.Margin = new Thickness(0, 5, 0, 0); footer.Children.Add(footnotes); DockPanel.SetDock(footer, Dock.Bottom); outer.Children.Add(footer);
+            var footerRow = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
+            DockPanel.SetDock(launcherVersion, Dock.Right); footerRow.Children.Add(launcherVersion); footerRow.Children.Add(footnotes);
+            footer.Children.Add(footerRow); DockPanel.SetDock(footer, Dock.Bottom); outer.Children.Add(footer);
             pageHost = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
             System.Windows.Input.KeyboardNavigation.SetTabIndex(pageHost, 1);
             setupPage = Page(Setup());
@@ -499,10 +624,21 @@ namespace WuWaVR.Manager
                 details.Text = savedDetails ?? ""; operationText.Text = savedFeedback ?? text["ready"];
                 feedbackPanel.IsExpanded = feedbackOpen;
             }
-            Content = outer; rendering = false; ShowStatus();
+            Content = new Border { Background = background, Child = outer }; rendering = false; ShowStatus();
             if (rebuilding)
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
                 { (pageHost.Content as ScrollViewer)?.ScrollToVerticalOffset(scrollOffset); languages.Focus(); }));
+        }
+        // The site/icon mark (dev/build-launcher-icon.ps1), drawn as vectors so it stays sharp at any DPI.
+        FrameworkElement Mark(double size)
+        {
+            var grid = new Grid { Width = 40, Height = 40 };
+            grid.Children.Add(new Border { Margin = new Thickness(1), CornerRadius = new CornerRadius(9), Background = Color("#10181B"),
+                BorderBrush = Color("#698B7D"), BorderThickness = new Thickness(1) });
+            grid.Children.Add(new System.Windows.Shapes.Path { Data = Geometry.Parse("M7,23 L13,13 L20,27 L27,13 L33,23 M7,29 L33,29"),
+                Stroke = Color("#B2E4CD"), StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+                StrokeLineJoin = PenLineJoin.Round });
+            return new Viewbox { Width = size, Height = size, Child = grid, FlowDirection = FlowDirection.LeftToRight };
         }
         void StyleFooter(Button button)
         { button.Background = Brushes.Transparent; button.Foreground = muted; button.FontSize = 11;
@@ -569,8 +705,8 @@ namespace WuWaVR.Manager
                          ConnectionRecovered();
                      }, true),
                      Action("retryConnection", async c => { await Connect(c); ConnectionRecovered(); })));
-            connectionPanel.Visibility = Visibility.Collapsed; panel.Children.Add(connectionPanel);
-            gamePath = Label(text["noGame"], 12, muted); gamePath.TextWrapping = TextWrapping.NoWrap; gamePath.TextTrimming = TextTrimming.CharacterEllipsis;
+            connectionPanel.Visibility = Visibility.Collapsed; connectionPanel.BorderBrush = Color("#5C4F2C"); panel.Children.Add(connectionPanel);
+            gamePath = Label(text["noGame"], 13, foreground); gamePath.TextWrapping = TextWrapping.NoWrap; gamePath.TextTrimming = TextTrimming.CharacterEllipsis;
             var browse = Action("browse", async c =>
             {
                 if (gameLocationOptions.Visibility == Visibility.Visible) { gameLocationOptions.Visibility = Visibility.Collapsed; operationText.Text = text["notChanged"]; return; }
@@ -617,8 +753,8 @@ namespace WuWaVR.Manager
             if (store.Selected != null && !releases.Items.Cast<Release>().Any(r => r.id == store.Selected.release.id)) releases.Items.Add(store.Selected.release);
             releases.SelectedItem = store.Selected == null ? releases.Items.Cast<Release>().FirstOrDefault() : releases.Items.Cast<Release>().First(r => r.id == store.Selected.release.id);
             catalogState = Label(text[catalogKey], 12, muted);
-            packageState = Label(text["none"], 12, muted);
-            gameVersion = Label(text["targetGame"] + " " + SelectedRelease().gameVersion, 13);
+            packageState = Label(text["none"], 13, foreground);
+            gameVersion = Label(text["targetGame"] + " " + SelectedRelease().gameVersion, 12, muted);
             compatible = new CheckBox { Content = Label(text["installConsent"], 12), Foreground = foreground, Margin = new Thickness(0, 3, 0, 0) };
             compatible.Checked += (s, e) => ShowStatus(); compatible.Unchecked += (s, e) => ShowStatus();
             releases.SelectionChanged += (s, e) => { compatible.IsChecked = false; gameVersion.Text = text["targetGame"] + " " + SelectedRelease().gameVersion; if (!rendering) ShowStatus(); };
@@ -637,17 +773,15 @@ namespace WuWaVR.Manager
             risk.Checked += (s, e) => ShowStatus(); risk.Unchecked += (s, e) => ShowStatus();
             riskNotice = Label(text["risk"], 12, Color("#ECCB93"));
             var consent = new StackPanel(); consent.Children.Add(riskNotice); consent.Children.Add(versionConsent); consent.Children.Add(risk);
-            var notice = new Border { Child = consent, Padding = new Thickness(10, 4, 10, 5), CornerRadius = new CornerRadius(7), Background = Color("#272921"), Margin = new Thickness(0, 3, 0, 2) };
-            launcherVersion = Label("", 12, muted);
-            launcherUpdateButton = Action("updateLauncher", async c => await UpdateLauncher(c));
+            var notice = new Border { Child = consent, Padding = new Thickness(12, 6, 12, 7), CornerRadius = new CornerRadius(9), Background = Color("#29261B"),
+                BorderBrush = Color("#5C4F2C"), BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 4) };
             packageUpdateState = Label("", 12, teal);
             packageUpdateButton = Action("selectLatestPackage", c => {
                 var newer = NewerPackage();
                 if (newer != null) { releases.SelectedItem = newer; advancedPanel.IsExpanded = true; operationText.Text = text["installNext"]; }
                 return Task.CompletedTask;
             });
-            panel.Children.Add(Step("02", text["package"], null, packageState, launcherVersion,
-                Wrap(launcherUpdateButton), packageUpdateState, Wrap(packageUpdateButton), gameVersion, notice, advancedPanel));
+            panel.Children.Add(Step("02", text["package"], null, packageState, gameVersion, packageUpdateState, Wrap(packageUpdateButton), notice, advancedPanel));
             panel.Children.Add(runtimeStep);
             return panel;
         }
@@ -1242,6 +1376,8 @@ namespace WuWaVR.Manager
                 String.Format(text[state], launcherUpdates.AvailableVersion);
             launcherUpdateButton.Content = text[launcherUpdates.ReadyToRestart ? "restartLauncher" : "updateLauncher"];
             launcherUpdateButton.Visibility = launcherUpdates.AvailableVersion == null ? Visibility.Collapsed : Visibility.Visible;
+            launcherUpdateBar.Visibility = launcherUpdateButton.Visibility;
+            launcherUpdateBarText.Text = String.Format(text[launcherUpdates.ReadyToRestart ? "launcherUpdateBarReady" : "launcherUpdateBar"], launcherUpdates.AvailableVersion);
         }
         async Task Runtime(string mode, CancellationToken c)
         {
@@ -1363,6 +1499,14 @@ namespace WuWaVR.Manager
             launchState.Text = gameRunning || running || workerFailed || workerCancelled ? LauncherBridge.LaunchSummary(status, k => text[k]) :
                 text[wantsInstall ? "installNext" : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : injectorRunning ? "runtimeCloseFirst" : runtimeBlock ?? (risk.IsChecked != true ? "riskNext" : Json.Text(game, "mode") == "steam" ? "launchNextSteam" : "launchNext")];
             feedbackPanel.Visibility = String.IsNullOrWhiteSpace(details.Text) ? Visibility.Collapsed : Visibility.Visible;
+            // Done steps get a check; the first unfinished one is outlined.
+            bool gameReady = pendingChoice || (gamePath.Text != text["noGame"] && !new[] { "gameSavedMissing", "gameNotFound",
+                "gameSettingsUnreadable", "gameMultiple", "findingGame", "locateHint" }.Contains(hint));
+            bool packageReady = hasPackage && !wantsInstall, runtimeReady = packageReady && connectionReady && runtimeBlock == null;
+            var done = new[] { gameReady, packageReady, runtimeReady };
+            int currentStep = Array.IndexOf(done, false);
+            for (int index = 0; index < done.Length; ++index)
+                ShowStep(index, done[index] ? StepState.Done : index == currentStep ? StepState.Current : StepState.Pending);
             var capture = Json.Child(status, "recording");
             bool canRecord = CaptureAvailability.HasSource(status, new[] { "auto", "steamvr", "simulator" }[Math.Max(0, source.SelectedIndex)]);
             recordingState.Text = text[!hasPackage ? "chooseVersion" : !connectionReady ? "connectionRequired" : recording ? "recordingActive" : !gameRunning ? "recordNeedsGame" : !canRecord ? "recordUnavailable" : "recordReady"];

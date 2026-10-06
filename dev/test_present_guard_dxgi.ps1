@@ -1,7 +1,10 @@
 param(
     [Parameter(Mandatory=$true)][string]$OutputRoot,
-    [ValidateSet('Standard','Retained','RetainedFixed','Rendered','EntryGateBaseline','EntryGateFixed','ResizeBaseline','ResizeFixed','ResizeProbeBaseline','ResizeProbeFixed')][string]$Mode = 'Standard',
-    [string]$ProductionSnapshot = ''
+    [string]$ProductionSnapshot = '',
+    [switch]$Baseline,
+    [switch]$BuildOnly,
+    [ValidateSet('11-pending','12-pending','12-present1-pending','11-retired','12-retired','12-present1-retired','stable','delegation','unrecoverable','e9-relay','cross-class','repatch')]
+    [string[]]$Cases = @()
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -14,6 +17,7 @@ $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Componen
 if ($LASTEXITCODE -ne 0 -or -not $vs) { throw 'MSVC toolchain unavailable.' }
 $vcvars = Join-Path ($vs | Select-Object -First 1) 'VC\Auxiliary\Build\vcvars64.bat'
 $kananInclude = Join-Path $buildRoot '_deps\kananlib-src\include'
+$bddInclude = Join-Path $buildRoot '_deps\bddisasm-src\inc'
 $spdInclude = Join-Path $upstream 'dependencies\submodules\spdlog\include'
 $libPaths = @(
     (Join-Path $buildRoot '_deps\kananlib-build\RelWithDebInfo\kananlib.lib'),
@@ -21,7 +25,7 @@ $libPaths = @(
     (Join-Path $buildRoot '_deps\bddisasm-build\RelWithDebInfo\bddisasm.lib'),
     (Join-Path $buildRoot '_deps\bddisasm-build\RelWithDebInfo\bdshemu.lib')
 )
-$source = Join-Path $PSScriptRoot 'test_actual_d3d_hooks.cpp'
+$source = Join-Path $PSScriptRoot 'test_present_guard_dxgi.cpp'
 $inputs = [ordered]@{}
 foreach ($relative in @('hooks\D3D11Hook.cpp','hooks\D3D12Hook.cpp','hooks\D3D11Hook.hpp','hooks\D3D12Hook.hpp','WindowFilter.cpp','WindowFilter.hpp','utility\WuWaSwapchainWindow.hpp','utility\WuWaPresentGuard.hpp')) {
     $path = Join-Path $repo ('mod\uevr\src\' + $relative)
@@ -29,13 +33,14 @@ foreach ($relative in @('hooks\D3D11Hook.cpp','hooks\D3D12Hook.cpp','hooks\D3D11
     if ($ProductionSnapshot) {
         $name = if ($relative.StartsWith('hooks\')) { Split-Path $relative -Leaf } else { $relative }
         $path = Join-Path $ProductionSnapshot $name
-        # Snapshots older than the Present loop guard do not contain it.
+        # Older pinned hooks do not include the newly added recovery header.
+        # Do not mislabel today's unused helper as part of that old snapshot.
         if ($relative -eq 'utility\WuWaPresentGuard.hpp' -and -not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
     }
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Production source missing: $relative" }
     $inputs[$relative] = $path
 }
-foreach ($path in @($output,$vcvars,$source,$kananInclude,$spdInclude) + $libPaths + @($inputs.Values)) {
+foreach ($path in @($output,$vcvars,$source,$kananInclude,$bddInclude,$spdInclude) + $libPaths + @($inputs.Values)) {
     if ($path -match '["%\r\n]') { throw 'Unsupported path characters for isolated MSVC batch.' }
 }
 foreach ($path in $libPaths) { if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Built dependency missing: $path" } }
@@ -76,16 +81,17 @@ extern std::unique_ptr<Framework> g_framework;
 '@
 $frameworkPath = Join-Path $fixture 'Framework.hpp'
 [IO.File]::WriteAllText($frameworkPath,$framework,[Text.Encoding]::ASCII)
-$exe = Join-Path $output 'actual-d3d-hooks.exe'
+$exe = Join-Path $output 'present-guard-dxgi.exe'
 $cmd = Join-Path $output 'build.cmd'
 $buildLog = Join-Path $output 'build.log'
 $libraries = ($libPaths | ForEach-Object { '"' + $_ + '"' }) -join ' '
+$helperDefine = if ($inputs.Contains('utility\WuWaPresentGuard.hpp')) { '/DWUWA_GUARD_AVAILABLE' } else { '' }
 $batch = @"
 @echo off
 call "$vcvars"
 if errorlevel 1 exit /b %errorlevel%
 cd /d "$output"
-cl /nologo /std:c++latest /EHa /W3 /MT /O1 /DNDEBUG /DNOMINMAX /DSPDLOG_COMPILED_LIB /DFMT_UNICODE=0 /FI"$frameworkPath" /I"$fixture" /I"$kananInclude" /I"$spdInclude" "$source" "$fixture\D3D11Hook.cpp" "$fixture\D3D12Hook.cpp" "$fixture\WindowFilter.cpp" /Fe:"$exe" /link $libraries d3d11.lib d3d12.lib dxgi.lib user32.lib shlwapi.lib psapi.lib dbghelp.lib advapi32.lib
+cl /nologo /std:c++latest /EHa /W3 /MT /O1 /DNDEBUG /DNOMINMAX /DSPDLOG_COMPILED_LIB /DFMT_UNICODE=0 $helperDefine /FI"$frameworkPath" /I"$fixture" /I"$kananInclude" /I"$bddInclude" /I"$spdInclude" "$source" "$fixture\D3D11Hook.cpp" "$fixture\D3D12Hook.cpp" "$fixture\WindowFilter.cpp" /Fe:"$exe" /link $libraries d3d11.lib d3d12.lib dxgi.lib user32.lib shlwapi.lib psapi.lib dbghelp.lib advapi32.lib
 exit /b %errorlevel%
 "@
 [IO.File]::WriteAllText($cmd,$batch,[Text.Encoding]::ASCII)
@@ -103,42 +109,41 @@ if (-not $compiler.WaitForExit(120000)) {
 }
 if ($compiler.ExitCode -ne 0) { Get-Content -LiteralPath $buildLog; throw "Actual hook fixture build failed: $($compiler.ExitCode)" }
 $receipt = [ordered]@{
-    schema=1; createdUtc=[DateTime]::UtcNow.ToString('o'); os=[Environment]::OSVersion.VersionString
-    availableGiB=[Math]::Round($memory.AvailablePhysicalMemory/1GB,2)
+    schema=1; createdUtc=[DateTime]::UtcNow.ToString('o'); baseline=[bool]$Baseline; buildOnly=[bool]$BuildOnly
     source=$source; sourceSha256=(Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
-    productionSources=$records; libraries=@($libPaths | ForEach-Object { [ordered]@{path=$_; sha256=(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash} })
-    stub=[ordered]@{path=$frameworkPath;sha256=(Get-FileHash -LiteralPath $frameworkPath -Algorithm SHA256).Hash;scope='Only Framework recursive hook-monitor mutex; no lifecycle, monitor or renderer initialization.'}
+    productionSources=$records; productionSnapshot=$ProductionSnapshot
     executable=$exe; executableSha256=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
-    scope='Actual production hooks/filter and built kananlib; hidden own-process hardware DXGI. Not full Framework, remote Windows11/AMD, game or headset acceptance.'
-    mode=$Mode
-    productionSnapshot=$ProductionSnapshot
-    expectedBehavior=$(if ($Mode -eq 'Retained') { 'Reproduce missing active DX12 callbacks when fixture deliberately retains retired DX11 dispatch; not evidence remote software does this.' } elseif ($Mode -eq 'RetainedFixed') { 'Positively observed retained DX11 dispatch reaches active DX12, original Present exactly once, actual DX11 and retired hooks do not bridge.' } elseif ($Mode -eq 'EntryGateBaseline') { 'Explicit call-site fault model bypasses primary12 entry: expect0 DX12 callbacks after61 DX11 callbacks; remote cause not established.' } elseif ($Mode -eq 'EntryGateFixed') { 'Same labelled entry-gate model succeeds via verified stable11 dispatch; real GPU readback/Present/resize on separate threads.' } elseif ($Mode -eq 'Rendered') { 'No entry gate:90 GPU pixel readbacks and non-TEST original Presents, stable verified device/queue, single resize callback, separate monitor/render threads, cleanup.' } else { 'Active hook callbacks and restoration succeed.' })
+    scope='Actual production hooks/filter; Framework mutex-only stub; private hidden hardware DXGI chains. Inline detour is a bounded controlled model, not Steam implementation. No game/backend/runtime/profile access.'
+    cases=@()
 }
-$info = New-Object Diagnostics.ProcessStartInfo
-$info.FileName=$exe; $info.WorkingDirectory=$output; $info.UseShellExecute=$false; $info.CreateNoWindow=$true
-if ($Mode -eq 'Retained') { $info.Arguments='--retained-dispatch' }
-if ($Mode -eq 'RetainedFixed') { $info.Arguments='--retained-fixed' }
-if ($Mode -eq 'Rendered') { $info.Arguments='--rendered' }
-if ($Mode -eq 'EntryGateBaseline') { $info.Arguments='--entry-gate-baseline' }
-if ($Mode -eq 'EntryGateFixed') { $info.Arguments='--entry-gate-fixed' }
-if ($Mode -eq 'ResizeBaseline') { $info.Arguments='--resize-baseline'; $receipt.expectedBehavior='Catch original access violations from both cached resize entries after same-API hook replacement before first Present; remote crash cause not established.' }
-if ($Mode -eq 'ResizeFixed') { $info.Arguments='--resize-fixed'; $receipt.expectedBehavior='Cached/queued resize after replacement, different selected chain and destruction forwards real DXGI once; active selected resize keeps one renderer callback.' }
-if ($Mode -eq 'ResizeProbeBaseline') { $info.Arguments='--resize-probe-baseline'; $receipt.expectedBehavior='Reproduce old global DX11 probe modifying a real DX12 resize slot before any Present, without overflowing or crashing.' }
-if ($Mode -eq 'ResizeProbeFixed') { $info.Arguments='--resize-probe-fixed'; $receipt.expectedBehavior='Probe leaves DX12 resize native; confirmed DX11 gets instance-only resize with immutable original, bounded same-chain overlay/renderer reentry, filtered/retired/queued/replaced/destroyed safe forwarding.' }
-$info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
-$child=New-Object Diagnostics.Process; $child.StartInfo=$info
-if (-not $child.Start()) { throw 'Could not start actual-hook test.' }
-$ownedChildHandle=$child.Handle
-$stdoutRead=$child.StandardOutput.ReadToEndAsync(); $stderrRead=$child.StandardError.ReadToEndAsync()
-try { $child.PriorityClass='BelowNormal' } catch { }
-$receipt.timedOut=-not $child.WaitForExit(30000)
-if ($receipt.timedOut) { $child.Kill(); $child.WaitForExit() }
-$stdout=$stdoutRead.GetAwaiter().GetResult(); $stderr=$stderrRead.GetAwaiter().GetResult()
-[IO.File]::WriteAllText((Join-Path $output 'probe.stdout.txt'),$stdout,[Text.Encoding]::UTF8)
-[IO.File]::WriteAllText((Join-Path $output 'probe.stderr.txt'),$stderr,[Text.Encoding]::UTF8)
-$receipt.pid=$child.Id; $receipt.exitCode=[int]$child.ExitCode; $receipt.passed=-not $receipt.timedOut -and $child.ExitCode -eq 0
-$receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $output 'evidence.json') -Encoding UTF8
-Write-Output $stdout
-if ($stderr) { Write-Output $stderr }
-if (-not $receipt.passed) { throw "Actual-hook test failed/unsupported: $output" }
+if (-not $BuildOnly) {
+    if (-not $Cases.Count) {
+        $Cases = @('11-pending','12-pending','12-present1-pending','11-retired','12-retired','12-present1-retired','unrecoverable')
+        if (-not $Baseline) { $Cases += @('stable','delegation','e9-relay','cross-class','repatch') }
+    }
+    foreach ($case in $Cases) {
+        $info = New-Object Diagnostics.ProcessStartInfo
+        $info.FileName=$exe; $info.Arguments=$case + $(if ($Baseline) { ' --baseline' } else { '' })
+        $info.WorkingDirectory=$output; $info.UseShellExecute=$false; $info.CreateNoWindow=$true
+        $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
+        $child = New-Object Diagnostics.Process; $child.StartInfo=$info
+        if (-not $child.Start()) { throw 'Could not start owned recovery fixture.' }
+        $ownedHandle=$child.Handle
+        try { $child.PriorityClass='BelowNormal' } catch { }
+        $stdout=$child.StandardOutput.ReadToEndAsync(); $stderr=$child.StandardError.ReadToEndAsync()
+        $timedOut=-not $child.WaitForExit(30000)
+        if ($timedOut) { $child.Kill(); $child.WaitForExit() }
+        $code=[int]$child.ExitCode
+        $outPath=Join-Path $output ($case+'.stdout.txt'); $errPath=Join-Path $output ($case+'.stderr.txt')
+        [IO.File]::WriteAllText($outPath,$stdout.GetAwaiter().GetResult(),[Text.Encoding]::UTF8)
+        [IO.File]::WriteAllText($errPath,$stderr.GetAwaiter().GetResult(),[Text.Encoding]::UTF8)
+        $receipt.cases += [ordered]@{case=$case; exitCode=$code; timedOut=$timedOut; passed=($code -eq 0 -and -not $timedOut); stdout=$outPath; stderr=$errPath}
+        Get-Content -LiteralPath $outPath
+        if ((Get-Item -LiteralPath $errPath).Length) { Get-Content -LiteralPath $errPath }
+        if ($code -ne 0 -or $timedOut) { break }
+    }
+}
+$receipt.passed=($BuildOnly -or (($receipt.cases | Where-Object { -not $_.passed }).Count -eq 0 -and $receipt.cases.Count -eq $Cases.Count))
+$receipt | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath (Join-Path $output 'evidence.json') -Encoding UTF8
+if (-not $receipt.passed) { throw "Present recovery fixture failed or unsupported; inspect $output" }
 Write-Output "Evidence: $output"

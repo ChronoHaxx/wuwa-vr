@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$OutputRoot,
-    [ValidateSet('Standard','Retained','RetainedFixed','Rendered','EntryGateBaseline','EntryGateFixed','ResizeBaseline','ResizeFixed')][string]$Mode = 'Standard',
+    [ValidateSet('Standard','Retained','RetainedFixed','Rendered','EntryGateBaseline','EntryGateFixed','ResizeBaseline','ResizeFixed','ResizeProbeBaseline','ResizeProbeFixed')][string]$Mode = 'Standard',
     [string]$ProductionSnapshot = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -121,6 +121,8 @@ if ($Mode -eq 'EntryGateBaseline') { $info.Arguments='--entry-gate-baseline' }
 if ($Mode -eq 'EntryGateFixed') { $info.Arguments='--entry-gate-fixed' }
 if ($Mode -eq 'ResizeBaseline') { $info.Arguments='--resize-baseline'; $receipt.expectedBehavior='Catch original access violations from both cached resize entries after same-API hook replacement before first Present; remote crash cause not established.' }
 if ($Mode -eq 'ResizeFixed') { $info.Arguments='--resize-fixed'; $receipt.expectedBehavior='Cached/queued resize after replacement, different selected chain and destruction forwards real DXGI once; active selected resize keeps one renderer callback.' }
+if ($Mode -eq 'ResizeProbeBaseline') { $info.Arguments='--resize-probe-baseline'; $receipt.expectedBehavior='Reproduce old global DX11 probe modifying a real DX12 resize slot before any Present, without overflowing or crashing.' }
+if ($Mode -eq 'ResizeProbeFixed') { $info.Arguments='--resize-probe-fixed'; $receipt.expectedBehavior='Probe leaves DX12 resize native; confirmed DX11 gets instance-only resize with immutable original, bounded same-chain overlay/renderer reentry, filtered/retired/queued/replaced/destroyed safe forwarding.' }
 $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
 $child=New-Object Diagnostics.Process; $child.StartInfo=$info
 if (-not $child.Start()) { throw 'Could not start actual-hook test.' }

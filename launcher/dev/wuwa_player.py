@@ -559,7 +559,7 @@ def launch_state(state=None):
         "elevated", "injectorPid", "injectorStarted", "injectorRunning", "backendLogStarted", "firstFrameSeen",
         "gameStartRequested", "gameStartEffective", "gameStartLauncher", "gameTarget", "backendError", "backendLogCaptured",
         "steamTargetCount", "steamTargetUnverifiedCount", "steamTargetCandidateCount", "steamTargetProcesses",
-        "targetVerificationLost", "backendEvidencePresent", "backendRendererInitialized", "backendProjectionSeen", "backendShuttingDown") if k in state}
+        "targetVerificationLost", "targetExitConfirmed", "steamTargetExitEvidence", "backendEvidencePresent", "backendRendererInitialized", "backendProjectionSeen", "backendShuttingDown") if k in state}
     owner = launch_owner_status(state)
     nonterminal = state.get("phase") not in (None, "", "failed", "cancelled", "finished")
     active = nonterminal and owner["verified"]

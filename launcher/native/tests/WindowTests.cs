@@ -119,6 +119,8 @@ public static class WindowTests
         public int IdentityPid = int.MaxValue;
         public bool RejectRecordStart, AllowRecordStart, AllowLaunch, RejectLaunch, AllowGameSettings, RejectGameSettings;
         public bool RejectCancel, KeepCancelRunning, StallStatus;
+        public bool StallCancelStatus;
+        public int CompleteCancelAfterReads, CancelStatusReads;
         public int GameSettingsWrites;
         public string SettingsFile;
         public readonly List<string> Writes = new List<string>();
@@ -146,7 +148,17 @@ public static class WindowTests
                         return Reply(new { app = "wuwa-vr-player-launcher", root = IdentityRoot ?? Path.Combine(store.Folder(store.Selected), "app"), pid = IdentityPid });
                     case "/": return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
                         store.Selected != null && store.Selected.folder == RejectedTokenFolder ? "Fixture unsupported helper interface" : "<meta name=\"wuwa-token\" content=\"window_fixture\">") });
-                    case "/api/status": StatusReads++; return StallStatus ? StalledReply(token) : Reply(Status);
+                    case "/api/status":
+                        StatusReads++;
+                        if (Cancels > 0) {
+                            CancelStatusReads++;
+                            if (StallCancelStatus) return StalledReply(token);
+                            if (CompleteCancelAfterReads > 0 && CancelStatusReads >= CompleteCancelAfterReads) {
+                                Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", false }, { "cancellable", false }, { "phase", "cancelled" }, { "message", "Fixture worker stopped after its normal polling interval" } };
+                                Status["job"] = new Dictionary<string, object> { { "running", false } };
+                            }
+                        }
+                        return StallStatus ? StalledReply(token) : Reply(Status);
                     case "/api/diagnostics":
                         if (DiagnosticsFailure != null) throw new HttpRequestException(DiagnosticsFailure);
                         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(DiagnosticsReply) });
@@ -975,9 +987,32 @@ public static class WindowTests
                     "stale Oct4 launch receipt trapped Close or skipped safe verified idle-helper shutdown");
                 Console.WriteLine("PASS WINDOW reported Oct4 launch state is rechecked on Close; exited worker permits verified helper shutdown without confirmation (fake HTTP only)");
             }
+            foreach (bool stall in new[] { false, true }) using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); f.Http.KeepCancelRunning = true;
+                f.Http.CompleteCancelAfterReads = stall ? 0 : 3; f.Http.StallCancelStatus = stall;
+                Set(w, "cancelGrace", TimeSpan.FromMilliseconds(stall ? 150 : 1200));
+                f.Http.Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", true },
+                    { "cancellable", true }, { "phase", "injected" }, { "ownerPid", 98765 }, { "message", "Fixture startup waiting" } };
+                Refresh(w); var watch = System.Diagnostics.Stopwatch.StartNew();
+                Click(w, Field<Button>(w, "cancelButton"));
+                Check(f.Http.Cancels == 1 && f.Http.Stops == 0 && f.Http.Launches == 0 && watch.Elapsed.TotalSeconds < 3,
+                    "cancellation grace was unbounded or performed another process operation");
+                if (stall) {
+                    Check(Field<bool>(w, "troubleshootingVisible") && Field<Expander>(w, "processRecoveryPanel").IsExpanded &&
+                        Field<bool>(w, "unresolvedStartup"), "status deadline hid unresolved cancellation or trapped the window");
+                    f.Http.StallCancelStatus = false;
+                } else {
+                    Check(f.Http.CancelStatusReads == 3 && !Field<bool>(w, "troubleshootingVisible") &&
+                        !Field<bool>(w, "unresolvedStartup") && !Field<Expander>(w, "processRecoveryPanel").IsExpanded,
+                        "normal delayed cancellation incorrectly opened stuck-process recovery");
+                }
+                Console.WriteLine("PASS WINDOW cancellation grace " + (stall ? "bounds a hung status request and exposes recovery" : "allows normal worker polling without premature recovery") + " (fake HTTP only)");
+            }
             foreach (bool refuseCancel in new[] { false, true }) using (var f = new Fixture(root))
             {
                 var w = f.Window; Connect(w); f.Http.KeepCancelRunning = true; f.Http.RejectCancel = refuseCancel;
+                Set(w, "cancelGrace", TimeSpan.FromMilliseconds(100));
                 f.Http.Status["launch"] = new Dictionary<string, object> {
                     { "phase", "preflight" }, { "message", "Previous startup stopped reporting. Review stuck launcher processes." },
                     { "buildId", "lightfix2-20261001" }, { "started", "2026-10-04T15:54:54.8465528+01:00" },

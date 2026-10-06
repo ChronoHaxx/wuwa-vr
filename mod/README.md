@@ -1,13 +1,13 @@
-# Mod source — 1.1.0 beta
+# Mod source — 1.1.1 beta
 
 The release target is
-[beta-1-1-0](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-0),
-launcher **1.1.0**, backend/package build **player-ready-1-1-0**, for game
+[beta-1-1-1](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1),
+launcher **1.1.1**, backend/package build **steam-resize-1-1-1**, for game
 **3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. The previous 1.0.10 startup was user-confirmed; new controller and headset acceptance remain pending.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The user confirmed successful startup on the previously affected Windows 11 Steam PC with the bundled simulator in 1.0.10. This release retains that startup repair. PlayStation hardware, headset comfort and the updated launcher flow still need user testing. See [the enum startup report](../docs/launch-kit/ENUM-STARTUP-20261006.md).
+The user confirmed 1.0.10 startup on the previously affected Windows 11 Steam simulator PC, and 1.1.0 through Kuro on the owner's PC. The owner's 1.1.0 Steam route crashed. Version 1.1.1 repairs the resize recursion found in that crash dump; controlled graphics and launcher tests pass, but this repair still needs real Steam and headset testing. See [the resize startup report](../docs/launch-kit/STEAM-RESIZE-1.1.1.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

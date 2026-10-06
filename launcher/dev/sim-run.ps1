@@ -131,7 +131,9 @@ function Update-SettleProcessState {
             steamTargetCandidateCount = $latest.SteamTargetCandidateCount;
             steamTargetUnverifiedCount = $latest.SteamTargetUnverifiedCount;
             steamTargetProcesses = $latest.SteamTargetProcesses;
-            targetVerificationLost = -not [bool]$latest.TargetRunning }
+            targetVerificationLost = -not [bool]$latest.TargetRunning -and -not [bool]$latest.TargetExitConfirmed;
+            targetExitConfirmed = [bool]$latest.TargetExitConfirmed;
+            steamTargetExitEvidence = $latest.SteamTargetExitEvidence }
     } else {
         $latest = Get-LaunchProcessSnapshot -TargetName $gameProcName -GameNames $gameNames `
             -LauncherNames $launcherNames -LauncherRoot $launcherRoot -Injector $watchedInjector
@@ -504,8 +506,8 @@ $observe = {
     if ($steamGame -and -not $observation.TargetRunning) {
         $observation.FirstFrameSeen = $false
         $observation.BackendLogStarted = $observation.BackendEvidencePresent
-        $observation.TargetVerificationLost = [bool]$sameAttributedLog
-        $backendEvidence.TargetVerificationLost = [bool]$sameAttributedLog
+        $observation.TargetVerificationLost = [bool]$sameAttributedLog -and -not [bool]$observation.TargetExitConfirmed
+        $backendEvidence.TargetVerificationLost = $observation.TargetVerificationLost
     } elseif ($steamGame) { $backendEvidence.TargetVerificationLost = $false }
     $observation
 }
@@ -524,6 +526,7 @@ $onPoll = {
         if ($observation.BackendRendererInitialized) { $message = 'UEVR reached renderer initialization, but the selected Steam process can no longer be uniquely verified. Open Troubleshooting and copy diagnostics; do not start another injector.' }
     }
     if ($observation.BackendShuttingDown) { $phase = 'stopping'; $message = 'UEVR reported Framework shutdown; ending this startup wait. The game may still be open.' }
+    if ($steamGame -and $observation.TargetExitConfirmed) { $phase = 'stopping'; $message = 'Windows confirmed that the original selected game process exited. Ending this startup wait; no game was closed by the launcher.' }
     if ($decision.Action -eq 'Cancelled') { $phase = 'stopping'; $message = 'Stopping this startup wait on request; the game is left open.' }
     if ($message -ne $progress.Message) {
         Write-Host ('  {0}  {1}' -f (Get-Date -Format 'HH:mm:ss'), $message)
@@ -542,7 +545,9 @@ $onPoll = {
         Update-LaunchState -Path $StatePath -Values @{steamTargetCount=$observation.SteamTargetCount;
             steamTargetCandidateCount=$observation.SteamTargetCandidateCount;
             steamTargetUnverifiedCount=$observation.SteamTargetUnverifiedCount;
-            steamTargetProcesses=$observation.SteamTargetProcesses}
+            steamTargetProcesses=$observation.SteamTargetProcesses;
+            targetExitConfirmed=[bool]$observation.TargetExitConfirmed;
+            steamTargetExitEvidence=$observation.SteamTargetExitEvidence}
     }
 }
 $cancelCheck = {

@@ -92,16 +92,28 @@ try {
     Check ($held.Verified -and $held.Source -eq 'verified-held-handle' -and $held.CreationFileTime -eq $limited.CreationFileTime) 'same live retained handle survives later permission restriction without PID-only trust'
     # Production exact-path comparison still rejects another executable name.
     $script:FixtureProcess=$child
-    function Get-Process { [CmdletBinding()]param($Name,$Id) $script:FixtureProcess }
+    function Get-Process { [CmdletBinding()]param($Name,$Id) if($script:FixtureProcess){$script:FixtureProcess} }
     Check (@(Get-WuWaSteamProcesses 'C:\Wrong\powershell.exe').Count -eq 0) 'retained identity never bypasses the selected executable path'
     $selected=@(Get-WuWaSteamProcesses $ps)
     Check ($selected.Count -eq 1 -and $selected[0].Id -eq $child.Id -and $selected[0].StartTime -eq $limited.StartTime) 'selected identity returns handle-derived creation time for continuity'
+    $script:FixtureProcess=$null
+    $game=[pscustomobject]@{Shipping=$ps;Bootstrap='C:\fixture\missing-bootstrap.exe'}
+    $aliveSnapshot=Get-WuWaSteamProcessSnapshot $game $null
+    Check ($aliveSnapshot.SteamTargetCandidateCount -eq 0 -and -not $aliveSnapshot.TargetExitConfirmed) 'real live retained handle does not turn absent enumeration into exit'
+    Check (@(Get-WuWaSteamRetainedProcessStates 'C:\Wrong\powershell.exe').Count -eq 0) 'retained exit observation remains exact-path bound'
     [WuWaIdentityAclFixture]::Set($handle,$original);$original=$null
     [IO.File]::WriteAllText($stop,'finish')
     Check ($child.WaitForExit(5000)) 'fixture exits cooperatively without process termination'
+    $deadSnapshot=Get-WuWaSteamProcessSnapshot $game $null
+    Check ($deadSnapshot.SteamTargetCandidateCount -eq 0 -and $deadSnapshot.TargetExitConfirmed -and $deadSnapshot.SteamTargetExitEvidence.pid -eq $child.Id -and $deadSnapshot.SteamTargetExitEvidence.creationFileTime -eq $limited.CreationFileTime) 'same original signaled handle proves exit when enumeration returns nothing'
+    Check ($deadSnapshot.SteamTargetExitEvidence.exitCode -eq 0) 'real cooperative fixture exit code is captured from original handle'
     $after=Get-WuWaSteamProcessIdentity $child
     Check (-not $after.Verified -and $after.Path -eq '') 'signaled original handle never accepts stale identity after process exit'
     Check ([WuWa.SteamProcessIdentityV1]::RetainedCount -eq 0) 'exited cache entry is disposed'
+    $afterEnumerationRace=Get-WuWaSteamProcessSnapshot $game $null
+    Check ($afterEnumerationRace.TargetExitConfirmed -and $afterEnumerationRace.SteamTargetExitEvidence.creationFileTime -eq $limited.CreationFileTime) 'exit proof survives a final enumerated PID read disposing its signaled handle'
+    [WuWa.SteamProcessIdentityV1]::Clear()
+    Check (-not (Get-WuWaSteamProcessSnapshot $game $null).TargetExitConfirmed) 'explicit new-attempt cleanup removes completed identity evidence too'
 } finally {
     if($original){[WuWaIdentityAclFixture]::Set($child.Handle,$original)}
     [IO.File]::WriteAllText($stop,'finish')

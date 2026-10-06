@@ -44,6 +44,8 @@ Check ((Get-LaunchWaitDecision -FirstFrameSeen $true -TimedOut $true).Action -eq
 Check ((Get-LaunchWaitDecision -FirstFrameSeen $true -BackendShuttingDown $true).Action -eq 'BackendStopped') 'positive shutdown overrides earlier projection evidence'
 Check ((Get-LaunchWaitDecision -FirstFrameSeen $true -BackendShuttingDown $true -CancelRequested $true).Action -eq 'Cancelled') 'explicit cancellation remains authoritative during shutdown or apparent readiness'
 Check ((Get-LaunchWaitDecision -GameSeen $true -GameRunning $false -GameStateUnknown $true -GameGoneSeconds 90).Action -eq 'Continue') 'ambiguous process observation alone never proves game exit'
+Check ((Get-LaunchWaitDecision -TargetExitConfirmed $true -GameStateUnknown $true -FirstFrameSeen $true).Action -eq 'GameExited') 'original signaled process handle overrides stale projection and unknown enumeration'
+Check ((Get-LaunchWaitDecision -TargetExitConfirmed $true -CancelRequested $true).Action -eq 'Cancelled') 'explicit cancellation remains authoritative over confirmed game exit'
 $script:lostEnumerationPolls=0
 $missingEnumeration=Wait-LaunchOutcome -TimeoutSeconds 1 -PollMilliseconds 10 -GameGoneGraceSeconds 0 -Observe {
     $script:lostEnumerationPolls++
@@ -83,6 +85,9 @@ function Wait-LaunchOutcome {
             if($global:FixtureSpecial -ne 'settle-pending') {
                 [IO.File]::AppendAllText($global:FixtureProfileLog,"[info] right-eye composite: capture=100x100 game=200x100 expected_eye=100x100 capture_resource=0x1`r`n")
             }
+        } elseif($global:FixtureSpecial -like 'confirmed-exit*') {
+            $global:FixtureGameVisible=$false
+            if($global:FixtureSpecial -eq 'confirmed-exit-cancel') { [IO.File]::WriteAllText((Join-Path $global:FixtureRun 'cancel.request'),'stop') }
         } elseif($global:FixtureSpecial -like 'shutdown*') {
             [IO.File]::AppendAllText($global:FixtureProfileLog,"[info] Framework initialized`r`n[info] Derived texture bounds right eye: 0, 1, 0, 1`r`n[info] Framework shutting down...`r`n")
             $global:FixtureGameVisible=$global:FixtureSpecial -eq 'shutdown-live'
@@ -130,6 +135,12 @@ function Get-WuWaSteamProcessIdentity {
     param($Process)
     [pscustomobject]@{Id=$Process.Id;Path=$Process.Path;StartTime=[datetime]'2026-10-06 14:59:59';Verified=[bool]$Process.Path;
         Source='inert-fixture';CreationFileTime=0;Win32Error=0;FailedStep=''}
+}
+function Get-WuWaSteamRetainedProcessStates {
+    param($ExpectedPath)
+    if($global:FixtureSpecial -like 'confirmed-exit*' -and -not $global:FixtureGameVisible) {
+        [pscustomobject]@{Id=101;CreationFileTime=123456;Exited=$true;ExitCodeKnown=$true;ExitCode=3221225477;Source='signaled-original-handle'}
+    }
 }
 function Get-ItemPropertyValue { param($Path,$LiteralPath,$Name) if($Name -eq 'ActiveRuntime'){$global:FixtureRuntime}else{throw 'Fixture registry value absent'} }
 function Get-ItemProperty { param($Path,$LiteralPath) throw 'Unexpected registry read' }
@@ -206,6 +217,7 @@ try {
     Write-Fixture (Join-Path $profile 'injector_config.txt') ('custom_var_urvr_folder='+$runtime)
     foreach($case in @(@{mode='steam';loss=''},@{mode='steam';loss='unreadable'},@{mode='steam';loss='duplicate'},@{mode='launcher';loss=''},@{mode='manual';loss=''},
         @{mode='steam';loss='';special='shutdown-gone'},@{mode='steam';loss='';special='shutdown-live'},
+        @{mode='steam';loss='';special='confirmed-exit'},@{mode='steam';loss='';special='confirmed-exit-cancel'},
         @{mode='steam';loss='';special='loss-cancel'},@{mode='steam';loss='';special='empty-cancel'},@{mode='steam';loss='';special='ambiguous-timeout'},
         @{mode='steam';loss='';special='settle-cancel'},@{mode='steam';loss='';special='settle-gone'},
         @{mode='steam';loss='';special='settle-unreadable'},@{mode='steam';loss='';special='settle-rotated'},
@@ -226,7 +238,10 @@ try {
         try { & (Join-Path $dev 'delegate.ps1') $settings $runtime $global:FixtureRuntime $state (Join-Path $global:FixtureRun 'cancel.request') $global:FixtureRun | Out-Null }
         catch { $errorText=$_.Exception.Message }
         $saved=Get-Content $state -Raw | ConvertFrom-Json
-        if($global:FixtureSpecial -like 'shutdown*') {
+        if($global:FixtureSpecial -eq 'confirmed-exit') {
+            Check ($saved.phase -eq 'failed' -and $saved.outcome -eq 'GameExited' -and $saved.targetExitConfirmed -and -not $saved.targetVerificationLost) 'actual observer ends on exact-process exit without relabeling it TargetUnverified'
+            Check ($saved.steamTargetCandidateCount -eq 0 -and $saved.steamTargetExitEvidence.pid -eq 101 -and $saved.steamTargetExitEvidence.exitCode -eq 3221225477 -and $errorText -match 'process exited') 'confirmed exit retains unsigned exit code and original identity with empty enumeration'
+        } elseif($global:FixtureSpecial -like 'shutdown*') {
             Check ($saved.phase -eq 'failed' -and $saved.outcome -eq 'BackendStopped' -and $saved.backendShuttingDown -and -not $saved.firstFrameSeen -and $errorText -match 'Framework shutdown') ($global:FixtureSpecial+': actual wait ends on attributed shutdown rather than stale progress or readiness')
             Check ($errorText -notmatch 'The game closed|reached renderer initialization, but') ($global:FixtureSpecial+': does not confuse backend shutdown with confirmed game exit or identity-loss failure')
         } elseif($global:FixtureSpecial -eq 'settle-cancel') {

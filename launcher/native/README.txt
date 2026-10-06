@@ -1,12 +1,12 @@
-WUWA VR — 1.1.0 BETA / GAME 3.7
-Release: beta-1-1-0 | VR build: player-ready-1-1-0
+WUWA VR — 1.1.1 BETA / GAME 3.7
+Release: beta-1-1-1 | VR build: steam-resize-1-1-1
 
 Run WuWa-VR-Setup.exe, then open WuWa VR from the Start menu.
 First VR installation needs internet; no separate Python install is needed.
 
 01 Game: choose your Steam or Kuro installation. For Steam, select
    Wuthering Waves.exe if browsing and sign into Steam first.
-02 WuWa VR: accept the account-risk notice and install 1.1.0 beta.
+02 WuWa VR: accept the account-risk notice and install 1.1.1 beta.
 03 Headset or simulator: start your headset software and select a valid
    OpenXR runtime, or explicitly choose Use bundled simulator.
    Select Launch in VR. Steam opens through Steam; for Kuro, press Play.
@@ -33,9 +33,7 @@ launcher workers requires explicit selection and confirmation. Game, Steam,
 headset/runtime and injector processes are excluded. Close launcher only does
 not claim that background work stopped. Developer tools holds recording.
 
-The user confirmed successful 1.0.10 startup on the previously affected
-Windows 11 Steam PC with the simulator. The new launcher flow, physical
-PlayStation input and headset experience require separate user testing.
+The user confirmed 1.0.10 startup on the previously affected Windows 11 Steam simulator PC, and 1.1.0 through Kuro on the owner's PC. The owner's 1.1.0 Steam route crashed. Version 1.1.1 repairs the resize recursion found in that crash dump; controlled graphics and launcher tests pass, but this repair still needs real Steam and headset testing.
 
 The desktop launcher is MIT open source. Mod source changes are public;
 upstream and community components retain their own licences. Read LICENSE.txt
@@ -47,10 +45,10 @@ Not approved by Kuro Games. Do not disable security software.
 Website: https://chronohaxx.github.io/wuwa-vr/
 Source: https://github.com/ChronoHaxx/wuwa-vr
 
-鸣潮 VR — 1.1.0 测试版 / 游戏 3.7
+鸣潮 VR — 1.1.1 测试版 / 游戏 3.7
 
 运行安装程序后，从开始菜单打开 WuWa VR。首次安装 VR 包需要网络，无需另装 Python。
-01 选择 Steam 或库洛游戏；02 阅读风险提示并安装 1.1.0 beta；
+01 选择 Steam 或库洛游戏；02 阅读风险提示并安装 1.1.1 beta；
 03 启动头显软件并选择有效运行时，或明确选择内置模拟器，然后启动 VR。
 Steam 通过 Steam 启动；库洛用户还需在库洛启动器点击开始游戏。
 
@@ -70,8 +68,10 @@ L3 + R3 打开 UEVR，专用控制在 VR > WuWa Controls。
 注入器不在停止目标内。仅关闭启动器窗口不表示后台任务已停止。
 开发工具保存录像和高级诊断功能。
 
-用户已确认 1.0.10 在此前受影响的 Windows 11 Steam 电脑上使用模拟器启动成功。
-本版新流程、PlayStation 实体手柄和头显体验仍需单独测试。
+用户已确认 1.0.10 在此前受影响的 Windows 11 Steam 电脑使用模拟器启动成功，
+1.1.0 在开发者电脑通过库洛启动成功，但同机 Steam 启动崩溃。1.1.1 修复了崩溃
+转储发现的窗口尺寸回调递归；受控图形和启动器测试通过，真实 Steam 启动、
+PlayStation 实体手柄及头显仍待复测。
 启动器采用 MIT 开源许可；模组改动源代码公开，上游组件保留各自许可。
 病毒扫描报告针对精确文件哈希，不保证安全或账号兼容性。
 非官方注入可能导致反作弊或账号限制，未经库洛批准。不要禁用安全软件。

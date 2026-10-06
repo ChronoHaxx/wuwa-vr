@@ -469,6 +469,7 @@ function Get-LaunchWaitDecision {
         [bool]$BackendLogStarted,
         [bool]$BackendShuttingDown,
         [bool]$GameStateUnknown,
+        [bool]$TargetExitConfirmed,
         [double]$TargetWithoutLogSeconds,
         [bool]$TimedOut,
         [int]$LauncherGraceSeconds = 15,
@@ -479,6 +480,8 @@ function Get-LaunchWaitDecision {
     $detail = ''
     if ($CancelRequested) {
         $action = 'Cancelled'; $detail = 'Stopped waiting on request.'
+    } elseif ($TargetExitConfirmed) {
+        $action = 'GameExited'; $detail = 'The original selected game process exited before VR startup completed.'
     } elseif ($BackendShuttingDown) {
         $action = 'BackendStopped'; $detail = 'UEVR reported Framework shutdown before startup completed. The game may still be open; the launcher did not close it.'
     } elseif ($FirstFrameSeen) {
@@ -573,8 +576,9 @@ function Wait-LaunchOutcome {
         $targetAlone = 0; if ($null -ne $targetSince) { $targetAlone = $now - $targetSince }
         # Optional evidence fields keep non-Steam callers compatible. Missing
         # enumeration is not proof that a previously verified process exited.
-        $backendStopped = $false; $gameStateUnknown = $false
+        $backendStopped = $false; $gameStateUnknown = $false; $targetExited = $false
         if ($observation.ContainsKey('BackendShuttingDown')) { $backendStopped = [bool]$observation.BackendShuttingDown }
+        if ($observation.ContainsKey('TargetExitConfirmed')) { $targetExited = [bool]$observation.TargetExitConfirmed }
         if ($observation.ContainsKey('TargetVerificationLost')) { $gameStateUnknown = [bool]$observation.TargetVerificationLost }
         if ($observation.ContainsKey('SteamTargetCount') -and -not $observation.TargetRunning) { $gameStateUnknown = $true }
         $decision = Get-LaunchWaitDecision -FirstFrameSeen ([bool]$observation.FirstFrameSeen) `
@@ -584,6 +588,7 @@ function Wait-LaunchOutcome {
             -LauncherGoneSeconds $launcherGone -TargetRunning ([bool]$observation.TargetRunning) `
             -BackendLogStarted ([bool]$observation.BackendLogStarted) -TargetWithoutLogSeconds $targetAlone `
             -BackendShuttingDown $backendStopped -GameStateUnknown $gameStateUnknown `
+            -TargetExitConfirmed $targetExited `
             -TimedOut ($now -ge $TimeoutSeconds) -LauncherGraceSeconds $LauncherGraceSeconds `
             -GameGoneGraceSeconds $GameGoneGraceSeconds -InjectionGraceSeconds $InjectionGraceSeconds
         if ($OnPoll) { & $OnPoll $observation $decision $gameSeen }

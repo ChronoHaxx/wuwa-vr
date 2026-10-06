@@ -170,7 +170,9 @@ class LaunchRecovery(unittest.TestCase):
                    steamTargetCount=0, steamTargetUnverifiedCount=1, steamTargetCandidateCount=1,
                    steamTargetProcesses=[{'pid':1234, 'pathReadable':False, 'matchesSelected':False}],
                    targetVerificationLost=True, backendEvidencePresent=True, backendRendererInitialized=True,
-                   backendProjectionSeen=True, backendShuttingDown=True)
+                   backendProjectionSeen=True, backendShuttingDown=True,
+                   targetExitConfirmed=True, steamTargetExitEvidence={'pid':1234, 'creationFileTime':123456,
+                       'source':'signaled-original-handle', 'exitCode':None})
         with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
             result = player.launch_state()
         self.assertEqual(result['gameStartRequested'], 'steam')
@@ -183,6 +185,9 @@ class LaunchRecovery(unittest.TestCase):
         self.assertEqual(result['steamTargetCandidateCount'], 1)
         self.assertEqual(result['steamTargetProcesses'][0]['pid'], 1234)
         self.assertFalse(result['steamTargetProcesses'][0]['pathReadable'])
+        self.assertTrue(result['targetExitConfirmed'])
+        self.assertEqual(result['steamTargetExitEvidence']['pid'],1234)
+        self.assertIsNone(result['steamTargetExitEvidence']['exitCode'])
         for key in ('targetVerificationLost', 'backendEvidencePresent', 'backendRendererInitialized', 'backendProjectionSeen', 'backendShuttingDown'):
             self.assertTrue(result[key])
 

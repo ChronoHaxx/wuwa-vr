@@ -11,6 +11,7 @@
 #include <wrl.h>
 
 #include "utility/PointerHook.hpp"
+#include "utility/VtableHook.hpp"
 
 class D3D11Hook {
 public:
@@ -87,7 +88,12 @@ protected:
     std::optional<uint32_t> m_next_present_interval{};
 
     std::unique_ptr<PointerHook> m_present_hook{};
-    std::unique_ptr<PointerHook> m_resize_buffers_hook{};
+    using ResizeBuffersFn = HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
+    // Resize belongs to a positively identified real DX11 chain, never the
+    // global DXGI table used while probing an unknown renderer.
+    ComPtr<IDXGISwapChain> m_resize_swapchain{};
+    std::unique_ptr<VtableHook> m_resize_buffers_hook{};
+    ResizeBuffersFn m_original_resize_buffers{};
     std::unique_ptr<PointerHook> m_set_render_targets_hook{};
     OnPresentFn m_on_present{ nullptr };
     OnPresentFn m_on_post_present{ nullptr };
@@ -96,6 +102,7 @@ protected:
 
     static HRESULT WINAPI present(IDXGISwapChain* swap_chain, UINT sync_interval, UINT flags);
     static HRESULT WINAPI resize_buffers(IDXGISwapChain* swap_chain, UINT buffer_count, UINT width, UINT height, DXGI_FORMAT new_format, UINT swap_chain_flags);
+    void install_resize_hook(IDXGISwapChain* swap_chain);
     static void WINAPI set_render_targets(
         ID3D11DeviceContext* context, UINT num_views, ID3D11RenderTargetView* const* rtvs, ID3D11DepthStencilView* dsv);
 };

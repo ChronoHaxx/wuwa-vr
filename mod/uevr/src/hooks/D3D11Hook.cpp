@@ -19,7 +19,36 @@ namespace {
 std::atomic_uint64_t g_d3d11_probe_generation{};
 D3D11Hook::PresentFn g_retired_d3d11_present{};
 using ResizeBuffersFn = HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
-ResizeBuffersFn g_retired_d3d11_resize{};
+
+// Covers every path, including filtered/retired forwarding and callbacks made
+// by another overlay. No allocation, code patching, or guessed success result.
+struct ResizeCall {
+    IDXGISwapChain* chain;
+    ResizeCall* previous;
+    static thread_local ResizeCall* current;
+    static bool contains(IDXGISwapChain* chain) {
+        unsigned depth{};
+        for (auto call = current; call != nullptr; call = call->previous) {
+            if (call->chain == chain || ++depth >= 16) return true;
+        }
+        return false;
+    }
+    explicit ResizeCall(IDXGISwapChain* source) : chain{source}, previous{current} { current = this; }
+    ~ResizeCall() { current = previous; }
+};
+thread_local ResizeCall* ResizeCall::current{};
+
+ResizeBuffersFn read_resize_original(IDXGISwapChain* chain) {
+    void** table{};
+    ResizeBuffersFn original{};
+    SIZE_T bytes{};
+    if (chain == nullptr || !ReadProcessMemory(GetCurrentProcess(), chain, &table, sizeof(table), &bytes) ||
+        bytes != sizeof(table) || table == nullptr) return nullptr;
+    bytes = 0;
+    if (!ReadProcessMemory(GetCurrentProcess(), table + 13, &original, sizeof(original), &bytes) ||
+        bytes != sizeof(original)) return nullptr;
+    return original;
+}
 
 void log_probe_window(uint64_t generation, const char* stage, IDXGISwapChain* chain,
     HRESULT desc_result, HWND desc_hwnd) {
@@ -107,18 +136,16 @@ bool D3D11Hook::hook() {
     try {
         m_present_hook.reset();
         m_resize_buffers_hook.reset();
+        m_resize_swapchain.Reset();
+        m_original_resize_buffers = nullptr;
 
         auto& present_fn = (*(void***)swap_chain)[8];
-        auto& resize_buffers_fn = (*(void***)swap_chain)[13];
 
         m_probe_present_slot = &present_fn;
 
         m_present_hook = std::make_unique<PointerHook>(&present_fn, (void*)&D3D11Hook::present);
         m_original_present = m_present_hook->get_original<PresentFn>();
         g_retired_d3d11_present = m_original_present;
-        m_resize_buffers_hook = std::make_unique<PointerHook>(&resize_buffers_fn, (void*)&D3D11Hook::resize_buffers);
-        g_retired_d3d11_resize = m_resize_buffers_hook->get_original<ResizeBuffersFn>();
-
         m_hooked = true;
     } catch (const std::exception& e) {
         spdlog::error("Failed to hook D3D11: {}", e.what());
@@ -148,7 +175,11 @@ bool D3D11Hook::unhook() {
         (uintptr_t)slot_value, slot_read && slot_value == (void*)&D3D11Hook::present,
         (uintptr_t)m_original_present);
 
-    if (m_present_hook->remove() && m_resize_buffers_hook->remove()) {
+    // Restore the private table before retiring the global Present slot.
+    // Keep its immutable original and COM identity until object replacement so
+    // an already dispatched resize can forward without touching the renderer.
+    if (m_resize_buffers_hook) m_resize_buffers_hook->remove();
+    if (m_present_hook->remove()) {
         // The next DX12 probe may deliberately install this same thunk. Destroy
         // the removed owner now, before a newer hook can own that destination.
         // A queued callback uses m_original_present, not this hook object.
@@ -264,6 +295,11 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
             d3d11->m_probe_generation, (uintptr_t)swap_chain, (uint32_t)device_result, (uintptr_t)d3d11->m_device);
     }
 
+    if (SUCCEEDED(device_result) && d3d11->m_device != nullptr &&
+        swap_chain == d3d11->m_swap_chain && d3d11->m_resize_buffers_hook == nullptr) {
+        d3d11->install_resize_hook(swap_chain);
+    }
+
     if (FAILED(device_result) && d3d11->m_observed_dx12_chain == nullptr &&
         std::chrono::steady_clock::now() >= d3d11->m_dx12_next_source_probe) {
         // Limit failed capability queries, not the number of future chains.
@@ -358,19 +394,36 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
     return result;
 }
 
-thread_local bool g_inside_d3d11_resize_buffers = false;
-HRESULT last_d3d11_resize_buffers_result = S_OK;
+void D3D11Hook::install_resize_hook(IDXGISwapChain* swap_chain) {
+    const auto original = read_resize_original(swap_chain);
+    if (original == nullptr || original == &D3D11Hook::resize_buffers) return;
+    // VtableHook::get_method reads the mutable old table. Save the callable now
+    // so a later overlay hook cannot silently change our forward destination.
+    m_resize_swapchain = swap_chain;
+    m_original_resize_buffers = original;
+    m_resize_buffers_hook = std::make_unique<VtableHook>(swap_chain);
+    if (!m_resize_buffers_hook->hook_method(13, (uintptr_t)&D3D11Hook::resize_buffers)) {
+        m_resize_buffers_hook.reset();
+        m_original_resize_buffers = nullptr;
+        m_resize_swapchain.Reset();
+        return;
+    }
+    spdlog::info("[WuWaD3DResize] api=11 stage=installed chain={:x} original={:x} scope=verified_instance",
+        (uintptr_t)swap_chain, (uintptr_t)original);
+}
 
 HRESULT WINAPI D3D11Hook::resize_buffers(
     IDXGISwapChain* swap_chain, UINT buffer_count, UINT width, UINT height, DXGI_FORMAT new_format, UINT swap_chain_flags) {
+    if (swap_chain == nullptr || ResizeCall::contains(swap_chain)) return DXGI_ERROR_INVALID_CALL;
+    ResizeCall resize_call{swap_chain};
     std::scoped_lock _{g_framework->get_hook_monitor_mutex()};
 
     auto d3d11 = g_d3d11_hook;
-    auto resize_buffers_fn = d3d11 != nullptr && d3d11->m_resize_buffers_hook != nullptr ?
-        d3d11->m_resize_buffers_hook->get_original<ResizeBuffersFn>() : g_retired_d3d11_resize;
-    if (resize_buffers_fn == nullptr) return DXGI_ERROR_INVALID_CALL;
+    const bool owns_chain = d3d11 != nullptr && d3d11->m_resize_swapchain.Get() == swap_chain;
+    const auto resize_buffers_fn = owns_chain ? d3d11->m_original_resize_buffers : read_resize_original(swap_chain);
+    if (resize_buffers_fn == nullptr || resize_buffers_fn == &D3D11Hook::resize_buffers) return DXGI_ERROR_INVALID_CALL;
 
-    if (d3d11 == nullptr || !d3d11->m_hooked) {
+    if (!owns_chain || !d3d11->m_hooked) {
         return resize_buffers_fn(swap_chain, buffer_count, width, height, new_format, swap_chain_flags);
     }
 
@@ -390,27 +443,7 @@ HRESULT WINAPI D3D11Hook::resize_buffers(
         d3d11->m_on_resize_buffers(*d3d11, width, height);
     }
 
-    if (g_inside_d3d11_resize_buffers) {
-        auto original_bytes = utility::get_original_bytes(Address{resize_buffers_fn});
-
-        if (original_bytes) {
-            ProtectionOverride protection_override{resize_buffers_fn, original_bytes->size(), PAGE_EXECUTE_READWRITE};
-
-            memcpy(resize_buffers_fn, original_bytes->data(), original_bytes->size());
-
-            spdlog::info("Resize buffers fixed");
-        }
-
-        return last_d3d11_resize_buffers_result;
-    }
-
-    g_inside_d3d11_resize_buffers = true;
-
-    last_d3d11_resize_buffers_result = resize_buffers_fn(swap_chain, buffer_count, width, height, new_format, swap_chain_flags);
-
-    g_inside_d3d11_resize_buffers = false;
-
-    return last_d3d11_resize_buffers_result;
+    return resize_buffers_fn(swap_chain, buffer_count, width, height, new_format, swap_chain_flags);
 }
 
 void WINAPI D3D11Hook::set_render_targets(

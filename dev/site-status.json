@@ -1,8 +1,8 @@
 {
-  "tag": "beta-1-1-0",
-  "previousTag": "beta-2026-10-06-enum-startup",
+  "tag": "beta-1-1-1",
+  "previousTag": "beta-1-1-0",
   "game": "3.7",
-  "appVersion": "1.1.0",
-  "buildId": "player-ready-1-1-0",
+  "appVersion": "1.1.1",
+  "buildId": "steam-resize-1-1-1",
   "installer": "WuWa-VR-Setup.exe"
 }

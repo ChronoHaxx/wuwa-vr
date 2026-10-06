@@ -1,37 +1,37 @@
 {
   "schema": 3,
-  "build": "player-ready-1-1-0",
+  "build": "steam-resize-1-1-1",
   "privateCandidate": false,
-  "launcherVersion": "1.1.0",
+  "launcherVersion": "1.1.1",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "c3ea3c7b5a33e64c9d559d7ae592aa3e27e02a425e9cf794c79b4f1139d47eb1",
-  "frozenPatchSha256": "5f06d4cb153309433c1f43e49d6fbe136285477cc2499130664df04de25efc62",
-  "sourceReconstructedTree": "b89a06e241f7ba91c7e08172fd3ec18360092e04",
-  "buildCompleted": "2026-10-06T20:58:28+0100",
+  "backendSha256": "8dc74c58a1a5d67ee01c5880458533b1715d286afbbd84b98bc8e95b3047f3d3",
+  "frozenPatchSha256": "9163076d74bc7c8554ebd292df16f441ef76ac3422ea6445c0a6da885df3de0c",
+  "sourceReconstructedTree": "fd3156b70bf05b9b35ae1e62b5cddadbe5b02dd5",
+  "buildCompleted": "2026-10-06T21:53:27+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 54267020,
-    "sha256": "8145de66c0425dcd688327ed4753dc2237d25cf1d313b487fbccd6e8b8e70a16",
+    "bytes": 54293102,
+    "sha256": "13aba469969652c9069a2b32b7460fc0d680f40647c6014123c00e6af2f072ac",
     "public": true
   },
-  "liveAcceptance": "Prior 1.0.10 startup user-confirmed on affected Windows 11 Steam simulator PC. Current changes have component tests; PlayStation hardware and headset acceptance pending.",
+  "liveAcceptance": "Prior 1.0.10 Windows 11 Steam simulator and 1.1.0 owner Kuro startup were user-confirmed. Owner Steam 1.1.0 crashed; the 1.1.1 resize repair passes controlled tests but real Steam, PlayStation and headset retests remain pending.",
   "previousPublicRelease": {
-    "tag": "beta-2026-10-06-enum-startup",
-    "backendSha256": "26b32f2c6cc2d52c29fa786ca932806b53469cc3b0a3a2f32b8ed174fffbe3b6"
+    "tag": "beta-1-1-0",
+    "backendSha256": "c3ea3c7b5a33e64c9d559d7ae592aa3e27e02a425e9cf794c79b4f1139d47eb1"
   },
-  "sourceIdentity": "Runtime readiness checks, clearer version flow and native PlayStation shortcuts. See PLAYER-READY-1.1.0.md. Accepted startup, rendering and graphics policy retained.",
+  "sourceIdentity": "Verified-instance DirectX 11 resize and recursive-forwarding guard; confirmed Steam process exit and bounded cancellation. See STEAM-RESIZE-1.1.1.md. Existing DirectX 12 handoff, input and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "player-ready-1-1-0",
+  "rendererBuild": "steam-resize-1-1-1",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-1-1-0",
+  "releaseTag": "beta-1-1-1",
   "sdkPatchSha256": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
   "sdkReconstructedTree": "0ad1702a10fec58469ec88265fa7297365fffab6",
-  "launcherSha256": "278d56b42bf6ecb741572d29d7df5c76387c1888a2f90ed8eab52634ae4374a7",
-  "setupSha256": "e5cc3a9817dca8eba76caa156b28f5a1d3b801fee13f3fb16835106455a28404"
+  "launcherSha256": "04acb434dd54ade4bb67102309ac56f82ab08763e4dd17d46ebe556ba8f3297b",
+  "setupSha256": "dc3fc42c2c2de2473bd6b7cd04c496213bd078119fb5e43032a3babc8bd601a1"
 }

@@ -1,40 +1,20 @@
-WUWA VR — 1.1.0 BETA / FOCUSED USER CHECKS
-App 1.1.0 | Package beta-1-1-0 | Build player-ready-1-1-0 | Game 3.7
+WUWA VR — 1.1.1 BETA / FOCUSED USER CHECKS
+App 1.1.1 | Package beta-1-1-1 | Build steam-resize-1-1-1 | Game 3.7
 
-Record Pass / Fail / Blocked / Not tested. No need to create faults deliberately.
-1.0.10 startup was user-confirmed on the affected Windows 11 Steam simulator PC;
-that does not automatically accept the new controller or launcher behavior.
+Record Pass / Fail / Blocked / Not tested. Automated checks are not user results.
+Close game and injector before updating package or changing runtime.
 
-[ ] Update app to 1.1.0, then choose/install VR package 1.1.0 beta in step 02.
-    Verify the two version statuses are distinct; checking updates preserves
-    a deliberately selected older package until you choose the new package.
-[ ] If Windows still points at the old simulator, Launch in VR is disabled
-    with a recovery message. Close game/injector, choose Use bundled simulator,
-    accept Windows permission, then verify the current package is ready.
-    A valid headset runtime should also enable launch without auto-switching.
-[ ] Launch once using the intended Steam/Kuro route. Confirm actual VR remains
-    running, open UEVR, then exit normally. Copy diagnostics if startup fails.
-[ ] With a PS4/PS5 controller, check the input-source status in WuWa Controls.
-    Verify L3+R3 menu, L3+Cross recenter, L3+Circle HUD, L2+R2 then R3 mono,
-    and L2+R2 then hold L3 for 0.8 seconds stereo screen. Release between chords.
-    Check USB/Bluetooth only if available. Record which connection was tested.
-[ ] Hold a shortcut during Alt-Tab/disconnect, then return/reconnect. No toggle
-    should happen until controls are released and pressed again. If using
-    Steam Input, each chord should toggle once, not once per input path.
-    Direct HID does not consume the game's own native PlayStation input.
-[ ] Check ordinary Xbox use still works if available. Test headset comfort
-    separately; stop if uncomfortable. Roll back when idle only if needed.
+[ ] Update app to 1.1.1, then choose/install VR package 1.1.1 beta in step 02.
+    If using simulator, explicitly choose Use bundled simulator. Confirm ready.
+[ ] Launch Steam once with the usual setup. Confirm actual VR stays running
+    through the 30-second startup check and open the UEVR menu. If it crashes,
+    copy diagnostics before retrying; do not start a second injector.
+[ ] Check normal Alt-Tab/window resize if available and exit the game normally.
+    VR should keep working after returning to the game.
+[ ] If a normal startup is cancelled, Stop waiting should settle after a short
+    delay. A real stuck worker still exposes recovery; nothing is auto-killed.
+[ ] On the other PC, repeat its previously working Steam simulator launch.
+    Also check Kuro at a convenient later session; do not stop current play.
 
-No live game, device or runtime changes are made by the automated checks.
-See PlayerGuide.html for recovery and remaining rendering limitations.
-
-中文测试要点（通过／失败／受阻／未测试）
-[ ] 应用和 VR 包均更新到 1.1.0；分别显示状态，检查更新保留主动选择。
-[ ] 旧模拟器阻止启动并显示处理方法；明确选择当前包模拟器后恢复。
-    有效头显运行时同样可启动，不会自动切换系统运行时。
-[ ] 正常启动一次，确认 VR 持续运行、菜单和退出正常。
-[ ] 查看 PlayStation 输入来源状态；测试菜单、回中、HUD 和两种屏幕快捷键。
-    分别记录 USB／蓝牙测试情况，每次快捷键后松开所有按键。
-[ ] 切出窗口／重连时按住快捷键不会自动触发，松开再按后恢复。
-    Steam Input 不应造成重复切换；直接 HID 不会吞掉游戏本身的手柄输入。
-[ ] 如有 Xbox 则做回归检查；头显舒适度单独确认。
+PS4/PS5 hardware and physical-headset comfort remain separate pending checks.
+See PlayerGuide.html for controls, recovery and remaining rendering limitations.

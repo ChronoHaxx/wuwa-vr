@@ -11,7 +11,7 @@
 <nav aria-label="Guide language"><a href="#en">English</a><a href="#zh" lang="zh-Hans">简体中文</a><a href="#controls">Controls</a><a href="#recovery">Troubleshooting</a></nav>
 <section id="en">
 <h1>Play WuWa in VR</h1>
-<p class="muted">1.1.0 player guide · Wuthering Waves 3.7 · Windows PCVR</p>
+<p class="muted">1.1.1 player guide · Wuthering Waves 3.7 · Windows PCVR</p>
 <p>Install <strong>WuWa-VR-Setup.exe</strong>, then open the <strong>WuWa VR</strong> shortcut. No separate Python installation is needed. The first VR-package installation needs internet; the small Setup download contains the launcher app.</p>
 <div class="card"><h3>01 · Choose your game</h3>
 <p>Check the detected or saved location. Use <strong>Change</strong> to select Steam or the official Kuro launcher. If browsing for Steam, choose its <code>Wuthering Waves.exe</code>, not the inner Shipping executable. Choose explicitly if you have several installations.</p></div>
@@ -26,9 +26,9 @@
 
 <h2>Updates and rollback</h2>
 <p>Open <strong>02 → Versions &amp; updates → Check updates</strong>. Update the launcher app when offered, then use <strong>Restart to update</strong> when idle. Select and install the desired <strong>VR package</strong> separately. A failed update check or cached list does not establish that your package is current.</p>
-<p>This release pairs app <strong>1.1.0</strong> with package <code>beta-1-1-0</code>, build <code>player-ready-1-1-0</code>, for WuWa <strong>3.7</strong>. To undo a VR-package update, close the game and injector, stop recording, then use <strong>Troubleshooting → Repair &amp; recovery → Use previous installed version</strong>. This does not roll back the launcher app. Settings, backups and recordings are retained.</p>
+<p>This release pairs app <strong>1.1.1</strong> with package <code>beta-1-1-1</code>, build <code>steam-resize-1-1-1</code>, for WuWa <strong>3.7</strong>. To undo a VR-package update, close the game and injector, stop recording, then use <strong>Troubleshooting → Repair &amp; recovery → Use previous installed version</strong>. This does not roll back the launcher app. Settings, backups and recordings are retained.</p>
 <p>If app updating is blocked, use the latest <a href="https://chronohaxx.github.io/wuwa-vr/">Setup from the website</a>. Reinstalling does not stop an existing stuck worker; use recovery below first.</p>
-<details><summary>Portable fallback</summary><p>Download <strong>WuWa-VR-Launcher.zip</strong> from the <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-0">matching release</a>, extract everything and open <strong>WuWa VR Launcher.exe</strong>. Keep its folders together. This opens the separate web tool interface; it does not self-update the installed desktop app. The launcher’s <strong>Open matching portable ZIP</strong> action locates an already available verified copy.</p></details>
+<details><summary>Portable fallback</summary><p>Download <strong>WuWa-VR-Launcher.zip</strong> from the <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1">matching release</a>, extract everything and open <strong>WuWa VR Launcher.exe</strong>. Keep its folders together. This opens the separate web tool interface; it does not self-update the installed desktop app. The launcher’s <strong>Open matching portable ZIP</strong> action locates an already available verified copy.</p></details>
 
 <h2 id="controls">Everyday controls</h2>
 <p>Xbox / XInput is the normal gameplay path. <strong>L3 / R3</strong> mean click the sticks. Focus the game, close UEVR and HUD/mouse adjustment, and release controls between shortcuts. Physical gamepad passthrough bypasses mod shortcuts. <strong>Insert</strong> opens UEVR with the keyboard.</p>
@@ -41,7 +41,7 @@
 <tr><td>L3 + View / Menu</td><td>First person / shortcut sheet</td></tr>
 </tbody></table>
 <p id="playstation"><strong>PS4/PS5:</strong> Steam Input or another working Xbox/XInput mapping uses the same shortcuts. Cross/Circle/Square/Triangle map to A/B/X/Y, L1/R1 to LB/RB, L2/R2 to LT/RT, Share/Create to View, and Options to Menu.</p>
-<p>1.1.0 adds experimental direct input for Sony DualShock 4 and DualSense/Edge over USB or Bluetooth, after two seconds without a successful XInput pad poll. Any active XInput pad takes priority. Release all controls after a reconnect or input-source change, and check <strong>VR → WuWa Controls → Controller shortcuts</strong>. Direct input can open/close UEVR, but menu navigation still needs keyboard/mouse, mapped XInput or existing VR menu controls. Direct input cannot suppress those buttons in the game’s own native input path, so a shortcut may also trigger a game action; XInput mapping is preferred for consumed shortcuts. No touchpad/PS-button shortcut, rumble or adaptive-trigger support is added. Physical PS testing remains pending. See the <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md#playstation-controllers-experimental">full reference</a>.</p>
+<p>1.1.0 added experimental direct input for Sony DualShock 4 and DualSense/Edge over USB or Bluetooth, after two seconds without a successful XInput pad poll. Any active XInput pad takes priority. Release all controls after a reconnect or input-source change, and check <strong>VR → WuWa Controls → Controller shortcuts</strong>. Direct input can open/close UEVR, but menu navigation still needs keyboard/mouse, mapped XInput or existing VR menu controls. Direct input cannot suppress those buttons in the game’s own native input path, so a shortcut may also trigger a game action; XInput mapping is preferred for consumed shortcuts. No touchpad/PS-button shortcut, rumble or adaptive-trigger support is added. Physical PS testing remains pending. See the <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md#playstation-controllers-experimental">full reference</a>.</p>
 <p>Open <strong>VR → WuWa Controls → View modes and cutscenes</strong> for screen choices. Cinematic framing correction is on by default. Automatic switching is experimental and off: a reported in-engine scene did not switch, and prerecorded-movie switching is untested. Keep the manual theatre shortcut available.</p>
 <details><summary>Optional walking, diorama and hand demos</summary>
 <p><strong>VR controllers for walking (optional) → Walking input</strong> starts off. OpenXR is required. Wake both Quest controllers, focus the game, release all buttons/triggers/grips and center the sticks to arm. Repeat after focus loss or reconnect.</p>
@@ -51,7 +51,7 @@
 
 <h2 id="recovery">If something goes wrong</h2>
 <ul>
-<li><strong>Startup stuck:</strong> use <strong>Stop waiting</strong>. If cancellation is not confirmed, open <strong>Troubleshooting → Stuck launcher processes → Find stuck launcher processes</strong>. Review identities and eligibility, select only the worker you intend to stop, then confirm <strong>Stop selected</strong>. Nothing is preselected. Review results before choosing <strong>Retry connection</strong>.</li>
+<li><strong>Startup stuck:</strong> use <strong>Stop waiting</strong> and allow up to four seconds for cancellation. A confirmed game exit ends the wait; unavailable process information remains unconfirmed. If cancellation is not confirmed, open <strong>Troubleshooting → Stuck launcher processes → Find stuck launcher processes</strong>. Review identities and eligibility, select only the worker you intend to stop, then confirm <strong>Stop selected</strong>. Nothing is preselected. Review results before choosing <strong>Retry connection</strong>.</li>
 <li><strong>Cannot close:</strong> <strong>Close launcher only</strong> closes the window while leaving background work untouched. It does not clear a startup lock. Recovery never targets WuWa, Steam, the injector or a VR runtime for termination; recording and runtime/profile changes remain protected.</li>
 <li><strong>Controller missing:</strong> <strong>Controller check</strong> reads XInput slots and HidHide information without changing settings. A connected slot is not proof of in-game button delivery. Keep intentional treadmill/remapper setups intact.</li>
 <li><strong>Squashed HUD:</strong> try <strong>VR → WuWa Controls → Reset HUD aspect</strong> and read its status; it can be unavailable. Opening and closing ESC has helped when the game permits it. <strong>L3 + B</strong> restores hidden game UI.</li>
@@ -61,13 +61,13 @@
 
 <h2>Recording and current limits</h2>
 <p>The <strong>Developer tools</strong> footer link opens the selected package’s web tools for recording, playtests and logs. Recording supports SteamVR and the bundled simulator; this recorder does not support VDXR or audio. Review videos for player names and account details before sharing. See the <a href="https://chronohaxx.github.io/wuwa-vr/feedback.html">feedback guide</a>.</p>
-<p>Startup on the affected <strong>Windows 11 Steam PC with the simulator was confirmed by the user on 1.0.10</strong>. This does not establish 1.1.0 PS4/PS5 or physical-headset acceptance; those checks remain pending.</p>
+<p>The user confirmed 1.0.10 startup on the previously affected Windows 11 Steam simulator PC, and 1.1.0 through Kuro on the owner's PC. The owner's 1.1.0 Steam route crashed. Version 1.1.1 repairs the resize recursion found in that crash dump; controlled graphics and launcher tests pass, but this repair still needs real Steam and headset testing.</p>
 <p>Known issues include long scene/dialogue stalls, unreliable HUD refresh, moving flat-menu backgrounds, distant NPC rim-light mismatch, Weapon/Echo submenu reflections and full-animation first-person aim. Manual mono theatre helps some menus/cinematics. Optional rim suppression removes intended nearby rim lighting too; it is a workaround, not a shader repair. The mod retains game graphics choices and custom edits; recognized inherited overrides are cleaned only during the documented package upgrade.</p>
 </section>
 <hr>
 <section id="zh" lang="zh-Hans">
 <h1>开始体验鸣潮 VR</h1>
-<p class="muted">1.1.0 玩家指南 · 鸣潮 3.7 · Windows PCVR</p>
+<p class="muted">1.1.1 玩家指南 · 鸣潮 3.7 · Windows PCVR</p>
 <p>运行 <strong>WuWa-VR-Setup.exe</strong> 后打开 <strong>WuWa VR</strong> 快捷方式，无需另装 Python。小型 Setup 只安装启动器应用；首次安装 VR 模组包需要联网下载。</p>
 <div class="card"><h3>01 · 选择游戏</h3><p>确认自动找到或已保存的路径。点击<strong>更改</strong>选择 Steam 或库洛官方启动器。手动选择 Steam 时，请选 <code>Wuthering Waves.exe</code>，而不是内部 Shipping 文件。多个安装并存时请明确选择。</p></div>
 <div class="card"><h3>02 · 安装鸣潮 VR</h3><p>确认对应游戏版本，阅读账号风险提示，再点击<strong>安装 VR</strong>。安装前会校验下载包；安装不会启动游戏。</p><p><strong>启动器应用</strong>是这个桌面窗口；<strong>VR 模组包</strong>包含模组及工具。更新其中一个不会自动更新另一个。</p></div>
@@ -76,9 +76,9 @@
 
 <h2>更新与回退</h2>
 <p>打开<strong>第 02 步 → 版本与更新 → 检查更新</strong>。先按提示更新启动器，空闲时选择<strong>重启并更新</strong>；再单独选择并安装所需的<strong>VR 模组包</strong>。检查失败或使用缓存列表时，不能据此判断已是最新版。</p>
-<p>本版本配套：应用 <strong>1.1.0</strong>，包 <code>beta-1-1-0</code>，构建 <code>player-ready-1-1-0</code>，游戏 <strong>3.7</strong>。回退 VR 包前关闭游戏和注入器、停止录制，再用<strong>故障排查 → 修复与恢复 → 使用上一个已安装版本</strong>。这不会回退桌面应用；设置、备份和录像会保留。</p>
+<p>本版本配套：应用 <strong>1.1.1</strong>，包 <code>beta-1-1-1</code>，构建 <code>steam-resize-1-1-1</code>，游戏 <strong>3.7</strong>。回退 VR 包前关闭游戏和注入器、停止录制，再用<strong>故障排查 → 修复与恢复 → 使用上一个已安装版本</strong>。这不会回退桌面应用；设置、备份和录像会保留。</p>
 <p>应用无法更新时，可使用<a href="https://chronohaxx.github.io/wuwa-vr/">网站上的新版 Setup</a>。重装不会停止已有的卡住进程，请先使用下方恢复功能。</p>
-<details><summary>便携备用方式</summary><p>从<a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-0">同一发布页面</a>下载 <strong>WuWa-VR-Launcher.zip</strong>，完整解压后打开 <strong>WuWa VR Launcher.exe</strong>，并保留所有文件夹。这是独立网页工具界面，不会自动更新已安装的桌面应用。<strong>打开匹配的便携 ZIP</strong>可定位已下载且校验通过的对应包。</p></details>
+<details><summary>便携备用方式</summary><p>从<a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1">同一发布页面</a>下载 <strong>WuWa-VR-Launcher.zip</strong>，完整解压后打开 <strong>WuWa VR Launcher.exe</strong>，并保留所有文件夹。这是独立网页工具界面，不会自动更新已安装的桌面应用。<strong>打开匹配的便携 ZIP</strong>可定位已下载且校验通过的对应包。</p></details>
 
 <h2 id="controls-zh">常用控制</h2>
 <p>通常使用 Xbox／XInput 游戏输入。<strong>L3／R3</strong>表示按下左右摇杆。将焦点切回游戏、关闭 UEVR 与 HUD／鼠标调整，再使用快捷键；重复操作前松开所有按键；手柄直通会绕过模组快捷键。键盘 <strong>Insert</strong> 可打开 UEVR。</p>
@@ -91,7 +91,7 @@
 <tr><td>L3 + View／Menu</td><td>第一人称／快捷键提示页</td></tr>
 </tbody></table>
 <p id="playstation-zh"><strong>PS4／PS5：</strong>通过 Steam Input 或其他有效的 Xbox／XInput 映射，可使用相同快捷键。叉／圆／方块／三角对应 A／B／X／Y，L1／R1 对应 LB／RB，L2／R2 对应 LT／RT，Share／Create 对应 View，Options 对应 Menu。</p>
-<p>1.1.0 新增实验性直连输入，支持 Sony DualShock 4、DualSense／Edge 的 USB 或蓝牙报告；连续两秒未成功读取 XInput 手柄时才使用。任何活跃 XInput 手柄都优先。重连或输入来源变化后先松开全部按键，并查看 <strong>VR → 鸣潮控制 → 手柄快捷操作</strong> 的状态。直连输入可开关 UEVR，但菜单操作仍需键盘／鼠标、XInput 映射或现有 VR 菜单控制。直连模式无法阻止游戏自身接收这些按键，因此快捷键也可能触发游戏动作；需要拦截组合键时优先使用 XInput 映射。未添加触控板／PS 键快捷键、震动或自适应扳机支持，实体 PS 手柄验证仍待完成。详见<a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md#playstation-controllers-experimental">完整说明</a>。</p>
+<p>1.1.0 加入实验性直连输入，支持 Sony DualShock 4、DualSense／Edge 的 USB 或蓝牙报告；连续两秒未成功读取 XInput 手柄时才使用。任何活跃 XInput 手柄都优先。重连或输入来源变化后先松开全部按键，并查看 <strong>VR → 鸣潮控制 → 手柄快捷操作</strong> 的状态。直连输入可开关 UEVR，但菜单操作仍需键盘／鼠标、XInput 映射或现有 VR 菜单控制。直连模式无法阻止游戏自身接收这些按键，因此快捷键也可能触发游戏动作；需要拦截组合键时优先使用 XInput 映射。未添加触控板／PS 键快捷键、震动或自适应扳机支持，实体 PS 手柄验证仍待完成。详见<a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md#playstation-controllers-experimental">完整说明</a>。</p>
 <p>屏幕选项位于 <strong>VR → WuWa Controls → View modes and cutscenes（视图模式与过场）</strong>。过场构图修正默认开启。自动切换仍为实验功能且默认关闭：已报告的一段引擎内过场未触发，预渲染影片切换也未测试，请保留手动影院快捷键。</p>
 <details><summary>可选漫游、微缩视角与裸手演示</summary>
 <p><strong>VR 控制器漫游（可选）→ 漫游输入</strong>每次启动默认关闭，需要 OpenXR。唤醒两侧 Quest 控制器、让游戏获得焦点，松开按键、扳机和握持键并让摇杆回中后启用输入；焦点丢失或重连后重复。</p>
@@ -111,8 +111,8 @@
 
 <h2>录制与当前限制</h2>
 <p>底部<strong>开发工具</strong>打开所选包的网页工具，包含录制、测试记录及日志。录制支持 SteamVR 和内置模拟器，不支持 VDXR 或音频。分享前检查玩家名称及账号信息；参阅<a href="https://chronohaxx.github.io/wuwa-vr/feedback.html">反馈指南</a>。</p>
-<p>用户已确认 <strong>1.0.10 在此前受影响的 Windows 11 Steam 电脑上通过模拟器启动成功</strong>。这不代表 1.1.0 的 PS4／PS5 或实体头显验收；这些检查仍待完成。</p>
+<p>用户已确认 1.0.10 在此前受影响的 Windows 11 Steam 电脑使用模拟器启动成功，1.1.0 在开发者电脑通过库洛启动成功，但同机 Steam 启动崩溃。1.1.1 修复了崩溃转储发现的窗口尺寸回调递归；受控图形和启动器测试通过，真实 Steam 启动及头显仍待复测。 PlayStation 实体手柄也仍待测试。</p>
 <p>待解决问题包括场景／对话加载停顿、HUD 刷新不可靠、平面菜单背景移动、远处 NPC 边缘光不一致、武器／声骸子菜单反射，以及完整动画第一人称瞄准。部分菜单／过场可用手动单目影院暂时处理。可选边缘光抑制也会去掉近处角色原有高光，是临时方案而非着色器修复。模组保留游戏画质选择与自定义修改；只有指定升级流程会清理已识别的旧覆盖项。</p>
 </section>
-<footer><a href="https://chronohaxx.github.io/wuwa-vr/">Website / 网站</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-0">Release / 发布说明</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md">Full controls / 完整控制</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/issues">Report an issue / 反馈</a> · <a href="https://ko-fi.com/chronohax">Support / 支持</a></footer>
+<footer><a href="https://chronohaxx.github.io/wuwa-vr/">Website / 网站</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1">Release / 发布说明</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md">Full controls / 完整控制</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/issues">Report an issue / 反馈</a> · <a href="https://ko-fi.com/chronohax">Support / 支持</a></footer>
 </main></body></html>

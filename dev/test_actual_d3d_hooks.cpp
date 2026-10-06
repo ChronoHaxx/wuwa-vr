@@ -91,6 +91,29 @@ static ResizeBuffersFn native_resize_buffers{};
 static ResizeTargetFn native_resize_target{};
 static unsigned original_resize_buffers{}, original_resize_target{};
 static HRESULT last_resize_target_result{};
+using Resize11Fn = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
+struct ResizeProbeState {
+    IDXGISwapChain* chain{};
+    Resize11Fn native{}, cached{};
+    unsigned calls{}, native_calls{};
+    bool recurse{};
+};
+static ResizeProbeState resize_probe[3];
+static HRESULT STDMETHODCALLTYPE resize_probe_forward(IDXGISwapChain* chain, UINT count, UINT w, UINT h, DXGI_FORMAT format, UINT flags) {
+    for (auto& state : resize_probe) if (state.chain == chain) {
+        ++state.calls;
+        // A labelled overlay-cycle model, not Valve's implementation. The cap
+        // keeps an old-source regression safe instead of exhausting its stack.
+        if (state.calls > 32) return E_UNEXPECTED;
+        if (state.recurse) return state.cached(chain, count, w, h, format, flags);
+        ++state.native_calls;
+        return state.native(chain, count, w, h, format, flags);
+    }
+    return E_UNEXPECTED;
+}
+static HRESULT STDMETHODCALLTYPE wrong_resize_origin(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT) {
+    return E_UNEXPECTED;
+}
 static HRESULT STDMETHODCALLTYPE counted_resize_buffers(IDXGISwapChain3* chain, UINT count, UINT w, UINT h, DXGI_FORMAT format, UINT flags) {
     ++original_resize_buffers;
     return native_resize_buffers(chain, count, w, h, format, flags);
@@ -195,7 +218,9 @@ int main(int argc, char** argv) {
         const bool rendered_mode = rendered || gate_baseline || gate_fixed;
         const bool resize_baseline = argc == 2 && std::string(argv[1]) == "--resize-baseline";
         const bool resize_fixed = argc == 2 && std::string(argv[1]) == "--resize-fixed";
-        require(argc == 1 || retained_dispatch || rendered_mode || resize_baseline || resize_fixed, "Unknown fixture mode");
+        const bool resize_probe_baseline = argc == 2 && std::string(argv[1]) == "--resize-probe-baseline";
+        const bool resize_probe_fixed = argc == 2 && std::string(argv[1]) == "--resize-probe-fixed";
+        require(argc == 1 || retained_dispatch || rendered_mode || resize_baseline || resize_fixed || resize_probe_baseline || resize_probe_fixed, "Unknown fixture mode");
         spdlog::set_pattern("[%l] %v");
         std::cout << "scope\tactual_D3D11Hook_D3D12Hook_WindowFilter=true\tkananlib=actual_built_library"
             "\tFramework=mutex_only_stub\tfull_Framework_initialized=false\tgame_injected=false" << std::endl;
@@ -261,6 +286,121 @@ int main(int argc, char** argv) {
             }
             require(counter >= expected, std::string("No actual callback: ") + label);
         };
+        if (resize_probe_baseline || resize_probe_fixed) {
+            const auto original11 = slot_value(chain11.base.Get(), 13);
+            const auto original12 = slot_value(chain12.base.Get(), 13);
+            install11();
+            if (resize_probe_baseline) {
+                require(slot_value(chain12.base.Get(), 13) != original12,
+                    "Baseline did not reproduce global DX11 probe changing real DX12 ResizeBuffers");
+                require(callbacks11 == 0 && callbacks12 == 0, "Baseline unexpectedly needed a Present");
+                hook11.reset();
+                require(slot_value(chain12.base.Get(), 13) == original12, "Baseline cleanup did not restore resize");
+                std::cout << "REPRODUCED\tDX11_probe_changes_real_DX12_resize_before_first_Present\tPresent_callbacks=0\tno_stack_overflow_triggered=true" << std::endl;
+                return 0;
+            }
+            require(slot_value(chain11.base.Get(), 13) == original11 && slot_value(chain12.base.Get(), 13) == original12,
+                "Renderer probe must not change either actual chain's ResizeBuffers slot");
+            resize_probe[0] = {chain12.base.Get(), reinterpret_cast<Resize11Fn>(original12)};
+            {
+                VtableHook count12{chain12.base.Get()};
+                require(count12.hook_method(13, reinterpret_cast<uintptr_t>(&resize_probe_forward)), "Count DX12 resize");
+                checked(chain12.base->ResizeBuffers(2, 80, 48, DXGI_FORMAT_UNKNOWN, 0), "DX12 resize during DX11 probe");
+                DXGI_SWAP_CHAIN_DESC desc{}; checked(chain12.base->GetDesc(&desc), "DX12 resize result");
+                require(resize_probe[0].calls == 1 && resize_probe[0].native_calls == 1 &&
+                    desc.BufferDesc.Width == 80 && desc.BufferDesc.Height == 48 && callbacks11 == 0,
+                    "DX12 bootstrap resize did not reach real native method once independently of Present");
+            }
+            std::cout << "PASS\tDX12_bootstrap_resize_untouched\tnative_calls=1\tbuffers=80x48\tPresent_callbacks=0" << std::endl;
+
+            resize_probe[1] = {chain11.base.Get(), reinterpret_cast<Resize11Fn>(original11)};
+            VtableHook count11{chain11.base.Get()};
+            require(count11.hook_method(13, reinterpret_cast<uintptr_t>(&resize_probe_forward)), "Count DX11 resize");
+            unsigned renderer_calls{};
+            bool recurse_renderer{};
+            HRESULT renderer_nested{};
+            hook11->on_resize_buffers([&](D3D11Hook&, uint32_t, uint32_t) {
+                ++renderer_calls;
+                if (recurse_renderer) renderer_nested = resize_probe[1].cached(chain11.base.Get(), 1, 80, 48, DXGI_FORMAT_UNKNOWN, 0);
+            });
+            present_until(chain11, matching11, 1, "Prove real DX11 before binding resize");
+            resize_probe[1].cached = reinterpret_cast<Resize11Fn>(slot_value(chain11.base.Get(), 13));
+            require(resize_probe[1].cached != &resize_probe_forward, "Verified DX11 did not receive instance resize hook");
+            // Mutate the old table after installation. A saved immutable original
+            // must still reach the real forwarder, not this changed slot.
+            require(count11.hook_method(13, reinterpret_cast<uintptr_t>(&wrong_resize_origin)), "Mutate old table for identity test");
+            checked(chain11.base->ResizeBuffers(1, 80, 48, DXGI_FORMAT_UNKNOWN, 0), "Verified DX11 resize");
+            require(renderer_calls == 1 && resize_probe[1].calls == 1 && resize_probe[1].native_calls == 1,
+                "Verified instance must call renderer and its immutable native original once");
+            require(count11.hook_method(13, reinterpret_cast<uintptr_t>(&resize_probe_forward)), "Restore old table counter");
+            std::cout << "PASS\tverified_DX11_instance_resize\trenderer_once=true\timmutable_original_once=true" << std::endl;
+
+            recurse_renderer = true;
+            checked(chain11.base->ResizeBuffers(1, 96, 64, DXGI_FORMAT_UNKNOWN, 0), "Renderer nested resize outer operation");
+            require(renderer_nested == DXGI_ERROR_INVALID_CALL && renderer_calls == 2 && resize_probe[1].native_calls == 2,
+                "Same-chain renderer reentry must fail before a second renderer/native call");
+            recurse_renderer = false;
+            auto cycle = [&](const char* label, bool expects_renderer) {
+                const auto calls_before = resize_probe[1].calls, native_before = resize_probe[1].native_calls;
+                const auto renderer_before = renderer_calls;
+                resize_probe[1].recurse = true;
+                const auto hr = resize_probe[1].cached(chain11.base.Get(), 1, 80, 48, DXGI_FORMAT_UNKNOWN, 0);
+                resize_probe[1].recurse = false;
+                require(hr == DXGI_ERROR_INVALID_CALL && resize_probe[1].calls == calls_before + 1 &&
+                    resize_probe[1].native_calls == native_before && renderer_calls == renderer_before + (expects_renderer ? 1 : 0), label);
+                std::cout << "PASS\t" << label << "\treentry=DXGI_ERROR_INVALID_CALL\touter_forward_once=true\tcode_bytes_untouched=true" << std::endl;
+            };
+            cycle("active_overlay_cycle_bounded", true);
+            WindowFilter::get().filter_window(window11.handle);
+            cycle("filtered_overlay_cycle_bounded", false);
+            const auto before_filtered = resize_probe[1].native_calls;
+            checked(resize_probe[1].cached(chain11.base.Get(), 1, 80, 48, DXGI_FORMAT_UNKNOWN, 0), "Filtered normal resize");
+            require(resize_probe[1].native_calls == before_filtered + 1, "Filtered resize must still execute normally");
+            require(hook11->unhook(), "Retire verified DX11");
+            require(slot_value(chain11.base.Get(), 13) == reinterpret_cast<void*>(&resize_probe_forward), "Retirement failed to restore instance table");
+            cycle("retired_overlay_cycle_bounded", false);
+
+            // A queued old-chain callback must not borrow the replacement's
+            // original or reset the replacement renderer.
+            HiddenWindow other_window;
+            auto other_chain = make11(other_window.handle);
+            resize_probe[2] = {other_chain.base.Get(), reinterpret_cast<Resize11Fn>(slot_value(other_chain.base.Get(), 13))};
+            std::promise<void> queued; auto ready = queued.get_future();
+            std::future<HRESULT> pending;
+            {
+                std::scoped_lock lock{g_framework->get_hook_monitor_mutex()};
+                pending = std::async(std::launch::async, [&] {
+                    queued.set_value();
+                    return resize_probe[1].cached(chain11.base.Get(), 1, 96, 64, DXGI_FORMAT_UNKNOWN, 0);
+                });
+                ready.get();
+                install11();
+            }
+            const auto end = std::chrono::steady_clock::now() + std::chrono::seconds{3};
+            while (pending.wait_for(std::chrono::milliseconds{0}) != std::future_status::ready && std::chrono::steady_clock::now() < end)
+                pump_for(std::chrono::milliseconds{1});
+            require(pending.wait_for(std::chrono::milliseconds{0}) == std::future_status::ready, "Queued resize did not finish");
+            checked(pending.get(), "Queued old-chain resize after replacement");
+            VtableHook count_other{other_chain.base.Get()};
+            require(count_other.hook_method(13, reinterpret_cast<uintptr_t>(&resize_probe_forward)), "Count other DX11 resize");
+            unsigned replacement_resizes{};
+            hook11->on_resize_buffers([&](D3D11Hook&, uint32_t, uint32_t) { ++replacement_resizes; });
+            present_until(other_chain, matching11, matching11 + 1, "Select replacement DX11 chain");
+            const auto old_native = resize_probe[1].native_calls;
+            checked(resize_probe[1].cached(chain11.base.Get(), 1, 80, 48, DXGI_FORMAT_UNKNOWN, 0), "Old resize while another chain selected");
+            require(resize_probe[1].native_calls == old_native + 1 && resize_probe[2].native_calls == 0 && replacement_resizes == 0,
+                "Old-chain resize borrowed new chain original or touched new renderer");
+            hook11.reset();
+            cycle("destroyed_hook_overlay_cycle_bounded", false);
+            checked(resize_probe[1].cached(chain11.base.Get(), 1, 96, 64, DXGI_FORMAT_UNKNOWN, 0), "Destroyed hook normal resize");
+            require(count_other.remove() && count11.remove(), "Fixture tables did not restore");
+            require(slot_value(chain11.base.Get(), 13) == original11 && slot_value(chain12.base.Get(), 13) == original12 &&
+                slot_value(chain11.base.Get(), 8) == saved11 && slot_value(chain12.base.Get(), 8) == saved12,
+                "Resize isolation test left a hook installed");
+            std::cout << "PASS\tqueued_replaced_other_chain_destroyed_resize\tnative_once=true\twrong_renderer_untouched=true\tall_slots_restored=true" << std::endl;
+            std::cout << "LIMIT\tactual_hooks_and_DXGI\toverlay_cycle_is_controlled_model\tSteam_binary_not_loaded\tFramework_mutex_only_stub" << std::endl;
+            return 0;
+        }
         if (resize_baseline || resize_fixed) {
             const auto saved_buffers = slot_value(chain12.version3.Get(), 13);
             const auto saved_target = slot_value(chain12.version3.Get(), 14);

@@ -55,6 +55,7 @@ namespace WuWaVR.Manager
         Func<CancellationToken, Task<ControllerDiagnostics.Report>> controllerProbeOverride;
         Action<string> controllerCopyOverride;
         TimeSpan controllerTimeout = TimeSpan.FromSeconds(10);
+        TimeSpan cancelGrace = TimeSpan.FromSeconds(4);
         Expander processRecoveryPanel;
         StackPanel processRecoveryRows;
         TextBlock processRecoveryState;
@@ -201,10 +202,25 @@ namespace WuWaVR.Manager
             if (operation != null) { operation.Cancel(); return; }
             if (bridge.Address == null || !LauncherBridge.CanCancelLaunch(status)) { OpenProcessRecovery(); return; }
             bool accepted = false;
-            await Run(async c => {
+            await RunAction(async c => {
                 await bridge.Post("/api/cancel", new { }, c); accepted = true;
                 operationText.Text = text["cancelRequested"];
-            });
+                // The worker polls every three seconds. Give normal cooperative
+                // cancellation time to finish before suggesting stuck-process recovery.
+                using (var grace = CancellationTokenSource.CreateLinkedTokenSource(c))
+                {
+                    grace.CancelAfter(cancelGrace);
+                    try {
+                        while (true) {
+                            status = await bridge.Status(grace.Token);
+                            var job = Json.Child(status, "job");
+                            if (!LauncherBridge.LaunchWorkerRunning(status) &&
+                                !(Json.Flag(job, "running") && Json.Text(job, "kind") == "launch")) break;
+                            await Task.Delay(250, grace.Token);
+                        }
+                    } catch (OperationCanceledException) when (!c.IsCancellationRequested && grace.IsCancellationRequested) { }
+                }
+            }, false);
             // An HTTP acknowledgement only requests cancellation. It does not
             // prove an old elevated worker released its lock or observed the request.
             if (!accepted || unresolvedStartup || !connectionReady)

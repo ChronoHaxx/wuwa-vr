@@ -130,6 +130,9 @@ namespace WuWa {
         public string Source = "unavailable";
         public string FailedStep = "";
         public int Win32Error;
+        public bool Exited;
+        public bool ExitCodeKnown;
+        public uint ExitCode;
     }
     public static class SteamProcessIdentityV1 {
         const uint QueryLimited = 0x1000, Synchronize = 0x100000, WaitTimeout = 258;
@@ -138,6 +141,7 @@ namespace WuWa {
             public SteamProcessIdentityResult Identity;
         }
         static readonly Dictionary<int, Entry> Entries = new Dictionary<int, Entry>();
+        static readonly List<SteamProcessIdentityResult> Completed = new List<SteamProcessIdentityResult>();
         static readonly object Gate = new object();
         [DllImport("kernel32.dll", SetLastError=true)] static extern SafeProcessHandle OpenProcess(uint access, bool inherit, int pid);
         [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool QueryFullProcessImageName(SafeProcessHandle handle, uint flags, StringBuilder path, ref int length);
@@ -149,14 +153,18 @@ namespace WuWa {
         }
         static SteamProcessIdentityResult Copy(SteamProcessIdentityResult value, string source) {
             return new SteamProcessIdentityResult {Id=value.Id, Path=value.Path, StartTime=value.StartTime,
-                CreationFileTime=value.CreationFileTime, Verified=value.Verified, Source=source};
+                CreationFileTime=value.CreationFileTime, Verified=value.Verified, Source=source,
+                Exited=value.Exited, ExitCodeKnown=value.ExitCodeKnown, ExitCode=value.ExitCode};
         }
         public static SteamProcessIdentityResult Read(int pid) {
             lock(Gate) {
                 Entry retained;
                 if(Entries.TryGetValue(pid, out retained)) {
-                    if(!retained.Handle.IsClosed && !retained.Handle.IsInvalid && WaitForSingleObject(retained.Handle, 0) == WaitTimeout)
-                        return Copy(retained.Identity, "verified-held-handle");
+                    var observed = ObserveRetained(retained);
+                    if(observed.Verified) return observed;
+                    // A process can exit between name enumeration and this read.
+                    // Preserve its proven exit before disposing the original handle.
+                    if(observed.Exited && Completed.Count < 32) Completed.Add(observed);
                     retained.Handle.Dispose(); Entries.Remove(pid);
                 }
                 bool canRetain = true;
@@ -193,7 +201,37 @@ namespace WuWa {
             }
         }
         public static void Clear() {
-            lock(Gate) { foreach(var value in Entries.Values) value.Handle.Dispose(); Entries.Clear(); }
+            lock(Gate) { foreach(var value in Entries.Values) value.Handle.Dispose(); Entries.Clear(); Completed.Clear(); }
+        }
+        static SteamProcessIdentityResult ObserveRetained(Entry entry) {
+            var result = Copy(entry.Identity, "verified-held-handle");
+            result.Verified = false;
+            if(!entry.Handle.IsClosed && !entry.Handle.IsInvalid) {
+                uint wait = WaitForSingleObject(entry.Handle, 0);
+                if(wait == WaitTimeout) result.Verified = true;
+                else if(wait == 0) {
+                    result.Exited = true; result.Source = "signaled-original-handle";
+                    uint code;
+                    result.ExitCodeKnown = GetExitCodeProcess(entry.Handle, out code);
+                    if(result.ExitCodeKnown) result.ExitCode = code;
+                } else { result.FailedStep = "WaitForSingleObject"; result.Win32Error = Marshal.GetLastWin32Error(); }
+            } else result.FailedStep = "retained handle unavailable";
+            return result;
+        }
+        public static SteamProcessIdentityResult[] ReadRetained(string expectedPath) {
+            lock(Gate) {
+                var results = new List<SteamProcessIdentityResult>();
+                foreach(var completed in Completed)
+                    if(String.Equals(completed.Path, expectedPath, StringComparison.OrdinalIgnoreCase))
+                        results.Add(Copy(completed, completed.Source));
+                foreach(var entry in Entries.Values) {
+                    if(!String.Equals(entry.Identity.Path, expectedPath, StringComparison.OrdinalIgnoreCase)) continue;
+                    // Query the original handle even when enumeration no longer
+                    // returns its PID. Never reopen a PID to establish exit.
+                    results.Add(ObserveRetained(entry));
+                }
+                return results.ToArray();
+            }
         }
         public static int RetainedCount { get { lock(Gate) { return Entries.Count; } } }
     }
@@ -218,6 +256,12 @@ function Get-WuWaSteamProcesses {
                 ProcessName=[IO.Path]::GetFileNameWithoutExtension($identity.Path)}
         }
     }
+}
+
+function Get-WuWaSteamRetainedProcessStates {
+    param([Parameter(Mandatory)][string]$ExpectedPath)
+    Initialize-WuWaSteamProcessIdentity
+    [WuWa.SteamProcessIdentityV1]::ReadRetained([IO.Path]::GetFullPath($ExpectedPath))
 }
 
 function Get-WuWaSteamProcessSnapshot {
@@ -250,6 +294,17 @@ function Get-WuWaSteamProcessSnapshot {
     $snapshot.SteamTargetCandidateCount = $candidates.Count
     $snapshot.SteamTargetUnverifiedCount = $unverified
     $snapshot.SteamTargetProcesses = $evidence
+    $retained = @(Get-WuWaSteamRetainedProcessStates -ExpectedPath $Game.Shipping)
+    # No name-enumeration result is proof of exit. A single original exact-path
+    # handle signaled by Windows is; any competing/unknown identity stays unknown.
+    $snapshot.TargetExitConfirmed = $candidates.Count -eq 0 -and $retained.Count -eq 1 -and $retained[0].Exited
+    $snapshot.SteamTargetExitEvidence = $null
+    if ($snapshot.TargetExitConfirmed) {
+        $identity = $retained[0]
+        $snapshot.SteamTargetExitEvidence = [pscustomobject]@{pid=$identity.Id;
+            creationFileTime=$identity.CreationFileTime;source=$identity.Source;
+            exitCode=$(if($identity.ExitCodeKnown){[long]$identity.ExitCode}else{$null})}
+    }
     $snapshot.LauncherRunning = $false # Steam is not a game-specific Play window.
     return $snapshot
 }

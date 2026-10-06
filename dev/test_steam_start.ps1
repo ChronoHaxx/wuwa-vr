@@ -55,6 +55,8 @@ $rejected=$false; try { Start-WuWaSteamGame $game } catch { $rejected=$true }
 Check ($rejected -and $script:Dispatches.Count -eq 1) 'Failed desktop validation fell back to process launch'
 
 # Basename collisions and unreadable executable paths cannot count as target.
+function Get-WuWaSteamRetainedProcessStates { param($ExpectedPath) $script:Retained }
+$script:Retained=@()
 function Get-WuWaSteamProcessIdentity {
     param($Process)
     [pscustomobject]@{Id=0;Path=$Process.Path;StartTime=[datetime]::Now;Verified=[bool]$Process.Path;
@@ -69,4 +71,17 @@ $snapshot=Get-WuWaSteamProcessSnapshot $game $null
 Check ($snapshot.TargetRunning -and $snapshot.GameRunning -and -not $snapshot.LauncherRunning) 'Correct Steam path not observed'
 $script:Processes += [pscustomobject]@{ProcessName='Client-Win64-Shipping';Path=$shipping}
 Check (-not (Get-WuWaSteamProcessSnapshot $game $null).TargetRunning) 'Duplicate selected instance counted as ready'
+$script:Retained=@([pscustomobject]@{Id=901;CreationFileTime=1234;Exited=$true;ExitCodeKnown=$true;ExitCode=3221225477;Source='signaled-original-handle'})
+Check (-not (Get-WuWaSteamProcessSnapshot $game $null).TargetExitConfirmed) 'Existing candidates cannot become exited through an older retained handle'
+$script:Processes=@()
+$snapshot=Get-WuWaSteamProcessSnapshot $game $null
+Check ($snapshot.TargetExitConfirmed -and $snapshot.SteamTargetExitEvidence.pid -eq 901 -and $snapshot.SteamTargetExitEvidence.exitCode -eq 3221225477) 'Original signaled handle proves exit after zero enumeration and retains unsigned exit code'
+$script:Retained[0].ExitCodeKnown=$false
+Check ($null -eq (Get-WuWaSteamProcessSnapshot $game $null).SteamTargetExitEvidence.exitCode) 'Unavailable exit code is omitted rather than invented'
+$script:Retained[0].Exited=$false
+Check (-not (Get-WuWaSteamProcessSnapshot $game $null).TargetExitConfirmed) 'Missing enumeration does not declare a live or unreadable retained process exited'
+$script:Retained[0].Exited=$true;$script:Retained+= $script:Retained[0]
+Check (-not (Get-WuWaSteamProcessSnapshot $game $null).TargetExitConfirmed) 'Multiple retained identities stay ambiguous'
+$script:Retained=@()
+Check (-not (Get-WuWaSteamProcessSnapshot $game $null).TargetExitConfirmed) 'Without a retained original handle missing enumeration stays unknown'
 Write-Output 'PASS: Steam manifest/settings identity; official/manual preserved; missing game/old injector rejected; fixed shell URI; no elevated fallback; exact-path observation.'

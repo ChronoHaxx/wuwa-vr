@@ -1,5 +1,5 @@
-WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.5
-Release: beta-2026-10-06-renderer-startup / VR build renderer-startup-20261006 / game 3.7
+WUWA VR — DESKTOP LAUNCHER / PUBLIC BETA 1.0.6
+Release: beta-2026-10-06-window-startup / VR build window-startup-20261006 / game 3.7
 
 Run WuWa-VR-Setup.exe once to install for your Windows user, then open the
 normal WuWa VR shortcut from the Start menu. No separate Python install is needed.
@@ -30,9 +30,9 @@ Updates: Step 02 > Versions & updates > Check updates. Update launcher downloads
 and verifies the desktop app update; it does not restart the app. When ready,
 close the game and injector, stop recording and finish other operations, then
 choose Restart to update and confirm. Installing or updating the desktop app
-preserves your selected VR package. In Step 02 choose beta-2026-10-06-renderer-startup
-and install it, or select it if already installed, to use renderer-startup-20261006
-with the new renderer-startup backend and recovery helpers. From 1.0.2–1.0.4, update/restart the app first, then explicitly
+preserves your selected VR package. In Step 02 choose beta-2026-10-06-window-startup
+and install it, or select it if already installed, to use window-startup-20261006
+with the new renderer-startup backend and recovery helpers. From 1.0.2–1.0.5, update/restart the app first, then explicitly
 select and install the renderer-startup package. Check updates does not select it for you.
 If the old app blocks updating, close it and use the new Setup from the website.
 This does not guarantee that a stalled worker has stopped; review remaining processes.
@@ -76,23 +76,16 @@ Advanced portable fallback: download WuWa-VR-Launcher.zip from the same release,
 extract the whole ZIP and open WuWa VR Launcher.exe. Keep its app and python
 folders together. This uses the older web interface and does not self-update
 the desktop app. Release downloads and previous versions:
-https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-startup
+https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-startup
 https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-steam
 
 Steam and game graphics settings · 6 October public beta
-App 1.0.5 / VR build renderer-startup-20261006 / game 3.7.
+App 1.0.6 / VR build window-startup-20261006 / game 3.7.
 Choose Steam or Kuro in step 01; saved choices are preserved. The VR package
 keeps the game’s graphics choices instead of forcing low/medium values. A
 one-time cleanup removes only recognized generated overrides, preserving custom
 edits and backups. The accepted timing correction remains separate.
-Renderer-startup 1.0.5 addresses a failure seen on a remote Windows 11 Steam PC:
-1.0.4 loaded the VR DLL but never reached a real game-renderer frame. The backend
-now tries the other graphics hook after an initial hook receives no real frames;
-it keeps an already detected renderer. This is not evidence of a GPU-brand cause.
-Each startup attempt preserves available backend.log evidence; Copy diagnostics
-includes it so a later launch does not erase the useful failure history.
-Native compilation and isolated graphics-hook tests passed. The remote-PC launch
-and headset retest remain pending; no successful remote fix is claimed.
+The affected Windows 11 Steam PC still failed to reach VR in 1.0.5. This follow-up repairs an unchecked DirectX 12 window lookup: it queries the supported interface and falls back to the base swapchain description when needed, while retaining window validation. Steam process checks now use limited access and retain verified identity only while the same process handle is alive. Repeated log lines are compacted so startup transitions remain visible. These are compatibility repairs and better evidence, not a confirmed fix on that PC; its retest and headset acceptance remain pending.
 Visible startup stages, cancellation, Close launcher only, guarded process recovery
 and Prepare uninstall remain available. Simulator selection and prerequisite
 checks are retained. Existing graphics choices and accepted view fixes are kept.
@@ -203,8 +196,8 @@ Guide: https://chronohaxx.github.io/wuwa-vr/guide.html
 Feedback: https://github.com/ChronoHaxx/wuwa-vr/issues
 Optional support: https://ko-fi.com/chronohax
 
-鸣潮 VR — 桌面启动器 / 公开测试版 1.0.5
-发布版本 beta-2026-10-06-renderer-startup／VR 构建 renderer-startup-20261006／游戏 3.7
+鸣潮 VR — 桌面启动器 / 公开测试版 1.0.6
+发布版本 beta-2026-10-06-window-startup／VR 构建 window-startup-20261006／游戏 3.7
 
 运行 WuWa-VR-Setup.exe，为当前 Windows 用户安装，然后从开始菜单打开
 普通 WuWa VR 快捷方式。无需另行安装 Python。小型安装程序不包含 VR 模组；
@@ -228,8 +221,8 @@ Optional support: https://ko-fi.com/chronohax
 更新：第 02 步 > 版本与更新 > 检查更新。“更新启动器”下载并校验桌面应用更新，
 此时不会重启。更新就绪后，关闭游戏和注入器、停止录制并完成其他操作，
 再选择“重启并更新”并确认。安装或更新桌面应用会保留当前选择的 VR 包。
-在第 02 步选择 beta-2026-10-06-renderer-startup 并安装（已安装时直接选用），
-即可使用 renderer-startup-20261006 后端。旧版（包括 1.0.4）须先更新并重启应用，
+在第 02 步选择 beta-2026-10-06-window-startup 并安装（已安装时直接选用），
+即可使用 window-startup-20261006 后端。旧版（包括 1.0.5）须先更新并重启应用，
 再明确选择并安装新 VR 包；检查更新不会自动改选。如旧应用阻止更新，请关闭应用并运行网站的新 Setup。
 这不能保证卡住的启动任务已停止；仍需检查残留进程。设置、备份、日志和录像会保留；
 不要删除 LocalAppData 中的 WuWa VR Manager 或 WuWa VR Launcher 文件夹。
@@ -259,14 +252,10 @@ WuWa VR Launcher.exe，保持 app 和 python 文件夹完整。这是旧版网�
 不会自动更新桌面应用。发布页及旧版本链接见上方英文部分。
 
 Steam 与游戏画质设置 · 10 月 6 日公开测试版
-应用 1.0.5／VR 构建 renderer-startup-20261006／游戏 3.7。
+应用 1.0.6／VR 构建 window-startup-20261006／游戏 3.7。
 第 01 步可选择 Steam 或库洛版本，保留已保存选择。VR 包保留游戏自身画质选择，
 不强制低／中画质；一次性清理仅移除已识别的旧生成覆盖项，保留自定义修改与备份。
-已接受的时序修正独立保留。远程 Windows 11 Steam 电脑在 1.0.4 中已载入 VR DLL，
-但没有接收到实际游戏渲染帧。1.0.5 在初始图形挂钩迟迟收不到帧时尝试另一种挂钩，
-已识别到实际渲染器后则保留该选择。这不能证明问题由某个显卡品牌造成。
-每次启动会保存可用的 backend.log，复制诊断会包含这些记录，避免下一次启动覆盖线索。
-原生后端已编译，隔离图形挂接测试已通过；远程电脑启动及头显复测仍待完成，不能宣称已修好。
+已接受的时序修正独立保留。受影响的 Windows 11 Steam 电脑在 1.0.5 中仍未进入 VR。本次修复 DirectX 12 窗口查询：先确认支持的接口，必要时使用交换链描述中的窗口，并保留窗口验证。Steam 进程检查改用有限权限；只有同一个进程句柄仍存活时才保留已验证的身份。重复日志会压缩，避免掩盖启动阶段。这些是兼容性修复和诊断改进，尚不能确认已修好该电脑；远程复测和头显验收仍待完成。
 保留启动阶段、取消提示、仅关闭启动器窗口、受保护的进程恢复与准备卸载。
 模拟器选择、依赖检查、已有画质选择及已接受的视图修正继续保留。
 过场构图修正默认开启。作者已确认私测 screen-comfort-r1 的模拟器回放改善；

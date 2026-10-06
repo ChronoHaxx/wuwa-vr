@@ -329,6 +329,30 @@ class LaunchRecovery(unittest.TestCase):
         self.assertNotIn('PrivateFixture', result)
         self.assertIn('%USERPROFILE%', result)
 
+    def test_repeated_frame_failures_do_not_hide_window_probe_evidence(self):
+        rows = [f'ordinary header {i}' for i in range(50)]
+        rows += ['[info] [WuWaD3DWindow] GetHwnd failed; GetDesc selected valid window']
+        rows += [f'[2026-10-06 16:31:11.{i:03d}] [UnrealVR] [error] Failed to initialize Framework on DirectX 11' for i in range(60)]
+        rows += ['[info] Device or SwapChain null. DirectX 12 may be in use.']
+        rows += [f'ordinary tail {i}' for i in range(190)]
+        result = '\n'.join(player.compact_backend_rows(rows))
+        self.assertIn('GetDesc selected valid window', result)
+        self.assertIn('Device or SwapChain null', result)
+        self.assertIn('repeated 59 more times', result)
+        self.assertIn('16:31:11.059', result)
+        self.assertLess(len(result.splitlines()), 181)
+
+    def test_distinct_probe_and_error_survive_interleaved_error_flood(self):
+        rows = [f'header {i}' for i in range(50)] + ['[error] Unique startup failure']
+        rows += ['[info] [WuWaD3DProbe] switching to DirectX 11']
+        for i in range(80):
+            rows += [f'[2026-10-06 16:31:11.{i:03d}] [error] repetitive failure', f'frame {i}']
+        rows += [f'tail {i}' for i in range(190)]
+        result = '\n'.join(player.compact_backend_rows(rows))
+        self.assertIn('Unique startup failure', result)
+        self.assertIn('switching to DirectX 11', result)
+        self.assertEqual(result.count('repetitive failure'), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

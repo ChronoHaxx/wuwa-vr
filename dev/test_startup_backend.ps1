@@ -82,6 +82,11 @@ $steamMocks=@'
 function Assert-WuWaSteamInjector { param($Injector) }
 function Get-WuWaSteamClient { 'C:\fixture\Steam.exe' }
 function Start-WuWaSteamGame { param($Game) [IO.File]::WriteAllText((Join-Path $global:FixtureRun 'dispatch.txt'),$Game.Uri) }
+function Get-WuWaSteamProcessIdentity {
+    param($Process)
+    [pscustomobject]@{Id=$Process.Id;Path=$Process.Path;StartTime=[datetime]::Now;Verified=[bool]$Process.Path;
+        Source='inert-fixture';CreationFileTime=0;Win32Error=0;FailedStep=''}
+}
 function Get-ItemPropertyValue { param($Path,$LiteralPath,$Name) if($Name -eq 'ActiveRuntime'){$global:FixtureRuntime}else{throw 'Fixture registry value absent'} }
 function Get-ItemProperty { param($Path,$LiteralPath) throw 'Unexpected registry read' }
 function Test-Path {

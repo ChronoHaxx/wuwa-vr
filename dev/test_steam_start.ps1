@@ -55,6 +55,11 @@ $rejected=$false; try { Start-WuWaSteamGame $game } catch { $rejected=$true }
 Check ($rejected -and $script:Dispatches.Count -eq 1) 'Failed desktop validation fell back to process launch'
 
 # Basename collisions and unreadable executable paths cannot count as target.
+function Get-WuWaSteamProcessIdentity {
+    param($Process)
+    [pscustomobject]@{Id=0;Path=$Process.Path;StartTime=[datetime]::Now;Verified=[bool]$Process.Path;
+        Source='inert-fixture';CreationFileTime=0;Win32Error=0;FailedStep=''}
+}
 $script:Processes=@([pscustomobject]@{ProcessName='Client-Win64-Shipping';Path='C:\Other\Client-Win64-Shipping.exe'},[pscustomobject]@{ProcessName='Client-Win64-Shipping';Path=$null})
 function Get-Process { param($Name,$Id) $script:Processes | Where-Object { $_.ProcessName -in @($Name) } }
 $snapshot=Get-WuWaSteamProcessSnapshot $game $null

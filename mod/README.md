@@ -1,19 +1,13 @@
-# Mod source — renderer-startup beta
+# Mod source — window-startup compatibility beta
 
 The release target is
-[beta-2026-10-06-renderer-startup](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-startup),
-launcher **1.0.5**, backend/package build **renderer-startup-20261006**, for game
+[beta-2026-10-06-window-startup](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-startup),
+launcher **1.0.6**, backend/package build **window-startup-20261006**, for game
 **3.7**. Native compilation, isolated graphics-hook checks, launcher tests and isolated package installation passed.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The **1.0.4** retest on the affected Windows 11 Steam PC loaded UEVR but repeatedly
-retried dummy graphics hooks without reaching the game renderer. This follow-up
-targets pre-initialization DirectX 12/11 probe selection and callback lifetime;
-it retains the earlier stalled-worker recovery fixes. The evidence does not
-establish Windows 11 as the cause. Successful startup on that PC, the owner's
-regression check and current headset acceptance remain pending. See
-[the renderer-startup report](../docs/launch-kit/RENDERER-STARTUP-20261006.md).
+The affected Windows 11 Steam PC still failed to reach VR in 1.0.5. This follow-up repairs an unchecked DirectX 12 window lookup: it queries the supported interface and falls back to the base swapchain description when needed, while retaining window validation. Steam process checks now use limited access and retain verified identity only while the same process handle is alive. Repeated log lines are compacted so startup transitions remain visible. These are compatibility repairs and better evidence, not a confirmed fix on that PC; its retest and headset acceptance remain pending. See [the window-startup report](../docs/launch-kit/WINDOW-STARTUP-20261006.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

@@ -108,12 +108,115 @@ function Start-WuWaSteamGame {
     $desktop.ShellExecute($verified.Uri, '', '', 'open', 1)
 }
 
+function Initialize-WuWaSteamProcessIdentity {
+    if ('WuWa.SteamProcessIdentityV1' -as [type]) { return }
+    # Get-Process.Path reads MainModule and can require process/module memory
+    # access. QueryFullProcessImageName needs only limited query rights. Keep a
+    # verified identity only while its original synchronize handle proves that
+    # exact process is still alive; never cache a path by PID alone.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+namespace WuWa {
+    public sealed class SteamProcessIdentityResult {
+        public int Id;
+        public string Path = "";
+        public DateTime StartTime;
+        public long CreationFileTime;
+        public bool Verified;
+        public string Source = "unavailable";
+        public string FailedStep = "";
+        public int Win32Error;
+    }
+    public static class SteamProcessIdentityV1 {
+        const uint QueryLimited = 0x1000, Synchronize = 0x100000, WaitTimeout = 258;
+        sealed class Entry {
+            public SafeProcessHandle Handle;
+            public SteamProcessIdentityResult Identity;
+        }
+        static readonly Dictionary<int, Entry> Entries = new Dictionary<int, Entry>();
+        static readonly object Gate = new object();
+        [DllImport("kernel32.dll", SetLastError=true)] static extern SafeProcessHandle OpenProcess(uint access, bool inherit, int pid);
+        [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool QueryFullProcessImageName(SafeProcessHandle handle, uint flags, StringBuilder path, ref int length);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetProcessTimes(SafeProcessHandle handle, out long created, out long exited, out long kernel, out long user);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetExitCodeProcess(SafeProcessHandle handle, out uint code);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern uint WaitForSingleObject(SafeProcessHandle handle, uint milliseconds);
+        static SteamProcessIdentityResult Failure(int pid, string step, int error) {
+            return new SteamProcessIdentityResult {Id=pid, FailedStep=step, Win32Error=error};
+        }
+        static SteamProcessIdentityResult Copy(SteamProcessIdentityResult value, string source) {
+            return new SteamProcessIdentityResult {Id=value.Id, Path=value.Path, StartTime=value.StartTime,
+                CreationFileTime=value.CreationFileTime, Verified=value.Verified, Source=source};
+        }
+        public static SteamProcessIdentityResult Read(int pid) {
+            lock(Gate) {
+                Entry retained;
+                if(Entries.TryGetValue(pid, out retained)) {
+                    if(!retained.Handle.IsClosed && !retained.Handle.IsInvalid && WaitForSingleObject(retained.Handle, 0) == WaitTimeout)
+                        return Copy(retained.Identity, "verified-held-handle");
+                    retained.Handle.Dispose(); Entries.Remove(pid);
+                }
+                bool canRetain = true;
+                SafeProcessHandle handle = OpenProcess(QueryLimited | Synchronize, false, pid);
+                if(handle.IsInvalid) {
+                    handle.Dispose(); canRetain = false;
+                    handle = OpenProcess(QueryLimited, false, pid);
+                }
+                try {
+                    if(handle.IsInvalid) return Failure(pid, "OpenProcess(limited query)", Marshal.GetLastWin32Error());
+                    long created, exited, kernel, user;
+                    if(!GetProcessTimes(handle, out created, out exited, out kernel, out user))
+                        return Failure(pid, "GetProcessTimes", Marshal.GetLastWin32Error());
+                    int length = 32768; var path = new StringBuilder(length);
+                    if(!QueryFullProcessImageName(handle, 0, path, ref length))
+                        return Failure(pid, "QueryFullProcessImageName", Marshal.GetLastWin32Error());
+                    if(canRetain) {
+                        uint wait = WaitForSingleObject(handle, 0);
+                        if(wait != WaitTimeout) return Failure(pid, "process exited or wait failed", wait == 0 ? 0 : Marshal.GetLastWin32Error());
+                    } else {
+                        uint exitCode;
+                        if(!GetExitCodeProcess(handle, out exitCode)) return Failure(pid, "GetExitCodeProcess", Marshal.GetLastWin32Error());
+                        if(exitCode != 259) return Failure(pid, "process exited", 0);
+                    }
+                    var result = new SteamProcessIdentityResult {Id=pid, Path=path.ToString(), CreationFileTime=created,
+                        StartTime=DateTime.FromFileTimeUtc(created).ToLocalTime(), Verified=true, Source="limited-query"};
+                    // At most32 handles per startup worker. Uncached queries remain
+                    // useful when synchronize rights are unavailable or full.
+                    if(canRetain && Entries.Count < 32) {
+                        Entries.Add(pid, new Entry {Handle=handle, Identity=result}); handle = null;
+                    }
+                    return Copy(result, result.Source);
+                } finally { if(handle != null) handle.Dispose(); }
+            }
+        }
+        public static void Clear() {
+            lock(Gate) { foreach(var value in Entries.Values) value.Handle.Dispose(); Entries.Clear(); }
+        }
+        public static int RetainedCount { get { lock(Gate) { return Entries.Count; } } }
+    }
+}
+'@
+}
+
+function Get-WuWaSteamProcessIdentity {
+    param([Parameter(Mandatory)]$Process)
+    Initialize-WuWaSteamProcessIdentity
+    return [WuWa.SteamProcessIdentityV1]::Read([int]$Process.Id)
+}
+
 function Get-WuWaSteamProcesses {
     param([Parameter(Mandatory)][string]$ExpectedPath)
     foreach ($process in @(Get-Process -Name ([IO.Path]::GetFileNameWithoutExtension($ExpectedPath)) -ErrorAction SilentlyContinue)) {
-        $path = $null
-        try { $path = $process.Path } catch { }
-        if ($path -and [string]::Equals([IO.Path]::GetFullPath($path), $ExpectedPath, [StringComparison]::OrdinalIgnoreCase)) { $process }
+        $identity = Get-WuWaSteamProcessIdentity -Process $process
+        if ($identity.Verified -and $identity.Path -and [string]::Equals([IO.Path]::GetFullPath($identity.Path), $ExpectedPath, [StringComparison]::OrdinalIgnoreCase)) {
+            # Use the same handle-derived creation time for continuity checks;
+            # do not reopen MainModule or StartTime with stronger permissions.
+            [pscustomobject]@{Id=$identity.Id;Path=$identity.Path;StartTime=$identity.StartTime;
+                ProcessName=[IO.Path]::GetFileNameWithoutExtension($identity.Path)}
+        }
     }
 }
 
@@ -123,8 +226,8 @@ function Get-WuWaSteamProcessSnapshot {
     $candidates = @(Get-Process -Name 'Client-Win64-Shipping' -ErrorAction SilentlyContinue)
     $target = @(); $unverified = 0; $evidence = @()
     foreach ($process in $candidates) {
-        $path = $null
-        try { $path = $process.Path } catch { }
+        $identity = Get-WuWaSteamProcessIdentity -Process $process
+        $path = if($identity.Verified) { $identity.Path } else { $null }
         $matches = $false
         if ($path) {
             try { $matches = [string]::Equals([IO.Path]::GetFullPath($path), $Game.Shipping, [StringComparison]::OrdinalIgnoreCase) } catch { $path = $null }
@@ -135,7 +238,9 @@ function Get-WuWaSteamProcessSnapshot {
             $processId = $null
             if ($process.PSObject.Properties['Id']) { $processId = $process.Id }
             # Sharing diagnostics does not require disclosing executable paths.
-            $evidence += [pscustomobject]@{pid=$processId;pathReadable=[bool]$path;matchesSelected=$matches}
+            $evidence += [pscustomobject]@{pid=$processId;pathReadable=[bool]$path;matchesSelected=$matches;
+                identitySource=$identity.Source;creationFileTime=$identity.CreationFileTime;
+                win32Error=$identity.Win32Error;failedStep=$identity.FailedStep}
         }
     }
     $bootstrap = @(Get-WuWaSteamProcesses $Game.Bootstrap)

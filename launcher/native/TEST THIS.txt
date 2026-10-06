@@ -1,13 +1,8 @@
-WUWA VR — RENDERER-STARTUP BETA CHECKS
-Desktop app 1.0.5 | beta-2026-10-06-renderer-startup
-VR build renderer-startup-20261006 | game 3.7
+WUWA VR — WINDOW-STARTUP COMPATIBILITY BETA CHECKS
+Desktop app 1.0.6 | beta-2026-10-06-window-startup
+VR build window-startup-20261006 | game 3.7
 
-On the affected remote Windows 11 Steam PC, 1.0.4 loaded the VR DLL but never
-reached a real game-renderer frame. This backend adds a graphics-hook fallback
-before a renderer is detected and preserves backend.log for each startup attempt.
-It does not change an already detected renderer or establish a GPU-brand cause.
-Native compilation and isolated graphics-hook tests passed. Remote-PC startup and
-headset acceptance remain pending; loading DLLs alone is not a successful launch.
+The affected Windows 11 Steam PC still failed to reach VR in 1.0.5. This follow-up repairs an unchecked DirectX 12 window lookup: it queries the supported interface and falls back to the base swapchain description when needed, while retaining window validation. Steam process checks now use limited access and retain verified identity only while the same process handle is alive. Repeated log lines are compacted so startup transitions remain visible. These are compatibility repairs and better evidence, not a confirmed fix on that PC; its retest and headset acceptance remain pending.
 
 Record Pass / Fail / Blocked / Not tested, with Windows version, game store,
 app/package/build versions and the exact visible result. No need to manufacture
@@ -15,9 +10,9 @@ failures or repeat every earlier feature check just to try this update.
 
 [ ] 1. Update BOTH parts. Step 02 > Versions & updates > Check updates >
     Update launcher, then Restart to update when the game, injector, recording
-    and other operations are idle. Confirm app 1.0.5. Explicitly select and
-    install beta-2026-10-06-renderer-startup in Step 02; confirm VR build
-    renderer-startup-20261006. An app update preserves the old package selection;
+    and other operations are idle. Confirm app 1.0.6. Explicitly select and
+    install beta-2026-10-06-window-startup in Step 02; confirm VR build
+    window-startup-20261006. An app update preserves the old package selection;
     Check updates does not select the new VR package automatically.
     If the old app blocks updating, close it and use the new WuWa-VR-Setup.exe
     from https://chronohaxx.github.io/wuwa-vr/. Reinstallation preserves data
@@ -58,8 +53,8 @@ rim lighting, scene/dialogue stalls, HUD refresh and flat-menu backgrounds are
 not claimed fixed by this renderer-startup change.
 
 鸣潮 VR — 渲染器启动测试版检查
-桌面应用 1.0.5 | beta-2026-10-06-renderer-startup
-VR 构建 renderer-startup-20261006 | 游戏 3.7
+桌面应用 1.0.6 | beta-2026-10-06-window-startup
+VR 构建 window-startup-20261006 | 游戏 3.7
 
 受影响的远程 Windows 11 Steam 电脑在 1.0.4 中已载入 VR DLL，但没有接收到
 实际游戏渲染帧。新后端在尚未识别实际渲染器时尝试另一种图形挂钩，并为每次
@@ -71,8 +66,8 @@ VR 构建 renderer-startup-20261006 | 游戏 3.7
 及实际结果。无需刻意制造故障，也无需为本次更新重复所有旧功能检查。
 
 [ ] 1. 两项都更新。第 02 步 > 版本与更新 > 检查更新 > 更新启动器，待游戏、
-    注入器、录制及其他操作结束后重启并更新，确认应用为 1.0.5。再明确选择
-    并安装 beta-2026-10-06-renderer-startup，确认构建 renderer-startup-20261006。
+    注入器、录制及其他操作结束后重启并更新，确认应用为 1.0.6。再明确选择
+    并安装 beta-2026-10-06-window-startup，确认构建 window-startup-20261006。
     更新应用会保留旧 VR 包选择；检查更新不会自动改选新包。旧应用阻止更新时，
     关闭后运行网站的新 WuWa-VR-Setup.exe。重装保留数据，也不保证卡住的任务已停止。
 [ ] 2. 启动一次。保留所需的 Steam／库洛安装及运行时，点击一次“以 VR 模式启动”，

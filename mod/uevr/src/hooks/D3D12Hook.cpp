@@ -1,6 +1,7 @@
 #include <thread>
 #include <future>
 #include <unordered_set>
+#include <tuple>
 
 #include <spdlog/spdlog.h>
 #include <utility/Thread.hpp>
@@ -11,8 +12,27 @@
 #include "Framework.hpp"
 
 #include "D3D12Hook.hpp"
+#include "utility/WuWaSwapchainWindow.hpp"
 
 static D3D12Hook* g_d3d12_hook = nullptr;
+
+namespace {
+// All Present/Resize callers hold Framework's hook-monitor mutex.
+void log_window_probe(const char* stage, IDXGISwapChain3* chain,
+    const wuwa_swapchain_window::Result& window, bool present1, bool phase1,
+    const void* selected = nullptr) {
+    using Key = std::tuple<const char*, const void*, HWND, HRESULT, HWND, HRESULT,
+        HWND, bool, bool, const void*>;
+    static wuwa_swapchain_window::DiagnosticBudget<Key, 32> budget;
+    const Key key{stage, chain, window.window, window.hwnd_result, window.hwnd,
+        window.desc_result, window.desc_hwnd, present1, phase1, selected};
+    if (!budget.record(key)) return;
+    spdlog::info("[WuWaD3DWindow] stage={} chain={:x} present1={} phase1={} hwnd_hr={:x} hwnd={:x} desc_checked={} desc_hr={:x} desc_hwnd={:x} resolved={:x} fallback={} selected={:x}",
+        stage, (uintptr_t)chain, present1, phase1, (uint32_t)window.hwnd_result,
+        (uintptr_t)window.hwnd, window.desc_checked, (uint32_t)window.desc_result,
+        (uintptr_t)window.desc_hwnd, (uintptr_t)window.window, window.used_desc, (uintptr_t)selected);
+}
+}
 
 D3D12Hook::~D3D12Hook() {
     unhook();
@@ -407,10 +427,9 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
         return present_fn(swap_chain, sync_interval, flags, params);
     }
 
-    HWND swapchain_wnd{nullptr};
-    swap_chain->GetHwnd(&swapchain_wnd);
-
-    if (d3d12->m_is_phase_1 && WindowFilter::get().is_filtered(swapchain_wnd)) {
+    const auto window = wuwa_swapchain_window::resolve(swap_chain);
+    if (d3d12->m_is_phase_1 && WindowFilter::get().is_filtered(window.window)) {
+        log_window_probe("filtered", swap_chain, window, present1, true);
         return present_fn(swap_chain, sync_interval, flags, params);
     }
 
@@ -424,11 +443,13 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
         }
 
         if (!d3d12->m_is_phase_1) {
+            log_window_probe("other_instance", swap_chain, window, present1, false, og_instance.as<void*>());
             return present_fn(swap_chain, sync_interval, flags, params);
         }
     }
 
     if (d3d12->m_is_phase_1) {
+        log_window_probe("selected", swap_chain, window, present1, true);
         //d3d12->m_present_hook.reset();
         d3d12->m_swapchain_hook.reset();
 
@@ -446,7 +467,15 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
     d3d12->m_inside_present = true;
     d3d12->m_swap_chain = swap_chain;
 
-    swap_chain->GetDevice(IID_PPV_ARGS(&d3d12->m_device));
+    const auto device_result = swap_chain->GetDevice(IID_PPV_ARGS(&d3d12->m_device));
+    {
+        using Key = std::tuple<const void*, HRESULT, const void*, uint32_t>;
+        static wuwa_swapchain_window::DiagnosticBudget<Key, 16> budget;
+        if (budget.record(Key{swap_chain, device_result, d3d12->m_device, d3d12->m_command_queue_offset})) {
+            spdlog::info("[WuWaD3DDevice] chain={:x} hr={:x} device={:x} command_queue_offset={:x}",
+                (uintptr_t)swap_chain, (uint32_t)device_result, (uintptr_t)d3d12->m_device, d3d12->m_command_queue_offset);
+        }
+    }
 
     if (d3d12->m_device != nullptr) {
         if (d3d12->m_using_proton_swapchain) {
@@ -566,16 +595,15 @@ HRESULT WINAPI D3D12Hook::resize_buffers(IDXGISwapChain3* swap_chain, UINT buffe
     //auto& hook = d3d12->m_resize_buffers_hook;
     //auto resize_buffers_fn = hook->get_original<decltype(D3D12Hook::resize_buffers)*>();
 
-    HWND swapchain_wnd{nullptr};
-    swap_chain->GetHwnd(&swapchain_wnd);
-
     auto resize_buffers_fn = d3d12->m_swapchain_hook->get_method<decltype(D3D12Hook::resize_buffers)*>(13);
 
     if (!d3d12->m_hooked) {
         return resize_buffers_fn(swap_chain, buffer_count, width, height, new_format, swap_chain_flags);
     }
 
-    if (WindowFilter::get().is_filtered(swapchain_wnd)) {
+    const auto window = wuwa_swapchain_window::resolve(swap_chain);
+    if (WindowFilter::get().is_filtered(window.window)) {
+        log_window_probe("resize_buffers_filtered", swap_chain, window, false, d3d12->m_is_phase_1);
         return resize_buffers_fn(swap_chain, buffer_count, width, height, new_format, swap_chain_flags);
     }
 
@@ -639,16 +667,15 @@ HRESULT WINAPI D3D12Hook::resize_target(IDXGISwapChain3* swap_chain, const DXGI_
     auto d3d12 = g_d3d12_hook;
     //auto resize_target_fn = d3d12->m_resize_target_hook->get_original<decltype(D3D12Hook::resize_target)*>();
 
-    HWND swapchain_wnd{nullptr};
-    swap_chain->GetHwnd(&swapchain_wnd);
-
     auto resize_target_fn = d3d12->m_swapchain_hook->get_method<decltype(D3D12Hook::resize_target)*>(14);
 
     if (!d3d12->m_hooked) {
         return resize_target_fn(swap_chain, new_target_parameters);
     }
 
-    if (WindowFilter::get().is_filtered(swapchain_wnd)) {
+    const auto window = wuwa_swapchain_window::resolve(swap_chain);
+    if (WindowFilter::get().is_filtered(window.window)) {
+        log_window_probe("resize_target_filtered", swap_chain, window, false, d3d12->m_is_phase_1);
         return resize_target_fn(swap_chain, new_target_parameters);
     }
 

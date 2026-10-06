@@ -887,6 +887,42 @@ def startup_diagnostics(launch):
     return lines
 
 
+def compact_backend_rows(rows):
+    """Keep probe transitions visible when per-frame failures flood a report."""
+    compact = []
+    last_key = None
+    repeats = 0
+    last_line = ''
+    for line in rows:
+        key = re.sub(r'^\[\d{4}-\d\d-\d\d [^\]]+\]\s*', '', line)
+        if key == last_key:
+            repeats += 1
+            last_line = line
+            continue
+        if repeats:
+            compact.append(f'[previous line repeated {repeats} more times; last occurrence: {last_line}]')
+        compact.append(line)
+        last_key, repeats = key, 0
+    if repeats:
+        compact.append(f'[previous line repeated {repeats} more times; last occurrence: {last_line}]')
+    if len(compact) <= 180:
+        return compact
+    middle = list(enumerate(compact[40:-80], 40))
+    transitions = [i for i, line in middle if re.search(
+        r'WuWaD3D(?:Probe|Window|Device)|Attempting to initialize DirectX|Device or SwapChain null|'
+        r'Hook(?:ed|ing) DirectX|Framework initialized|xrCreateSession|xrBeginSession|'
+        r'xrGetD3D(?:11|12)GraphicsRequirements|FEnumProperty.*(?:offset|candidate)', line, re.IGNORECASE)]
+    # Keep distinct errors, not dozens of timestamp variants of the same error.
+    errors = {}
+    for i, line in middle:
+        if re.search(r'\[(?:error|critical)\]|exception occurred|could not create openxr', line, re.IGNORECASE):
+            key = re.sub(r'^\[\d{4}-\d\d-\d\d [^\]]+\]\s*', '', line)
+            errors[key] = i
+    selected = sorted(set(transitions[-32:] + list(errors.values())[-24:]))
+    return (compact[:40] + ['[... selected initialization/error lines from sampled log ...]'] +
+            [compact[i] for i in selected] + ['[... intermediate backend lines omitted ...]'] + compact[-80:])
+
+
 def backend_diagnostics(launch):
     """Include the renderer's own evidence, with fixed paths and bounded reads.
 
@@ -919,12 +955,7 @@ def backend_diagnostics(launch):
                 text = (head + tail).decode("utf-8-sig", errors="replace")
             else:
                 text = head.decode("utf-8-sig", errors="replace") + "\n[... middle of backend log omitted ...]\n" + tail.decode("utf-8", errors="replace")
-            rows = text.splitlines()
-            if len(rows) > 180:
-                markers = [line for line in rows[40:-140] if re.search(
-                    r"\[(?:error|critical)\]|exception occurred|could not create openxr|xrGetD3D(?:11|12)GraphicsRequirements|FEnumProperty.*(?:offset|candidate)",
-                    line, re.IGNORECASE)][-24:]
-                rows = rows[:40] + ["[... selected initialization/error lines from sampled log ...]"] + markers + ["[... intermediate backend lines omitted ...]"] + rows[-140:]
+            rows = compact_backend_rows(text.splitlines())
             return ["", f"{title}; modified {stamp}; {stat.st_size} bytes:",
                     *(redact(line) for line in rows)]
         except (OSError, ValueError):

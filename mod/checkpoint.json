@@ -1,35 +1,35 @@
 {
   "schema": 3,
-  "build": "window-startup-20261006",
+  "build": "window-filter-20261006",
   "privateCandidate": false,
-  "launcherVersion": "1.0.6",
+  "launcherVersion": "1.0.7",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "5e7423ada531817047516cc9a5db31c6322d839ebfb79c18d0fa1188c1424d17",
-  "frozenPatchSha256": "cdad82b9349ed77a2d5b7c49be5e9e19805521e069406e3f41517f6cb7cf100a",
-  "sourceReconstructedTree": "8fdf65d062f634eda7acdc6bec6e94ff8ce60975",
-  "buildCompleted": "2026-10-06T16:40:41+0100",
+  "backendSha256": "25bc493f981e2c5b5ff9a7e008e923b7dd2cc1dc2b61ff3efbb7c3467f4c4760",
+  "frozenPatchSha256": "224a2dd2b724015e0c242c38a33a76a036706a1ea44923232c66f0f7fe144c6c",
+  "sourceReconstructedTree": "030a6744bfd3ddd1701d431beb611ad9e072497c",
+  "buildCompleted": "2026-10-06T18:16:32+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 54269866,
-    "sha256": "4006be72786670c087b2a3d88cad8e257b5dadc92df54d58b74f569abfd901ca",
+    "bytes": 54290865,
+    "sha256": "358144b3dfd6685ae7d5914a227dc50553024e62a1720faae79bf2f3a1fe5eb3",
     "public": true
   },
   "liveAcceptance": "Compiled and background-tested; affected Windows 11 Steam PC and headset retest pending.",
   "previousPublicRelease": {
-    "tag": "beta-2026-10-04-cinematic",
-    "backendSha256": "f9e050db26937edc0e8f59d55d7f0c7efbb3d01c28c2b13f737ad65d241e29f1"
+    "tag": "beta-2026-10-06-window-startup",
+    "backendSha256": "5e7423ada531817047516cc9a5db31c6322d839ebfb79c18d0fa1188c1424d17"
   },
-  "sourceIdentity": "Validated DXGI window fallback, limited-access process identity and compact startup diagnostics. See WINDOW-STARTUP-20261006.md. Injector, accepted scene rendering and graphics policy retained.",
+  "sourceIdentity": "Window-filter worker and lock repair, per-hook bootstrap evidence and terminal shutdown handling. See WINDOW-FILTER-20261006.md. Injector, accepted scene rendering and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "window-startup-20261006",
+  "rendererBuild": "window-filter-20261006",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-2026-10-06-window-startup",
-  "launcherSha256": "71161e90c3ff117a04d5dcb9909c145d1e911a989fd56216af931f930789343c",
-  "setupSha256": "8c4835b1d21bec3be19e25f2817d817074307e8a0a659977246148af58aa3f20"
+  "releaseTag": "beta-2026-10-06-window-filter",
+  "launcherSha256": "340496ee0bbc6e70ed170570536a9afae1488623e203d1c5ab95efd16a6ba33f",
+  "setupSha256": "bf50371232da1d4b7036275516a1d4d71869f41d0d8dd011a562bff909fca52f"
 }

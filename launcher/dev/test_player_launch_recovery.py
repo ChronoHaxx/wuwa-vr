@@ -170,7 +170,7 @@ class LaunchRecovery(unittest.TestCase):
                    steamTargetCount=0, steamTargetUnverifiedCount=1, steamTargetCandidateCount=1,
                    steamTargetProcesses=[{'pid':1234, 'pathReadable':False, 'matchesSelected':False}],
                    targetVerificationLost=True, backendEvidencePresent=True, backendRendererInitialized=True,
-                   backendProjectionSeen=True)
+                   backendProjectionSeen=True, backendShuttingDown=True)
         with patch.object(player, 'launch_owner_status', return_value={'verified': True, 'check': 'alive', 'legacy': True}):
             result = player.launch_state()
         self.assertEqual(result['gameStartRequested'], 'steam')
@@ -183,7 +183,7 @@ class LaunchRecovery(unittest.TestCase):
         self.assertEqual(result['steamTargetCandidateCount'], 1)
         self.assertEqual(result['steamTargetProcesses'][0]['pid'], 1234)
         self.assertFalse(result['steamTargetProcesses'][0]['pathReadable'])
-        for key in ('targetVerificationLost', 'backendEvidencePresent', 'backendRendererInitialized', 'backendProjectionSeen'):
+        for key in ('targetVerificationLost', 'backendEvidencePresent', 'backendRendererInitialized', 'backendProjectionSeen', 'backendShuttingDown'):
             self.assertTrue(result[key])
 
     def test_foreign_cancel_path_and_terminal_states_never_written(self):
@@ -352,6 +352,16 @@ class LaunchRecovery(unittest.TestCase):
         self.assertIn('Unique startup failure', result)
         self.assertIn('switching to DirectX 11', result)
         self.assertEqual(result.count('repetitive failure'), 1)
+
+    def test_bootstrap_counts_and_shutdown_survive_middle_truncation(self):
+        rows = [f'header {i}' for i in range(60)]
+        rows += ['[info] [WuWaD3DBootstrap] api=12 callbacks=8 filtered=8',
+                 '[info] Framework shutting down...']
+        rows += [f'tail {i}' for i in range(200)]
+        result = '\n'.join(player.compact_backend_rows(rows))
+        self.assertIn('callbacks=8 filtered=8', result)
+        self.assertIn('Framework shutting down...', result)
+        self.assertLess(len(result.splitlines()), 181)
 
 
 if __name__ == '__main__':

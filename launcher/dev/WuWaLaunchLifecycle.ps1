@@ -426,7 +426,10 @@ function Get-LaunchBackendError {
     # OpenVR failure is a normal precursor to OpenXR fallback. Even these more
     # specific errors are observations, not terminal decisions: runtime retry
     # may succeed and no process is stopped just because a line says 'error'.
-    $matches = [regex]::Matches($Text, '(?im)^.*\[error\].*(?:Initialization of mods failed\. Reason:|Could not create openxr (?:instance|system|session|stage space):|Failed to initialize Framework on DirectX|Exception occurred in VR::on_initialize\(\)).*$')
+    # Framework also returns false during its deliberate 60-frame warmup and
+    # when probing the wrong API. The generic "Failed to initialize Framework"
+    # line therefore identifies neither a terminal failure nor the game's API.
+    $matches = [regex]::Matches($Text, '(?im)^.*\[error\].*(?:Initialization of mods failed\. Reason:|Could not create openxr (?:instance|system|session|stage space):|Failed to init D3D(?:11|12)\b|Failed to initialize ImGui\.|Exception occurred in VR::on_initialize\(\)).*$')
     if ($matches.Count) {
         $last = $matches[$matches.Count - 1].Value.Trim()
         return $last.Substring(0, [Math]::Min(512, $last.Length))
@@ -435,15 +438,17 @@ function Get-LaunchBackendError {
     # Present was reached. Repeated monitor retries with no real initialization
     # are the observable symptom; the RTTI warning alone does not establish a
     # failure, and this stage is earlier than OpenXR initialization.
-    $progress = [regex]::Matches($Text, '(?im)^.*\[info\].*(?:Attempting to initialize DirectX (?:11|12)|Framework initialized|Creating OpenXR swapchains|texture bounds right eye).*$')
+    # "Attempting to initialize DirectX" is emitted before GetDevice succeeds;
+    # only completed initialization clears earlier unsuccessful probe cycles.
+    $progress = [regex]::Matches($Text, '(?im)^.*\[info\].*(?:Framework initialized|Creating OpenXR swapchains|texture bounds right eye).*$')
     $pending = $Text
     if ($progress.Count) {
         $lastProgress = $progress[$progress.Count - 1]
         $pending = $Text.Substring($lastProgress.Index + $lastProgress.Length)
     }
-    $retries = [regex]::Matches($pending, '(?im)^.*\[info\].*Sending rehook request for D3D\s*$').Count
+    $retries = [regex]::Matches($pending, '(?im)^.*\[info\].*(?:Sending rehook request for D3D\s*$|No real Present reached the D3D(?:11|12) probe; trying D3D(?:11|12)|Device or SwapChain null\. DirectX (?:11|12) may be in use\. Unhooking D3D(?:11|12))').Count
     if ($retries -ge 3) {
-        return ('UEVR loaded but has not attached to the game renderer. Graphics-hook retries: {0}; startup is still waiting. Open Troubleshooting and copy diagnostics.' -f $retries)
+        return ('UEVR loaded but has not attached to the game renderer. Graphics-hook retry events: {0}; startup is still waiting. Open Troubleshooting and copy diagnostics.' -f $retries)
     }
     return ''
 }
@@ -462,6 +467,8 @@ function Get-LaunchWaitDecision {
         [double]$LauncherGoneSeconds,
         [bool]$TargetRunning,
         [bool]$BackendLogStarted,
+        [bool]$BackendShuttingDown,
+        [bool]$GameStateUnknown,
         [double]$TargetWithoutLogSeconds,
         [bool]$TimedOut,
         [int]$LauncherGraceSeconds = 15,
@@ -470,11 +477,13 @@ function Get-LaunchWaitDecision {
     )
     $action = 'Continue'
     $detail = ''
-    if ($FirstFrameSeen) {
-        $action = 'Ready'; $detail = 'UEVR produced its first stereo frame.'
-    } elseif ($CancelRequested) {
+    if ($CancelRequested) {
         $action = 'Cancelled'; $detail = 'Stopped waiting on request.'
-    } elseif ($GameSeen -and -not $GameRunning -and $GameGoneSeconds -ge $GameGoneGraceSeconds) {
+    } elseif ($BackendShuttingDown) {
+        $action = 'BackendStopped'; $detail = 'UEVR reported Framework shutdown before startup completed. The game may still be open; the launcher did not close it.'
+    } elseif ($FirstFrameSeen) {
+        $action = 'Ready'; $detail = 'UEVR produced its first stereo frame.'
+    } elseif (-not $GameStateUnknown -and $GameSeen -and -not $GameRunning -and $GameGoneSeconds -ge $GameGoneGraceSeconds) {
         $action = 'GameExited'; $detail = 'The game closed before UEVR produced a stereo frame.'
     } elseif (-not $GameSeen -and $InjectorExpected -and -not $InjectorRunning) {
         $action = 'InjectorExited'; $detail = 'The injector closed before the game started, so nothing could be injected.'
@@ -562,12 +571,19 @@ function Wait-LaunchOutcome {
         $gameGone = 0; if ($null -ne $gameGoneSince) { $gameGone = $now - $gameGoneSince }
         $launcherGone = 0; if ($null -ne $launcherGoneSince) { $launcherGone = $now - $launcherGoneSince }
         $targetAlone = 0; if ($null -ne $targetSince) { $targetAlone = $now - $targetSince }
+        # Optional evidence fields keep non-Steam callers compatible. Missing
+        # enumeration is not proof that a previously verified process exited.
+        $backendStopped = $false; $gameStateUnknown = $false
+        if ($observation.ContainsKey('BackendShuttingDown')) { $backendStopped = [bool]$observation.BackendShuttingDown }
+        if ($observation.ContainsKey('TargetVerificationLost')) { $gameStateUnknown = [bool]$observation.TargetVerificationLost }
+        if ($observation.ContainsKey('SteamTargetCount') -and -not $observation.TargetRunning) { $gameStateUnknown = $true }
         $decision = Get-LaunchWaitDecision -FirstFrameSeen ([bool]$observation.FirstFrameSeen) `
             -CancelRequested $cancel -GameRunning ([bool]$observation.GameRunning) -GameSeen $gameSeen `
             -GameGoneSeconds $gameGone -InjectorExpected $InjectorExpected `
             -InjectorRunning ([bool]$observation.InjectorRunning) -LauncherExpected $LauncherExpected `
             -LauncherGoneSeconds $launcherGone -TargetRunning ([bool]$observation.TargetRunning) `
             -BackendLogStarted ([bool]$observation.BackendLogStarted) -TargetWithoutLogSeconds $targetAlone `
+            -BackendShuttingDown $backendStopped -GameStateUnknown $gameStateUnknown `
             -TimedOut ($now -ge $TimeoutSeconds) -LauncherGraceSeconds $LauncherGraceSeconds `
             -GameGoneGraceSeconds $GameGoneGraceSeconds -InjectionGraceSeconds $InjectionGraceSeconds
         if ($OnPoll) { & $OnPoll $observation $decision $gameSeen }

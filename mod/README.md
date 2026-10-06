@@ -1,13 +1,13 @@
-# Mod source — window-startup compatibility beta
+# Mod source — window-filter startup repair beta
 
 The release target is
-[beta-2026-10-06-window-startup](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-startup),
-launcher **1.0.6**, backend/package build **window-startup-20261006**, for game
+[beta-2026-10-06-window-filter](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-filter),
+launcher **1.0.7**, backend/package build **window-filter-20261006**, for game
 **3.7**. Native compilation, isolated graphics-hook checks, launcher tests and isolated package installation passed.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The affected Windows 11 Steam PC still failed to reach VR in 1.0.5. This follow-up repairs an unchecked DirectX 12 window lookup: it queries the supported interface and falls back to the base swapchain description when needed, while retaining window validation. Steam process checks now use limited access and retain verified identity only while the same process handle is alive. Repeated log lines are compacted so startup transitions remain visible. These are compatibility repairs and better evidence, not a confirmed fix on that PC; its retest and headset acceptance remain pending. See [the window-startup report](../docs/launch-kit/WINDOW-STARTUP-20261006.md).
+The affected Windows 11 Steam PC still failed to reach VR with 1.0.6, after all three injection DLLs loaded. This update repairs two reproduced window-filter defects: its worker could exit while idle, and a window-title query could deadlock the rendering thread. Title queries are now bounded and performed outside the filter lock. Startup reports distinguish normal graphics warmup from an actual failure and stop waiting when the current backend shuts down. Per-attempt graphics-hook evidence now separates missing callbacks from rejected windows. These repairs passed background tests; successful startup on the affected PC and headset acceptance are still unverified. See [the window-filter repair report](../docs/launch-kit/WINDOW-FILTER-20261006.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

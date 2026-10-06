@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <atomic>
 #include <spdlog/spdlog.h>
 #include <utility/Thread.hpp>
 #include <utility/Module.hpp>
@@ -7,10 +8,25 @@
 #include "Framework.hpp"
 
 #include "D3D11Hook.hpp"
+#include "utility/WuWaSwapchainWindow.hpp"
 
 using namespace std;
 
 static D3D11Hook* g_d3d11_hook = nullptr;
+
+namespace {
+std::atomic_uint64_t g_d3d11_probe_generation{};
+
+void log_probe_window(uint64_t generation, const char* stage, IDXGISwapChain* chain,
+    HRESULT desc_result, HWND desc_hwnd) {
+    // Additional interface queries are limited to the first three events of
+    // each outcome in a probe. They never change the GetDesc-based selection.
+    const auto window = wuwa_swapchain_window::resolve(chain);
+    spdlog::info("[WuWaD3DWindow] api=11 probe={} stage={} chain={:x} hwnd_hr={:x} hwnd={:x} desc_hr={:x} desc_hwnd={:x} resolved={:x}",
+        generation, stage, (uintptr_t)chain, (uint32_t)window.hwnd_result,
+        (uintptr_t)window.hwnd, (uint32_t)desc_result, (uintptr_t)desc_hwnd, (uintptr_t)desc_hwnd);
+}
+}
 
 D3D11Hook::~D3D11Hook() {
     unhook();
@@ -18,6 +34,11 @@ D3D11Hook::~D3D11Hook() {
 
 bool D3D11Hook::hook() {
     spdlog::info("Hooking D3D11");
+
+    m_probe_generation = ++g_d3d11_probe_generation;
+    m_probe_callbacks = m_probe_filtered = m_probe_selected = 0;
+    m_probe_device_queries = m_probe_device_ok = 0;
+    m_probe_present_slot = nullptr;
 
     g_d3d11_hook = this;
 
@@ -81,6 +102,8 @@ bool D3D11Hook::hook() {
         auto& present_fn = (*(void***)swap_chain)[8];
         auto& resize_buffers_fn = (*(void***)swap_chain)[13];
 
+        m_probe_present_slot = &present_fn;
+
         m_present_hook = std::make_unique<PointerHook>(&present_fn, (void*)&D3D11Hook::present);
         m_resize_buffers_hook = std::make_unique<PointerHook>(&resize_buffers_fn, (void*)&D3D11Hook::resize_buffers);
 
@@ -102,6 +125,16 @@ bool D3D11Hook::unhook() {
     }
 
     spdlog::info("Unhooking D3D11");
+
+    void* slot_value{};
+    SIZE_T bytes{};
+    const bool slot_read = m_probe_present_slot != nullptr && ReadProcessMemory(GetCurrentProcess(),
+        m_probe_present_slot, &slot_value, sizeof(slot_value), &bytes) && bytes == sizeof(slot_value);
+    spdlog::info("[WuWaD3DProbeSummary] api=11 probe={} callbacks={} filtered={} accepted={} device_queries={} device_ok={} slot={:x} slot_read={} slot_value={:x} slot_owned={} original={:x}",
+        m_probe_generation, m_probe_callbacks, m_probe_filtered, m_probe_selected,
+        m_probe_device_queries, m_probe_device_ok, (uintptr_t)m_probe_present_slot, slot_read,
+        (uintptr_t)slot_value, slot_read && slot_value == (void*)&D3D11Hook::present,
+        (uintptr_t)m_present_hook->get_original<void*>());
 
     if (m_present_hook->remove() && m_resize_buffers_hook->remove()) {
         m_hooked = false;
@@ -126,11 +159,20 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
     // dispatched callback that waited while Framework switched API probes.
     if (!d3d11->m_hooked) return present_fn(swap_chain, sync_interval, flags);
 
+    ++d3d11->m_probe_callbacks;
+
     DXGI_SWAP_CHAIN_DESC swap_desc{};
-    swap_chain->GetDesc(&swap_desc);
+    const auto desc_result = swap_chain->GetDesc(&swap_desc);
 
     if (WindowFilter::get().is_filtered(swap_desc.OutputWindow)) {
+        if (++d3d11->m_probe_filtered <= 3) {
+            log_probe_window(d3d11->m_probe_generation, "filtered", swap_chain, desc_result, swap_desc.OutputWindow);
+        }
         return present_fn(swap_chain, sync_interval, flags);
+    }
+
+    if (++d3d11->m_probe_selected <= 3) {
+        log_probe_window(d3d11->m_probe_generation, "accepted", swap_chain, desc_result, swap_desc.OutputWindow);
     }
 
     d3d11->m_inside_present = true;
@@ -147,7 +189,13 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
         return present_fn(swap_chain, sync_interval, flags);
     }*/
 
-    swap_chain->GetDevice(__uuidof(d3d11->m_device), (void**)&d3d11->m_device);
+    const auto device_result = swap_chain->GetDevice(__uuidof(d3d11->m_device), (void**)&d3d11->m_device);
+    ++d3d11->m_probe_device_queries;
+    if (SUCCEEDED(device_result) && d3d11->m_device != nullptr) ++d3d11->m_probe_device_ok;
+    if (d3d11->m_probe_device_queries <= 3) {
+        spdlog::info("[WuWaD3DDevice] api=11 probe={} chain={:x} hr={:x} device={:x}",
+            d3d11->m_probe_generation, (uintptr_t)swap_chain, (uint32_t)device_result, (uintptr_t)d3d11->m_device);
+    }
 
     /*if (d3d11->m_set_render_targets_hook == nullptr) {
         ComPtr<ID3D11DeviceContext> context{};

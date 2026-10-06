@@ -2,7 +2,7 @@
 
 Free, unofficial Wuthering Waves VR mod, built on praydog's UEVR and community work.
 
-**[Download the Windows installer · beta 1.0.6 · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-window-startup/WuWa-VR-Setup.exe)** · [Release notes & source](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-startup) · [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html)
+**[Download the Windows installer · beta 1.0.7 · game 3.7](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-window-filter/WuWa-VR-Setup.exe)** · [Release notes & source](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-filter) · [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html)
 
 Install **WuWa VR**, then follow **01 Game → 02 Install VR → 03 Headset or simulator**.
 The small installer downloads the separate VR mod (about **54 MB**) in step 02,
@@ -11,18 +11,18 @@ Choose **Launch in VR** and accept Windows permission. Steam starts the selected
 game through Steam; with Kuro, press **Play** in its launcher. The installed app offers launcher updates while idle;
 VR package updates are in step 02. Updates preserve settings, backups and recordings.
 
-Update both the app to **1.0.6** and the step 02 package to
-**beta-2026-10-06-window-startup** / build **window-startup-20261006**.
+Update both the app to **1.0.7** and the step 02 package to
+**beta-2026-10-06-window-filter** / build **window-filter-20261006**.
 Updating the app preserves the selected VR package; explicitly select/install
 the new package after restarting. Existing recovery, cancellation, **Close
 launcher only** and guarded process stopping remain under **Troubleshooting**.
 Game, Steam and VR runtime processes are excluded from confirmed recovery stops.
 
-The affected Windows 11 Steam PC still failed to reach VR in 1.0.5. This follow-up repairs an unchecked DirectX 12 window lookup: it queries the supported interface and falls back to the base swapchain description when needed, while retaining window validation. Steam process checks now use limited access and retain verified identity only while the same process handle is alive. Repeated log lines are compacted so startup transitions remain visible. These are compatibility repairs and better evidence, not a confirmed fix on that PC; its retest and headset acceptance remain pending.
+The affected Windows 11 Steam PC still failed to reach VR with 1.0.6, after all three injection DLLs loaded. This update repairs two reproduced window-filter defects: its worker could exit while idle, and a window-title query could deadlock the rendering thread. Title queries are now bounded and performed outside the filter lock. Startup reports distinguish normal graphics warmup from an actual failure and stop waiting when the current backend shuts down. Per-attempt graphics-hook evidence now separates missing callbacks from rejected windows. These repairs passed background tests; successful startup on the affected PC and headset acceptance are still unverified.
 
 [Watch / guide](https://chronohaxx.github.io/wuwa-vr/) · [Report an issue](https://github.com/ChronoHaxx/wuwa-vr/issues)
 
-[Portable ZIP (advanced fallback)](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-window-startup/WuWa-VR-Launcher.zip)
+[Portable ZIP (advanced fallback)](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-window-filter/WuWa-VR-Launcher.zip)
 uses the older browser launcher: extract everything, then open **WuWa VR Launcher.exe**.
 No separate Python installation is needed. [Previous beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-renderer-startup).
 Keep older packages for **Troubleshooting → Repair & recovery → Use previous

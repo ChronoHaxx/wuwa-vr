@@ -410,7 +410,7 @@ $injectorProcess = $null
 $watchedInjector = $null
 $injectorHandled = $false
 $progress = @{ Message = '' }
-$backendEvidence = @{ Header = ''; ReadFrom = 0; Captured = $false; Error = ''; RendererInitialized = $false; ProjectionSeen = $false; TargetVerificationLost = $false }
+$backendEvidence = @{ Header = ''; ReadFrom = 0; Captured = $false; Error = ''; RendererInitialized = $false; ProjectionSeen = $false; TargetVerificationLost = $false; ShuttingDown = $false }
 function Save-ObservedBackendLog {
     if (-not $DiagnosticDirectory -or -not $backendEvidence.Header) { return }
     try {
@@ -440,6 +440,7 @@ $observe = {
     $observation.BackendEvidencePresent = $false
     $observation.BackendRendererInitialized = $false
     $observation.BackendProjectionSeen = $false
+    $observation.BackendShuttingDown = $false
     $observation.TargetVerificationLost = $false
     $header = ''
     $observation.Slice = ''
@@ -472,6 +473,11 @@ $observe = {
         $observation.BackendProjectionSeen = $observation.Slice -match 'texture bounds right eye'
         $backendEvidence.RendererInitialized = $observation.BackendRendererInitialized
         $backendEvidence.ProjectionSeen = $observation.BackendProjectionSeen
+        # Shutdown belongs to this attempt only after the same exact attribution
+        # gate as renderer evidence. Old/foreign logs must never end this wait.
+        $observation.BackendShuttingDown = $observation.Slice -match '(?im)^.*\[info\]\s+Framework shutting down\.\.\.\s*$'
+        $backendEvidence.ShuttingDown = $observation.BackendShuttingDown
+        if ($observation.BackendShuttingDown) { $observation.FirstFrameSeen = $false }
         $observation.BackendError = Get-LaunchBackendError -Text $observation.Slice
         $backendEvidence.Error = $observation.BackendError
         Save-ObservedBackendLog
@@ -498,6 +504,8 @@ $onPoll = {
         $message = 'UEVR log evidence is present, but the selected Steam process can no longer be uniquely verified. Open Troubleshooting and copy diagnostics; do not start another injector.'
         if ($observation.BackendRendererInitialized) { $message = 'UEVR reached renderer initialization, but the selected Steam process can no longer be uniquely verified. Open Troubleshooting and copy diagnostics; do not start another injector.' }
     }
+    if ($observation.BackendShuttingDown) { $phase = 'stopping'; $message = 'UEVR reported Framework shutdown; ending this startup wait. The game may still be open.' }
+    if ($decision.Action -eq 'Cancelled') { $phase = 'stopping'; $message = 'Stopping this startup wait on request; the game is left open.' }
     if ($message -ne $progress.Message) {
         Write-Host ('  {0}  {1}' -f (Get-Date -Format 'HH:mm:ss'), $message)
         $progress.Message = $message
@@ -509,6 +517,7 @@ $onPoll = {
         backendEvidencePresent = [bool]$observation.BackendEvidencePresent;
         backendRendererInitialized = [bool]$observation.BackendRendererInitialized;
         backendProjectionSeen = [bool]$observation.BackendProjectionSeen;
+        backendShuttingDown = [bool]$observation.BackendShuttingDown;
         targetVerificationLost = [bool]$observation.TargetVerificationLost }
     if ($steamGame) {
         Update-LaunchState -Path $StatePath -Values @{steamTargetCount=$observation.SteamTargetCount;
@@ -590,6 +599,7 @@ try {
             'LauncherClosed' { ' Run the shortcut again and press Play in the launcher.' }
             'InjectorExited' { ' Open Troubleshooting and copy diagnostics; include injector.stdout.log and injector.stderr.log from this attempt if present. Check Windows Security protection history for a blocked file. Do not disable security software.' }
             'GameExited'     { ' The game may have crashed or been closed manually; the launcher cannot distinguish them. Open Troubleshooting and copy diagnostics, including this attempt backend.log.' }
+            'BackendStopped' { ' Open Troubleshooting and copy diagnostics, including this attempt backend.log. This does not establish whether the game crashed or was closed manually.' }
             'NotInjected'    { ' Open Troubleshooting > Copy diagnostics in the launcher. Include the injector log when reporting this failure. Close the game normally before retrying.' }
             default          { '' }
         }
@@ -600,14 +610,16 @@ try {
         $backendDetail = ''; if ($backendEvidence.Error -and $outcome.Action -ne 'Cancelled') { $backendDetail = ' Last backend startup error: ' + $backendEvidence.Error }
         $message = $outcome.Detail + $exitDetail + $cleanup + $advice + $backendDetail
         $reportedOutcome = $outcome.Action
-        if ($backendEvidence.TargetVerificationLost -and $backendEvidence.RendererInitialized -and $outcome.Action -in @('GameExited','TimedOut','NotInjected')) {
+        if ($backendEvidence.TargetVerificationLost -and $outcome.Action -in @('GameExited','TimedOut','NotInjected')) {
             $reportedOutcome = 'TargetUnverified'
-            $message = 'UEVR reached renderer initialization, but the selected Steam process could not be continuously verified. This observation did not establish a renderer startup failure. Open Troubleshooting and copy diagnostics before retrying.' + $cleanup
+            $message = 'The selected Steam process could not be continuously verified. UEVR log evidence was preserved, but the launcher cannot establish whether the game is still running. Open Troubleshooting and copy diagnostics before retrying.' + $cleanup
+            if ($backendEvidence.RendererInitialized) { $message = 'UEVR reached renderer initialization, but the selected Steam process could not be continuously verified. This observation did not establish a renderer startup failure. Open Troubleshooting and copy diagnostics before retrying.' + $cleanup }
         }
         Update-LaunchState -Path $StatePath -Values @{ phase = $phase; outcome = $reportedOutcome; message = $message }
         throw $message
     }
 
+    Assert-LaunchNotCancelled -CancelPath $CancelPath
     if ($slice -match 'texture bounds right eye') {
         # The first stereo frame is far too early to sample per-frame
         # instrumentation. [WuWaDiag] records accumulate over the session, and
@@ -636,9 +648,11 @@ try {
         Write-Output "First stereo frame seen. Sampling for $SettleSeconds s so per-frame instrumentation can accumulate..."
         $settleDeadline = (Get-Date).AddSeconds($SettleSeconds)
         while ($runContinuity.Result -eq 'PASS' -and (Get-Date) -lt $settleDeadline) {
+            Assert-LaunchNotCancelled -CancelPath $CancelPath
             $remainingMs = [int][Math]::Ceiling(($settleDeadline - (Get-Date)).TotalMilliseconds)
             if ($remainingMs -le 0) { break }
             Start-Sleep -Milliseconds ([Math]::Min(3000, $remainingMs))
+            Assert-LaunchNotCancelled -CancelPath $CancelPath
             $gameProcesses = @(Get-SelectedGameProcesses)
             $runContinuity = Get-RunContinuityCheck -ExpectedProcess $expectedProcess `
                 -BackendEntryTime $entryTime -ExpectedLogHeader $expectedHeader `

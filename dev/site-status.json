@@ -1,8 +1,8 @@
 {
-  "tag": "beta-2026-10-06-window-startup",
-  "previousTag": "beta-2026-10-06-renderer-startup",
+  "tag": "beta-2026-10-06-window-filter",
+  "previousTag": "beta-2026-10-06-window-startup",
   "game": "3.7",
-  "appVersion": "1.0.6",
-  "buildId": "window-startup-20261006",
+  "appVersion": "1.0.7",
+  "buildId": "window-filter-20261006",
   "installer": "WuWa-VR-Setup.exe"
 }

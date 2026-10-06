@@ -2,6 +2,17 @@
   "schema": 1,
   "releases": [
     {
+      "id": "beta-2026-10-06-window-filter",
+      "gameVersion": "3.7",
+      "buildId": "window-filter-20261006",
+      "channel": "beta",
+      "published": "2026-10-06T17:17:25.820807+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-2026-10-06-window-filter/WuWa-VR-Launcher.zip",
+      "sha256": "358144b3dfd6685ae7d5914a227dc50553024e62a1720faae79bf2f3a1fe5eb3",
+      "size": 54290865,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-window-filter"
+    },
+    {
       "id": "beta-2026-10-06-window-startup",
       "gameVersion": "3.7",
       "buildId": "window-startup-20261006",

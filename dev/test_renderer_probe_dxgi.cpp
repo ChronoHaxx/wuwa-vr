@@ -263,6 +263,110 @@ static bool no_present_fallback(std::vector<Chain>& chains) {
         return routed;
     }
 }
+
+static PresentFn lifecycle_original11{}, lifecycle_original12{};
+static Present1Fn lifecycle_original12_1{};
+static unsigned lifecycle_calls11{}, lifecycle_calls12{}, lifecycle_calls12_1{};
+static HRESULT STDMETHODCALLTYPE lifecycle_present11(IDXGISwapChain* chain, UINT interval, UINT flags) {
+    ++lifecycle_calls11;
+    return lifecycle_original11(chain, interval, flags);
+}
+static HRESULT STDMETHODCALLTYPE lifecycle_present12(IDXGISwapChain* chain, UINT interval, UINT flags) {
+    ++lifecycle_calls12;
+    return lifecycle_original12(chain, interval, flags);
+}
+static HRESULT STDMETHODCALLTYPE lifecycle_present12_1(IDXGISwapChain1* chain, UINT interval, UINT flags,
+                                                      const DXGI_PRESENT_PARAMETERS* params) {
+    ++lifecycle_calls12_1;
+    return lifecycle_original12_1(chain, interval, flags, params);
+}
+struct LifecycleHooks {
+    std::unique_ptr<PointerHook> present, present1;
+    void remove() {
+        require(present && present->remove(), "Lifecycle Present remove failed");
+        require(!present1 || present1->remove(), "Lifecycle Present1 remove failed");
+    }
+};
+static std::unique_ptr<LifecycleHooks> install_lifecycle(Chain& probe, bool d12) {
+    auto hooks = std::make_unique<LifecycleHooks>();
+    hooks->present = std::make_unique<PointerHook>(slot(probe.base.Get(), 8),
+        d12 ? reinterpret_cast<void*>(&lifecycle_present12) : reinterpret_cast<void*>(&lifecycle_present11));
+    if (d12) {
+        lifecycle_original12 = hooks->present->get_original<PresentFn>();
+        hooks->present1 = std::make_unique<PointerHook>(slot(probe.extended.Get(), 22),
+            reinterpret_cast<void*>(&lifecycle_present12_1));
+        lifecycle_original12_1 = hooks->present1->get_original<Present1Fn>();
+    } else {
+        lifecycle_original11 = hooks->present->get_original<PresentFn>();
+    }
+    return hooks;
+}
+static void verify_lifecycle_dispatch(Chain& target, bool d12, const char* stage) {
+    lifecycle_calls11 = lifecycle_calls12 = lifecycle_calls12_1 = 0;
+    checked(invoke(target, false, DXGI_PRESENT_TEST), "Lifecycle Present(TEST)");
+    require(d12 ? lifecycle_calls12 == 1 && lifecycle_calls11 == 0 :
+        lifecycle_calls11 == 1 && lifecycle_calls12 == 0, "Wrong/absent active probe after replacement");
+    if (d12) {
+        checked(invoke(target, true, DXGI_PRESENT_TEST), "Lifecycle Present1(TEST)");
+        require(lifecycle_calls12_1 == 1, "Present1 slot lost after replacement");
+    }
+    std::cout << "lifecycle_dispatch\tstage=" << stage << "\tactive=" << (d12 ? "D3D12" : "D3D11")
+        << "\td11=" << lifecycle_calls11 << "\td12=" << lifecycle_calls12
+        << "\td12_present1=" << lifecycle_calls12_1 << std::endl;
+}
+static void alternating_object_lifetime(std::vector<Chain>& chains) {
+    auto& probe12 = chains[1]; auto& target12 = chains[2]; auto& probe11 = chains[3];
+    const auto slot12 = slot(probe12.base.Get(), 8);
+    const auto slot11 = slot(probe11.base.Get(), 8);
+    const auto saved12 = *slot12; const auto saved11 = *slot11;
+    const auto slot12_1 = slot(probe12.extended.Get(), 22); const auto saved12_1 = *slot12_1;
+    if (slot12 != slot11 || slot12 != slot(target12.base.Get(), 8)) {
+        std::cout << "lifecycle_not_reproduced\tshared_slot=false\tCannot evaluate reported shared-slot hypothesis on this driver." << std::endl;
+        return;
+    }
+    std::unique_ptr<LifecycleHooks> old11;
+    auto old12 = install_lifecycle(probe12, true);
+    verify_lifecycle_dispatch(target12, true, "initial");
+    for (unsigned cycle = 0; cycle < 3; ++cycle) {
+        // Framework monitor first removes the active API, retaining originals.
+        // hook_d3d11 then resets the OLD DX11 object before making its new one.
+        old12->remove();
+        old11.reset();
+        require(*slot11 == saved11, "Old DX11 destruction changed restored slot");
+        old11 = install_lifecycle(probe11, false);
+        verify_lifecycle_dispatch(target12, false, "12_to_11");
+
+        // initialize() unhooks mismatched DX11; hook_d3d12 resets OLD DX12
+        // before installing replacement. Actual PointerHook destructors run.
+        old11->remove();
+        old12.reset();
+        require(*slot12 == saved12 && *slot12_1 == saved12_1, "Old DX12 destruction changed restored slots");
+        old12 = install_lifecycle(probe12, true);
+        verify_lifecycle_dispatch(target12, true, "11_to_12");
+    }
+    // The other API's retired object may outlive a new active API. Its different
+    // destination must not remove the active Present pointer on destruction.
+    old11.reset();
+    verify_lifecycle_dispatch(target12, true, "destroy_retired_other_api");
+    old12->remove(); old12.reset();
+    require(*slot12 == saved12 && *slot12_1 == saved12_1, "Lifecycle final restore failed");
+
+    // Positive control: reverse Framework's real ordering deliberately. An old
+    // removed hook destroyed AFTER a same-destination replacement CAN restore
+    // the slot. Record this as a detected hazard, not a production reproduction.
+    auto retired = std::make_unique<PointerHook>(slot12, reinterpret_cast<void*>(&lifecycle_present12));
+    require(retired->remove(), "Positive-control retire failed");
+    auto replacement = std::make_unique<PointerHook>(slot12, reinterpret_cast<void*>(&lifecycle_present12));
+    require(*slot12 == reinterpret_cast<void*>(&lifecycle_present12), "Positive-control install failed");
+    retired.reset();
+    const bool reversed_order_clobbered = *slot12 == saved12;
+    require(reversed_order_clobbered, "Fixture did not detect deliberately reversed destruction ordering");
+    replacement.reset();
+    require(*slot12 == saved12, "Positive-control final restore failed");
+    std::cout << "lifecycle_result\tproduction_order_cycles=3\tshared_slot=true\tlost_callbacks=0"
+        << "\twrong_order_positive_control_clobbered=" << reversed_order_clobbered
+        << "\tScope=actual_PointerHook_and_DXGI_with_Framework_order_not_full_Framework" << std::endl;
+}
 int main(int argc, char** argv) {
     try {
         const bool warp = argc == 2 && std::string(argv[1]) == "--warp";
@@ -286,6 +390,7 @@ int main(int argc, char** argv) {
         const bool fallback_routed = no_present_fallback(chains);
         queued_retirement(chains[1], false);
         queued_retirement(chains[1], true);
+        alternating_object_lifetime(chains);
         require(!IsWindowVisible(window11.handle) && !IsWindowVisible(window12.handle) && !IsWindowVisible(null_window.handle), "Window became visible");
         std::cout << "PASS\tPointerHook dispatch/restoration and no-Present policy.\tNULL_to_HWND_fallback_observed=" << fallback_routed
             << "\tDifferent vtable routes are recorded, not assumed equal."

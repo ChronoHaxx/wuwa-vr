@@ -51,6 +51,67 @@
     } catch { /* Keep the informational fallback if configuration is invalid. */ }
   }
 
+  // Hero: a muted preview loop. Reduced-motion and data-saver visitors start paused.
+  const frame = document.getElementById("run-video");
+  if (frame) {
+    const video = frame.querySelector("video"), toggle = frame.querySelector(".video-toggle");
+    const calm = matchMedia("(prefers-reduced-motion: reduce)").matches || navigator.connection?.saveData === true;
+    if (video && toggle) {
+      const show = playing => {
+        toggle.dataset.state = playing ? "playing" : "paused";
+        toggle.setAttribute("aria-label", playing ? toggle.dataset.pause : toggle.dataset.play);
+      };
+      let chosen = false; // The visitor's own play/pause choice always wins.
+      const play = () => { video.preload = "auto"; video.play().catch(() => show(false)); };
+      toggle.hidden = false; show(false);
+      toggle.addEventListener("click", () => { chosen = true; video.paused ? play() : video.pause(); });
+      video.addEventListener("play", () => show(true));
+      video.addEventListener("pause", () => show(false));
+      // Browsers may refuse playback in a hidden tab; start once the page is visible.
+      document.addEventListener("visibilitychange", () => {
+        if (!calm && !chosen && !document.hidden && video.paused) play();
+      });
+      if (!calm) play();
+    }
+    // Contact YouTube only after the visitor asks for the full run.
+    const id = /^[\w-]{11}$/.test(frame.dataset.youtube || "") ? frame.dataset.youtube : "";
+    if (id) document.querySelectorAll("[data-youtube-open]").forEach(link => link.addEventListener("click", event => {
+      event.preventDefault();
+      const player = document.createElement("iframe");
+      player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
+      player.title = frame.dataset.youtubeTitle || "YouTube";
+      player.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+      player.allowFullscreen = true;
+      player.referrerPolicy = "strict-origin-when-cross-origin";
+      frame.replaceChildren(player);
+      frame.scrollIntoView({block: "center", behavior: calm ? "auto" : "smooth"});
+      player.focus();
+    }));
+  }
+
+  // Launcher tour: each step card shows its screenshot.
+  document.querySelectorAll(".tour").forEach(tour => {
+    const steps = [...tour.querySelectorAll(".tour-step")], shots = [...tour.querySelectorAll(".tour-shot")];
+    steps.forEach((step, index) => {
+      const button = step.querySelector(".tour-select");
+      if (!button) return;
+      button.hidden = false;
+      button.addEventListener("click", () => steps.forEach((other, i) => {
+        other.classList.toggle("is-active", i === index);
+        shots[i]?.classList.toggle("is-active", i === index);
+        other.querySelector(".tour-select")?.setAttribute("aria-pressed", String(i === index));
+      }));
+    });
+  });
+
+  // The language menu closes like a menu: outside click or Escape.
+  document.querySelectorAll(".lang-menu").forEach(menu => {
+    document.addEventListener("click", event => { if (menu.open && !menu.contains(event.target)) menu.open = false; });
+    menu.addEventListener("keydown", event => {
+      if (event.key === "Escape" && menu.open) { menu.open = false; menu.querySelector("summary").focus(); }
+    });
+  });
+
   // Only remember the chosen language, never report text or device details.
   const languages = ["en", "zh-Hans", "ja", "ko", "es", "pt-BR", "fr", "de", "ru", "ar"];
   document.querySelectorAll("[data-language]").forEach(link => link.addEventListener("click", () => {
@@ -67,6 +128,37 @@
         remembered.hidden = false;
       }
     } catch { /* The static language links still work. */ }
+  }
+
+  // English home only: offer the visitor's own language once, unless they chose or dismissed.
+  const suggest = document.getElementById("language-suggest");
+  if (suggest && document.querySelector("[data-home]")?.dataset.home === "en") {
+    try {
+      const options = JSON.parse(suggest.dataset.options || "{}");
+      const chosen = localStorage.getItem("wuwa-language");
+      const match = tag => {
+        const lower = String(tag).toLowerCase();
+        if (/^zh(-(cn|sg|hans)\b|$)/.test(lower)) return "zh-Hans";
+        if (lower.startsWith("pt")) return "pt-BR";
+        return ["ja", "ko", "es", "fr", "de", "ru", "ar"].find(code => lower === code || lower.startsWith(code + "-"));
+      };
+      const code = chosen ? null : (navigator.languages || [navigator.language]).map(match).find(Boolean);
+      if (code && options[code] && localStorage.getItem("wuwa-language-dismissed") !== code) {
+        const [label, href] = options[code];
+        const link = Object.assign(document.createElement("a"), {href, textContent: label, lang: code});
+        link.dir = code === "ar" ? "rtl" : "ltr";
+        link.dataset.language = code;
+        link.addEventListener("click", () => { try { localStorage.setItem("wuwa-language", code); } catch { /* optional */ } });
+        const close = Object.assign(document.createElement("button"), {type: "button", textContent: "×"});
+        close.setAttribute("aria-label", "Dismiss");
+        close.addEventListener("click", () => {
+          suggest.hidden = true;
+          try { localStorage.setItem("wuwa-language-dismissed", code); } catch { /* optional */ }
+        });
+        suggest.replaceChildren(link, close);
+        suggest.hidden = false;
+      }
+    } catch { /* The language menu still works. */ }
   }
 
   const form = document.getElementById("report-form");

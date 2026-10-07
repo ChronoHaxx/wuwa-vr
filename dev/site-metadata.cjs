@@ -6,7 +6,7 @@ const baseUrl = 'https://chronohaxx.github.io/wuwa-vr/';
 const pages = [
   'credits.html', 'developers.html', 'feedback.html', 'guide.html', 'index.html',
   ...['ar', 'de', 'en', 'es', 'fr', 'ja', 'ko', 'pt-BR', 'ru', 'zh-Hans'].map(code => `l/${code}.html`),
-  'languages.html', 'license.html', 'risk.html', 'support.html', 'testing.html', 'understanding.html'
+  'languages.html', 'license.html', 'record.html', 'risk.html', 'support.html', 'testing.html', 'understanding.html'
 ];
 const entryPages = {
   'index.html': {
@@ -26,7 +26,7 @@ const entryPages = {
     description: '免费的非官方《鸣潮》VR Windows 社区测试版。简体中文指南介绍启动器安装与更新、头显运行时选择、手柄快捷键、已知问题及账号风险。'
   }
 };
-const sharePoster = 'media/feature-portal.jpg';
+const sharePoster = 'media/run-poster.jpg';
 function canonicalUrl(file) {
   if (!pages.includes(file)) throw Error('Not a public content page: ' + file);
   return baseUrl + (file === 'index.html' ? '' : file);
@@ -75,8 +75,8 @@ function updateHtml(file, html) {
   ];
   if (entryPages[file]) {
     const alt = file === 'l/zh-Hans.html'
-      ? '可选 6DOF 窗口模式的双眼实机录像画面。2026 年 9 月开发版本，Quest Pro / SteamVR 镜像。'
-      : 'Both eye views of optional 6DOF window mode from approved September 2026 development footage, Quest Pro / SteamVR mirror.';
+      ? '在跑步机上以第一人称穿越索拉里斯-3 的实机画面：天空中的环形平台。'
+      : 'First-person gameplay from a treadmill walk across Solaris-3: a ring platform above the clouds.';
     tags.push(`<meta property="og:image" content="${baseUrl + sharePoster}">`,
       `<meta property="og:image:alt" content="${escape(alt)}">`,
       `<meta name="twitter:image" content="${baseUrl + sharePoster}">`,

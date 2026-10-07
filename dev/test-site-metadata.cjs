@@ -17,7 +17,7 @@ function generate(...args) {
     {cwd: fixture, env: process.env, encoding: 'utf8', timeout: 30000, windowsHide: true});
 }
 function verify() {
-  assert.equal(metadata.pages.length, 21);
+  assert.equal(metadata.pages.length, 22);
   for (const file of metadata.pages) {
     const html = fs.readFileSync(path.join(site, file), 'utf8');
     assert.deepEqual(managedValues(html, /<link rel="canonical" href="([^"]+)">/g),
@@ -33,7 +33,7 @@ function verify() {
   const sitemap = fs.readFileSync(path.join(site, 'sitemap.xml'), 'utf8');
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
   assert.deepEqual(urls, metadata.pages.map(metadata.canonicalUrl));
-  assert.equal(new Set(urls).size, 21);
+  assert.equal(new Set(urls).size, 22);
   assert(urls.includes(metadata.baseUrl));
   assert(!urls.some(url => /index\.html|google3ebe|launcher-updates/.test(url)));
   for (const file of ['index.html', 'guide.html', 'l/en.html', 'l/zh-Hans.html']) {
@@ -44,7 +44,7 @@ function verify() {
     assert(description.includes('Windows') && description.includes(file.includes('zh-Hans') ? '社区测试版' : 'community beta'), file);
     assert(!/3\.7/.test(title + description), file);
     assert.deepEqual(managedValues(html, /<meta property="og:image" content="([^"]+)">/g),
-      [metadata.baseUrl + 'media/feature-portal.jpg']);
+      [metadata.baseUrl + 'media/run-poster.jpg']);
   }
 }
 function verifyReleaseSections() {
@@ -66,7 +66,7 @@ function verifyReleaseSections() {
     .filter(([, context]) => context.toLowerCase().includes('quest')).map(([, , body]) => body);
   assert(questRows.some(row => row.includes('Right A / B')) && questRows.some(row => row.includes('Left Menu')),
     'Quest heading must remain searchable through each mapping row context');
-  assert(recovery.includes('cinematic-20261004') && recovery.includes('advanced portable fallback'));
+  assert(recovery.includes('Cinematic framing is on by default') && recovery.includes('advanced portable fallback'));
   assert(recovery.includes('prerendered movie switching has not been tested'));
   assert(recovery.includes('Headset comfort') && recovery.includes('Reset HUD aspect'));
   for (const file of ['index.html', 'l/en.html', 'l/zh-Hans.html']) {
@@ -95,7 +95,8 @@ try {
   for (const directory of ['docs', 'LICENSES']) fs.cpSync(path.join(root, directory), path.join(fixture, directory), {recursive: true});
   for (const file of ['CREDITS.md', 'SUPPORT.md', 'CONTRIBUTING.md',
     'release/site-media.json', 'dev/build-site.cjs', 'dev/site-metadata.cjs', 'dev/site-layout.cjs',
-    'dev/build-community.cjs', 'dev/site-status.json']) {
+    'dev/build-community.cjs', 'dev/build-home.cjs', 'dev/site-report.cjs', 'dev/site-status.json',
+    'release/security-reports.json']) {
     fs.mkdirSync(path.dirname(path.join(fixture, file)), {recursive: true});
     fs.copyFileSync(path.join(root, file), path.join(fixture, file));
   }
@@ -111,7 +112,7 @@ try {
   const first = snapshot();
   for (const file of metadata.pages) assert.equal(outsideHead(first[file]), outsideHead(before[file]), 'Body/shell changed: ' + file);
   for (const file of protectedFiles) assert.equal(first[file], before[file], 'Protected bytes changed: ' + file);
-  checks.push('21 self canonicals and share tags; EN/zh entry text; root sitemap; body/shell/verification/feed preserved');
+  checks.push('22 self canonicals and share tags; EN/zh entry text; root sitemap; body/shell/verification/feed preserved');
   generate('--metadata-only');
   assert.deepEqual(snapshot(), first);
   checks.push('metadata-only regeneration is byte-identical');

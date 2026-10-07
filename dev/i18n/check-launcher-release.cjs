@@ -10,7 +10,7 @@ const {tag} = release;
 const server = http.createServer((req, res) => {
   const file = path.resolve(site, '.' + decodeURIComponent(new URL(req.url, 'http://localhost').pathname));
   if (!file.startsWith(site + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end(); }
-  res.setHeader('Content-Type', ({'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml'})[path.extname(file)] || 'application/octet-stream');
+  res.setHeader('Content-Type', ({'.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.mp4': 'video/mp4'})[path.extname(file)] || 'application/octet-stream');
   res.end(fs.readFileSync(file));
 });
 (async () => {
@@ -38,13 +38,15 @@ const server = http.createServer((req, res) => {
         assert(await page.locator(`a[href$="/${tag}/WuWa-VR-Launcher.zip"]`).count() > 0);
         assert(await page.locator(`a[href$="/tag/${release.previousTag}"]`).count() > 0);
         assert.equal(await page.locator('.visual-steps img').count(), 0, 'Obsolete launcher screenshots remain');
-        assert.equal(await page.locator(name === 'index.html' ? '#get-started ol li' : '#start > ol:first-of-type > li').count(), 3);
+        assert.equal(await page.locator(name === 'guide.html' ? '#start > ol:first-of-type > li' : '#start .launcher-steps > li').count(), 3);
         // Caveats can be collapsed for a quieter page; they must remain in the document.
         const text = await page.locator('main').textContent();
         assert(text.includes(release.appVersion) && text.includes(release.game));
         assert(text.includes(name.includes('zh-Hans') ? '默认关闭' : 'off by default'));
         assert(text.includes(name.includes('zh-Hans') ? '预渲染' : 'prerendered'));
-        assert(text.includes(name.includes('zh-Hans') ? '底层双眼渲染问题尚未解决' : 'underlying stereo rendering fault is unresolved'));
+        // The deeper rendering caveat lives in the guide; home pages carry the short limits list.
+        if (name === 'guide.html') assert(text.includes('underlying stereo rendering fault is unresolved'));
+        else assert.equal(await page.locator('#limits li').count(), 4);
         for (const href of await page.locator('a[href]').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))) {
           if (/^(https?:|mailto:)/.test(href)) continue;
           const target = new URL(href, base + '/' + name), file = path.join(site, decodeURIComponent(target.pathname));
@@ -55,12 +57,15 @@ const server = http.createServer((req, res) => {
         checks.push(`${name}: ${width}px layout, installer/portable/previous links, three steps, beta limits, local anchors`);
       }
     }
-    for (const name of ['l/ja.html', 'l/ko.html', 'l/es.html', 'l/pt-BR.html', 'l/fr.html', 'l/de.html', 'l/ru.html', 'l/ar.html']) {
-      await page.goto(base + '/' + name);
-      assert(await page.locator('#launcher-version-note').isVisible());
-      assert.equal(await page.locator('#launcher-version-note a').count(), 2);
+    for (const code of ['ja', 'ko', 'es', 'pt-BR', 'fr', 'de', 'ru', 'ar']) {
+      await page.goto(`${base}/l/${code}.html`);
+      assert.equal(await page.locator('html').getAttribute('lang'), code);
+      assert.equal(await page.locator('#release-download a.primary').getAttribute('href'), `https://github.com/ChronoHaxx/wuwa-vr/releases/download/${tag}/WuWa-VR-Setup.exe`);
+      assert.equal(await page.locator('#start .launcher-steps > li').count(), 3);
+      assert.equal(await page.locator('#launcher-version-note').count(), 0, 'Obsolete portable-guide note remains: ' + code);
+      assert(await page.locator(`.tour-shot img[src$="launcher/${code}-ready.webp"]`).count() === 1, 'Launcher screenshots are not in the page language: ' + code);
     }
-    checks.push('eight other locale guides retain a visible portable-guide scope note and EN/zh links');
+    checks.push('eight other locales carry the current installer, three steps and launcher screenshots in their own language');
     const plain = await browser.newContext({javaScriptEnabled: false, viewport: {width: 390, height: 844}});
     const nojs = await plain.newPage();
     await nojs.goto(base + '/l/zh-Hans.html');

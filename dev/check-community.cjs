@@ -9,7 +9,7 @@ const codes=['en','zh-Hans','ja','ko','es','pt-BR','fr','de','ru','ar'];
 const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost'),file=path.resolve(site,'.'+decodeURIComponent(url.pathname));
   if(!file.startsWith(site+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);return res.end();}
-  res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'})[path.extname(file)]||'text/plain');
+  res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.mp4':'video/mp4'})[path.extname(file)]||'text/plain');
   res.end(fs.readFileSync(file));
 });
 (async()=>{

@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "title": "Mod de VR para Wuthering Waves no Windows | Beta da comunidade WuWa VR",
+    "description": "Baixe o beta comunitário, gratuito e não oficial de Wuthering Waves VR para Windows: instalador, atalhos do controle, configuração do headset, problemas conhecidos e aviso de risco para a conta."
+  },
+  "chrome": {
+    "skip": "Pular para o conteúdo", "nav": "Site", "home": "Início", "guide": "Guia", "capture": "Gravar", "feedback": "Feedback",
+    "install": "Instalar", "features": "Recursos", "faq": "Perguntas", "download": "Baixar", "language": "Idioma",
+    "tagline": "Projeto de fãs, gratuito e não oficial. Sem relação com a Kuro Games.", "explore": "Explorar", "project": "Projeto",
+    "languages": "Todos os idiomas", "code": "Código e contribuições", "releases": "Versões", "risk": "Risco para a conta e aviso legal",
+    "license": "Escopo da licença", "support": "Apoio opcional", "credits": "Créditos",
+    "mit": "O site e os guias originais usam a licença MIT. Os componentes de terceiros mantêm seus próprios termos.",
+    "suggest": "Ver esta página em português"
+  },
+  "english": " (em inglês)",
+  "hero": {
+    "eyebrow": "Beta da comunidade",
+    "title": "Entre em Wuthering Waves",
+    "lede": "Um mod de VR gratuito, feito por fãs, para Windows. Ande por Solaris-3 em escala real com rastreamento de cabeça, corpo em primeira pessoa e atalhos no controle. Baseado no UEVR de praydog.",
+    "download": "Baixar para Windows",
+    "meta": "Instalador {app} · Wuthering Waves {game} · Windows 10/11 de 64 bits",
+    "watch": "Ver a caminhada na esteira",
+    "watchMeta": "1:20 · YouTube",
+    "notes": "Notas da versão e código",
+    "portable": "Avançado: ZIP portátil",
+    "previous": "Beta anterior · {previous}",
+    "caption": "Jogo de verdade em uma esteira Reality Runner: 3,8 km por Solaris-3 em primeira pessoa, acelerado 31×.",
+    "pause": "Pausar vídeo",
+    "play": "Reproduzir vídeo",
+    "youtube": "Reproduz do YouTube (youtube-nocookie.com) só quando você escolher."
+  },
+  "risk": { "link": "Ler o aviso de risco para a conta" },
+  "start": {
+    "title": "Instale e siga três passos",
+    "lede": "Execute o WuWa-VR-Setup.exe e abra o WuWa VR; o launcher guia você no resto. A primeira instalação baixa o mod de VR e não é preciso Python nem outras ferramentas.",
+    "steps": [
+      "Escolha sua cópia do jogo na Steam ou no launcher oficial da Kuro. A escolha fica salva. A Epic ainda não é compatível.",
+      "Leia o aviso de risco para a conta, confirme a versão do jogo e instale. As atualizações mantêm suas configurações e backups.",
+      "Abra o software do seu headset ou escolha o simulador incluído. Depois clique em Iniciar em VR e aceite a permissão do Windows."
+    ],
+    "shots": [
+      "Launcher na primeira abertura: o passo 01, Encontrar Wuthering Waves, está em destaque.",
+      "Jogo encontrado: o passo 01 está marcado, o passo 02, Instalar VR, está em destaque e a caixa de risco está marcada.",
+      "Pronto: os três passos estão marcados, o SteamVR foi detectado e Iniciar em VR está disponível."
+    ],
+    "caption": "Telas reais do launcher, geradas pelo app em português. Seus caminhos e seu runtime serão diferentes.",
+    "controls": "No jogo, L3 + R3 abre as configurações do UEVR. As opções do WuWa ficam em VR → WuWa Controls.",
+    "guide": "Guia completo de instalação, atualização e recuperação",
+    "names": ["Encontrar Wuthering Waves", "Instalar VR", "Headset ou simulador"]
+  },
+  "features": {
+    "title": "Feito para jogar, não só para olhar",
+    "items": [
+      ["VR estéreo e rastreamento de cabeça", "Profundidade real em headsets OpenXR. Menus e HUD continuam usáveis, e dá para mover, redimensionar ou esconder a interface."],
+      ["Feito para controle", "Atalhos para Xbox e, de forma experimental, PlayStation, com uma folha de atalhos dentro da VR em L3 + Menu."],
+      ["Corpo em primeira pessoa", "Veja as mãos e a roupa do seu personagem com a cabeça oculta. Acompanhamento da animação opcional, com modo de conforto."],
+      ["Câmeras livres", "Visões de câmera livre, drone, avião e acrobacias para explorar e tirar capturas. Experimental."],
+      ["Janela 6DOF", "Um modo de janela opcional que coloca o jogo no seu quarto. Adaptado do trabalho de Elliott Tate."],
+      ["Os dois olhos combinam", "Árvores distantes, objetos e luz indireta combinam em cada olho, e o mundo parece uma cena só."]
+    ]
+  },
+  "firstPerson": {
+    "title": "Primeira pessoa, até a animação parada",
+    "text": "Olhe para baixo e lá está seu personagem: mãos, roupa e animações paradas em escala real. Esconda os ossos da cabeça e mantenha o corpo, ou siga a animação completa para uma visão mais viva.",
+    "caption": "Um olho do espelho do headset, gravado em 26 de setembro de 2026 com um Quest Pro via SteamVR. Uma captura mais nítida está a caminho.",
+    "cta": "Grave seus próprios clipes em alta resolução",
+    "ctaText": "Passo a passo: primeira pessoa, imagem limpa e o gravador integrado."
+  },
+  "faq": {
+    "title": "Perguntas",
+    "items": [
+      ["Quais headsets funcionam?", "O WuWa VR usa OpenXR. Foi jogado em um Quest Pro via SteamVR; outros headsets OpenXR devem funcionar, mas ainda não foram verificados. O simulador incluído permite testar em uma tela comum."],
+      ["Steam, launcher da Kuro ou Epic?", "A Steam e o launcher oficial da Kuro são compatíveis. A Epic ainda não."],
+      ["Minha conta pode ser restringida?", "Sim, é possível. O mod é injetado no jogo e o anti-cheat pode detectá-lo. A Kuro Games não o aprovou. Leia o aviso de risco antes de instalar."],
+      ["O Windows avisa sobre o instalador. É normal?", "O instalador não tem assinatura de código, então o SmartScreen pode avisar. Baixe somente da versão no GitHub do projeto e compare o checksum SHA-256. Nunca desative o antivírus nem o anti-cheat."],
+      ["Como funcionam as atualizações?", "O app procura as próprias atualizações e pergunta antes de reiniciar. Os pacotes de VR são atualizados à parte no passo 02, e você pode voltar a uma versão instalada anterior."],
+      ["Ele altera os arquivos do jogo?", "Não. O launcher não mexe nos arquivos do jogo; o mod de VR é injetado ao iniciar."],
+      ["Como desinstalo?", "Use Solução de problemas → Preparar desinstalação no app e depois remova o WuWa VR em Configurações do Windows → Aplicativos. Configurações, backups e gravações ficam guardados, a menos que você os apague."],
+      ["É grátis?", "Sim. É um projeto de fãs gratuito e o launcher é código aberto com licença MIT. O apoio no Ko-fi é opcional e não compra nenhuma garantia."]
+    ]
+  },
+  "limits": {
+    "title": "Limitações conhecidas",
+    "items": [
+      "A inicialização pela Steam ainda falha em alguns PCs; há uma correção em teste. O caminho pelo launcher oficial da Kuro é o mais testado.",
+      "Alguns carregamentos de cenas e diálogos podem travar, e menus planos podem mostrar um fundo em movimento.",
+      "A atualização da proporção do HUD não é confiável; parte da iluminação de NPCs, reflexos e névoa ainda precisa de testes.",
+      "A troca automática para cinemáticas é experimental e vem desligada; ainda não foi testada com um vídeo pré-renderizado."
+    ],
+    "recovery": "Problemas e passos de recuperação"
+  },
+  "open": {
+    "title": "Código aberto e downloads verificáveis",
+    "text": "O launcher para desktop é código aberto com licença MIT e nossas mudanças no mod são públicas. Cada versão traz o código correspondente e checksums SHA-256.",
+    "launcher": "Código do launcher",
+    "mod": "Mudanças no mod",
+    "release": "Checksums desta versão",
+    "scan": "Os relatórios do VirusTotal ainda não foram verificados para esta versão. Nenhuma análise limpa ou certificação de segurança é declarada."
+  },
+  "credits": {
+    "title": "Feito sobre o trabalho da comunidade",
+    "text": "O WuWa VR se apoia no trabalho de praydog e dos colaboradores do UEVR, mirudo2, polar, SannpoKun, Indath, endlessfalls e Elliott Tate.",
+    "more": "Créditos e licenças",
+    "support": "Apoiar no Ko-fi"
+  },
+  "languagesPage": {
+    "title": "Idiomas",
+    "intro": "A página inicial, os passos de instalação, os controles do dia a dia e o formulário de feedback em dez idiomas. O guia completo e o menu do UEVR estão em inglês.",
+    "request": "Pedir um idioma ou corrigir uma tradução"
+  }
+}

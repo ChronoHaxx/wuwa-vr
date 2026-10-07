@@ -22,6 +22,7 @@ redistribute another project's files.
 | [Elliott Tate: UEVR-6DOF-Window](https://github.com/elliotttate/UEVR-6DOF-Window) | Optional stereo window implementation adapted from `fb31341e860b15e116a15123820c95f044ff0a0f`, whose UEVR base differs from ours. |
 | [OpenXR Simulator contributors](https://github.com/elliotttate/OpenXR-Simulator) | Headset-free development runtime. Local input/capture fixes are kept separately from the UEVR backend. |
 | [LGUI](https://github.com/liufei2008/LGUI) | Public source used as reference to understand UI render paths. It is not asserted to be the exact version shipped with WuWa and is not bundled as a game asset. |
+| [Kanit](https://github.com/cadsondemak/kanit) (Cadson Demak) and [SUITE](https://github.com/sun-typeface/SUITE) (Sunn) | Website heading and button typefaces, the open-licence fonts Wuthering Waves itself ships. Subset WOFF2 copies under the SIL Open Font License 1.1; see `LICENSES/fonts/`. Not covered by this project's MIT grant. |
 | ChronoHaxx | Project direction, integration, game/headset testing and this workspace's controls, HUD, camera, diagnostic and packaging changes. |
 
 ## Tools and artwork

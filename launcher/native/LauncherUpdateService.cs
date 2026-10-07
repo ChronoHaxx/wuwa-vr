@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Velopack;
@@ -29,7 +30,10 @@ namespace WuWaVR.Manager
 
     public sealed class LauncherUpdateService : IDisposable
     {
-        public const string Version = "1.0.4";
+        // From AssemblyInfo, so a portable or preview build never shows a stale number.
+        public static readonly string Version = typeof(LauncherUpdateService).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? "0.0.0";
         public const string AppId = "ChronoHaxx.WuWaVR";
         public const string Channel = "win-beta";
         public const string Repository = "https://github.com/ChronoHaxx/wuwa-vr";

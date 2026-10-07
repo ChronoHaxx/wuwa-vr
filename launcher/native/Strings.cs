@@ -9,6 +9,21 @@ namespace WuWaVR.Manager
 {
     public sealed class Strings
     {
+        // Picker order: the two original languages first, then by code. Names are
+        // written in their own language so a reader can always find theirs.
+        public static readonly string[] Codes = { "en", "zh-Hans", "ar", "de", "es", "fr", "ja", "ko", "pt-BR", "ru" };
+        public static readonly string[] Names = { "English", "简体中文", "العربية", "Deutsch", "Español", "Français", "日本語", "한국어", "Português (Brasil)", "Русский" };
+        public static bool RightToLeft(string code) { return code == "ar"; }
+        public static string Supported(string code) { return Codes.Contains(code) ? code : "en"; }
+        // Maps a Windows UI culture (zh-CN, pt-BR, de-AT…) to a launcher language.
+        public static string FromCulture(string culture)
+        {
+            culture = culture ?? "";
+            if (culture.StartsWith("zh", StringComparison.OrdinalIgnoreCase)) return "zh-Hans";
+            if (culture.StartsWith("pt", StringComparison.OrdinalIgnoreCase)) return "pt-BR";
+            string language = culture.Split('-')[0].ToLowerInvariant();
+            return Codes.Contains(language) ? language : "en";
+        }
         readonly Dictionary<string, Dictionary<string, string>> values = new Dictionary<string, Dictionary<string, string>>();
         public string Language = "en";
         public Strings()
@@ -17,7 +32,7 @@ namespace WuWaVR.Manager
             foreach (var resource in assembly.GetManifestResourceNames().Where(x => x.Contains(".locales.") && x.EndsWith(".json")))
             using (var reader = new StreamReader(assembly.GetManifestResourceStream(resource)))
             { var v = Json.Read<Dictionary<string, string>>(reader.ReadToEnd()); values.Add(v["code"], v); }
-            if (!values.ContainsKey("en") || !values.ContainsKey("zh-Hans")) throw new InvalidDataException("Launcher translations are missing.");
+            if (Codes.Any(code => !values.ContainsKey(code))) throw new InvalidDataException("Launcher translations are missing.");
             foreach (var language in values.Values)
                 if (values["en"].Keys.Except(language.Keys).Any()) throw new InvalidDataException("Incomplete launcher translation.");
         }

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 
@@ -42,12 +44,27 @@ namespace WuWaVR.Manager
                     }
                     var app = new Application();
                     if (preview) File.AppendAllText(args[1] + ".render.log", "Application created\n");
-                    var window = new MainWindow(new PackageStore(root), data, preview, args.Length > 2 ? args[2] : null,
+                    bool firstRun = !preview && !File.Exists(Path.Combine(root, "manager.json"));
+                    var packages = new PackageStore(root);
+                    if (firstRun)
+                    {
+                        // First start: follow Windows' display language until the player picks one.
+                        packages.State.language = Strings.FromCulture(System.Globalization.CultureInfo.CurrentUICulture.Name);
+                        packages.Save();
+                    }
+                    var window = new MainWindow(packages, data, preview, args.Length > 2 ? args[2] : null,
                         preview ? null : LauncherUpdateService.CreateInstalled());
                     if (preview)
                     {
                         File.AppendAllText(args[1] + ".render.log", "Layout constructed\n");
-                        window.SavePreview(args[1]); window.Close(); app.Shutdown();
+                        string fixturePath = Path.Combine(root, "preview.json"); double scale = 1;
+                        if (File.Exists(fixturePath))
+                        {
+                            var fixture = Json.Read<Dictionary<string, object>>(File.ReadAllText(fixturePath));
+                            window.ApplyPreviewFixture(fixture);
+                            object requested; if (fixture.TryGetValue("scale", out requested)) scale = Math.Max(1, Math.Min(3, Convert.ToDouble(requested)));
+                        }
+                        window.SavePreview(args[1], scale); window.Close(); app.Shutdown();
                         File.AppendAllText(args[1] + ".render.log", "Preview saved\n"); return 0;
                     }
                     using (var activation = new InstanceActivation(root, () =>
@@ -78,11 +95,11 @@ namespace WuWaVR.Manager
                 {
                     var saved = Json.Read<System.Collections.Generic.Dictionary<string, object>>(File.ReadAllText(file));
                     string language = saved == null ? "" : Json.Text(saved, "language");
-                    if (language == "en" || language == "zh-Hans") return language;
+                    if (Strings.Codes.Contains(language)) return language;
                 }
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is System.Security.SecurityException || e is ArgumentException || e is InvalidOperationException) { }
-            return System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh", StringComparison.OrdinalIgnoreCase) ? "zh-Hans" : "en";
+            return Strings.FromCulture(System.Globalization.CultureInfo.CurrentUICulture.Name);
         }
     }
 }

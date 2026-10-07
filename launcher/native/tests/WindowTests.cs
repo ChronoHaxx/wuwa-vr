@@ -659,7 +659,8 @@ public static class WindowTests
                 Field<CheckBox>(f.Window, "risk").IsChecked = true;
                 Check(Field<Button>(f.Window, "launchButton").IsEnabled && Convert.ToString(Field<Button>(f.Window, "launchButton").Content) == "Install VR", "primary action must offer install, not launch, on first use");
                 Check(Field<Button>(f.Window, "cancelButton").Visibility == Visibility.Collapsed, "idle setup displays cancellation");
-                foreach (int language in new[] { 1, 0 })
+                // Every language, longest strings included; English last so later checks start from it.
+                foreach (int language in Enumerable.Range(1, Strings.Codes.Length - 1).Concat(new[] { 0 }))
                 {
                     Field<ComboBox>(f.Window, "languages").SelectedIndex = language; Drain();
                     var visual = (FrameworkElement)f.Window.Content;
@@ -677,7 +678,7 @@ public static class WindowTests
                     }
                 }
                 Offscreen(f.Window);
-                Console.WriteLine("PASS WINDOW fresh setup gates actions and keeps adjacent risk/consent visible at 720x641 content in EN/zh");
+                Console.WriteLine("PASS WINDOW fresh setup gates actions and keeps adjacent risk/consent visible at 720x641 content in all ten languages");
             }
             using (var f = new Fixture(root))
             {

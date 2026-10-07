@@ -50,7 +50,7 @@ function footer({prefix = '', labels = {}} = {}) {
     `</div><div class="wrap footer-note"><p>${escape(t.mit)}</p></div></footer>`;
 }
 function head({lang = 'en', title, description, prefix = '', extra = ''}) {
-  return `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#0e1518"><title>${escape(title)}</title><link rel="icon" href="${prefix}media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="${prefix}style.css"><script src="${prefix}config.js" defer></script><script src="${prefix}app.js" defer></script>${extra}</head>`;
+  return `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#0b0b0c"><title>${escape(title)}</title><link rel="icon" href="${prefix}media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="${prefix}style.css"><script src="${prefix}config.js" defer></script><script src="${prefix}app.js" defer></script>${extra}</head>`;
 }
 function shell(title, description, body, {lang = 'en', dir = 'ltr', prefix = '', labels = {}} = {}) {
   return `<!doctype html><html lang="${lang}" dir="${dir}">${head({lang, title: `${title} — WuWa VR`, description, prefix})}<body><a class="skip" href="#main">${escape({...english, ...labels}.skip)}</a>${header({lang, prefix, labels})}<main class="wrap page" id="main">${body}</main>${footer({prefix, labels})}</body></html>\n`;
@@ -65,7 +65,7 @@ function refreshChrome(site, files) {
       .replace(/<header class="(?:header wrap|site-header)"[\s\S]*?<\/header>/, () => header({prefix}))
       .replace(/<footer class="(?:footer wrap|site-footer)"[\s\S]*?<\/footer>/, () => footer({prefix}))
       .replace(/<main class="wrap" id="main">/, '<main class="wrap page" id="main">')
-      .replace(/<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#0e1518">');
+      .replace(/<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#0b0b0c">');
     if (!/<header class="site-header"/.test(next) || !/<footer class="site-footer"/.test(next)) throw Error('Missing page chrome: ' + file);
     if (next !== html) { fs.writeFileSync(full, next); changed++; }
   }

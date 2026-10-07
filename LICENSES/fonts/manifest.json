@@ -1,0 +1,20 @@
+{
+  "fonts": {
+    "kanit-500": {
+      "source": "Client/Binaries/Win64/ThirdParty/KrPcSdk_Global/Kanit-Medium.ttf",
+      "source_sha256": "3f75c3310023eee648d6d15fcd2fd042320b73102b17942bb4bde0fe240d2c22",
+      "file": "site/fonts/kanit-500.woff2",
+      "sha256": "c1dc128b995a736dda0ce4834f93814a9ed2d8c2334779f5eb24eaf1319adf89",
+      "bytes": 34396,
+      "license": "LICENSES/fonts/Kanit-OFL.txt"
+    },
+    "suite-700-ko": {
+      "source": "Client/Binaries/Win64/ThirdParty/KrPcSdk_Global/SUITE-Bold.otf",
+      "source_sha256": "7c28ed81631a6796e4b4b44d03c498d0914c4c4cf47bd4385c7a71a1e2306982",
+      "file": "site/fonts/suite-700-ko.woff2",
+      "sha256": "5635f494b70d4b26ebf001bdd55f603d19617eb7fff09e1677503f437976f0db",
+      "bytes": 21940,
+      "license": "LICENSES/fonts/SUITE-OFL.txt"
+    }
+  }
+}

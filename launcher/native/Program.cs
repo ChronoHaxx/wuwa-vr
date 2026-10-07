@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -56,7 +57,14 @@ namespace WuWaVR.Manager
                     if (preview)
                     {
                         File.AppendAllText(args[1] + ".render.log", "Layout constructed\n");
-                        window.SavePreview(args[1]); window.Close(); app.Shutdown();
+                        string fixturePath = Path.Combine(root, "preview.json"); double scale = 1;
+                        if (File.Exists(fixturePath))
+                        {
+                            var fixture = Json.Read<Dictionary<string, object>>(File.ReadAllText(fixturePath));
+                            window.ApplyPreviewFixture(fixture);
+                            object requested; if (fixture.TryGetValue("scale", out requested)) scale = Math.Max(1, Math.Min(3, Convert.ToDouble(requested)));
+                        }
+                        window.SavePreview(args[1], scale); window.Close(); app.Shutdown();
                         File.AppendAllText(args[1] + ".render.log", "Preview saved\n"); return 0;
                     }
                     using (var activation = new InstanceActivation(root, () =>

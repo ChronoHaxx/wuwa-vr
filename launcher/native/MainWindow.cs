@@ -29,7 +29,7 @@ namespace WuWaVR.Manager
         CancellationTokenSource operation;
         TaskCompletionSource<bool> operationFinished;
         bool polling, closing, rendering, preserveActionFeedback, submittedJob;
-        bool connectionReady;
+        bool connectionReady, previewConnected;
         string connectionProblem = "";
         string lastJobSnapshot, lastNativeError = "";
         bool allowClose, closeChecking, unresolvedStartup;
@@ -1473,7 +1473,7 @@ namespace WuWaVR.Manager
                 String.IsNullOrEmpty(Json.Text(game, "problem")) ? Json.Text(game, "mode") == "steam" ? "gameSteamSaved" : "gameSavedFound" : "gameSavedMissing";
             gameHint.Text = text[hint];
             gameHint.ToolTip = discovery != null && discovery.Candidates.Count > 1 ? String.Join(Environment.NewLine, discovery.Candidates) : gameHint.Text;
-            runtime.Text = store.Selected != null && !connectionReady ? text["connectionRequired"] : LauncherPresentation.RuntimeSummary(bridge.Address != null, status, k => text[k]);
+            runtime.Text = store.Selected != null && !connectionReady ? text["connectionRequired"] : LauncherPresentation.RuntimeSummary(bridge.Address != null || previewConnected, status, k => text[k]);
             runtimeCheck.IsEnabled = operation == null && store.Selected != null;
             var job = Json.Child(status, "job"); var launch = Json.Child(status, "launch");
             bool workerRunning = LauncherBridge.LaunchWorkerRunning(status), running = Json.Flag(job, "running") || workerRunning;
@@ -1604,11 +1604,23 @@ namespace WuWaVR.Manager
                 }
             }
         }
-        public void SavePreview(string path)
+        // Documentation renders: preview-state\preview.json may supply observed helper
+        // status so screenshots show a ready launcher without a helper, game or headset.
+        public void ApplyPreviewFixture(Dictionary<string, object> fixture)
+        {
+            if (!preview) throw new InvalidOperationException("Preview fixtures apply only to --preview renders.");
+            status = Json.Child(fixture, "status");
+            connectionReady = previewConnected = Json.Flag(fixture, "connected");
+            risk.IsChecked = Json.Flag(fixture, "riskAccepted");
+            compatible.IsChecked = Json.Flag(fixture, "versionConfirmed");
+            operationText.Text = Json.Text(fixture, "operation");
+            ShowStatus();
+        }
+        public void SavePreview(string path, double scale = 1)
         {
             var visual = (FrameworkElement)Content;
             visual.Measure(new Size(880, 790)); visual.Arrange(new Rect(0, 0, 880, 790)); visual.UpdateLayout();
-            var image = new RenderTargetBitmap(880, 790, 96, 96, PixelFormats.Pbgra32); image.Render(visual);
+            var image = new RenderTargetBitmap((int)Math.Round(880 * scale), (int)Math.Round(790 * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32); image.Render(visual);
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
             using (var stream = File.Create(path)) encoder.Save(stream);

@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Velopack;
 using Velopack.Locators;
@@ -311,6 +312,25 @@ public static class LauncherUpdateTests
             var w = new MainWindow(new PackageStore(dir), Path.Combine(dir, "backend"), true, "en", service);
             try { Pump(Call(w, "CheckLauncherUpdates", CancellationToken.None, false)); Check(fake.Checks == 0, "preview network adapter invoked"); }
             finally { w.Close(); service.Dispose(); }
+        });
+        test("documentation fixture renders observed runtime only in preview, at the requested scale", () => {
+            string dir = Path.Combine(root, "preview-fixture");
+            var fixture = Json.Read<Dictionary<string, object>>("{\"connected\":true,\"riskAccepted\":true,\"versionConfirmed\":true,\"operation\":\"\",\"status\":{\"openxr\":{\"available\":true,\"name\":\"Fixture headset\",\"canHeadset\":true}}}");
+            var live = new MainWindow(new PackageStore(Path.Combine(dir, "live")), Path.Combine(dir, "backend"), false, "en");
+            try { live.ApplyPreviewFixture(fixture); Check(false, "live window accepted a preview fixture"); }
+            catch (InvalidOperationException) { }
+            finally { live.Close(); }
+            var w = new MainWindow(new PackageStore(Path.Combine(dir, "preview")), Path.Combine(dir, "backend"), true, "en");
+            try
+            {
+                w.ApplyPreviewFixture(fixture);
+                Check(Field<TextBlock>(w, "runtime").Text.StartsWith("Fixture headset · "), "fixture runtime was not shown");
+                Check(Field<CheckBox>(w, "risk").IsChecked == true && Field<CheckBox>(w, "compatible").IsChecked == true && Field<TextBlock>(w, "operationText").Text == "", "fixture consent or footer text ignored");
+                string png = Path.Combine(dir, "scaled.png"); w.SavePreview(png, 2);
+                var frame = BitmapDecoder.Create(new Uri(png), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+                Check(frame.PixelWidth == 1760 && frame.PixelHeight == 1580, "preview scale ignored: " + frame.PixelWidth + "x" + frame.PixelHeight);
+            }
+            finally { w.Close(); }
         });
     }
 }

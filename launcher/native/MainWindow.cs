@@ -88,8 +88,8 @@ namespace WuWaVR.Manager
         string catalogKey = "catalogBundled";
         Dictionary<string, object> status = new Dictionary<string, object>();
         readonly List<Button> actions = new List<Button>();
-        readonly Brush background = Color("#10191D"), card = Color("#19262C"), foreground = Color("#EDF3F1"), muted = Color("#A5B8BE"), teal = Color("#82DFC7");
-        readonly Brush line = Color("#293C43"), activeLine = Color("#3F8F7C"), badge = Color("#263F3C");
+        readonly Brush background = Color("#0F0F10"), card = Color("#19191B"), foreground = Color("#F5F3EE"), muted = Color("#B9B4AA"), accent = Color("#D8B565");
+        readonly Brush line = Color("#2E2D2A"), activeLine = Color("#8A7238"), badge = Color("#2A2414");
         // Step cards show where the player is: done (check), current (outlined) or still to come.
         enum StepState { Pending, Current, Done }
         readonly Border[] stepCards = new Border[3], stepBadges = new Border[3];
@@ -258,7 +258,7 @@ namespace WuWaVR.Manager
         Style ButtonStyle()
         {
             var style = new Style(typeof(Button));
-            style.Setters.Add(new Setter(Control.BackgroundProperty, Color("#25383F")));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, Color("#26262A")));
             style.Setters.Add(new Setter(Control.ForegroundProperty, foreground));
             style.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
             style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
@@ -282,7 +282,7 @@ namespace WuWaVR.Manager
             var pressed = new Trigger { Property = Button.IsPressedProperty, Value = true };
             pressed.Setters.Add(new Setter(OpacityProperty, 0.75)); style.Triggers.Add(pressed);
             var focused = new Trigger { Property = IsKeyboardFocusedProperty, Value = true };
-            focused.Setters.Add(new Setter(Control.BorderBrushProperty, teal));
+            focused.Setters.Add(new Setter(Control.BorderBrushProperty, accent));
             focused.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(2))); style.Triggers.Add(focused);
             // Disabled stays legible: the tooltip and status line explain why.
             var disabled = new Trigger { Property = IsEnabledProperty, Value = false };
@@ -295,7 +295,7 @@ namespace WuWaVR.Manager
         Button Action(string key, Func<CancellationToken, Task> fn, bool primary = false)
         {
             var button = new Button { Content = text[key], Padding = new Thickness(14, 9, 14, 9), Margin = new Thickness(0, 4, 8, 4),
-                Background = primary ? teal : Color("#25383F"), Foreground = primary ? background : foreground, Cursor = System.Windows.Input.Cursors.Hand, Tag = key };
+                Background = primary ? accent : Color("#26262A"), Foreground = primary ? background : foreground, Cursor = System.Windows.Input.Cursors.Hand, Tag = key };
             ToolTipService.SetShowOnDisabled(button, true);
             button.Click += async (s, e) => await Run(async c =>
             {
@@ -368,12 +368,12 @@ namespace WuWaVR.Manager
             // Keep the ComboBox's native keyboard/selection behavior while styling its popup too.
             return (Style)System.Windows.Markup.XamlReader.Parse(@"
 <Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='{x:Type ComboBox}'>
- <Setter Property='Foreground' Value='#EDF3F1'/><Setter Property='Background' Value='#223239'/><Setter Property='BorderBrush' Value='#3B5159'/>
+ <Setter Property='Foreground' Value='#F5F3EE'/><Setter Property='Background' Value='#222225'/><Setter Property='BorderBrush' Value='#45423B'/>
  <Setter Property='ScrollViewer.HorizontalScrollBarVisibility' Value='Disabled'/>
  <Setter Property='ItemContainerStyle'><Setter.Value><Style TargetType='{x:Type ComboBoxItem}'>
-  <Setter Property='Foreground' Value='#EDF3F1'/><Setter Property='Background' Value='#19262C'/><Setter Property='Padding' Value='10,8'/>
+  <Setter Property='Foreground' Value='#F5F3EE'/><Setter Property='Background' Value='#19191B'/><Setter Property='Padding' Value='10,8'/>
   <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type ComboBoxItem}'><Border Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}'><ContentPresenter/></Border></ControlTemplate></Setter.Value></Setter>
-  <Style.Triggers><Trigger Property='IsHighlighted' Value='True'><Setter Property='Background' Value='#36594F'/></Trigger><Trigger Property='IsSelected' Value='True'><Setter Property='Background' Value='#315047'/></Trigger></Style.Triggers>
+  <Style.Triggers><Trigger Property='IsHighlighted' Value='True'><Setter Property='Background' Value='#3A3220'/></Trigger><Trigger Property='IsSelected' Value='True'><Setter Property='Background' Value='#4A3E22'/></Trigger></Style.Triggers>
  </Style></Setter.Value></Setter>
  <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type ComboBox}'>
   <Grid>
@@ -382,14 +382,14 @@ namespace WuWaVR.Manager
     <ToggleButton.Template><ControlTemplate TargetType='{x:Type ToggleButton}'><Border Background='{TemplateBinding Background}'/></ControlTemplate></ToggleButton.Template>
    </ToggleButton>
    <ContentPresenter Margin='11,8,30,8' IsHitTestVisible='False' VerticalAlignment='Center' Content='{TemplateBinding SelectionBoxItem}' ContentTemplate='{TemplateBinding SelectionBoxItemTemplate}' ContentTemplateSelector='{TemplateBinding ItemTemplateSelector}'/>
-   <TextBlock Text='&#xE70D;' FontFamily='Segoe MDL2 Assets' FontSize='10' Margin='0,0,12,0' Foreground='#A5B8BE' HorizontalAlignment='Right' VerticalAlignment='Center' IsHitTestVisible='False'/>
+   <TextBlock Text='&#xE70D;' FontFamily='Segoe MDL2 Assets' FontSize='10' Margin='0,0,12,0' Foreground='#B9B4AA' HorizontalAlignment='Right' VerticalAlignment='Center' IsHitTestVisible='False'/>
    <Popup x:Name='PART_Popup' Placement='Bottom' IsOpen='{TemplateBinding IsDropDownOpen}' AllowsTransparency='True' Focusable='False' PopupAnimation='Fade'>
-    <Border Background='#19262C' BorderBrush='#526A72' BorderThickness='1' CornerRadius='6' MinWidth='{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}' MaxHeight='280' Padding='3' Margin='0,3,0,0'>
+    <Border Background='#19191B' BorderBrush='#4E4A40' BorderThickness='1' CornerRadius='6' MinWidth='{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}' MaxHeight='280' Padding='3' Margin='0,3,0,0'>
      <ScrollViewer CanContentScroll='True' HorizontalScrollBarVisibility='Disabled'><ItemsPresenter KeyboardNavigation.DirectionalNavigation='Contained'/></ScrollViewer>
     </Border>
    </Popup>
   </Grid>
-  <ControlTemplate.Triggers><Trigger Property='IsKeyboardFocusWithin' Value='True'><Setter TargetName='Shell' Property='BorderBrush' Value='#82DFC7'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Shell' Property='BorderBrush' Value='#82DFC7'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers>
+  <ControlTemplate.Triggers><Trigger Property='IsKeyboardFocusWithin' Value='True'><Setter TargetName='Shell' Property='BorderBrush' Value='#D8B565'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Shell' Property='BorderBrush' Value='#D8B565'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers>
  </ControlTemplate></Setter.Value></Setter>
 </Style>");
         }
@@ -398,18 +398,18 @@ namespace WuWaVR.Manager
         {
             return (Style)System.Windows.Markup.XamlReader.Parse(@"
 <Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='{x:Type CheckBox}'>
- <Setter Property='Foreground' Value='#EDF3F1'/><Setter Property='Cursor' Value='Hand'/><Setter Property='FocusVisualStyle' Value='{x:Null}'/>
+ <Setter Property='Foreground' Value='#F5F3EE'/><Setter Property='Cursor' Value='Hand'/><Setter Property='FocusVisualStyle' Value='{x:Null}'/>
  <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type CheckBox}'>
   <Grid Background='Transparent'><Grid.ColumnDefinitions><ColumnDefinition Width='Auto'/><ColumnDefinition/></Grid.ColumnDefinitions>
-   <Border x:Name='Box' Width='18' Height='18' CornerRadius='4' Background='#223239' BorderBrush='#6B848C' BorderThickness='1' VerticalAlignment='Top' Margin='0,4,10,0'>
-    <TextBlock x:Name='Tick' Text='&#xE73E;' FontFamily='Segoe MDL2 Assets' FontSize='12' Foreground='#10191D' HorizontalAlignment='Center' VerticalAlignment='Center' Visibility='Collapsed'/>
+   <Border x:Name='Box' Width='18' Height='18' CornerRadius='4' Background='#222225' BorderBrush='#6E685B' BorderThickness='1' VerticalAlignment='Top' Margin='0,4,10,0'>
+    <TextBlock x:Name='Tick' Text='&#xE73E;' FontFamily='Segoe MDL2 Assets' FontSize='12' Foreground='#0F0F10' HorizontalAlignment='Center' VerticalAlignment='Center' Visibility='Collapsed'/>
    </Border>
    <ContentPresenter Grid.Column='1' VerticalAlignment='Top' RecognizesAccessKey='True'/>
   </Grid>
   <ControlTemplate.Triggers>
-   <Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Box' Property='BorderBrush' Value='#82DFC7'/></Trigger>
-   <Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='Box' Property='BorderBrush' Value='#82DFC7'/><Setter TargetName='Box' Property='BorderThickness' Value='2'/></Trigger>
-   <Trigger Property='IsChecked' Value='True'><Setter TargetName='Box' Property='Background' Value='#82DFC7'/><Setter TargetName='Box' Property='BorderBrush' Value='#82DFC7'/><Setter TargetName='Tick' Property='Visibility' Value='Visible'/></Trigger>
+   <Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Box' Property='BorderBrush' Value='#D8B565'/></Trigger>
+   <Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='Box' Property='BorderBrush' Value='#D8B565'/><Setter TargetName='Box' Property='BorderThickness' Value='2'/></Trigger>
+   <Trigger Property='IsChecked' Value='True'><Setter TargetName='Box' Property='Background' Value='#D8B565'/><Setter TargetName='Box' Property='BorderBrush' Value='#D8B565'/><Setter TargetName='Tick' Property='Visibility' Value='Visible'/></Trigger>
    <Trigger Property='IsEnabled' Value='False'><Setter Property='Opacity' Value='0.5'/></Trigger>
   </ControlTemplate.Triggers>
  </ControlTemplate></Setter.Value></Setter>
@@ -427,9 +427,9 @@ namespace WuWaVR.Manager
     <Track.DecreaseRepeatButton><RepeatButton Command='ScrollBar.PageUpCommand' Opacity='0' Focusable='False'/></Track.DecreaseRepeatButton>
     <Track.IncreaseRepeatButton><RepeatButton Command='ScrollBar.PageDownCommand' Opacity='0' Focusable='False'/></Track.IncreaseRepeatButton>
     <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='{x:Type Thumb}'>
-     <Border x:Name='T' Background='#34494F' CornerRadius='3' Margin='3,2,3,2'/>
-     <ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='T' Property='Background' Value='#56717A'/></Trigger>
-      <Trigger Property='IsDragging' Value='True'><Setter TargetName='T' Property='Background' Value='#82DFC7'/></Trigger></ControlTemplate.Triggers>
+     <Border x:Name='T' Background='#3A3833' CornerRadius='3' Margin='3,2,3,2'/>
+     <ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='T' Property='Background' Value='#5A5446'/></Trigger>
+      <Trigger Property='IsDragging' Value='True'><Setter TargetName='T' Property='Background' Value='#D8B565'/></Trigger></ControlTemplate.Triggers>
     </ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
    </Track>
   </ControlTemplate></Setter.Value></Setter>
@@ -453,8 +453,8 @@ namespace WuWaVR.Manager
      </Border>
      <ControlTemplate.Triggers>
       <Trigger Property='IsChecked' Value='True'><Setter TargetName='Chevron' Property='Text' Value='&#xE70D;'/></Trigger>
-      <Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Chevron' Property='Foreground' Value='#82DFC7'/></Trigger>
-      <Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='Hit' Property='BorderBrush' Value='#82DFC7'/></Trigger>
+      <Trigger Property='IsMouseOver' Value='True'><Setter TargetName='Chevron' Property='Foreground' Value='#D8B565'/></Trigger>
+      <Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='Hit' Property='BorderBrush' Value='#D8B565'/></Trigger>
      </ControlTemplate.Triggers>
     </ControlTemplate></ToggleButton.Template>
    </ToggleButton>
@@ -475,7 +475,7 @@ namespace WuWaVR.Manager
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(46) });
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var numberText = Label(number, 13, teal); numberText.FontWeight = FontWeights.SemiBold; numberText.Margin = new Thickness(0);
+            var numberText = Label(number, 13, accent); numberText.FontWeight = FontWeights.SemiBold; numberText.Margin = new Thickness(0);
             numberText.HorizontalAlignment = HorizontalAlignment.Center; numberText.VerticalAlignment = VerticalAlignment.Center;
             var stepBadge = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = badge, Child = numberText, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 14, 0) };
             grid.Children.Add(stepBadge);
@@ -492,9 +492,9 @@ namespace WuWaVR.Manager
         {
             if (stepCards[index] == null) return;
             stepCards[index].BorderBrush = state == StepState.Current ? activeLine : line;
-            stepBadges[index].Background = state == StepState.Done ? teal : badge;
+            stepBadges[index].Background = state == StepState.Done ? accent : badge;
             stepNumbers[index].Text = state == StepState.Done ? "✓" : "0" + (index + 1);
-            stepNumbers[index].Foreground = state == StepState.Done ? background : state == StepState.Current ? teal : muted;
+            stepNumbers[index].Foreground = state == StepState.Done ? background : state == StepState.Current ? accent : muted;
         }
         Button FooterLink(string key, string url)
         {
@@ -529,7 +529,7 @@ namespace WuWaVR.Manager
             var heading = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 12, 0) };
             var title = new TextBlock { Text = text["title"], FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = foreground, VerticalAlignment = VerticalAlignment.Center };
             var pill = new Border { Background = badge, CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 2, 9, 3), Margin = new Thickness(12, 3, 0, 0), VerticalAlignment = VerticalAlignment.Center,
-                Child = new TextBlock { Text = text["beta"], FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = teal } };
+                Child = new TextBlock { Text = text["beta"], FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = accent } };
             heading.Children.Add(Row(title, pill));
             var tagline = Label(text["tagline"], 13, muted); tagline.Margin = new Thickness(0, 1, 0, 0); heading.Children.Add(tagline);
             Grid.SetColumn(heading, 1); header.Children.Add(heading);
@@ -554,7 +554,7 @@ namespace WuWaVR.Manager
             launcherUpdateButton.Margin = new Thickness(0); launcherUpdateButton.Padding = new Thickness(14, 6, 14, 6);
             launcherUpdateBarText = Label("", 13, foreground); launcherUpdateBarText.VerticalAlignment = VerticalAlignment.Center;
             var updateRow = new DockPanel(); DockPanel.SetDock(launcherUpdateButton, Dock.Right); updateRow.Children.Add(launcherUpdateButton); updateRow.Children.Add(launcherUpdateBarText);
-            launcherUpdateBar = new Border { Background = Color("#17312C"), BorderBrush = activeLine, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
+            launcherUpdateBar = new Border { Background = Color("#241E10"), BorderBrush = activeLine, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
                 Padding = new Thickness(14, 7, 8, 7), Margin = new Thickness(0, 0, 0, 12), Child = updateRow, Visibility = Visibility.Collapsed };
             DockPanel.SetDock(launcherUpdateBar, Dock.Top); outer.Children.Add(launcherUpdateBar);
             var footer = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
@@ -585,7 +585,7 @@ namespace WuWaVR.Manager
             var launchBar = new DockPanel(); DockPanel.SetDock(launchButton, Dock.Right); launchBar.Children.Add(launchButton);
             DockPanel.SetDock(cancelButton, Dock.Right); launchBar.Children.Add(cancelButton); launchBar.Children.Add(launchState); footer.Children.Add(launchBar);
             operationText = Label(preview ? text["preview"] : text["ready"], 12, muted);
-            progress = new ProgressBar { Minimum = 0, Maximum = 1, Height = 4, Foreground = teal, Background = card, Margin = new Thickness(0, 8, 0, 5) };
+            progress = new ProgressBar { Minimum = 0, Maximum = 1, Height = 4, Foreground = accent, Background = card, Margin = new Thickness(0, 8, 0, 5) };
             footer.Children.Add(progress); footer.Children.Add(operationText);
             recoveryShortcut = new Button { Content = text["processRecoveryTitle"], Tag = "processRecoveryOpen", HorizontalAlignment = HorizontalAlignment.Left };
             recoveryShortcut.Click += (s, e) => OpenProcessRecovery(); StyleFooter(recoveryShortcut); actions.Add(recoveryShortcut); footer.Children.Add(recoveryShortcut);
@@ -633,10 +633,10 @@ namespace WuWaVR.Manager
         FrameworkElement Mark(double size)
         {
             var grid = new Grid { Width = 40, Height = 40 };
-            grid.Children.Add(new Border { Margin = new Thickness(1), CornerRadius = new CornerRadius(9), Background = Color("#10181B"),
-                BorderBrush = Color("#698B7D"), BorderThickness = new Thickness(1) });
+            grid.Children.Add(new Border { Margin = new Thickness(1), CornerRadius = new CornerRadius(9), Background = Color("#0E0E10"),
+                BorderBrush = Color("#8A7238"), BorderThickness = new Thickness(1) });
             grid.Children.Add(new System.Windows.Shapes.Path { Data = Geometry.Parse("M7,23 L13,13 L20,27 L27,13 L33,23 M7,29 L33,29"),
-                Stroke = Color("#B2E4CD"), StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+                Stroke = Color("#D8B565"), StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
                 StrokeLineJoin = PenLineJoin.Round });
             return new Viewbox { Width = size, Height = size, Child = grid, FlowDirection = FlowDirection.LeftToRight };
         }
@@ -705,7 +705,7 @@ namespace WuWaVR.Manager
                          ConnectionRecovered();
                      }, true),
                      Action("retryConnection", async c => { await Connect(c); ConnectionRecovered(); })));
-            connectionPanel.Visibility = Visibility.Collapsed; connectionPanel.BorderBrush = Color("#5C4F2C"); panel.Children.Add(connectionPanel);
+            connectionPanel.Visibility = Visibility.Collapsed; connectionPanel.BorderBrush = Color("#5E3026"); panel.Children.Add(connectionPanel);
             gamePath = Label(text["noGame"], 13, foreground); gamePath.TextWrapping = TextWrapping.NoWrap; gamePath.TextTrimming = TextTrimming.CharacterEllipsis;
             var browse = Action("browse", async c =>
             {
@@ -771,11 +771,11 @@ namespace WuWaVR.Manager
             advancedPanel = new Expander { Header = text["advanced"], Foreground = muted, Content = updates, Margin = new Thickness(0, 4, 0, 0) };
             risk = new CheckBox { Content = Label(text["riskAccept"], 12), Foreground = foreground, Margin = new Thickness(0, 3, 0, 0) };
             risk.Checked += (s, e) => ShowStatus(); risk.Unchecked += (s, e) => ShowStatus();
-            riskNotice = Label(text["risk"], 12, Color("#ECCB93"));
+            riskNotice = Label(text["risk"], 12, Color("#F0B4A3"));
             var consent = new StackPanel(); consent.Children.Add(riskNotice); consent.Children.Add(versionConsent); consent.Children.Add(risk);
-            var notice = new Border { Child = consent, Padding = new Thickness(12, 6, 12, 7), CornerRadius = new CornerRadius(9), Background = Color("#29261B"),
-                BorderBrush = Color("#5C4F2C"), BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 4) };
-            packageUpdateState = Label("", 12, teal);
+            var notice = new Border { Child = consent, Padding = new Thickness(12, 6, 12, 7), CornerRadius = new CornerRadius(9), Background = Color("#22130F"),
+                BorderBrush = Color("#5E3026"), BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 4) };
+            packageUpdateState = Label("", 12, accent);
             packageUpdateButton = Action("selectLatestPackage", c => {
                 var newer = NewerPackage();
                 if (newer != null) { releases.SelectedItem = newer; advancedPanel.IsExpanded = true; operationText.Text = text["installNext"]; }
@@ -791,7 +791,7 @@ namespace WuWaVR.Manager
             source.SelectionChanged += (s, e) => { if (!rendering) ShowStatus(); };
             fps = Choice("30", "45", "60"); size = Choice("720", "1024", "1280"); size.SelectedIndex = 1; purpose = Choice(text["videoOnly"], text["playtest"]);
             var panel = new StackPanel(); panel.Children.Add(Label(text["recordInfo"], 14, muted));
-            recordingState = Label("", 12, teal); panel.Children.Add(recordingState);
+            recordingState = Label("", 12, accent); panel.Children.Add(recordingState);
             recordingOptions = new Expander { Header = text["recordOptions"], Foreground = muted, Margin = new Thickness(0, 12, 0, 0), Content = new StackPanel() };
             ((StackPanel)recordingOptions.Content).Children.Add(CaptureFields("source", source, "purpose", purpose));
             ((StackPanel)recordingOptions.Content).Children.Add(CaptureFields("fps", fps, "eyeSize", size));
@@ -814,7 +814,7 @@ namespace WuWaVR.Manager
         UIElement Shortcut(string input, string key)
         {
             var row = new Grid(); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(132) }); row.ColumnDefinitions.Add(new ColumnDefinition());
-            var keys = Label(input, 12, teal); keys.FontWeight = FontWeights.SemiBold; row.Children.Add(keys);
+            var keys = Label(input, 12, accent); keys.FontWeight = FontWeights.SemiBold; row.Children.Add(keys);
             var description = Label(text[key], 12, muted); Grid.SetColumn(description, 1); row.Children.Add(description); return row;
         }
         UIElement Help()
@@ -928,7 +928,7 @@ namespace WuWaVR.Manager
         }
         UIElement ProcessRecovery()
         {
-            processRecoveryState = Label("", 12, teal); processRecoveryRows = new StackPanel();
+            processRecoveryState = Label("", 12, accent); processRecoveryRows = new StackPanel();
             var rows = new ScrollViewer { Content = processRecoveryRows, MaxHeight = 300,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             processRecoveryPanel = new Expander { Header = text["processRecoveryTitle"], Foreground = foreground, Margin = new Thickness(0, 6, 0, 12),
@@ -1023,8 +1023,8 @@ namespace WuWaVR.Manager
         }
         UIElement ControllerCheck()
         {
-            controllerState = Label("", 13, teal);
-            controllerProgress = new ProgressBar { Height = 3, IsIndeterminate = true, Foreground = teal, Background = card,
+            controllerState = Label("", 13, accent);
+            controllerProgress = new ProgressBar { Height = 3, IsIndeterminate = true, Foreground = accent, Background = card,
                 Margin = new Thickness(0, 5, 0, 6), Visibility = Visibility.Collapsed };
             controllerDetails = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
                 MinHeight = 90, MaxHeight = 210, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -1032,8 +1032,8 @@ namespace WuWaVR.Manager
             var guidance = new Expander { Header = text["controllerGuidance"], Foreground = foreground, Margin = new Thickness(0, 8, 0, 0),
                 Content = new StackPanel() };
             var steps = (StackPanel)guidance.Content;
-            steps.Children.Add(Label(text["controllerOnlyTitle"], 13, teal)); steps.Children.Add(Label(text["controllerOnlyHelp"], 12, muted));
-            steps.Children.Add(Label(text["controllerTreadmillTitle"], 13, teal)); steps.Children.Add(Label(text["controllerTreadmillHelp"], 12, muted));
+            steps.Children.Add(Label(text["controllerOnlyTitle"], 13, accent)); steps.Children.Add(Label(text["controllerOnlyHelp"], 12, muted));
+            steps.Children.Add(Label(text["controllerTreadmillTitle"], 13, accent)); steps.Children.Add(Label(text["controllerTreadmillHelp"], 12, muted));
             controllerPanel = new Expander { Header = text["controllerCheck"], Foreground = foreground, Margin = new Thickness(0, 0, 0, 10),
                 Content = Card(text["controllerCheck"], Label(text["controllerIntro"], 12, muted), controllerState, controllerProgress,
                     Wrap(ControllerButton("controllerRefresh", RefreshControllers), ControllerButton("controllerCopy", CopyControllerReport)),
@@ -1519,7 +1519,7 @@ namespace WuWaVR.Manager
                 {
                     bool current = connectionReady && (key == "useHeadset" ? !simulator && Json.Flag(xr, "canHeadset") : Json.Flag(xr, "isBundledSimulator"));
                     button.Content = text[key] + (current ? " · " + text["current"] : "");
-                    button.BorderBrush = current ? teal : Brushes.Transparent;
+                    button.BorderBrush = current ? accent : Brushes.Transparent;
                 }
                 if (operation != null) reason = "busy";
                 else

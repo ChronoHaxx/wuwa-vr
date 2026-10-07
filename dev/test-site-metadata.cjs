@@ -92,10 +92,10 @@ try {
   // Copy only generator inputs. Videos are existence-only fixtures: generators
   // do not decode media, and copying large recordings would add no coverage.
   fs.cpSync(path.join(root, 'site'), site, {recursive: true, filter: file => !/\.(mp4|webm)$/i.test(file)});
-  for (const directory of ['docs', 'LICENSES']) fs.cpSync(path.join(root, directory), path.join(fixture, directory), {recursive: true});
+  for (const directory of ['docs', 'LICENSES', 'mod/localization/wuwa']) fs.cpSync(path.join(root, directory), path.join(fixture, directory), {recursive: true});
   for (const file of ['CREDITS.md', 'SUPPORT.md', 'CONTRIBUTING.md',
     'release/site-media.json', 'dev/build-site.cjs', 'dev/site-metadata.cjs', 'dev/site-layout.cjs',
-    'dev/build-community.cjs', 'dev/build-home.cjs', 'dev/site-report.cjs', 'dev/site-status.json',
+    'dev/build-community.cjs', 'dev/build-home.cjs', 'dev/controls-section.cjs', 'mod/controls.json', 'dev/site-report.cjs', 'dev/site-status.json',
     'release/security-reports.json']) {
     fs.mkdirSync(path.dirname(path.join(fixture, file)), {recursive: true});
     fs.copyFileSync(path.join(root, file), path.join(fixture, file));

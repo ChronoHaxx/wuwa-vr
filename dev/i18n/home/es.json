@@ -66,6 +66,19 @@
     "cta": "Graba tus propios clips en alta resolución",
     "ctaText": "Paso a paso: primera persona, una imagen limpia y la grabadora integrada."
   },
+  "pad": {
+    "title": "Atajos del mando",
+    "intro": "Casi todos los atajos son L3 más un botón: mantén pulsado el stick izquierdo, pulsa el botón y suelta todo. En VR, L3 + Menu muestra la misma lista como hoja.",
+    "hold": "Mantén L3 y pulsa",
+    "more": "Gestos",
+    "names": "Nombres de botones",
+    "psNote": "El soporte de PlayStation es experimental.",
+    "freecam": "Con la cámara libre activa",
+    "mouse": "Con el modo HUD / ratón activo",
+    "uevr": "Con los ajustes de UEVR abiertos",
+    "image": "Guardar como imagen",
+    "all": "Todos los atajos"
+  },
   "faq": {
     "title": "Preguntas",
     "items": [

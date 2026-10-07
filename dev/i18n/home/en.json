@@ -106,6 +106,19 @@
     "cta": "Record your own high-resolution clips",
     "ctaText": "Step-by-step: first person, a clean frame and the built-in recorder."
   },
+  "pad": {
+    "title": "Controller shortcuts",
+    "intro": "Most shortcuts are L3 plus one button: click and hold the left stick, press the button, then let go of everything. In VR, L3 + Menu shows the same list as a sheet.",
+    "hold": "Hold L3, then press",
+    "more": "Gestures",
+    "names": "Button names",
+    "psNote": "PlayStation support is experimental.",
+    "freecam": "While freecam is on",
+    "mouse": "While HUD / mouse mode is on",
+    "uevr": "With UEVR settings open",
+    "image": "Save as image",
+    "all": "Every shortcut"
+  },
   "faq": {
     "title": "Questions",
     "items": [

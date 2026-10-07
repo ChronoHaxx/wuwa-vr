@@ -231,4 +231,26 @@
     if (repository && notice) notice.hidden = true;
     form.hidden = false;
   }
+  // Controller section: Xbox / PlayStation button names, and callouts that light up the drawing.
+  const pad = document.getElementById("controls");
+  const padSwitch = pad?.querySelector(".pad-switch");
+  if (padSwitch) {
+    const named = [...pad.querySelectorAll("[data-ps]")];
+    named.forEach(el => {el.dataset.xbox = el.textContent;});
+    const choose = (choice, remember) => {
+      named.forEach(el => {el.textContent = choice === "ps" ? el.dataset.ps : el.dataset.xbox;});
+      padSwitch.querySelectorAll("[data-pad-choice]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.padChoice === choice)));
+      if (remember) try { localStorage.setItem("wuwa-pad", choice); } catch { /* optional */ }
+    };
+    padSwitch.addEventListener("click", event => {
+      const button = event.target.closest("[data-pad-choice]");
+      if (button) choose(button.dataset.padChoice, true);
+    });
+    try { if (localStorage.getItem("wuwa-pad") === "ps") choose("ps", false); } catch { /* optional */ }
+    padSwitch.hidden = false;
+    const light = (id, on) => pad.querySelectorAll(`.pad-svg [data-btn~="${id}"], .pad-list [data-btn="${id}"]`).forEach(el => el.classList.toggle("is-hot", on));
+    pad.querySelectorAll(".pad-list li[data-btn]").forEach(li => {
+      for (const [type, on] of [["mouseenter", true], ["mouseleave", false]]) li.addEventListener(type, () => light(li.dataset.btn, on));
+    });
+  }
 })();

@@ -6,6 +6,9 @@ const {chromium}=require(require.resolve('playwright',{paths:[root,modules]}));
 const output=path.resolve(process.argv[2]||path.join(root,'extracted/accessibility-20260925/community-browser'));
 fs.mkdirSync(output,{recursive:true});
 const codes=['en','zh-Hans','ja','ko','es','pt-BR','fr','de','ru','ar'];
+// The controller section lists every row of mod/controls.json, plus one heading row per 'when' context.
+const padGroups=JSON.parse(fs.readFileSync(path.join(root,'mod/controls.json'),'utf8')).groups;
+const padRows=padGroups.flatMap(g=>g.rows).length,padTableRows=padRows+padGroups.reduce((n,g)=>n+new Set(g.rows.map(r=>r.when).filter(Boolean)).size,0);
 const server=http.createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost'),file=path.resolve(site,'.'+decodeURIComponent(url.pathname));
   if(!file.startsWith(site+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);return res.end();}
@@ -29,7 +32,8 @@ const server=http.createServer((req,res)=>{
       assert.equal(await page.locator('html').getAttribute('lang'),code);
       assert.equal(await page.locator('html').getAttribute('dir'),code==='ar'?'rtl':'ltr');
       assert.equal(await page.locator('h1').count(),1);
-      assert.equal(await page.locator('#controls bdi[dir=ltr]').count(),8);
+      assert.equal(await page.locator('#controls .pad-groups th[scope=row]').count(),padRows);
+      assert.equal(await page.locator('#controls kbd').evaluateAll(k=>k.filter(e=>!e.closest('bdi[dir=ltr]')).length),0);
       assert(await page.locator('#report-form').isVisible());
       assert.equal(await page.locator('#report-form').getAttribute('data-lang'),code);
       assert(await page.evaluate(()=>document.querySelector('.risk').compareDocumentPosition(document.querySelector('#start'))&Node.DOCUMENT_POSITION_FOLLOWING));
@@ -45,6 +49,15 @@ const server=http.createServer((req,res)=>{
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Narrow overflow: '+code);
       await page.setViewportSize({width:1280,height:900});
       if(code==='ar')await page.screenshot({path:path.join(output,'arabic-desktop.png')});
+      if(code==='ar'){
+        // Button names switch to PlayStation and back; the choice is remembered.
+        const a=page.locator('#controls .pad-list [data-btn="A"] kbd');assert.equal(await a.textContent(),'A');
+        await page.locator('[data-pad-choice=ps]').click();assert.equal(await a.textContent(),'✕');
+        assert.equal(await page.locator('#controls .pad-svg [data-btn~="RT"] text').textContent(),'R2');
+        await page.reload();assert.equal(await a.textContent(),'✕');assert.equal(await page.locator('[data-pad-choice=ps]').getAttribute('aria-pressed'),'true');
+        await page.locator('[data-pad-choice=xbox]').click();assert.equal(await a.textContent(),'A');
+        checks.push('controller section: Xbox / PlayStation names switch, persist and switch back');
+      }
       checks.push('locale, risk placement, links, form and 320px reflow: '+code);
     }
     await page.setViewportSize({width:390,height:844});await page.goto(base+'/l/ar.html');
@@ -99,7 +112,7 @@ const server=http.createServer((req,res)=>{
     assert(await page.locator('#issue-link').isVisible());checks.push('missing optional notice does not break submission interception');
     const plain=await browser.newContext({javaScriptEnabled:false,viewport:{width:320,height:720}});
     const nojs=await plain.newPage();await nojs.goto(base+'/l/ar.html');assert(await nojs.locator('#report-form').isHidden());
-    assert(await nojs.locator('noscript').isVisible());assert(await nojs.locator('.risk').isVisible());assert.equal(await nojs.locator('#controls tr').count(),8);
+    assert(await nojs.locator('noscript').isVisible());assert(await nojs.locator('.risk').isVisible());assert.equal(await nojs.locator('#controls tr').count(),padTableRows);
     await plain.close();checks.push('without JavaScript: readable risk, controls and manual feedback instructions; no unhandled form');
     assert.equal(sent,0);assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(output,'verification.json'),JSON.stringify({checkedAt:new Date().toISOString(),checks,errors,networkPosts:sent,scope:'Local browser fixtures only; no GitHub submission, payment, game or headset acceptance.'},null,2));

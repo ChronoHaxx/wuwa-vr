@@ -446,6 +446,27 @@
     "PlayStation reader stopped; use Steam Input if available": "PlayStation 输入读取已停止；可用时请使用 Steam Input",
     "PlayStation shortcuts paused: WuWa shortcuts disabled": "PlayStation 快捷操作已暂停：鸣潮快捷操作已禁用",
     "PlayStation shortcuts paused: controller passthrough enabled": "PlayStation 快捷操作已暂停：手柄直通已启用",
-    "PlayStation shortcuts paused: an XInput slot is selected": "PlayStation 快捷操作已暂停：已选择固定的 XInput 槽位"
+    "PlayStation shortcuts paused: an XInput slot is selected": "PlayStation 快捷操作已暂停：已选择固定的 XInput 槽位",
+    "Activated automatically in this menu: cursor only. L3 + R3 opens settings.": "此菜单自动启用：仅鼠标指针。L3 + R3 打开设置。",
+    "GAME UI HIDDEN - MENUS ARE HIDDEN TOO": "游戏界面已隐藏 - 菜单也会隐藏",
+    "GAME UI HIDDEN: L3 + B restores the HUD and game menus.": "游戏界面已隐藏：L3 + B 恢复 HUD 和游戏菜单。",
+    "HUD / MOUSE ON (menu cursor): L3 + R3 > WuWa Controls > Exit mouse mode now restores game controls.": "HUD／鼠标已启用（菜单指针）：L3 + R3 > WuWa Controls > 立即退出鼠标模式，恢复游戏操作。",
+    "HUD / MOUSE ON: gameplay input paused. L3 + LB exits; release all controls. UEVR settings still open with L3 + R3.": "HUD／鼠标已启用：游戏操作已暂停。L3 + LB 退出，然后松开所有按键。L3 + R3 仍可打开 UEVR 设置。",
+    "INSERT > WuWa Controls > Show game UI now": "INSERT > WuWa Controls > 显示游戏界面",
+    "L3/R3 = stick clicks. L3 + LB toggles HUD/mouse adjustment. Utility: LB + R3 = V; hold 0.8 s for Tab wheel.": "L3／R3＝按下摇杆。L3 + LB 切换 HUD／鼠标调整。辅助：LB + R3＝V；按住 0.8 秒打开 Tab 轮盘。",
+    "Or: UEVR > WuWa Controls > Show game UI now": "或：UEVR > WuWa Controls > 显示游戏界面",
+    "Polar shortcuts are disabled or bypassed.": "Polar 快捷键已禁用或被绕过。",
+    "UEVR > WuWa Controls > Exit mouse mode now": "UEVR > WuWa Controls > 立即退出鼠标模式",
+    "WuWa Controls > Show game UI now": "WuWa Controls > 显示游戏界面",
+    "D-pad": "十字键",
+    "D-pad / A / B": "十字键 / A / B",
+    "L3 + D-pad Down": "L3 + 十字键下",
+    "L3 + D-pad Left / Right": "L3 + 十字键左 / 右",
+    "L3 + D-pad Up": "L3 + 十字键上",
+    "Hold RB": "按住 RB",
+    "Shortcut sheet: previous / next page": "快捷表：上一页／下一页",
+    "Shortcut sheet: automatic page": "快捷表：自动选页",
+    "Full speed while Polar walk is on": "Polar 步行开启时全速",
+    "V once; hold 0.8 s for the Tab wheel": "按一次 V；按住 0.8 秒打开 Tab 轮盘"
   }
 }

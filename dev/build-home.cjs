@@ -3,7 +3,7 @@
 // refreshes the shared header/footer and metadata on the other public pages.
 // Node standard library only: node dev/build-home.cjs
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
-const L = require('./site-layout.cjs'), {report} = require('./site-report.cjs');
+const L = require('./site-layout.cjs'), {report} = require('./site-report.cjs'), pad = require('./controls-section.cjs');
 const esc = L.escape, root = path.resolve(__dirname, '..'), site = path.join(root, 'site');
 const status = L.status(), codes = L.languages.map(([code]) => code);
 const youtube = {id: 'N3yqYROPPww', watch: 'https://www.youtube.com/watch?v=N3yqYROPPww', length: '1:20'};
@@ -11,7 +11,6 @@ const releaseUrl = `${L.repo}/releases/tag/${status.tag}`, asset = name => `${L.
 const baseUrl = 'https://chronohaxx.github.io/wuwa-vr/';
 const fill = (text, values = {}) => text.replace(/\{(\w+)\}/g, (match, key) => key in values ? values[key] : match);
 const vars = {app: status.appVersion, game: status.game, previous: status.previousTag.replace(/^beta-/, '').replace(/-/g, '.')};
-const keys = ['L3 + R3', 'L3 + B', 'L3 + A', 'L3 + Menu', 'L3 + LB', 'L3 + View', 'Double R3', 'L3 + RB'];
 const shotStates = ['fresh', 'found', 'ready'];
 
 // Every locale must have exactly the English shape, as text (never markup).
@@ -95,8 +94,7 @@ function home(t, prefix) {
   const features = `<section id="features" class="section alt"><div class="wrap"><div class="section-head"><h2>${esc(t.features.title)}</h2></div><ul class="feature-grid">${t.features.items.map(([title, text], i) => `<li class="feature">${svg(featureIcons[i])}<h3>${esc(title)}</h3><p>${esc(text)}</p></li>`).join('')}</ul></div></section>`;
   const firstPerson = `<section id="first-person" class="section"><div class="wrap split"><figure class="clip"><video controls preload="none" playsinline poster="${prefix}media/feature-first-person.jpg" width="960" height="720"><source src="${prefix}media/feature-first-person.mp4" type="video/mp4"><a href="${prefix}media/feature-first-person.mp4">${esc(t.firstPerson.title)}</a></video><figcaption>${esc(t.firstPerson.caption)}</figcaption></figure>
 <div class="split-copy"><h2>${esc(t.firstPerson.title)}</h2><p>${esc(t.firstPerson.text)}</p><a class="card-link" href="${prefix}record.html" hreflang="en"><strong>${toEnglish(t.firstPerson.cta)}</strong><span>${esc(t.firstPerson.ctaText)}</span>${icon.arrow}</a></div></div></section>`;
-  const controls = `<section id="controls" class="section alt"><div class="wrap"><div class="section-head"><h2>${esc(s.controls)}</h2><p>${esc(s.keyIntro)}</p></div><div class="table-scroll"><table class="shortcut-table"><tbody>${keys.map((key, i) => `<tr><th scope="row">${kbd(key)}</th><td>${esc(s.keyActions[i])}</td></tr>`).join('')}</tbody></table></div>
-<p class="section-foot"><a href="${prefix}guide.html#controls" hreflang="en">${esc(s.detailed)}</a></p></div></section>`;
+  const controls = pad.render({code: t.code, dir: t.dir, copy: t.pad, prefix, guideLink: `<a href="${prefix}guide.html#controls" hreflang="en">${esc(s.detailed)}</a>`});
   const faq = `<section id="faq" class="section"><div class="wrap narrow"><div class="section-head"><h2>${esc(t.faq.title)}</h2></div><div class="faq">${t.faq.items.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div></div></section>`;
   const limits = `<section id="limits" class="section alt"><div class="wrap narrow"><div class="section-head"><h2>${esc(t.limits.title)}</h2></div><ul class="limit-list">${t.limits.items.map(item => `<li>${esc(item)}</li>`).join('')}</ul><p class="section-foot"><a href="${prefix}guide.html#recovery" hreflang="en">${toEnglish(t.limits.recovery)}</a></p></div></section>`;
   const open = `<section id="open" class="section"><div class="wrap narrow"><div class="section-head"><h2>${esc(t.open.title)}</h2><p>${esc(t.open.text)}</p></div><div class="link-row"><a class="button" href="${L.repo}/tree/main/launcher/native">${esc(t.open.launcher)}</a><a class="button" href="${L.repo}/tree/main/mod">${esc(t.open.mod)}</a><a class="button" href="${releaseUrl}">${esc(t.open.release)}</a></div><p class="small">${esc(scanNote(t))}</p></div></section>`;

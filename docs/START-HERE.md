@@ -4,7 +4,7 @@
 [Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-1-1/WuWa-VR-Setup.exe), install it for your Windows user, then open **WuWa VR** from the Start menu. The first VR package installation needs internet. No separate Python installation is needed.
 
 1. **01 · Game.** Choose your Steam or Kuro installation. For Steam, browse to **Wuthering Waves.exe** if necessary; sign into Steam first.
-2. **02 · WuWa VR.** Read and accept the account-risk notice, then install **1.1.1 beta**. This is the VR package; the launcher app has its own version shown separately.
+2. **02 · Install VR.** Read and accept the account-risk notice, then install **1.1.1 beta**. This is the VR package; the launcher app has its own version shown separately.
 3. **03 · Headset or simulator.** Start your headset software and choose its valid OpenXR runtime, or explicitly select **Use bundled simulator**. Select **Launch in VR** and accept Windows permission. Steam starts through Steam; Kuro users press **Play** in its launcher.
 
 Your choices are saved, so later sessions can go straight to **Launch in VR** when ready. A simulator from an older package or an invalid/missing runtime blocks launch and shows what to fix. Close the game and injector before switching runtimes. Updating the app never changes the system runtime automatically.

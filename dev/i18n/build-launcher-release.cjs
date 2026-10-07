@@ -1,5 +1,5 @@
-// Scoped release refresh for the published site. Keep its shell, approved media,
-// verification files and unrelated technical pages; do not import the site redesign.
+// Scoped release refresh for the published site's guide and reference pages.
+// Home pages come from dev/build-home.cjs; verification files stay untouched.
 const fs = require('node:fs'), path = require('node:path');
 const root = path.resolve(__dirname, '../..'), site = path.join(root, 'site');
 const status = JSON.parse(fs.readFileSync(path.join(root, 'dev/site-status.json'), 'utf8'));
@@ -65,17 +65,6 @@ async function build() {
     const file = path.join(site, name), old = fs.readFileSync(file, 'utf8'), next = transform(old);
     if (old !== next) fs.writeFileSync(file, next);
   };
-  update('index.html', text => {
-    text = banner(text);
-    text = text.replace('<strong>Xbox controls and adjustable HUD.</strong> Show, hide or move the UI; open an in-VR shortcut sheet.', '<strong>Controller shortcuts and adjustable HUD.</strong> Xbox/XInput plus experimental native PS4/PS5 shortcuts. Show, hide or move the UI; open an in-VR shortcut sheet.');
-    text = text.replace(/<section><h2>Known problems<\/h2>[\s\S]*?<\/section>/, '');
-    text = text.replace(/<section id="source-and-checks">[\s\S]*?<\/section>/, '');
-    text = replace(text, /<div id="release-download">[\s\S]*?<\/div>|<p><a class="button primary"[^>]*>Download[\s\S]*?<\/p><p class="small">[\s\S]*?<\/p>/, downloads(locales.en), 'home download');
-    text = replace(text, /<section id="get-started">[\s\S]*?<\/section>/,
-      `<section id="get-started"><h2>${locales.en.start}</h2>${steps(locales.en)}<p>${locales.en.controls}</p><a href="guide.html#start">${locales.en.guide}</a></section>`, 'home steps');
-    text = text.replace(/<section id="launcher-updates">[\s\S]*?<\/section><section id="launcher-beta">[\s\S]*?<\/section>/, '');
-    return text.replace('<section><h2>Current features</h2>', details(locales.en) + sourceAndChecks() + '<section><h2>Current features</h2>');
-  });
   update('guide.html', text => {
     text = banner(text);
     const setup = render('docs/START-HERE.md');
@@ -118,26 +107,9 @@ async function build() {
     `<section id="distribution"><h2>Distribution status</h2><p><a href="${release}">The 6 October public beta</a> provides <a href="${asset(status.installer)}">WuWa-VR-Setup.exe</a> for desktop app ${status.appVersion}, plus the advanced <a href="${asset('WuWa-VR-Launcher.zip')}">portable ZIP</a>, matching source and checksums. The thin installer downloads the separate VR mod on first installation.</p><p>VR build <strong>${status.buildId}</strong> targets game ${status.game}. ${locales.en.accepted}</p><p>${locales.en.limits}</p><p>${locales.en.cutscenes}</p><p>The optional NPC rim workaround remains off by default and also removes intended nearby rim lighting; the underlying stereo fault remains unresolved.</p><p>Keep native source, profiles, component notices and hashes paired. Publication does not change upstream licence terms or imply endorsement. Preserve older releases for rollback and keep this experimental release labelled beta.</p></section>`, 'distribution release'));
   update('testing.html', text => replace(text, /<section id="checkpoints">[\s\S]*?<\/section>/,
     `<section id="checkpoints"><h2>Checkpoint identities</h2><p><a href="${release}">6 Oct startup compatibility beta ${status.appVersion} (game ${status.game}): files, source and checksums</a>, VR build <strong>${status.buildId}</strong>. ${locales.en.accepted}</p><p>The report does not establish Windows 11 as the cause. The retained cinematic correction was accepted in a simulator replay with matching letterbox heights; headset comfort remains pending. Automatic cinema stays off and unverified. See the release receipt for build/package checks. <a href="${repo}/releases/tag/${status.previousTag}">Previous 6 Oct beta</a> and <a href="${repo}/releases/tag/beta-2026-09-26-230213">26 Sep beta</a> remain historical checkpoints. Keep the build name, timestamp and backend hash with a report.</p></section>`, 'test checkpoints'));
-  for (const [code, t] of Object.entries(locales)) {
-    update(`l/${code}.html`, text => {
-      text = replace(text, /<section id="start">[\s\S]*?<\/section>/,
-        `<section id="start"><h2>${t.start}</h2>${downloads(t)}${steps(t)}<p>${t.controls.replaceAll('href="guide.html', 'href="../guide.html')}</p><p>${t.risk}</p></section>`, `${code} steps`);
-      text = text.replace(/<section id="launcher-updates">[\s\S]*?<\/section><section id="launcher-beta">[\s\S]*?<\/section><section id="launcher-portable">[\s\S]*?<\/section>/, '');
-      text = text.replace('<section id="controls">', details(t) + `<section id="launcher-portable"><h2>${t.fallback}</h2><p>${t.portable}</p></section><section id="controls">`);
-      return text;
-    });
-  }
-  // Keep other existing translations, clearly separating their older portable
-  // instructions from the current installed-app flow, without pretending translation.
-  for (const code of ['ja', 'ko', 'es', 'pt-BR', 'fr', 'de', 'ru', 'ar']) {
-    update(`l/${code}.html`, text => {
-      const note = `<aside id="launcher-version-note" class="notice" lang="en">${locales.en.archive} <a href="en.html#start">English</a> · <a href="zh-Hans.html#start">简体中文</a></aside>`;
-      text = text.replace(/<aside id="launcher-version-note"[\s\S]*?<\/aside>/, '');
-      return text.replace('<section id="start">', note + '<section id="start">');
-    });
-  }
   // Both full generation and this scoped refresh end here; keep one metadata policy.
-  require('../site-metadata.cjs').apply(site);
-  console.log('Refreshed installer download, setup and updates in English/Simplified Chinese; preserved existing site and other locales.');
+  // The home builder owns index.html and l/*.html, and applies the shared chrome and metadata.
+  require('../build-home.cjs');
+  console.log('Refreshed the guide and release references; rebuilt the home pages in ten languages.');
 }
 module.exports = {build};

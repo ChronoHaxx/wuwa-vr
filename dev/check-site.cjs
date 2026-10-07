@@ -11,7 +11,7 @@ const server=http.createServer((req,res)=>{
   if(!route.startsWith('/wuwa-vr/')){res.writeHead(404);res.end();return;}
   const file=path.resolve(site,route.slice('/wuwa-vr/'.length)||'index.html');
   if(!file.startsWith(site+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);res.end();return;}
-  const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
+  const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.mp4':'video/mp4'};
   res.writeHead(200,{'Content-Type':types[path.extname(file)]||'text/plain'});res.end(fs.readFileSync(file));
 });
 (async()=>{
@@ -23,7 +23,7 @@ const server=http.createServer((req,res)=>{
     const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:1});
     page.on('pageerror',e=>errors.push(String(e)));
     page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
-    for(const file of ['index.html','guide.html','credits.html','support.html','risk.html','license.html','languages.html','feedback.html','testing.html','developers.html']){
+    for(const file of ['index.html','guide.html','record.html','credits.html','support.html','risk.html','license.html','languages.html','feedback.html','testing.html','developers.html']){
       await page.goto(base+file);await page.locator('h1').waitFor();
       assert.equal(await page.locator('h1').count(),1);
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Desktop page overflows: '+file);
@@ -71,7 +71,7 @@ const server=http.createServer((req,res)=>{
     assert(await page.locator('#support-pending').isHidden());
     await page.unroute('**/config.js');checks.push('empty support URL stays disconnected; unsafe scheme refused; valid fixture displayed without navigation');
     await page.setViewportSize({width:390,height:844});
-    for(const file of ['index.html','guide.html','credits.html','support.html','risk.html','license.html','languages.html','feedback.html','testing.html']){
+    for(const file of ['index.html','guide.html','record.html','credits.html','support.html','risk.html','license.html','languages.html','feedback.html','testing.html']){
       await page.goto(base+file);
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile page overflows: '+file);
       if(['index.html','support.html'].includes(file))await page.screenshot({path:path.join(output,'mobile-'+file.replace('.html','.png')),fullPage:true});
@@ -90,10 +90,22 @@ const server=http.createServer((req,res)=>{
     await page.emulateMedia({media:'screen'});await page.setViewportSize({width:1280,height:900});
     for(const file of ['index.html','guide.html']){
       await page.goto(base+file);
-      const steps=page.locator(file==='index.html'?'#get-started .launcher-steps > li':'#start > ol:first-of-type > li');
+      const home=file==='index.html';
+      const steps=page.locator(home?'#start .launcher-steps > li':'#start > ol:first-of-type > li');
       assert.equal(await steps.count(),3,'Three installed-launcher steps expected on '+file);
-      for(const [index,label] of ['01 · Game.','02 · Install VR.','03 · Headset or simulator.'].entries()){
-        assert((await steps.nth(index).innerText()).startsWith(label),'Launcher steps out of order on '+file);
+      // Home step titles match the launcher's own card titles; the guide keeps its numbered prose.
+      for(const [index,label] of (home?['Find Wuthering Waves','Install VR','Headset or simulator']:['01 · Game.','02 · Install VR.','03 · Headset or simulator.']).entries()){
+        const text=home?await steps.nth(index).locator('h3').innerText():await steps.nth(index).innerText();
+        assert(home?text===label:text.startsWith(label),'Launcher steps out of order on '+file+': '+text.slice(0,40));
+      }
+      if(home){
+        // Each step shows the matching native launcher render, in order.
+        const shots=await page.locator('.tour-shot img').evaluateAll(images=>images.map(i=>i.getAttribute('src')));
+        assert.deepEqual(shots,['media/launcher/en-fresh.webp','media/launcher/en-found.webp','media/launcher/en-ready.webp']);
+        await steps.nth(2).locator('.tour-select').click();
+        assert(await page.locator('.tour-shot[data-shot="2"]').isVisible()&&await page.locator('.tour-shot[data-shot="0"]').isHidden(),'Tour step did not switch its screenshot');
+        assert.equal(await steps.nth(2).locator('.tour-select').getAttribute('aria-pressed'),'true');
+        await page.reload();
       }
       assert.equal(await page.locator('.visual-steps img').count(),0,'Old browser screenshots must not represent the installed app');
       const asset=`https://github.com/ChronoHaxx/wuwa-vr/releases/download/${release.tag}/`;
@@ -115,7 +127,7 @@ const server=http.createServer((req,res)=>{
         assert(stop.visible&&stop.outline,`Keyboard stop without visible focus on ${file}: ${JSON.stringify(stop)}`);
       }
     }
-    checks.push('three ordered launcher steps and current installer/portable links; no text under 14px; keyboard order starts at skip link with visible focus');
+    checks.push('three ordered launcher steps with native screenshots that switch per step; current installer/portable links; no text under 14px; keyboard order starts at skip link with visible focus');
     assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(output,'verification.json'),JSON.stringify({checkedAt:new Date().toISOString(),basePath:'/wuwa-vr/',checks,errors,scope:'Local browser and static presentation only; no game/headset acceptance.'},null,2));
     console.log(JSON.stringify({passed:checks.length,output,errors}));

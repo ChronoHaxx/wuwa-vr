@@ -15,6 +15,7 @@
 #include "D3D12Hook.hpp"
 #include "D3D11Hook.hpp"
 #include "utility/WuWaSwapchainWindow.hpp"
+#include "utility/WuWaPresentGuard.hpp"
 
 static D3D12Hook* g_d3d12_hook = nullptr;
 
@@ -433,6 +434,8 @@ bool D3D12Hook::hook() {
             (uintptr_t)m_dispatch_swapchain.Get());
         m_present_hook = std::make_unique<PointerHook>(&present_fn, m_present_destination);
         m_present1_hook = std::make_unique<PointerHook>(&present1_fn, (void*)&D3D12Hook::present1);
+        wuwa_present_guard::remember(m_present_hook->get_original<void*>(), false);
+        wuwa_present_guard::remember(m_present1_hook->get_original<void*>(), true);
         m_hooked = true;
     } catch (const std::exception& e) {
         spdlog::error("Failed to initialize hooks: {}", e.what());
@@ -511,7 +514,9 @@ std::optional<HRESULT> D3D12Hook::present_from_stable_d3d11(
         original, sync_interval, flags);
     // Queue validation/reentry refusal still belongs to this exact source. Do
     // not fall through to a newer DX11 probe's potentially different original.
-    return result.has_value() ? *result : original(source, sync_interval, flags);
+    if (result.has_value()) return *result;
+    return wuwa_present_guard::forward(original, false,
+        [&](auto target) { return target(source, sync_interval, flags); });
 }
 
 std::optional<HRESULT> D3D12Hook::present_from_d3d11(IDXGISwapChain3* observed,
@@ -602,9 +607,18 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
         return original_override != nullptr ? original_override(swap_chain, sync_interval, flags) :
             present_fn(swap_chain, sync_interval, flags, params);
     };
+    // Early returns forward through the loop guard (see WuWaPresentGuard).
+    auto forward_original = [&] {
+        void* const fn = original_override != nullptr ? reinterpret_cast<void*>(original_override) :
+            reinterpret_cast<void*>(present_fn);
+        return wuwa_present_guard::forward(fn, present1, [&](void* target) -> HRESULT {
+            if (target == fn) return call_original();
+            return reinterpret_cast<Present1Fn>(target)(swap_chain, sync_interval, flags, params);
+        });
+    };
 
     if (!d3d12->m_hooked) {
-        return call_original();
+        return forward_original();
     }
 
     ++d3d12->m_probe_callbacks;
@@ -613,7 +627,7 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
     if (d3d12->m_is_phase_1 && WindowFilter::get().is_filtered(window.window)) {
         ++d3d12->m_probe_filtered;
         log_window_probe(d3d12->m_probe_generation, d3d12->m_probe_filtered_logs, "filtered", swap_chain, window, present1, true);
-        return call_original();
+        return forward_original();
     }
 
     if (!d3d12->m_is_phase_1 && swap_chain != d3d12->m_swapchain_hook->get_instance()) {
@@ -628,7 +642,7 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
         if (!d3d12->m_is_phase_1) {
             ++d3d12->m_probe_other_instance;
             log_window_probe(d3d12->m_probe_generation, d3d12->m_probe_other_logs, "other_instance", swap_chain, window, present1, false, og_instance.as<void*>());
-            return call_original();
+            return forward_original();
         }
     }
 
@@ -696,7 +710,7 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
             spdlog::info("Attempting to call real present function");
 
             ++g_present_depth;
-            const auto result = call_original();
+            const auto result = [&] { wuwa_present_guard::Scope forwarding; return call_original(); }();
             --g_present_depth;
 
             if (result != S_OK) {
@@ -737,6 +751,7 @@ HRESULT D3D12Hook::present_internal(IDXGISwapChain3* swap_chain, UINT sync_inter
     auto result = S_OK;
     
     if (!d3d12->m_ignore_next_present) {
+        wuwa_present_guard::Scope forwarding;  // lets the early paths see a loop
         result = call_original();
 
         if (result != S_OK) {

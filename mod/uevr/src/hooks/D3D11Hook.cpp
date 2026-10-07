@@ -10,6 +10,7 @@
 #include "D3D11Hook.hpp"
 #include "D3D12Hook.hpp"
 #include "utility/WuWaSwapchainWindow.hpp"
+#include "utility/WuWaPresentGuard.hpp"
 
 using namespace std;
 
@@ -146,6 +147,7 @@ bool D3D11Hook::hook() {
         m_present_hook = std::make_unique<PointerHook>(&present_fn, (void*)&D3D11Hook::present);
         m_original_present = m_present_hook->get_original<PresentFn>();
         g_retired_d3d11_present = m_original_present;
+        wuwa_present_guard::remember(reinterpret_cast<void*>(m_original_present), false);
         m_hooked = true;
     } catch (const std::exception& e) {
         spdlog::error("Failed to hook D3D11: {}", e.what());
@@ -233,7 +235,12 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
     auto present_fn = d3d11 != nullptr && d3d11->m_original_present != nullptr ?
         d3d11->m_original_present : g_retired_d3d11_present;
     if (present_fn == nullptr) return DXGI_ERROR_INVALID_CALL;
-    if (d3d11 == nullptr) return present_fn(swap_chain, sync_interval, flags);
+    // Every early return forwards through the loop guard (see WuWaPresentGuard).
+    auto forward = [&](PresentFn fn) {
+        return wuwa_present_guard::forward(fn, false,
+            [&](PresentFn target) { return target(swap_chain, sync_interval, flags); });
+    };
+    if (d3d11 == nullptr) return forward(present_fn);
 
     // Unhook restores the slot but keeps the original callable for an already
     // dispatched callback that waited while Framework switched API probes.
@@ -243,7 +250,7 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
                 d3d11->m_observed_dx12_device.Get(), present_fn, sync_interval, flags);
             if (bridged.has_value()) return *bridged;
         }
-        return present_fn(swap_chain, sync_interval, flags);
+        return forward(present_fn);
     }
 
     ++d3d11->m_probe_callbacks;
@@ -255,7 +262,7 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
         if (++d3d11->m_probe_filtered <= 3) {
             log_probe_window(d3d11->m_probe_generation, "filtered", swap_chain, desc_result, swap_desc.OutputWindow);
         }
-        return present_fn(swap_chain, sync_interval, flags);
+        return forward(present_fn);
     }
 
     if (++d3d11->m_probe_selected <= 3) {
@@ -375,6 +382,7 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swap_chain, UINT sync_interval
     g_inside_d3d11_present = true;
 
     if (!d3d11->m_ignore_next_present) {
+        wuwa_present_guard::Scope forwarding;  // lets the early paths see a loop
         result = present_fn(swap_chain, sync_interval, flags);
         last_d3d11_present_result = result;
     } else {

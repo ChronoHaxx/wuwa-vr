@@ -23,12 +23,14 @@ $libPaths = @(
 )
 $source = Join-Path $PSScriptRoot 'test_actual_d3d_hooks.cpp'
 $inputs = [ordered]@{}
-foreach ($relative in @('hooks\D3D11Hook.cpp','hooks\D3D12Hook.cpp','hooks\D3D11Hook.hpp','hooks\D3D12Hook.hpp','WindowFilter.cpp','WindowFilter.hpp','utility\WuWaSwapchainWindow.hpp')) {
+foreach ($relative in @('hooks\D3D11Hook.cpp','hooks\D3D12Hook.cpp','hooks\D3D11Hook.hpp','hooks\D3D12Hook.hpp','WindowFilter.cpp','WindowFilter.hpp','utility\WuWaSwapchainWindow.hpp','utility\WuWaPresentGuard.hpp')) {
     $path = Join-Path $repo ('mod\uevr\src\' + $relative)
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { $path = Join-Path $upstream ('src\' + $relative) }
     if ($ProductionSnapshot) {
         $name = if ($relative.StartsWith('hooks\')) { Split-Path $relative -Leaf } else { $relative }
         $path = Join-Path $ProductionSnapshot $name
+        # Snapshots older than the Present loop guard do not contain it.
+        if ($relative -eq 'utility\WuWaPresentGuard.hpp' -and -not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }
     }
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Production source missing: $relative" }
     $inputs[$relative] = $path

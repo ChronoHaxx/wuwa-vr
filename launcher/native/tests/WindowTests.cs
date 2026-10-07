@@ -758,7 +758,8 @@ public static class WindowTests
             using (var f = new Fixture(root))
             {
                 var w = f.Window; Connect(w);
-                var newer = new Release { id = "beta-1.1.0", displayName = "1.1.0 beta", channel = "beta", gameVersion = "3.7", published = "2026-10-07T00:00:00Z" };
+                // Dated far ahead so it stays newer than every real entry in the shipped catalog.
+                var newer = new Release { id = "beta-1.1.0", displayName = "1.1.0 beta", channel = "beta", gameVersion = "3.7", published = "2099-01-01T00:00:00Z" };
                 Field<Catalog>(w, "catalog").releases.Add(newer); Field<ComboBox>(w, "releases").Items.Add(newer); Refresh(w);
                 Check(Field<TextBlock>(w, "packageUpdateState").Text.Contains("1.1.0 beta") && Button(w, "selectLatestPackage").Visibility == Visibility.Visible &&
                     f.Store.Selected.release.id == f.B.release.id, "VR package update is hidden or silently migrated rollback selection");

@@ -1,10 +1,10 @@
 # Start playing
 
-**1.1.1 beta · Wuthering Waves 3.7 · Windows x64.**
-[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-1-1/WuWa-VR-Setup.exe), install it for your Windows user, then open **WuWa VR** from the Start menu. The first VR package installation needs internet. No separate Python installation is needed.
+**1.1.2 beta · Wuthering Waves 3.7 · Windows x64.**
+[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-1-2/WuWa-VR-Setup.exe), install it for your Windows user, then open **WuWa VR** from the Start menu. The first VR package installation needs internet. No separate Python installation is needed.
 
 1. **01 · Game.** Choose your Steam or Kuro installation. For Steam, browse to **Wuthering Waves.exe** if necessary; sign into Steam first.
-2. **02 · Install VR.** Read and accept the account-risk notice, then install **1.1.1 beta**. This is the VR package; the launcher app has its own version shown separately.
+2. **02 · Install VR.** Read and accept the account-risk notice, then install **1.1.2 beta**. This is the VR package; the launcher app has its own version shown separately.
 3. **03 · Headset or simulator.** Start your headset software and choose its valid OpenXR runtime, or explicitly select **Use bundled simulator**. Select **Launch in VR** and accept Windows permission. Steam starts through Steam; Kuro users press **Play** in its launcher.
 
 Your choices are saved, so later sessions can go straight to **Launch in VR** when ready. A simulator from an older package or an invalid/missing runtime blocks launch and shows what to fix. Close the game and injector before switching runtimes. Updating the app never changes the system runtime automatically.
@@ -18,11 +18,11 @@ The simulator lets you inspect the view without a headset. It does not establish
 **Launcher app** is the installed desktop application. **VR package** contains the game integration, scripts and bundled simulator. The two statuses are separate: an up-to-date app can still be using an older VR package.
 
 - **Update launcher:** download and verify the app update. When game, injector, recording and other operations are idle, select **Restart to update** and confirm.
-- **VR package update:** use the package update option or **02 → Versions & updates**, deliberately choose **1.1.1 beta**, then install it. Checking for updates preserves your current choice, including rollback.
+- **VR package update:** use the package update option or **02 → Versions & updates**, deliberately choose **1.1.2 beta**, then install it. Checking for updates preserves your current choice, including rollback.
 - **Rollback:** when idle, use **Troubleshooting → Repair & recovery → Use previous installed version**. This changes the VR package, not the app. If using the simulator, select the restored package's simulator before launching.
 - If the app cannot update, close it and run the latest installer from the website. Reinstallation preserves settings and does not stop existing workers.
 
-Older date-and-fix-name packages are historical builds. New releases use a readable version such as **1.1.1 beta**; exact package IDs remain in diagnostics for bug reports.
+Older date-and-fix-name packages are historical builds. New releases use a readable version such as **1.1.2 beta**; exact package IDs remain in diagnostics for bug reports.
 
 ## Controls and current limits
 
@@ -36,7 +36,7 @@ Cinematic framing is on by default and was accepted in a simulator replay. Autom
 
 The optional NPC rim-light suppression starts off and also removes intended rim lighting nearby; the **underlying stereo rendering fault is unresolved**. Scene/dialogue stalls, HUD-aspect refresh failures, some reflections/fog and moving flat-menu backgrounds remain open. Manual mono theatre can help with menus. See [troubleshooting](TROUBLESHOOTING.md).
 
-The user confirmed 1.0.10 startup on the previously affected Windows 11 Steam simulator PC, and 1.1.0 through Kuro on the owner's PC. The owner's 1.1.0 Steam route crashed. Version 1.1.1 repairs the resize recursion found in that crash dump; controlled graphics and launcher tests pass, but this repair still needs real Steam and headset testing.
+The owner confirmed this release's VR build on the Windows 10 PC where 1.1.1 crashed through Steam: the game reaches VR through Steam and stays open. On that PC the Steam overlay sent the game's first frames back into our DirectX hook in a loop; 1.1.2 breaks the loop and presents the frame. The Windows 11 Steam PC retest and the new launcher window on a real launch are still pending.
 
 ## Recovery, recording and uninstall
 
@@ -50,8 +50,8 @@ Use **Troubleshooting → Copy diagnostics** when launch stalls. **Stop waiting*
 
 ## Portable fallback and source
 
-The [portable ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-1-1/WuWa-VR-Launcher.zip) uses the older browser interface and does not self-update the desktop app. Extract the whole archive and keep its folders together.
+The [portable ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-1-2/WuWa-VR-Launcher.zip) uses the older browser interface and does not self-update the desktop app. Extract the whole archive and keep its folders together.
 
 The launcher is MIT open source. The mod's source changes and build instructions are public; upstream components retain their own licences. [Source repository](https://github.com/ChronoHaxx/wuwa-vr) · [component licences](../LICENSE.md).
 
-[Previous 1.0.10 beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-2026-10-06-enum-startup) is available for rollback.
+[Previous 1.1.1 beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1) is available for rollback.

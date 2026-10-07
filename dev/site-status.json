@@ -1,8 +1,8 @@
 {
-  "tag": "beta-1-1-1",
-  "previousTag": "beta-1-1-0",
+  "tag": "beta-1-1-2",
+  "previousTag": "beta-1-1-1",
   "game": "3.7",
-  "appVersion": "1.1.1",
-  "buildId": "steam-resize-1-1-1",
+  "appVersion": "1.1.2",
+  "buildId": "steam-guard-1-1-2",
   "installer": "WuWa-VR-Setup.exe"
 }

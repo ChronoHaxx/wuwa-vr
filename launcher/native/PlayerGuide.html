@@ -11,7 +11,7 @@
 <nav aria-label="Guide language"><a href="#en">English</a><a href="#zh" lang="zh-Hans">简体中文</a><a href="#controls">Controls</a><a href="#recovery">Troubleshooting</a></nav>
 <section id="en">
 <h1>Play WuWa in VR</h1>
-<p class="muted">1.1.1 player guide · Wuthering Waves 3.7 · Windows PCVR</p>
+<p class="muted">1.1.2 player guide · Wuthering Waves 3.7 · Windows PCVR</p>
 <p>Install <strong>WuWa-VR-Setup.exe</strong>, then open the <strong>WuWa VR</strong> shortcut. No separate Python installation is needed. The first VR-package installation needs internet; the small Setup download contains the launcher app.</p>
 <div class="card"><h3>01 · Choose your game</h3>
 <p>Check the detected or saved location. Use <strong>Change</strong> to select Steam or the official Kuro launcher. If browsing for Steam, choose its <code>Wuthering Waves.exe</code>, not the inner Shipping executable. Choose explicitly if you have several installations.</p></div>
@@ -26,9 +26,9 @@
 
 <h2>Updates and rollback</h2>
 <p>Open <strong>02 → Versions &amp; updates → Check updates</strong>. Update the launcher app when offered, then use <strong>Restart to update</strong> when idle. Select and install the desired <strong>VR package</strong> separately. A failed update check or cached list does not establish that your package is current.</p>
-<p>This release pairs app <strong>1.1.1</strong> with package <code>beta-1-1-1</code>, build <code>steam-resize-1-1-1</code>, for WuWa <strong>3.7</strong>. To undo a VR-package update, close the game and injector, stop recording, then use <strong>Troubleshooting → Repair &amp; recovery → Use previous installed version</strong>. This does not roll back the launcher app. Settings, backups and recordings are retained.</p>
+<p>This release pairs app <strong>1.1.2</strong> with package <code>beta-1-1-2</code>, build <code>steam-guard-1-1-2</code>, for WuWa <strong>3.7</strong>. To undo a VR-package update, close the game and injector, stop recording, then use <strong>Troubleshooting → Repair &amp; recovery → Use previous installed version</strong>. This does not roll back the launcher app. Settings, backups and recordings are retained.</p>
 <p>If app updating is blocked, use the latest <a href="https://chronohaxx.github.io/wuwa-vr/">Setup from the website</a>. Reinstalling does not stop an existing stuck worker; use recovery below first.</p>
-<details><summary>Portable fallback</summary><p>Download <strong>WuWa-VR-Launcher.zip</strong> from the <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1">matching release</a>, extract everything and open <strong>WuWa VR Launcher.exe</strong>. Keep its folders together. This opens the separate web tool interface; it does not self-update the installed desktop app. The launcher’s <strong>Open matching portable ZIP</strong> action locates an already available verified copy.</p></details>
+<details><summary>Portable fallback</summary><p>Download <strong>WuWa-VR-Launcher.zip</strong> from the <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-2">matching release</a>, extract everything and open <strong>WuWa VR Launcher.exe</strong>. Keep its folders together. This opens the separate web tool interface; it does not self-update the installed desktop app. The launcher’s <strong>Open matching portable ZIP</strong> action locates an already available verified copy.</p></details>
 
 <h2 id="controls">Everyday controls</h2>
 <p>Xbox / XInput is the normal gameplay path. <strong>L3 / R3</strong> mean click the sticks. Focus the game, close UEVR and HUD/mouse adjustment, and release controls between shortcuts. Physical gamepad passthrough bypasses mod shortcuts. <strong>Insert</strong> opens UEVR with the keyboard.</p>
@@ -61,13 +61,13 @@
 
 <h2>Recording and current limits</h2>
 <p>The <strong>Developer tools</strong> footer link opens the selected package’s web tools for recording, playtests and logs. Recording supports SteamVR and the bundled simulator; this recorder does not support VDXR or audio. Review videos for player names and account details before sharing. See the <a href="https://chronohaxx.github.io/wuwa-vr/feedback.html">feedback guide</a>.</p>
-<p>The user confirmed 1.0.10 startup on the previously affected Windows 11 Steam simulator PC, and 1.1.0 through Kuro on the owner's PC. The owner's 1.1.0 Steam route crashed. Version 1.1.1 repairs the resize recursion found in that crash dump; controlled graphics and launcher tests pass, but this repair still needs real Steam and headset testing.</p>
+<p>The owner confirmed this release's VR build on the Windows 10 PC where 1.1.1 crashed through Steam: the game reaches VR through Steam and stays open. On that PC the Steam overlay sent the game's first frames back into our DirectX hook in a loop; 1.1.2 breaks the loop and presents the frame. The Windows 11 Steam PC retest and the new launcher window on a real launch are still pending.</p>
 <p>Known issues include long scene/dialogue stalls, unreliable HUD refresh, moving flat-menu backgrounds, distant NPC rim-light mismatch, Weapon/Echo submenu reflections and full-animation first-person aim. Manual mono theatre helps some menus/cinematics. Optional rim suppression removes intended nearby rim lighting too; it is a workaround, not a shader repair. The mod retains game graphics choices and custom edits; recognized inherited overrides are cleaned only during the documented package upgrade.</p>
 </section>
 <hr>
 <section id="zh" lang="zh-Hans">
 <h1>开始体验鸣潮 VR</h1>
-<p class="muted">1.1.1 玩家指南 · 鸣潮 3.7 · Windows PCVR</p>
+<p class="muted">1.1.2 玩家指南 · 鸣潮 3.7 · Windows PCVR</p>
 <p>运行 <strong>WuWa-VR-Setup.exe</strong> 后打开 <strong>WuWa VR</strong> 快捷方式，无需另装 Python。小型 Setup 只安装启动器应用；首次安装 VR 模组包需要联网下载。</p>
 <div class="card"><h3>01 · 选择游戏</h3><p>确认自动找到或已保存的路径。点击<strong>更改</strong>选择 Steam 或库洛官方启动器。手动选择 Steam 时，请选 <code>Wuthering Waves.exe</code>，而不是内部 Shipping 文件。多个安装并存时请明确选择。</p></div>
 <div class="card"><h3>02 · 安装鸣潮 VR</h3><p>确认对应游戏版本，阅读账号风险提示，再点击<strong>安装 VR</strong>。安装前会校验下载包；安装不会启动游戏。</p><p><strong>启动器应用</strong>是这个桌面窗口；<strong>VR 模组包</strong>包含模组及工具。更新其中一个不会自动更新另一个。</p></div>
@@ -76,9 +76,9 @@
 
 <h2>更新与回退</h2>
 <p>打开<strong>第 02 步 → 版本与更新 → 检查更新</strong>。先按提示更新启动器，空闲时选择<strong>重启并更新</strong>；再单独选择并安装所需的<strong>VR 模组包</strong>。检查失败或使用缓存列表时，不能据此判断已是最新版。</p>
-<p>本版本配套：应用 <strong>1.1.1</strong>，包 <code>beta-1-1-1</code>，构建 <code>steam-resize-1-1-1</code>，游戏 <strong>3.7</strong>。回退 VR 包前关闭游戏和注入器、停止录制，再用<strong>故障排查 → 修复与恢复 → 使用上一个已安装版本</strong>。这不会回退桌面应用；设置、备份和录像会保留。</p>
+<p>本版本配套：应用 <strong>1.1.2</strong>，包 <code>beta-1-1-2</code>，构建 <code>steam-guard-1-1-2</code>，游戏 <strong>3.7</strong>。回退 VR 包前关闭游戏和注入器、停止录制，再用<strong>故障排查 → 修复与恢复 → 使用上一个已安装版本</strong>。这不会回退桌面应用；设置、备份和录像会保留。</p>
 <p>应用无法更新时，可使用<a href="https://chronohaxx.github.io/wuwa-vr/">网站上的新版 Setup</a>。重装不会停止已有的卡住进程，请先使用下方恢复功能。</p>
-<details><summary>便携备用方式</summary><p>从<a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1">同一发布页面</a>下载 <strong>WuWa-VR-Launcher.zip</strong>，完整解压后打开 <strong>WuWa VR Launcher.exe</strong>，并保留所有文件夹。这是独立网页工具界面，不会自动更新已安装的桌面应用。<strong>打开匹配的便携 ZIP</strong>可定位已下载且校验通过的对应包。</p></details>
+<details><summary>便携备用方式</summary><p>从<a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-2">同一发布页面</a>下载 <strong>WuWa-VR-Launcher.zip</strong>，完整解压后打开 <strong>WuWa VR Launcher.exe</strong>，并保留所有文件夹。这是独立网页工具界面，不会自动更新已安装的桌面应用。<strong>打开匹配的便携 ZIP</strong>可定位已下载且校验通过的对应包。</p></details>
 
 <h2 id="controls-zh">常用控制</h2>
 <p>通常使用 Xbox／XInput 游戏输入。<strong>L3／R3</strong>表示按下左右摇杆。将焦点切回游戏、关闭 UEVR 与 HUD／鼠标调整，再使用快捷键；重复操作前松开所有按键；手柄直通会绕过模组快捷键。键盘 <strong>Insert</strong> 可打开 UEVR。</p>
@@ -111,8 +111,8 @@
 
 <h2>录制与当前限制</h2>
 <p>底部<strong>开发工具</strong>打开所选包的网页工具，包含录制、测试记录及日志。录制支持 SteamVR 和内置模拟器，不支持 VDXR 或音频。分享前检查玩家名称及账号信息；参阅<a href="https://chronohaxx.github.io/wuwa-vr/feedback.html">反馈指南</a>。</p>
-<p>用户已确认 1.0.10 在此前受影响的 Windows 11 Steam 电脑使用模拟器启动成功，1.1.0 在开发者电脑通过库洛启动成功，但同机 Steam 启动崩溃。1.1.1 修复了崩溃转储发现的窗口尺寸回调递归；受控图形和启动器测试通过，真实 Steam 启动及头显仍待复测。 PlayStation 实体手柄也仍待测试。</p>
+<p>开发者已在 1.1.1 通过 Steam 启动会崩溃的 Windows 10 电脑上确认本版本的 VR 构建：通过 Steam 可进入 VR 并保持运行。该电脑上 Steam 覆盖层会把游戏的首帧循环送回我们的 DirectX 钩子；1.1.2 打断该循环并正常呈现画面。Windows 11 Steam 电脑复测以及新启动器窗口的实机启动仍待测试。 PlayStation 实体手柄也仍待测试。</p>
 <p>待解决问题包括场景／对话加载停顿、HUD 刷新不可靠、平面菜单背景移动、远处 NPC 边缘光不一致、武器／声骸子菜单反射，以及完整动画第一人称瞄准。部分菜单／过场可用手动单目影院暂时处理。可选边缘光抑制也会去掉近处角色原有高光，是临时方案而非着色器修复。模组保留游戏画质选择与自定义修改；只有指定升级流程会清理已识别的旧覆盖项。</p>
 </section>
-<footer><a href="https://chronohaxx.github.io/wuwa-vr/">Website / 网站</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1">Release / 发布说明</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md">Full controls / 完整控制</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/issues">Report an issue / 反馈</a> · <a href="https://ko-fi.com/chronohax">Support / 支持</a></footer>
+<footer><a href="https://chronohaxx.github.io/wuwa-vr/">Website / 网站</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-2">Release / 发布说明</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md">Full controls / 完整控制</a> · <a href="https://github.com/ChronoHaxx/wuwa-vr/issues">Report an issue / 反馈</a> · <a href="https://ko-fi.com/chronohax">Support / 支持</a></footer>
 </main></body></html>

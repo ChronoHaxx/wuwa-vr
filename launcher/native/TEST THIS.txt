@@ -1,20 +1,17 @@
-WUWA VR — 1.1.1 BETA / FOCUSED USER CHECKS
-App 1.1.1 | Package beta-1-1-1 | Build steam-resize-1-1-1 | Game 3.7
+WUWA VR — 1.1.2 BETA / FOCUSED USER CHECKS
+App 1.1.2 | Package beta-1-1-2 | Build steam-guard-1-1-2 | Game 3.7 | 7 Oct 22:07 BST
 
 Record Pass / Fail / Blocked / Not tested. Automated checks are not user results.
 Close game and injector before updating package or changing runtime.
 
-[ ] Update app to 1.1.1, then choose/install VR package 1.1.1 beta in step 02.
+[ ] Update app to 1.1.2, then choose/install VR package 1.1.2 beta in step 02.
     If using simulator, explicitly choose Use bundled simulator. Confirm ready.
-[ ] Launch Steam once with the usual setup. Confirm actual VR stays running
-    through the 30-second startup check and open the UEVR menu. If it crashes,
-    copy diagnostics before retrying; do not start a second injector.
-[ ] Check normal Alt-Tab/window resize if available and exit the game normally.
-    VR should keep working after returning to the game.
-[ ] If a normal startup is cancelled, Stop waiting should settle after a short
-    delay. A real stuck worker still exposes recovery; nothing is auto-killed.
+[ ] Launch through Steam once with the usual setup. Confirm VR stays running at
+    the login/menu for 60+ seconds and open the UEVR menu. If it crashes, copy
+    diagnostics before retrying; do not start a second injector.
+[ ] Close the game and launch once more; it should start the same way.
 [ ] On the other PC, repeat its previously working Steam simulator launch.
-    Also check Kuro at a convenient later session; do not stop current play.
+[ ] Switch the launcher language once and back; the window should stay readable.
 
 PS4/PS5 hardware and physical-headset comfort remain separate pending checks.
 See PlayerGuide.html for controls, recovery and remaining rendering limitations.

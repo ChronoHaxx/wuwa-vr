@@ -1,13 +1,13 @@
-# Mod source — 1.1.1 beta
+# Mod source — 1.1.2 beta
 
 The release target is
-[beta-1-1-1](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-1),
-launcher **1.1.1**, backend/package build **steam-resize-1-1-1**, for game
-**3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. The previous 1.0.10 startup was user-confirmed; new controller and headset acceptance remain pending.
+[beta-1-1-2](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-2),
+launcher **1.1.2**, backend/package build **steam-guard-1-1-2**, for game
+**3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. The owner confirmed this build's Steam startup on the PC where 1.1.1 crashed; the Windows 11 PC retest, controller and headset acceptance remain pending.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The user confirmed 1.0.10 startup on the previously affected Windows 11 Steam simulator PC, and 1.1.0 through Kuro on the owner's PC. The owner's 1.1.0 Steam route crashed. Version 1.1.1 repairs the resize recursion found in that crash dump; controlled graphics and launcher tests pass, but this repair still needs real Steam and headset testing. See [the resize startup report](../docs/launch-kit/STEAM-RESIZE-1.1.1.md).
+The owner confirmed this release's VR build on the Windows 10 PC where 1.1.1 crashed through Steam: the game reaches VR through Steam and stays open. On that PC the Steam overlay sent the game's first frames back into our DirectX hook in a loop; 1.1.2 breaks the loop and presents the frame. The Windows 11 Steam PC retest and the new launcher window on a real launch are still pending. See [the resize startup report](../docs/launch-kit/STEAM-GUARD-1.1.2.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

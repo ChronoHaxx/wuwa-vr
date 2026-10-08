@@ -20,7 +20,7 @@ controller state. Other manufacturers, dongles and emulated HID IDs are excluded
 | L3 / R3 | Click the left / right stick |
 
 The shared Lua state machine handles portal (`L3 + L2`), diorama (`L3 + R2`),
-stereo screen (both triggers then hold `L3` for 0.8 seconds), mono theatre
+stereo screen (both triggers first, then click `L3`), mono theatre
 (both triggers first, then click `R3`), and the other existing WuWa shortcuts.
 `L3 + R3` opens/closes UEVR and respects its optional long-press setting.
 Direct HID does not add UEVR menu navigation: use existing mapped XInput,

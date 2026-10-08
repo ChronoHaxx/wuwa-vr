@@ -48,10 +48,11 @@ test('native mono preserves triggers-first and fresh edge requirements',function
     for i=1,60 do f:ps(R3,255,255) end
     f:count('VR_MonoTheatreMode',1)
 end)
-test('native stereo screen requires continuous 0.8 second hold',function()
-    local f=fixture(); f:ps(); f:ps(L3,255,255)
-    for i=1,39 do f:ps(L3,255,255) end
-    f:count('VR_2DScreenMode',0); f:ps(L3,255,255); f:ps(L3,255,255); f:count('VR_2DScreenMode',1)
+test('native stereo screen: triggers first, then one L3 click toggles once',function()
+    local f=fixture(); f:ps(); f:ps(L3,255,255); f:count('VR_2DScreenMode',0)
+    f:ps(); f:ps(0,255,255); f:ps(L3,255,255); f:count('VR_2DScreenMode',1)
+    for i=1,40 do f:ps(L3,255,255) end
+    f:count('VR_2DScreenMode',1); f:ps(); f:ps(0,255,255); f:ps(L3,255,255); f:count('VR_2DScreenMode',2)
 end)
 test('Steam Input appearing while native chord held cannot toggle twice',function()
     local f=fixture(); f:ps(); f:ps(L3,255,0); f:count('WindowMode_Enabled',1)

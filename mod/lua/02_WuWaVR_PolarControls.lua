@@ -490,7 +490,7 @@ local function process_pad(index,state,result)
     if l3 and r3 then
         actions.view=nil
         if s.view_chord then s.view_chord="cancelled" end
-        s.mono_ready=nil
+        s.triggers_ready=nil
         s.tap_l=-100; s.tap_r=-100; s.lone_l=false; s.lone_r=false; s.previous=b; input=nil; return
     end
     local adjust=adjusting()
@@ -498,7 +498,7 @@ local function process_pad(index,state,result)
     -- Enter/leave only after all controls are released. This also protects
     -- menu-click/game-action transitions and a checkbox changed in UEVR.
     if s.adjust_wait or actions.adjust then
-        s.mono_ready=nil; actions.view=nil
+        s.triggers_ready=nil; actions.view=nil
         input=nil; zero_pad(state.Gamepad); s.previous=b
         if neutral(p) and not actions.adjust then s.adjust_wait=false; input={pad=p,at=t} end
         return
@@ -507,26 +507,26 @@ local function process_pad(index,state,result)
         actions.adjust=true; s.adjust_wait=true; s.lone_l=false; s.lone_r=false
         input=nil; zero_pad(state.Gamepad); s.previous=b; return
     end
-    -- Mono theatre requires a prior, fresh sample with both full triggers and
-    -- neither stick pressed. Simultaneous input or R3-first cannot arm it.
-    local mono_ready=s.mono_ready and t>=s.mono_ready and t-s.mono_ready<=0.25
+    -- Mono theatre and stereo screen require a prior, fresh sample with both
+    -- full triggers and no buttons. Simultaneous input or stick-first cannot arm them.
+    local triggers_ready=s.triggers_ready and t>=s.triggers_ready and t-s.triggers_ready<=0.25
     if not s.view_chord and not adjust and b==0 and p.bLeftTrigger>=180 and p.bRightTrigger>=180 then
-        s.mono_ready=t
-    else s.mono_ready=nil end
-    -- One shared latch owns portal, diorama, stereo-screen hold and mono-theatre
-    -- click. A cancelled gesture cannot roll into a different view shortcut.
+        s.triggers_ready=t
+    else s.triggers_ready=nil end
+    -- One shared latch owns portal, diorama and the stereo-screen and mono-theatre
+    -- clicks. A cancelled gesture cannot roll into a different view shortcut.
     -- Reserve its stick and both triggers until all three are released.
     if s.view_chord or (not adjust and ((l3 and (p.bLeftTrigger>=30 or p.bRightTrigger>=30)) or
         (r3 and p.bLeftTrigger>=30 and p.bRightTrigger>=30))) then
         local lt,rt=p.bLeftTrigger,p.bRightTrigger
         if not s.view_chord then
             s.view_owner=r3 and "mono" or "left"
-            s.view_chord=(b==B.R3 and lt>=180 and rt>=180 and mono_ready and has(rising,B.R3)) and "mono" or
+            s.view_chord=(b==B.R3 and lt>=180 and rt>=180 and triggers_ready and has(rising,B.R3)) and "mono" or
                 (b==B.L3 and lt>=30 and rt<30) and "portal" or
                 (b==B.L3 and rt>=30 and lt<30) and "diorama" or
-                (b==B.L3 and lt>=30 and rt>=30) and "screen" or "cancelled"
+                (b==B.L3 and lt>=180 and rt>=180 and triggers_ready and has(rising,B.L3)) and "screen" or "cancelled"
         end
-        s.mono_ready=nil
+        s.triggers_ready=nil
         -- UObject/cursor reads stay on the engine tick; it validates queued
         -- requests against the current menu state before applying them.
         local menu=game_menu or enabled("WuWaControls_NativeMenu")
@@ -542,18 +542,17 @@ local function process_pad(index,state,result)
         local fire=l3 and trigger>=180
         if s.view_chord=="mono" then fire=has(rising,B.R3) and lt>=180 and rt>=180 end
         if s.view_chord=="screen" then
-            -- Continuous input is required: a polling pause, clock reversal,
-            -- released modifier or trigger drop cannot finish an old long hold.
+            -- Triggers first, then click L3: fires once both triggers are fully
+            -- held with L3 down, like mono's R3 click. Until then, a polling
+            -- pause, clock reversal, released L3 or trigger cancels the chord.
+            -- A fired click stays queued if L3 is released before the tick.
             local interrupted=not l3 or lt<30 or rt<30 or
-                (s.view_hold_at and (lt<180 or rt<180)) or
                 (s.view_sample_at and (t<s.view_sample_at or t-s.view_sample_at>0.25))
-            if interrupted then s.view_chord="cancelled"; actions.view=nil
+            if interrupted then
+                if not s.view_fired then s.view_chord="cancelled"; actions.view=nil end
             else
                 s.view_sample_at=t
-                if lt>=180 and rt>=180 then
-                    s.view_hold_at=s.view_hold_at or t
-                    fire=t-s.view_hold_at>=0.8
-                end
+                fire=lt>=180 and rt>=180
             end
         end
         if fire and not s.view_fired then
@@ -564,7 +563,7 @@ local function process_pad(index,state,result)
         input=nil; s.previous=b
         if (s.view_owner=="mono" and neutral(p)) or
             (s.view_owner~="mono" and not l3 and lt<30 and rt<30) then
-            s.view_chord=nil; s.view_owner=nil; s.view_fired=false; s.view_hold_at=nil; s.view_sample_at=nil
+            s.view_chord=nil; s.view_owner=nil; s.view_fired=false; s.view_sample_at=nil
         end
         return
     end
@@ -1066,7 +1065,7 @@ local function tick(_,delta)
     if game_menu or adjust then
         for _,s in pairs(slots) do
             if s.view_chord and (adjust or s.view_chord=="diorama") then s.view_chord="cancelled" end
-            if adjust then s.mono_ready=nil end
+            if adjust then s.triggers_ready=nil end
         end
     end
     if actions.sheet then set("WuWaControls_ShowShortcutSheet",not enabled("WuWaControls_ShowShortcutSheet")) end

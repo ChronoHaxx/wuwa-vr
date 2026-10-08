@@ -21,8 +21,8 @@ updates preserves your selection, including a rollback. Settings, backups,
 recordings and logs are kept. Older packages remain available for rollback.
 
 L3 + R3 opens UEVR; custom controls are under VR > WuWa Controls.
-Hold both triggers first, then click R3 for mono theatre, or hold L3 for
-0.8 seconds for a stereo screen. Release all controls before repeating.
+Hold both triggers first, then click R3 for mono theatre, or click L3 for a
+stereo screen. Release all controls before repeating.
 PlayStation setup, input limitations and the complete controls are in PlayerGuide.html.
 Automatic cinema is experimental, off by default, and untested with real
 prerendered movies. Scene stalls, HUD reset and some rendering issues remain.
@@ -58,7 +58,7 @@ Steam 通过 Steam 启动；库洛用户还需在库洛启动器点击开始游�
 并安装新 VR 包。检查更新不会覆盖当前选择或主动回退。用户数据会保留。
 
 L3 + R3 打开 UEVR，专用控制在 VR > WuWa Controls。
-先按住两个扳机，再点击 R3 切换单目影院；或按住 L3 0.8 秒切换立体屏幕。
+先按住两个扳机，再点击 R3 切换单目影院；或点击 L3 切换立体屏幕。
 每次操作后松开全部按键。PlayStation 配置和完整限制见 PlayerGuide.html。
 自动影院为实验功能，默认关闭，真正的预渲染影片仍未验证。加载停顿、HUD
 刷新和部分渲染问题仍未解决。

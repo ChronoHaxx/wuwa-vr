@@ -2571,7 +2571,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             }
         }
         wuwa_ui::TextWrapped("Mono shows the same scene and HUD to both eyes. Use it for troublesome cutscenes or flat menus.");
-        wuwa_ui::TextWrapped("Hold LT + RT: hold L3 for 0.8 s for stereo screen, or click R3 for mono. Release controls before repeating.");
+        wuwa_ui::TextWrapped("Hold LT + RT, then click L3 for stereo screen or R3 for mono. Release controls before repeating.");
         wuwa_ui::draw(*m_cinematic_framing_fix, "Match cinematic framing between eyes (default on)");
         if (wuwa_ui::TreeNode("Automatic cutscene switching (unverified)")) {
             if (wuwa_ui::draw(*m_auto_cinema, "Enable automatic switching"))
@@ -2854,7 +2854,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         bool effective_mono = is_using_mono_theatre();
         if (ImGui::Checkbox(wuwa_l10n::label("Mono theatre (no stereo)").c_str(), &effective_mono))
             set_mono_theatre_manually(effective_mono);
-        wuwa_ui::TextWrapped("Hold LT + RT: hold L3 for 0.8 s to toggle the screen, or click R3 to toggle mono. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.");
+        wuwa_ui::TextWrapped("Hold LT + RT, then click L3 to toggle the screen or R3 to toggle mono. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.");
         if (wuwa_ui::draw(*m_auto_cinema, "Automatic cinematic screen (experimental)"))
             m_wuwa_controls.reset_auto_cinema();
         wuwa_ui::draw(*m_auto_story_presentation, "Story cutscenes and dialogue");

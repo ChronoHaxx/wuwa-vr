@@ -15,7 +15,7 @@ const BUTTON = /(?<![A-Za-z])(L3|R3|LB|RB|LT|RT|View|Menu|F7|A|B|X|Y)(?![A-Za-z]
 const toPs = text => text.replace(BUTTON, name => PS[name] || name);
 const pureButtons = part => part.split(' / ').every(p => /^(L3|R3|LB|RB|LT|RT|View|Menu|F7|A|B|X|Y)$/.test(p));
 // Words in a key or action must be translated; button names and symbols need not be.
-const needsWords = text => /[a-z]{2,}/.test(text.replace(BUTTON, '').replace(/\b0\.8 s\b/g, ''));
+const needsWords = text => /[a-z]{2,}/.test(text.replace(BUTTON, ''));
 
 // View and Menu are easier to find by their printed icons than by name.
 const ICON = {
@@ -32,13 +32,8 @@ function combo(keys, t) {
   const double = keys.match(/^Double (L3|R3)$/);
   if (double) return `<bdi dir="ltr" class="combo" title="${esc(t(keys))}">${chip(double[1])}<span class="times">×2</span></bdi>`;
   const parts = t(keys).split(/\s*(\+|→)\s*/);  // some catalogs write RT+左 without spaces
-  const html = parts.map((part, i) => {
-    if (i % 2) return `<span class="op">${part}</span>`;
-    const timed = part.match(/^(.*) (0\.8 s)$/);
-    const body = timed ? timed[1] : part;
-    const keysHtml = pureButtons(body) ? body.split(' / ').map(chip).join('<span class="op">/</span>') : chip(body);
-    return keysHtml + (timed ? `<span class="times">${timed[2]}</span>` : '');
-  }).join('');
+  const html = parts.map((part, i) => i % 2 ? `<span class="op">${part}</span>` :
+    pureButtons(part) ? part.split(' / ').map(chip).join('<span class="op">/</span>') : chip(part)).join('');
   return `<bdi dir="ltr" class="combo">${html}</bdi>`;
 }
 // Which drawn buttons an English key string uses, e.g. "RT + D-pad L / R" -> RT Left Right.

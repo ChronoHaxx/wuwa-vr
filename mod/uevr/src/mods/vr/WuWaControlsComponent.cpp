@@ -117,7 +117,7 @@ constexpr const char* sheet[][2] = {
     {"L3 + R3    UEVR menu", "L3 + RB    Game / fixed camera"},
     {"L3 + A     Recenter view / portal", "L3 + Y/X   Fixed / first-person height"},
     {"L3 + LT / F7   Portal on / off", "L3 + RT    Diorama on / off (10x)"},
-    {"LT + RT, then hold L3 0.8 s: stereo screen", "LT + RT, then click R3: mono theatre"},
+    {"LT + RT, then click L3: stereo screen", "LT + RT, then click R3: mono theatre"},
     {"Double L3  Windows screenshot", "LB + LT/RT Fixed camera farther / closer"},
     {"Double R3  Freecam on / off", "Freecam: left stick moves, right looks"},
     {"L3 + B     Show / hide game UI", "Freecam: LT rises, RT boosts speed"},
@@ -469,7 +469,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
             {{"L3 + A", "Recenter headset / portal"}},
             {{"L3 + LT / F7", "Portal on / off"}},
             {{"L3 + RT", "Diorama on / off (10x)"}},
-            {{"LT + RT, then hold L3", "Stereo screen on / off (hold 0.8 s)"}},
+            {{"LT + RT, then click L3", "Stereo screen on / off"}},
             {{"LT + RT, then click R3", "Mono theatre on / off (no stereo depth)"}},
             {{"L3 + Menu", "Show / hide shortcut sheet"}},
             {{"L3 + LB, release", "Toggle HUD / mouse adjustment"}},
@@ -484,7 +484,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     }
     if (wuwa_ui::TreeNode("How to use view toggles")) {
         wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
-        wuwa_ui::TextWrapped("Fully hold both triggers first: hold L3 for 0.8 seconds for the stereo screen, or click R3 for mono theatre with no stereo depth. Release all controls and center the sticks before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
+        wuwa_ui::TextWrapped("Fully hold both triggers first, then click L3 for the stereo screen or R3 for mono theatre with no stereo depth. Release all controls and center the sticks before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
         wuwa_ui::TextWrapped("Mono preserves your saved stereo-screen choice; screen off exits both screen modes. Neither changes portal or normal world scale. Manual toggles take priority over automatic cinema for the current scene.");
         wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
         ImGui::TreePop();

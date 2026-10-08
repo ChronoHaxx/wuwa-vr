@@ -16,6 +16,12 @@ git -C uevr-build/dependencies/submodules/UESDK -c core.autocrlf=false apply ../
 
 Follow UEVR's build instructions and build the `uevr` target. These patches
 already include the portal changes. Do not stack older patches.
+
+`mod/uevr` mirrors the patched files. After changing them, or the language
+catalogs, keep the patch in step from this repository's root:
+`python dev/bundle-languages.py` (catalogs into the embedded
+`wuwa-languages.json`), then `python dev/sync-native-patch.py <UEVR clone>`.
+Both accept `--check`.
 Use one compiler worker on the shared PC. For an already configured MSBuild
 project, `dev/build-native-limited.py --project <uevr.vcxproj> --log-dir <folder>`
 sets `/m:1` and `/MP1`, uses low priority and stops above its memory budget.

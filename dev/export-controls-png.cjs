@@ -39,7 +39,8 @@ const server = http.createServer((req, res) => {
       }
       // Alone on the page, so a right-to-left layout cannot push the fixed-width card off screen.
       await page.evaluate(() => { const card = document.getElementById('pad-card'); card.classList.add('is-export'); document.body.replaceChildren(card); });
-      await page.evaluate(() => document.fonts.ready);
+      // Fonts, then two frames so the leader lines redraw for the export width.
+      await page.evaluate(() => document.fonts.ready.then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))));
       await page.locator('#pad-card').screenshot({path: path.join(out, code + '.png')});
       await page.close();
       console.log(code, fs.statSync(path.join(out, code + '.png')).size, 'bytes');

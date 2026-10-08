@@ -16,9 +16,15 @@ const pureButtons = part => part.split(' / ').every(p => /^(L3|R3|LB|RB|LT|RT|Vi
 // Words in a key or action must be translated; button names and symbols need not be.
 const needsWords = text => /[a-z]{2,}/.test(text.replace(BUTTON, '').replace(/\b0\.8 s\b/g, ''));
 
+// View and Menu are easier to find by their printed icons than by name.
+const ICON = {
+  View: '<svg class="kbd-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 4.5h7v6h-7zM6.5 10.5v1.5h7v-6h-4"/></svg>',
+  Menu: '<svg class="kbd-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 4.5h10M3 8h10M3 11.5h10"/></svg>'
+};
 function chip(text) {
-  const ps = toPs(text);
-  return `<kbd${ps !== text ? ` data-ps="${esc(ps)}"` : ''}>${esc(text)}</kbd>`;
+  const ps = toPs(text), face = /^[ABXY]$/.test(text) ? ` data-face="${text}"` : '';
+  const label = ps !== text ? `<span data-ps="${esc(ps)}">${esc(text)}</span>` : esc(text);
+  return `<kbd${face}>${ICON[text] || ''}${label}</kbd>`;
 }
 // "L3 + Y / X" -> chips joined by + and /; "Double R3" -> R3 ×2; worded parts stay one chip.
 function combo(keys, t) {
@@ -37,7 +43,7 @@ function combo(keys, t) {
 
 // Original controller drawing (not an official asset). data-btn ties shapes to callouts.
 function pad() {
-  const face = (id, x, y) => `<g class="btn" data-btn="${id}${id === 'Y' || id === 'X' ? ' YX' : ''}"><circle cx="${x}" cy="${y}" r="17"/><text x="${x}" y="${y + 6}" data-ps="${PS[id]}">${id}</text></g>`;
+  const face = (id, x, y) => `<g class="btn face-${id}" data-btn="${id}${id === 'Y' || id === 'X' ? ' YX' : ''}"><circle cx="${x}" cy="${y}" r="17"/><text x="${x}" y="${y + 6}" data-ps="${PS[id]}">${id}</text></g>`;
   const shoulder = (id, x, y, w, h, r, rot) => `<g class="btn" data-btn="${id}" transform="rotate(${rot} ${x + w / 2} ${y + h / 2})"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/><text x="${x + w / 2}" y="${y + h / 2 + 5}" data-ps="${PS[id]}">${id}</text></g>`;
   return `<svg class="pad-svg" viewBox="0 0 640 400" aria-hidden="true" focusable="false">
 <defs><linearGradient id="pad-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7e3a3"/><stop offset=".55" stop-color="#d6af5b"/><stop offset="1" stop-color="#9c7630"/></linearGradient></defs>
@@ -47,10 +53,12 @@ ${shoulder('LB', 118, 62, 128, 24, 12, -8)}${shoulder('RB', 394, 62, 128, 24, 12
 <circle class="pad-home" cx="320" cy="124" r="17"/>
 <g class="btn" data-btn="View"><rect x="270" y="150" width="26" height="17" rx="6"/><path class="glyph" d="M277 155h7v6h-7zM281 158h7v6"/></g>
 <g class="btn" data-btn="Menu"><rect x="344" y="150" width="26" height="17" rx="6"/><path class="glyph" d="M351 155h12M351 158.5h12M351 162h12"/></g>
+<text class="pad-label" x="283" y="188" data-ps="Create">View</text><text class="pad-label" x="357" y="188" data-ps="Options">Menu</text>
 <g class="btn modifier" data-btn="L3"><circle cx="200" cy="170" r="40" class="well"/><circle cx="200" cy="170" r="27"/><text x="200" y="176">L3</text></g>
 <g class="dpad"><rect x="253" y="217" width="18" height="22" rx="4" class="btn"/><rect x="235" y="235" width="22" height="18" rx="4" class="btn"/><rect x="267" y="235" width="22" height="18" rx="4" class="btn"/><rect x="253" y="249" width="18" height="22" rx="4" class="btn" data-btn="Down"/></g>
 <g class="btn" data-btn="R3"><circle cx="388" cy="244" r="37" class="well"/><circle cx="388" cy="244" r="25"/><text x="388" y="250">R3</text></g>
 ${face('Y', 456, 134)}${face('X', 422, 168)}${face('B', 490, 168)}${face('A', 456, 202)}
+<g class="pad-leaders"></g>
 </svg>`;
 }
 

@@ -231,15 +231,16 @@
     if (repository && notice) notice.hidden = true;
     form.hidden = false;
   }
-  // Controller section: Xbox / PlayStation button names, and callouts that light up the drawing.
-  const pad = document.getElementById("controls");
-  const padSwitch = pad?.querySelector(".pad-switch");
-  if (padSwitch) {
+  // Controller section (home and guide): Xbox / PlayStation button names, and
+  // callouts or table rows that light up their buttons on the drawings.
+  const padSwitch = document.querySelector(".pad-switch");
+  const pad = padSwitch?.closest("section"), padCard = pad?.querySelector(".pad-card");
+  if (padSwitch && padCard) {
     const named = [...pad.querySelectorAll("[data-ps]")];
     named.forEach(el => {el.dataset.xbox = el.textContent;});
     // Thin lines from each callout to its button while the lists sit either side of
     // the drawing, ending in a dot at the button's edge (Y / X: between the two).
-    const leaders = pad.querySelector(".pad-leaders"), drawing = pad.querySelector(".pad-svg");
+    const leaders = padCard.querySelector(".pad-leaders"), drawing = padCard.querySelector(".pad-svg");
     const drawLeaders = () => {
       leaders.replaceChildren();
       const matrix = drawing.getScreenCTM();
@@ -279,9 +280,14 @@
     });
     try { if (localStorage.getItem("wuwa-pad") === "ps") choose("ps", false); } catch { /* optional */ }
     padSwitch.hidden = false;
-    const light = (id, on) => pad.querySelectorAll(`.pad-svg [data-btn~="${id}"], .pad-list [data-btn="${id}"], .pad-leaders [data-btn="${id}"]`).forEach(el => el.classList.toggle("is-hot", on));
-    pad.querySelectorAll(".pad-list li[data-btn]").forEach(li => {
+    const light = (id, on) => padCard.querySelectorAll(`.pad-svg [data-btn~="${id}"], .pad-list [data-btn="${id}"], .pad-leaders [data-btn="${id}"]`).forEach(el => el.classList.toggle("is-hot", on));
+    padCard.querySelectorAll(".pad-list li[data-btn]").forEach(li => {
       for (const [type, on] of [["mouseenter", true], ["mouseleave", false]]) li.addEventListener(type, () => light(li.dataset.btn, on));
+    });
+    pad.querySelectorAll(".pad-page tr[data-btns]").forEach(row => {
+      const page = row.closest(".pad-page"), ids = row.dataset.btns.split(" ").filter(Boolean);
+      const mark = on => ids.forEach(id => page.querySelectorAll(`.pad-svg [data-btn~="${id}"]`).forEach(el => el.classList.toggle("is-hot", on)));
+      row.addEventListener("mouseenter", () => mark(true)); row.addEventListener("mouseleave", () => mark(false));
     });
   }
 })();

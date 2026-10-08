@@ -180,6 +180,7 @@ video:focus-visible,video:focus-within{outline:2px solid var(--focus);outline-of
 .pad-save{display:inline-flex;align-items:center;min-height:40px;padding:8px 16px;border:1px solid var(--line-2);border-radius:var(--radius);color:var(--accent);font-size:15px;text-decoration:none}
 .pad-save:hover{border-color:var(--accent);color:var(--gold-hi)}
 .pad-card{position:relative;margin:0;padding:28px 28px 24px;border:1px solid var(--line);background:radial-gradient(ellipse 60% 70% at 50% 42%,rgba(214,178,98,.1),transparent 70%),var(--surface)}
+.pad-title kbd{padding:4px 9px;font-size:16px;vertical-align:2px}
 .pad-title{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 18px;color:var(--ink);font:var(--display-weight) 20px/1.3 var(--display);font-synthesis:none}
 .pad-brand,.pad-url{display:none}
 .pad-diagram{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.45fr) minmax(0,1fr);align-items:center;gap:20px;direction:ltr}
@@ -213,6 +214,8 @@ video:focus-visible,video:focus-within{outline:2px solid var(--focus);outline-of
 .pad-leaders path{fill:none;stroke:rgba(214,178,98,.45);stroke-width:1.2;vector-effect:non-scaling-stroke;transition:stroke .15s}
 .pad-leaders circle{fill:#d6af5b}
 .pad-leaders .is-hot path{stroke:var(--gold-hi);stroke-width:2}
+.pad-svg .lit rect,.pad-svg .lit circle:not(.well),.pad-svg rect.lit{fill:#2a2316;stroke:#f2d68e;stroke-width:2.5}
+.pad-svg .lit .well{stroke:rgba(242,214,142,.65)}
 .pad-svg .modifier circle:not(.well),.pad-svg .is-hot rect,.pad-svg .is-hot circle:not(.well),.pad-svg rect.is-hot{fill:url(#pad-gold);stroke:#f7e3a3}
 .pad-svg .modifier .well{stroke:rgba(247,227,163,.75);stroke-width:2}
 .pad-svg .modifier text,.pad-svg .is-hot text{fill:var(--accent-ink)}
@@ -223,6 +226,16 @@ video:focus-visible,video:focus-within{outline:2px solid var(--focus);outline-of
 .pad-gestures li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;color:var(--muted);font-size:15px}
 .pad-note{margin:12px 0 0}
 .pad-all{margin:48px 0 4px}
+.pad-pages{display:grid;gap:22px;margin-top:30px}
+.pad-page{padding:22px 24px;border:1px solid var(--line);background:var(--surface)}
+.pad-page-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.pad-page-head h3{margin:0;color:var(--accent);font:var(--display-weight) 19px/1.3 var(--display);font-synthesis:none;letter-spacing:.06em}
+.pad-page-head p{margin:2px 0 0;color:var(--muted);font-size:15px}
+.pad-page-body{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:22px;align-items:start}
+.pad-page-body .table-scroll{margin:0}
+.pad-page-body .pad-svg{position:sticky;top:calc(var(--header) + 20px)}
+.pad-page .shortcut-table th{width:50%;white-space:normal}
+.pad-page tr[data-btns]:hover > *{background:rgba(214,178,98,.06)}
 .pad-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 28px;align-items:start}
 .pad-group h3{margin:20px 0 0;color:var(--accent);font:var(--display-weight) 18px/1.3 var(--display);font-synthesis:none}
 .pad-group .table-scroll{margin-block:12px 0}
@@ -231,6 +244,7 @@ video:focus-visible,video:focus-within{outline:2px solid var(--focus);outline-of
 .shortcut-table tr.when .combo{margin-inline-start:6px;vertical-align:middle}
 .pad-card.is-export{width:1500px;padding:44px 48px 30px;background:radial-gradient(ellipse 60% 70% at 50% 42%,rgba(214,178,98,.12),transparent 70%),#0b0a09}
 .is-export .pad-title{font-size:26px}
+.is-export .pad-title kbd{padding:5px 11px;font-size:21px;vertical-align:3px}
 .is-export .pad-brand{display:inline;padding-inline-end:14px;border-inline-end:1px solid var(--line-2);background:var(--gold);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.06em;text-transform:uppercase}
 .is-export .pad-url{display:block;margin:18px 0 0;color:var(--dim);font-size:15px;text-align:end}
 .is-export .pad-list li{font-size:17px}
@@ -361,6 +375,9 @@ textarea{resize:vertical}
   .shortcut-table th{white-space:normal}
   .pad-card{padding:18px 14px}
   .pad-diagram,.pad-gestures{grid-template-columns:minmax(0,1fr)}
+  .pad-page{padding:18px 14px}
+  .pad-page-body{grid-template-columns:minmax(0,1fr)}
+  .pad-page .pad-svg{position:static;max-width:420px;margin-inline:auto}
   .pad-list li{flex-wrap:wrap}
   .combo kbd{white-space:normal;overflow-wrap:anywhere}
   .feature-clips{grid-template-columns:minmax(0,1fr)}

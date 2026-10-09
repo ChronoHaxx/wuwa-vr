@@ -29,7 +29,7 @@ Older date-and-fix-name packages are historical builds. New releases use a reada
 Open UEVR with **L3 + R3**, then **VR → WuWa Controls**. Both stick clicks are L3/R3 on Xbox and PlayStation.
 
 - Hold both triggers first, then click **R3** for **mono theatre**: the same scene and HUD in both eyes.
-- Hold both triggers first, then hold **L3 for 0.8 seconds** for a **stereoscopic screen**.
+- Hold both triggers first, then click **L3** for a **stereoscopic screen**.
 - Release all controls before repeating, with UEVR and HUD/mouse adjustment closed.
 
 Cinematic framing is on by default and was accepted in a simulator replay. Automatic cinematic switching is experimental, **off by default**, and has not been verified with a real prerendered movie. Keep the manual shortcuts available.

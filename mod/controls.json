@@ -23,7 +23,7 @@
       "rows": [
         {"keys": "L3 + LT", "action": "Portal on / off", "button": "LT"},
         {"keys": "L3 + RT", "action": "Diorama on / off (10x)", "button": "RT"},
-        {"keys": "LT + RT → L3 0.8 s", "action": "Stereo screen on / off (hold 0.8 s)", "gesture": true},
+        {"keys": "LT + RT → L3", "action": "Stereo screen on / off", "gesture": true},
         {"keys": "LT + RT → R3", "action": "Mono theatre on / off (no stereo depth)", "gesture": true},
         {"keys": "L3 + Y / X", "action": "First / fixed: height", "button": "YX"},
         {"keys": "LB + LT / RT", "action": "Fixed: farther / closer"},

@@ -100,16 +100,16 @@
       "ru": "Сочетания Polar отключены или обходятся.",
       "ar": "اختصارات Polar معطّلة أو متجاوزة."
     },
-    "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT: hold L3 = stereo, click R3 = mono.": {
-      "zh-Hans": "空间窗口：L3 + LT / F7  |  微缩视角：L3 + RT  |  LT + RT：按住 L3＝立体屏幕，按 R3＝单目影院。",
-      "ja": "ポータル：L3 + LT / F7  |  ジオラマ：L3 + RT  |  LT + RT：L3 長押し＝立体スクリーン、R3＝単眼シアター。",
-      "ko": "포털: L3 + LT / F7  |  디오라마: L3 + RT  |  LT + RT: L3 길게 = 입체 화면, R3 = 단안 시어터.",
-      "es": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT: mantener L3 = estéreo, pulsar R3 = mono.",
-      "pt-BR": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT: segurar L3 = estéreo, clicar R3 = mono.",
-      "fr": "Portail : L3 + LT / F7  |  Diorama : L3 + RT  |  LT + RT : maintenir L3 = stéréo, cliquer R3 = mono.",
-      "de": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT: L3 halten = Stereo, R3 klicken = Mono.",
-      "ru": "Портал: L3 + LT / F7  |  Диорама: L3 + RT  |  LT + RT: удерживать L3 = стерео, нажать R3 = моно.",
-      "ar": "النافذة: L3 + LT / F7  |  المجسم المصغّر: L3 + RT  |  LT + RT: اضغط مطولًا L3 = مجسم، اضغط R3 = أحادي."
+    "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT, then click L3 = stereo, R3 = mono.": {
+      "zh-Hans": "空间窗口：L3 + LT / F7 ｜ 微缩：L3 + RT ｜ LT + RT，再轻按 L3＝立体，R3＝单目。",
+      "ja": "ポータル：L3 + LT / F7  |  ジオラマ：L3 + RT  |  LT + RT の後に L3＝立体スクリーン、R3＝単眼シアター。",
+      "ko": "포털: L3 + LT / F7  |  디오라마: L3 + RT  |  LT + RT 후 L3 = 입체 화면, R3 = 단안 시어터.",
+      "es": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT y luego pulsar L3 = estéreo, R3 = mono.",
+      "pt-BR": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT e depois clicar L3 = estéreo, R3 = mono.",
+      "fr": "Portail : L3 + LT / F7  |  Diorama : L3 + RT  |  LT + RT puis cliquer L3 = stéréo, R3 = mono.",
+      "de": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT, dann L3 klicken = Stereo, R3 = Mono.",
+      "ru": "Портал: L3 + LT / F7  |  Диорама: L3 + RT  |  LT + RT, затем нажать L3 = стерео, R3 = моно.",
+      "ar": "النافذة: L3 + LT / F7  |  المجسم المصغّر: L3 + RT  |  LT + RT ثم اضغط L3 = مجسم، R3 = أحادي."
     },
     "Sheet: L3 + D-pad Left/Right = pages; Up = automatic   |   UEVR: release RT to scroll.": {
       "zh-Hans": "快捷表：L3 + 十字键左右翻页，上键自动   |   UEVR：松开 RT 再滚动。",
@@ -179,10 +179,10 @@
       "ja": "ジオラマの切替（10 倍）", "ko": "디오라마 켜기 / 끄기 (10배)", "es": "Diorama sí / no (10x)", "pt-BR": "Diorama ligar / desligar (10x)",
       "fr": "Diorama oui / non (10x)", "de": "Diorama ein / aus (10x)", "ru": "Диорама: вкл. / выкл. (10x)", "ar": "تشغيل المجسم المصغّر أو إيقافه (10x)"
     },
-    "Stereo screen on / off (hold 0.8 s)": {
-      "ja": "立体スクリーンの切替（0.8 秒長押し）", "ko": "입체 화면 켜기 / 끄기 (0.8초 길게)", "es": "Pantalla estéreo sí / no (mantén 0,8 s)",
-      "pt-BR": "Tela estéreo ligar / desligar (segure 0,8 s)", "fr": "Écran stéréo oui / non (maintenir 0,8 s)", "de": "Stereo-Leinwand ein / aus (0,8 s halten)",
-      "ru": "Стереоэкран: вкл. / выкл. (удерживать 0,8 с)", "ar": "تشغيل الشاشة المجسمة أو إيقافها (اضغط مطولًا 0.8 ث)"
+    "Stereo screen on / off": {
+      "zh-Hans": "开关立体屏幕", "ja": "立体スクリーンの切替", "ko": "입체 화면 켜기 / 끄기", "es": "Pantalla estéreo sí / no",
+      "pt-BR": "Tela estéreo ligar / desligar", "fr": "Écran stéréo oui / non", "de": "Stereo-Leinwand ein / aus",
+      "ru": "Стереоэкран: вкл. / выкл.", "ar": "تشغيل الشاشة المجسمة أو إيقافها"
     },
     "Mono theatre on / off (no stereo depth)": {
       "ja": "単眼シアターの切替（立体感なし）", "ko": "단안 시어터 켜기 / 끄기 (입체감 없음)", "es": "Teatro mono sí / no (sin profundidad estéreo)",

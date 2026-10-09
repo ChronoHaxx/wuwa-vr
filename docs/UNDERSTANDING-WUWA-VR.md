@@ -19,8 +19,8 @@ comfort remains pending.** The correction retains the game's letterbox and
 separate eye views; it does not provide a free-look camera for every cinematic.
 
 Manual recovery remains available: fully hold **LT + RT first**, then **click R3**
-for **mono theatre** (the same scene and HUD in both eyes), or **hold L3 for
-0.8 seconds** for a **stereoscopic screen**. Release everything before repeating;
+for **mono theatre** (the same scene and HUD in both eyes), or **click L3**
+for a **stereoscopic screen**. Release everything before repeating;
 close UEVR and HUD/mouse adjustment. Automatic cinema is **experimental and off**
 by default. It did not activate for the latest reported in-engine scene; a real
 prerendered movie has not been tested. Long scene/dialogue stalls, HUD refresh

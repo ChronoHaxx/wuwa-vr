@@ -79,7 +79,7 @@ local function screen_hold(f,seconds,index,tick)
     end
 end
 local function begin_screen(f,index)
-    consumed(f:sample(L3,255,255,index))
+    f:sample(0,255,255,index); consumed(f:sample(L3,255,255,index))
 end
 local function test(name,body)
     local ok,message=pcall(body)
@@ -241,48 +241,51 @@ test('reset clears queued actions and synthetic toggles preserve changed normal 
     f:sample(); consumed(f:sample(L3,0,255)); f:counts(0,2)
     assert(f.values.VR_WorldScale=='2.25','Diorama off reverted the new normal scale')
 end)
-test('screen needs fresh neutral and .8 seconds with both full triggers; fires once',function()
+test('screen needs fresh neutral, both full triggers, then an L3 click; fires once',function()
     local f=fixture()
     f:sample(L3,255,255)
     for _=1,10 do f:advance(.1); f:input(L3,255,255); f:tick() end
     f:counts(0,0,0)
     f:sample()
     -- Both triggers first is a reliable deliberate acquisition; ordinary
-    -- trigger-only game input remains unchanged until L3 is held as well.
+    -- trigger-only game input remains unchanged until L3 is pressed as well.
     local normal=f:sample(0,255,255)
     assert(normal.bLeftTrigger==255 and normal.bRightTrigger==255,'Pre-L3 triggers changed')
-    begin_screen(f); screen_hold(f,.799); f:counts(0,0,0)
-    screen_hold(f,.002); f:counts(0,0,1)
+    begin_screen(f); f:counts(0,0,1)
     assert(f.values[SCREEN]=='true','Screen mode was not enabled')
     screen_hold(f,1.1); f:counts(0,0,1)
     consumed(f:sample(0,255,255)); begin_screen(f); screen_hold(f,1); f:counts(0,0,1)
     consumed(f:sample(L3,0,0)); begin_screen(f); screen_hold(f,1); f:counts(0,0,1)
-    f:sample(); begin_screen(f); screen_hold(f,.801); f:counts(0,0,2)
-    assert(f.values[SCREEN]=='false','Second fresh hold did not disable screen mode')
+    f:sample(); begin_screen(f); f:counts(0,0,2)
+    assert(f.values[SCREEN]=='false','Second fresh click did not disable screen mode')
     assert(not f.writes.VR_EnableGUI,'Screen toggle changed HUD visibility')
 end)
 
-test('screen hold timer starts only when both triggers reach 180',function()
-    local f=fixture(); f:sample(); consumed(f:sample(L3,30,30))
-    for _=1,12 do f:advance(.1); consumed(f:input(L3,179,179)); f:tick() end
-    f:counts(0,0,0)
-    consumed(f:sample(L3,180,180)); screen_hold(f,.799); f:counts(0,0,0)
-    screen_hold(f,.002); f:counts(0,0,1)
+test('screen click released before the engine tick still toggles once',function()
+    local f=fixture(); f:sample(); f:sample(0,255,255)
+    f:advance(); consumed(f:input(L3,255,255)); f:advance(); consumed(f:input(0,255,255))
+    f:tick(); f:counts(0,0,1)
+    begin_screen(f); f:counts(0,0,1)
+    f:sample(); begin_screen(f); f:counts(0,0,2)
 end)
 
-test('screen interruption cancels until every chord input releases',function()
-    for _,reason in ipairs({'extra','menu_escape','lt_release','rt_release','partial','l3_release','stale','clock'}) do
-        local f=fixture(); f:sample(); begin_screen(f); screen_hold(f,.4)
-        if reason=='extra' then consumed(f:sample(L3+Y,255,255))
-        elseif reason=='menu_escape' then assert(f:sample(L3+R3,255,255).wButtons==L3+R3,'Menu escape changed')
-        elseif reason=='lt_release' then consumed(f:sample(L3,0,255))
-        elseif reason=='rt_release' then consumed(f:sample(L3,255,0))
-        elseif reason=='partial' then consumed(f:sample(L3,179,255))
-        elseif reason=='l3_release' then consumed(f:sample(0,255,255))
-        elseif reason=='stale' then f:advance(.251); consumed(f:input(L3,255,255))
-        else f:advance(-.1); consumed(f:input(L3,255,255)) end
+test('screen needs both triggers at 180 before the L3 click',function()
+    local f=fixture(); f:sample(); f:sample(0,179,179); consumed(f:sample(L3,179,179))
+    consumed(f:sample(L3,255,255)); f:counts(0,0,0)
+    f:sample(); f:sample(0,180,180); consumed(f:sample(L3,180,180)); f:counts(0,0,1)
+end)
+
+test('screen click is rejected unless it follows a fresh triggers-only sample',function()
+    for _,reason in ipairs({'extra','menu_escape','partial','l3_first','stale','clock'}) do
+        local f=fixture(); f:sample()
+        if reason=='extra' then f:sample(0,255,255); consumed(f:sample(L3+Y,255,255))
+        elseif reason=='menu_escape' then f:sample(0,255,255); assert(f:sample(L3+R3,255,255).wButtons==L3+R3,'Menu escape changed')
+        elseif reason=='partial' then f:sample(0,255,179); consumed(f:sample(L3,255,255))
+        elseif reason=='l3_first' then f:sample(L3,0,0); consumed(f:sample(L3,255,255))
+        elseif reason=='stale' then f:sample(0,255,255); f:advance(.251); consumed(f:input(L3,255,255))
+        else f:sample(0,255,255); f:advance(-.1); consumed(f:input(L3,255,255)) end
         screen_hold(f,1); f:counts(0,0,0)
-        f:sample(); begin_screen(f); screen_hold(f,.801); f:counts(0,0,1)
+        f:sample(); begin_screen(f); f:counts(0,0,1)
     end
 end)
 
@@ -293,7 +296,7 @@ test('single-trigger gestures never promote to screen mode when the other joins'
             consumed(f:sample(L3,right and 0 or value,right and value or 0))
             begin_screen(f); screen_hold(f,1.2)
             f:counts(not right and fired and 1 or 0,right and fired and 1 or 0,0)
-            f:sample(); begin_screen(f); screen_hold(f,.801)
+            f:sample(); begin_screen(f)
             f:counts(not right and fired and 1 or 0,right and fired and 1 or 0,1)
         end
     end
@@ -307,8 +310,8 @@ test('screen toggle remains available during game dialogue and cursor transition
             if signal=='native' then f.values.WuWaControls_NativeMenu=tostring(on) else f.pc.bShowMouseCursor=on end
             f:tick()
         end
-        begin_screen(f); screen_hold(f,.4); menu(true); screen_hold(f,.401); f:counts(0,0,1)
-        f:sample(); begin_screen(f); screen_hold(f,.801); f:counts(0,0,2)
+        f:sample(0,255,255); menu(true); consumed(f:sample(L3,255,255)); f:counts(0,0,1)
+        f:sample(); begin_screen(f); f:counts(0,0,2)
         assert(f.values[PORTAL]=='true' and f.values[DIORAMA]=='true','Screen changed another view mode')
         assert(f.values.VR_EnableGUI=='true' and not f.writes.VR_EnableGUI,'Screen changed the dialogue HUD')
     end
@@ -316,7 +319,7 @@ end)
 
 test('screen focus, UEVR, adjustment, disabled controls and passthrough require rearm',function()
     for _,reason in ipairs({'adjust','focus','enabled','ui','passthrough'}) do
-        local f=fixture(); f:sample(); begin_screen(f); screen_hold(f,.4)
+        local f=fixture(); f:sample(); f:sample(0,255,255)
         local function blocked(on)
             if reason=='adjust' then f.values.WuWaControls_AdjustMode=tostring(on)
             elseif reason=='focus' then f.values.WuWaControls_Focused=tostring(not on)
@@ -329,13 +332,13 @@ test('screen focus, UEVR, adjustment, disabled controls and passthrough require 
         -- The transition was seen only by the tick, not an XInput callback.
         for _=1,12 do f:advance(.1); f:input(L3,255,255); f:tick() end
         f:counts(0,0,0)
-        f:sample(); begin_screen(f); screen_hold(f,.801); f:counts(0,0,1)
+        f:sample(); begin_screen(f); f:counts(0,0,1)
     end
 end)
 
 test('queued screen requests respect TTL and reject a reversed clock',function()
     for _,age in ipairs({.249,.251,-.01}) do
-        local f=fixture(); f:sample(); begin_screen(f); screen_hold(f,.801,nil,false)
+        local f=fixture(); f:sample(); f:sample(0,255,255); f:advance(); consumed(f:input(L3,255,255))
         f:counts(0,0,0); f:tick(age)
         local count=age>=0 and age<.25 and 1 or 0
         f:counts(0,0,count); screen_hold(f,1); f:counts(0,0,count)
@@ -345,14 +348,14 @@ end)
 test('screen disconnect, handover and reset discard pending requests',function()
     for _,reason in ipairs({'disconnect','handover','reset','unrelated'}) do
         local f=fixture(); f:sample(); f:sample(0,0,0,1)
-        begin_screen(f); screen_hold(f,.801,nil,false)
+        f:sample(0,255,255); f:advance(); consumed(f:input(L3,255,255))
         if reason=='disconnect' then f:input(L3,255,255,0,1167)
         elseif reason=='handover' then f:advance(1.01); f:input(A,0,0,1)
         elseif reason=='reset' then f.callbacks.on_script_reset()
         else f:input(0,0,0,1,1167) end
         f:tick(); f:counts(0,0,reason=='unrelated' and 1 or 0)
         if reason=='handover' then
-            f:sample(0,0,0,1); begin_screen(f,1); screen_hold(f,.801,1); f:counts(0,0,1)
+            f:sample(0,0,0,1); begin_screen(f,1); f:counts(0,0,1)
         end
     end
 end)

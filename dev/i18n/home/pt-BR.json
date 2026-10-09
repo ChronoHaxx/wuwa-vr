@@ -66,6 +66,19 @@
     "cta": "Grave seus próprios clipes em alta resolução",
     "ctaText": "Passo a passo: primeira pessoa, imagem limpa e o gravador integrado."
   },
+  "pad": {
+    "title": "Atalhos do controle",
+    "intro": "Quase todos os atalhos são L3 mais um botão: mantenha o analógico esquerdo pressionado, aperte o botão e solte tudo. Na VR, L3 + Menu mostra a mesma lista como uma folha.",
+    "hold": "Segure L3 e aperte",
+    "more": "Gestos",
+    "names": "Nomes dos botões",
+    "psNote": "O suporte a PlayStation é experimental.",
+    "freecam": "Com a câmera livre ativa",
+    "mouse": "Com o modo HUD / mouse ativo",
+    "uevr": "Com as configurações do UEVR abertas",
+    "image": "Salvar como imagem",
+    "all": "Todos os atalhos"
+  },
   "faq": {
     "title": "Perguntas",
     "items": [

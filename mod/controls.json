@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "about": "Every controller shortcut, grouped like the in-VR sheet's four pages. The website's tables and controller diagram are built from this file. 'keys' and 'action' are English keys in mod/localization/wuwa/<lang>.json, the same catalog the in-VR sheet reads; a key absent from a catalog shows in English. Button names follow Xbox; the website maps them to PlayStation. 'button' places the shortcut on the 'hold L3, then press' diagram. Keep in step with mod/lua/02_WuWaVR_PolarControls.lua and docs/CONTROLS.md.",
+  "groups": [
+    {
+      "id": "everyday",
+      "title": "01  EVERYDAY",
+      "rows": [
+        {"keys": "L3 + B", "action": "Show / hide game UI", "button": "B"},
+        {"keys": "L3 + A", "action": "Recenter view / portal", "button": "A"},
+        {"keys": "L3 + R3", "action": "Open / close UEVR settings", "button": "R3"},
+        {"keys": "L3 + Menu", "action": "Show / hide shortcut sheet", "button": "Menu"},
+        {"keys": "L3 + View", "action": "First person on / off", "button": "View"},
+        {"keys": "L3 + RB", "action": "Game / fixed camera", "button": "RB"},
+        {"keys": "L3 + LB", "action": "Toggle HUD / mouse mode", "button": "LB"},
+        {"keys": "Double R3", "action": "Freecam on / off", "gesture": true},
+        {"keys": "Double L3", "action": "Windows screenshot", "gesture": true}
+      ]
+    },
+    {
+      "id": "cameras",
+      "title": "02  CAMERAS",
+      "rows": [
+        {"keys": "L3 + LT", "action": "Portal on / off", "button": "LT"},
+        {"keys": "L3 + RT", "action": "Diorama on / off (10x)", "button": "RT"},
+        {"keys": "LT + RT → L3 0.8 s", "action": "Stereo screen on / off (hold 0.8 s)", "gesture": true},
+        {"keys": "LT + RT → R3", "action": "Mono theatre on / off (no stereo depth)", "gesture": true},
+        {"keys": "L3 + Y / X", "action": "First / fixed: height", "button": "YX"},
+        {"keys": "LB + LT / RT", "action": "Fixed: farther / closer"},
+        {"keys": "L3 + D-pad Down", "action": "First person: animation on/off", "button": "Down"},
+        {"keys": "Hold RB", "action": "Full speed while Polar walk is on"},
+        {"keys": "Left / right stick", "action": "Freecam: move / look", "when": "freecam"},
+        {"keys": "LT / LB", "action": "Freecam: rise / descend", "when": "freecam"},
+        {"keys": "RT / double RT", "action": "Freecam: boost / turbo", "when": "freecam"}
+      ]
+    },
+    {
+      "id": "menus",
+      "title": "03  MENUS & HUD",
+      "rows": [
+        {"keys": "L3 + D-pad Left / Right", "action": "Shortcut sheet: previous / next page"},
+        {"keys": "L3 + D-pad Up", "action": "Shortcut sheet: automatic page"},
+        {"keys": "LB + R3", "action": "V once; hold 0.8 s for the Tab wheel"},
+        {"keys": "Left stick", "action": "Move cursor", "when": "mouse"},
+        {"keys": "A / B", "action": "Click / go back", "when": "mouse"},
+        {"keys": "X + left stick", "action": "Scroll", "when": "mouse"},
+        {"keys": "D-pad", "action": "Move map", "when": "mouse"},
+        {"keys": "LT / RT", "action": "HUD nearer / farther", "when": "mouse"},
+        {"keys": "LB / RB", "action": "HUD down / up", "when": "mouse"}
+      ]
+    },
+    {
+      "id": "uevr",
+      "title": "04  UEVR SETTINGS",
+      "rows": [
+        {"keys": "D-pad / A / B", "action": "Navigate / activate / back", "when": "uevr"},
+        {"keys": "LB / RB", "action": "Change sidebar page", "when": "uevr"},
+        {"keys": "Left stick (RT off)", "action": "Scroll focused panel", "when": "uevr"},
+        {"keys": "RT + left / right stick", "action": "Camera forward/side / height", "when": "uevr"},
+        {"keys": "RT + D-pad L / R", "action": "Choose RT shortcut page", "when": "uevr"}
+      ]
+    }
+  ]
+}

@@ -66,6 +66,19 @@
     "cta": "Eigene Clips in hoher Auflösung aufnehmen",
     "ctaText": "Schritt für Schritt: Ego-Perspektive, sauberes Bild und der eingebaute Recorder."
   },
+  "pad": {
+    "title": "Controller-Kürzel",
+    "intro": "Die meisten Kürzel sind L3 plus eine Taste: linken Stick gedrückt halten, Taste drücken, dann alles loslassen. In VR zeigt L3 + Menu dieselbe Liste als Übersicht.",
+    "hold": "L3 halten, dann drücken",
+    "more": "Gesten",
+    "names": "Tastennamen",
+    "psNote": "PlayStation-Unterstützung ist experimentell.",
+    "freecam": "Bei aktiver freier Kamera",
+    "mouse": "Bei aktivem HUD-/Mausmodus",
+    "uevr": "Bei geöffneten UEVR-Einstellungen",
+    "image": "Als Bild speichern",
+    "all": "Alle Kürzel"
+  },
   "faq": {
     "title": "Fragen",
     "items": [

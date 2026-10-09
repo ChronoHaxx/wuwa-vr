@@ -1,6 +1,6 @@
 // Scoped release refresh for the published site's guide and reference pages.
 // Home pages come from dev/build-home.cjs; verification files stay untouched.
-const fs = require('node:fs'), path = require('node:path');
+const fs = require('node:fs'), path = require('node:path'), controlsSection = require('../controls-section.cjs');
 const root = path.resolve(__dirname, '../..'), site = path.join(root, 'site');
 const status = JSON.parse(fs.readFileSync(path.join(root, 'dev/site-status.json'), 'utf8'));
 const repo = 'https://github.com/ChronoHaxx/wuwa-vr';
@@ -74,6 +74,9 @@ async function build() {
     if (!filter) throw Error('Missing guide controls filter');
     text = replace(text, /<section id="controls">[\s\S]*?<\/section>/,
       `<section id="controls"><h2>Controller shortcuts</h2>${filter[0]}${render('docs/CONTROLS.md', true)}</section>`, 'guide controls');
+    // Controller images: the shared card and the four sheet pages, from mod/controls.json.
+    const padCopy = JSON.parse(fs.readFileSync(path.join(__dirname, 'home/en.json'), 'utf8')).pad;
+    text = replace(text, /<section id="visual-controls">[\s\S]*?<\/section>/, controlsSection.renderGuide({copy: padCopy}), 'guide controller images');
     text = replace(text, /<section id="recovery">[\s\S]*?<\/section>/,
       `<section id="recovery"><h2>Problems and recovery</h2><p>${locales.en.cutscenes}</p>${render('docs/TROUBLESHOOTING.md')}</section>`, 'guide recovery');
     text = replace(text, /(<h1>Player guide<\/h1>)<p>[\s\S]*?<\/p>/,

@@ -659,6 +659,14 @@
     "PlayStation reader stopped; use Steam Input if available": "PlayStation reader stopped; use Steam Input if available",
     "PlayStation shortcuts paused: WuWa shortcuts disabled": "PlayStation shortcuts paused: WuWa shortcuts disabled",
     "PlayStation shortcuts paused: controller passthrough enabled": "PlayStation shortcuts paused: controller passthrough enabled",
-    "PlayStation shortcuts paused: an XInput slot is selected": "PlayStation shortcuts paused: an XInput slot is selected"
+    "PlayStation shortcuts paused: an XInput slot is selected": "PlayStation shortcuts paused: an XInput slot is selected",
+    "D-pad": "D-pad",
+    "L3 + D-pad Left / Right": "L3 + D-pad Left / Right",
+    "L3 + D-pad Up": "L3 + D-pad Up",
+    "Hold RB": "Hold RB",
+    "Shortcut sheet: previous / next page": "Shortcut sheet: previous / next page",
+    "Shortcut sheet: automatic page": "Shortcut sheet: automatic page",
+    "Full speed while Polar walk is on": "Full speed while Polar walk is on",
+    "V once; hold 0.8 s for the Tab wheel": "V once; hold 0.8 s for the Tab wheel"
   }
 }

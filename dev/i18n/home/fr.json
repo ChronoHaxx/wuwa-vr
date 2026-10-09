@@ -66,6 +66,19 @@
     "cta": "Enregistrez vos propres clips en haute résolution",
     "ctaText": "Pas à pas : première personne, image propre et enregistreur intégré."
   },
+  "pad": {
+    "title": "Raccourcis manette",
+    "intro": "La plupart des raccourcis combinent L3 et un bouton : maintenez le stick gauche enfoncé, appuyez sur le bouton, puis relâchez tout. En VR, L3 + Menu affiche la même liste sous forme de fiche.",
+    "hold": "Maintenez L3, puis appuyez",
+    "more": "Gestes",
+    "names": "Noms des boutons",
+    "psNote": "La prise en charge PlayStation est expérimentale.",
+    "freecam": "Caméra libre active",
+    "mouse": "Mode HUD / souris actif",
+    "uevr": "Réglages UEVR ouverts",
+    "image": "Enregistrer en image",
+    "all": "Tous les raccourcis"
+  },
   "faq": {
     "title": "Questions",
     "items": [

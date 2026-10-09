@@ -1,0 +1,221 @@
+{
+  "note": "Controller strings added to mod/localization/wuwa/<lang>.json by dev/merge-controls-l10n.py. Keys are the English catalog keys; existing translations are never overwritten. Draft translations, native-speaker review welcome.",
+  "strings": {
+    "Activated automatically in this menu: cursor only. L3 + R3 opens settings.": {
+      "zh-Hans": "此菜单自动启用：仅鼠标指针。L3 + R3 打开设置。",
+      "ja": "このメニューで自動有効：カーソルのみ。L3 + R3 で設定を開きます。",
+      "ko": "이 메뉴에서 자동 활성화: 커서만. L3 + R3으로 설정을 엽니다.",
+      "es": "Automático en este menú: solo cursor. L3 + R3 abre los ajustes.",
+      "pt-BR": "Automático neste menu: apenas cursor. L3 + R3 abre as configurações.",
+      "fr": "Automatique ici : curseur uniquement. L3 + R3 ouvre les réglages.",
+      "de": "Hier automatisch: nur Mauszeiger. L3 + R3 öffnet die Einstellungen.",
+      "ru": "Автоматически в этом меню: только курсор. L3 + R3 открывает настройки.",
+      "ar": "تفعيل تلقائي في هذه القائمة: المؤشر فقط. L3 + R3 يفتح الإعدادات."
+    },
+    "GAME UI HIDDEN - MENUS ARE HIDDEN TOO": {
+      "zh-Hans": "游戏界面已隐藏 - 菜单也会隐藏",
+      "ja": "ゲーム UI 非表示 - メニューも隠れます",
+      "ko": "게임 UI 숨김 - 메뉴도 숨겨집니다",
+      "es": "INTERFAZ OCULTA - LOS MENÚS TAMBIÉN",
+      "pt-BR": "INTERFACE OCULTA - OS MENUS TAMBÉM",
+      "fr": "INTERFACE MASQUÉE - LES MENUS AUSSI",
+      "de": "SPIEL-UI AUSGEBLENDET - MENÜS AUCH",
+      "ru": "ИНТЕРФЕЙС СКРЫТ - МЕНЮ ТОЖЕ",
+      "ar": "واجهة اللعبة مخفية - والقوائم أيضًا"
+    },
+    "GAME UI HIDDEN: L3 + B restores the HUD and game menus.": {
+      "zh-Hans": "游戏界面已隐藏：L3 + B 恢复 HUD 和游戏菜单。",
+      "ja": "ゲーム UI 非表示：L3 + B で HUD とゲームメニューを戻します。",
+      "ko": "게임 UI 숨김: L3 + B로 HUD와 게임 메뉴를 복원합니다.",
+      "es": "INTERFAZ OCULTA: L3 + B recupera el HUD y los menús.",
+      "pt-BR": "INTERFACE OCULTA: L3 + B restaura o HUD e os menus.",
+      "fr": "INTERFACE MASQUÉE : L3 + B rétablit le HUD et les menus.",
+      "de": "SPIEL-UI AUSGEBLENDET: L3 + B holt HUD und Menüs zurück.",
+      "ru": "ИНТЕРФЕЙС СКРЫТ: L3 + B возвращает HUD и меню игры.",
+      "ar": "واجهة اللعبة مخفية: L3 + B يعيد الواجهة وقوائم اللعبة."
+    },
+    "HUD / MOUSE ON (menu cursor): L3 + R3 > WuWa Controls > Exit mouse mode now restores game controls.": {
+      "zh-Hans": "HUD／鼠标已启用（菜单指针）：L3 + R3 > WuWa Controls > 立即退出鼠标模式，恢复游戏操作。",
+      "ja": "HUD／マウス有効（メニューカーソル）：L3 + R3 > WuWa Controls > マウスモードを終了 でゲーム操作に戻ります。",
+      "ko": "HUD / 마우스 켜짐(메뉴 커서): L3 + R3 > WuWa Controls > 마우스 모드 종료로 게임 조작을 복원합니다.",
+      "es": "HUD / RATÓN ACTIVO (cursor de menú): L3 + R3 > WuWa Controls > Salir del modo ratón devuelve los controles del juego.",
+      "pt-BR": "HUD / MOUSE ATIVO (cursor de menu): L3 + R3 > WuWa Controls > Sair do modo mouse restaura os controles do jogo.",
+      "fr": "HUD / SOURIS ACTIF (curseur de menu) : L3 + R3 > WuWa Controls > Quitter le mode souris rétablit les commandes du jeu.",
+      "de": "HUD/MAUS AKTIV (Menüzeiger): L3 + R3 > WuWa Controls > Mausmodus jetzt beenden stellt die Spielsteuerung wieder her.",
+      "ru": "HUD / МЫШЬ ВКЛ. (курсор меню): L3 + R3 > WuWa Controls > Выйти из режима мыши возвращает управление игрой.",
+      "ar": "الواجهة / الماوس مفعّل (مؤشر القائمة): L3 + R3 > WuWa Controls > الخروج من وضع الماوس يعيد تحكم اللعبة."
+    },
+    "HUD / MOUSE ON: gameplay input paused. L3 + LB exits; release all controls. UEVR settings still open with L3 + R3.": {
+      "zh-Hans": "HUD／鼠标已启用：游戏操作已暂停。L3 + LB 退出，然后松开所有按键。L3 + R3 仍可打开 UEVR 设置。",
+      "ja": "HUD／マウス有効：ゲーム操作は一時停止中。L3 + LB で終了し、すべて離してください。UEVR 設定は L3 + R3 で開けます。",
+      "ko": "HUD / 마우스 켜짐: 게임 입력 일시 정지. L3 + LB로 종료한 뒤 모든 버튼을 놓으세요. UEVR 설정은 L3 + R3으로 열 수 있습니다.",
+      "es": "HUD / RATÓN ACTIVO: juego en pausa. L3 + LB sale; suelta todos los controles. L3 + R3 sigue abriendo UEVR.",
+      "pt-BR": "HUD / MOUSE ATIVO: jogo pausado. L3 + LB sai; solte todos os controles. L3 + R3 ainda abre o UEVR.",
+      "fr": "HUD / SOURIS ACTIF : jeu en pause. L3 + LB pour quitter ; relâchez tout. L3 + R3 ouvre toujours UEVR.",
+      "de": "HUD/MAUS AKTIV: Spieleingaben pausiert. L3 + LB beendet; alles loslassen. UEVR öffnet weiterhin mit L3 + R3.",
+      "ru": "HUD / МЫШЬ ВКЛ.: управление игрой приостановлено. L3 + LB — выход; отпустите все кнопки. Настройки UEVR по-прежнему: L3 + R3.",
+      "ar": "الواجهة / الماوس مفعّل: إدخال اللعب متوقف مؤقتًا. L3 + LB للخروج، ثم حرّر كل الأزرار. إعدادات UEVR ما زالت تُفتح بـ L3 + R3."
+    },
+    "INSERT > WuWa Controls > Show game UI now": {
+      "zh-Hans": "INSERT > WuWa Controls > 显示游戏界面",
+      "ja": "INSERT > WuWa Controls > ゲーム UI を表示",
+      "ko": "INSERT > WuWa Controls > 게임 UI 표시",
+      "es": "INSERT > WuWa Controls > Mostrar interfaz del juego",
+      "pt-BR": "INSERT > WuWa Controls > Mostrar interface do jogo",
+      "fr": "INSERT > WuWa Controls > Afficher l’interface du jeu",
+      "de": "INSERT > WuWa Controls > Spieloberfläche jetzt zeigen",
+      "ru": "INSERT > WuWa Controls > Показать интерфейс игры",
+      "ar": "INSERT > WuWa Controls > إظهار واجهة اللعبة الآن"
+    },
+    "L3/R3 = stick clicks. L3 + LB toggles HUD/mouse adjustment. Utility: LB + R3 = V; hold 0.8 s for Tab wheel.": {
+      "zh-Hans": "L3／R3＝按下摇杆。L3 + LB 切换 HUD／鼠标调整。辅助：LB + R3＝V；按住 0.8 秒打开 Tab 轮盘。",
+      "ja": "L3／R3＝スティック押し込み。L3 + LB で HUD／マウス調整を切替。補助：LB + R3＝V、0.8 秒長押しで Tab ホイール。",
+      "ko": "L3 / R3 = 스틱 클릭. L3 + LB로 HUD / 마우스 조정 전환. 보조: LB + R3 = V, 0.8초 누르면 Tab 휠.",
+      "es": "L3 / R3 = pulsar sticks. L3 + LB cambia el ajuste HUD / ratón. Utilidad: LB + R3 = V; mantén 0,8 s para la rueda Tab.",
+      "pt-BR": "L3 / R3 = clicar analógicos. L3 + LB alterna o ajuste HUD / mouse. Utilitário: LB + R3 = V; segure 0,8 s para a roda Tab.",
+      "fr": "L3 / R3 = clic des sticks. L3 + LB bascule le réglage HUD / souris. Utilitaire : LB + R3 = V ; maintenir 0,8 s pour la roue Tab.",
+      "de": "L3/R3 = Stick drücken. L3 + LB schaltet HUD-/Mausanpassung um. Hilfe: LB + R3 = V; 0,8 s halten für das Tab-Rad.",
+      "ru": "L3 / R3 = нажатие стиков. L3 + LB переключает настройку HUD / мыши. Утилита: LB + R3 = V; удерживайте 0,8 с для колеса Tab.",
+      "ar": "L3 / R3 = الضغط على العصا. L3 + LB يبدّل ضبط الواجهة / الماوس. مساعدة: LB + R3 = V؛ اضغط مطولًا 0.8 ث لعجلة Tab."
+    },
+    "Or: UEVR > WuWa Controls > Show game UI now": {
+      "zh-Hans": "或：UEVR > WuWa Controls > 显示游戏界面",
+      "ja": "または：UEVR > WuWa Controls > ゲーム UI を表示",
+      "ko": "또는: UEVR > WuWa Controls > 게임 UI 표시",
+      "es": "O bien: UEVR > WuWa Controls > Mostrar interfaz del juego",
+      "pt-BR": "Ou: UEVR > WuWa Controls > Mostrar interface do jogo",
+      "fr": "Ou : UEVR > WuWa Controls > Afficher l’interface du jeu",
+      "de": "Oder: UEVR > WuWa Controls > Spieloberfläche jetzt zeigen",
+      "ru": "Или: UEVR > WuWa Controls > Показать интерфейс игры",
+      "ar": "أو: UEVR > WuWa Controls > إظهار واجهة اللعبة الآن"
+    },
+    "Polar shortcuts are disabled or bypassed.": {
+      "zh-Hans": "Polar 快捷键已禁用或被绕过。",
+      "ja": "Polar ショートカットは無効、またはバイパスされています。",
+      "ko": "Polar 단축키가 꺼져 있거나 우회되었습니다.",
+      "es": "Los atajos de Polar están desactivados u omitidos.",
+      "pt-BR": "Os atalhos do Polar estão desativados ou ignorados.",
+      "fr": "Les raccourcis Polar sont désactivés ou contournés.",
+      "de": "Polar-Kürzel sind deaktiviert oder umgangen.",
+      "ru": "Сочетания Polar отключены или обходятся.",
+      "ar": "اختصارات Polar معطّلة أو متجاوزة."
+    },
+    "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT: hold L3 = stereo, click R3 = mono.": {
+      "zh-Hans": "空间窗口：L3 + LT / F7  |  微缩视角：L3 + RT  |  LT + RT：按住 L3＝立体屏幕，按 R3＝单目影院。",
+      "ja": "ポータル：L3 + LT / F7  |  ジオラマ：L3 + RT  |  LT + RT：L3 長押し＝立体スクリーン、R3＝単眼シアター。",
+      "ko": "포털: L3 + LT / F7  |  디오라마: L3 + RT  |  LT + RT: L3 길게 = 입체 화면, R3 = 단안 시어터.",
+      "es": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT: mantener L3 = estéreo, pulsar R3 = mono.",
+      "pt-BR": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT: segurar L3 = estéreo, clicar R3 = mono.",
+      "fr": "Portail : L3 + LT / F7  |  Diorama : L3 + RT  |  LT + RT : maintenir L3 = stéréo, cliquer R3 = mono.",
+      "de": "Portal: L3 + LT / F7  |  Diorama: L3 + RT  |  LT + RT: L3 halten = Stereo, R3 klicken = Mono.",
+      "ru": "Портал: L3 + LT / F7  |  Диорама: L3 + RT  |  LT + RT: удерживать L3 = стерео, нажать R3 = моно.",
+      "ar": "النافذة: L3 + LT / F7  |  المجسم المصغّر: L3 + RT  |  LT + RT: اضغط مطولًا L3 = مجسم، اضغط R3 = أحادي."
+    },
+    "Sheet: L3 + D-pad Left/Right = pages; Up = automatic   |   UEVR: release RT to scroll.": {
+      "zh-Hans": "快捷表：L3 + 十字键左右翻页，上键自动   |   UEVR：松开 RT 再滚动。",
+      "ja": "ガイド：L3 + 十字キー左右でページ、上で自動   |   UEVR：RT を離してスクロール。",
+      "ko": "단축키: L3 + 방향 패드 좌우 = 페이지, 위 = 자동   |   UEVR: RT를 놓고 스크롤.",
+      "es": "Atajos: L3 + cruceta izq./der. = páginas; arriba = automático   |   UEVR: suelta RT para desplazar.",
+      "pt-BR": "Atalhos: L3 + direcional esq./dir. = páginas; cima = automático   |   UEVR: solte RT para rolar.",
+      "fr": "Raccourcis : L3 + croix gauche/droite = pages ; haut = automatique   |   UEVR : relâchez RT pour défiler.",
+      "de": "Übersicht: L3 + Steuerkreuz links/rechts = Seiten; oben = automatisch   |   UEVR: RT loslassen zum Scrollen.",
+      "ru": "Подсказки: L3 + крестовина влево/вправо = страницы; вверх = авто   |   UEVR: отпустите RT для прокрутки.",
+      "ar": "الاختصارات: L3 + أزرار الاتجاه يمين/يسار = الصفحات؛ أعلى = تلقائي   |   UEVR: حرّر RT للتمرير."
+    },
+    "UEVR > WuWa Controls > Exit mouse mode now": {
+      "zh-Hans": "UEVR > WuWa Controls > 立即退出鼠标模式",
+      "ja": "UEVR > WuWa Controls > マウスモードを終了",
+      "ko": "UEVR > WuWa Controls > 마우스 모드 종료",
+      "es": "UEVR > WuWa Controls > Salir del modo ratón",
+      "pt-BR": "UEVR > WuWa Controls > Sair do modo mouse",
+      "fr": "UEVR > WuWa Controls > Quitter le mode souris",
+      "de": "UEVR > WuWa Controls > Mausmodus jetzt beenden",
+      "ru": "UEVR > WuWa Controls > Выйти из режима мыши",
+      "ar": "UEVR > WuWa Controls > الخروج من وضع الماوس"
+    },
+    "WuWa Controls > Show game UI now": {
+      "zh-Hans": "WuWa Controls > 显示游戏界面",
+      "ja": "WuWa Controls > ゲーム UI を表示",
+      "ko": "WuWa Controls > 게임 UI 표시",
+      "es": "WuWa Controls > Mostrar interfaz del juego",
+      "pt-BR": "WuWa Controls > Mostrar interface do jogo",
+      "fr": "WuWa Controls > Afficher l’interface du jeu",
+      "de": "WuWa Controls > Spieloberfläche jetzt zeigen",
+      "ru": "WuWa Controls > Показать интерфейс игры",
+      "ar": "WuWa Controls > إظهار واجهة اللعبة الآن"
+    },
+    "D-pad": {
+      "zh-Hans": "十字键", "ja": "十字キー", "ko": "방향 패드", "es": "Cruceta", "pt-BR": "Direcional",
+      "fr": "Croix directionnelle", "de": "Steuerkreuz", "ru": "Крестовина", "ar": "أزرار الاتجاه"
+    },
+    "D-pad / A / B": {
+      "zh-Hans": "十字键 / A / B", "ja": "十字キー / A / B", "ko": "방향 패드 / A / B", "es": "Cruceta / A / B", "pt-BR": "Direcional / A / B",
+      "fr": "Croix / A / B", "de": "Steuerkreuz / A / B", "ru": "Крестовина / A / B", "ar": "أزرار الاتجاه / A / B"
+    },
+    "L3 + D-pad Down": {
+      "zh-Hans": "L3 + 十字键下", "ja": "L3 + 十字キー下", "ko": "L3 + 방향 패드 아래", "es": "L3 + cruceta abajo", "pt-BR": "L3 + direcional para baixo",
+      "fr": "L3 + croix bas", "de": "L3 + Steuerkreuz unten", "ru": "L3 + крестовина вниз", "ar": "L3 + الاتجاه للأسفل"
+    },
+    "L3 + D-pad Left / Right": {
+      "en": "L3 + D-pad Left / Right",
+      "zh-Hans": "L3 + 十字键左 / 右", "ja": "L3 + 十字キー左 / 右", "ko": "L3 + 방향 패드 왼쪽 / 오른쪽", "es": "L3 + cruceta izquierda / derecha", "pt-BR": "L3 + direcional esquerda / direita",
+      "fr": "L3 + croix gauche / droite", "de": "L3 + Steuerkreuz links / rechts", "ru": "L3 + крестовина влево / вправо", "ar": "L3 + الاتجاه يسار / يمين"
+    },
+    "L3 + D-pad Up": {
+      "en": "L3 + D-pad Up",
+      "zh-Hans": "L3 + 十字键上", "ja": "L3 + 十字キー上", "ko": "L3 + 방향 패드 위", "es": "L3 + cruceta arriba", "pt-BR": "L3 + direcional para cima",
+      "fr": "L3 + croix haut", "de": "L3 + Steuerkreuz oben", "ru": "L3 + крестовина вверх", "ar": "L3 + الاتجاه للأعلى"
+    },
+    "Hold RB": {
+      "en": "Hold RB",
+      "zh-Hans": "按住 RB", "ja": "RB 長押し", "ko": "RB 길게 누르기", "es": "Mantén RB", "pt-BR": "Segure RB",
+      "fr": "Maintenir RB", "de": "RB halten", "ru": "Удерживать RB", "ar": "اضغط مطولًا RB"
+    },
+    "Portal on / off": {
+      "ja": "ポータルの切替", "ko": "포털 켜기 / 끄기", "es": "Portal sí / no", "pt-BR": "Portal ligar / desligar",
+      "fr": "Portail oui / non", "de": "Portal ein / aus", "ru": "Портал: вкл. / выкл.", "ar": "تشغيل النافذة أو إيقافها"
+    },
+    "Diorama on / off (10x)": {
+      "ja": "ジオラマの切替（10 倍）", "ko": "디오라마 켜기 / 끄기 (10배)", "es": "Diorama sí / no (10x)", "pt-BR": "Diorama ligar / desligar (10x)",
+      "fr": "Diorama oui / non (10x)", "de": "Diorama ein / aus (10x)", "ru": "Диорама: вкл. / выкл. (10x)", "ar": "تشغيل المجسم المصغّر أو إيقافه (10x)"
+    },
+    "Stereo screen on / off (hold 0.8 s)": {
+      "ja": "立体スクリーンの切替（0.8 秒長押し）", "ko": "입체 화면 켜기 / 끄기 (0.8초 길게)", "es": "Pantalla estéreo sí / no (mantén 0,8 s)",
+      "pt-BR": "Tela estéreo ligar / desligar (segure 0,8 s)", "fr": "Écran stéréo oui / non (maintenir 0,8 s)", "de": "Stereo-Leinwand ein / aus (0,8 s halten)",
+      "ru": "Стереоэкран: вкл. / выкл. (удерживать 0,8 с)", "ar": "تشغيل الشاشة المجسمة أو إيقافها (اضغط مطولًا 0.8 ث)"
+    },
+    "Mono theatre on / off (no stereo depth)": {
+      "ja": "単眼シアターの切替（立体感なし）", "ko": "단안 시어터 켜기 / 끄기 (입체감 없음)", "es": "Teatro mono sí / no (sin profundidad estéreo)",
+      "pt-BR": "Teatro mono ligar / desligar (sem profundidade estéreo)", "fr": "Théâtre mono oui / non (sans relief)", "de": "Mono-Kino ein / aus (ohne Stereotiefe)",
+      "ru": "Моно-кинотеатр: вкл. / выкл. (без стереоглубины)", "ar": "تشغيل المسرح الأحادي أو إيقافه (بلا عمق مجسم)"
+    },
+    "Shortcut sheet: previous / next page": {
+      "en": "Shortcut sheet: previous / next page",
+      "zh-Hans": "快捷表：上一页／下一页", "ja": "ガイド：前／次のページ", "ko": "단축키 시트: 이전 / 다음 페이지",
+      "es": "Hoja de atajos: página anterior / siguiente", "pt-BR": "Folha de atalhos: página anterior / seguinte",
+      "fr": "Fiche de raccourcis : page précédente / suivante", "de": "Übersicht: vorige / nächste Seite",
+      "ru": "Подсказки: предыдущая / следующая страница", "ar": "ورقة الاختصارات: الصفحة السابقة / التالية"
+    },
+    "Shortcut sheet: automatic page": {
+      "en": "Shortcut sheet: automatic page",
+      "zh-Hans": "快捷表：自动选页", "ja": "ガイド：ページ自動", "ko": "단축키 시트: 자동 페이지",
+      "es": "Hoja de atajos: página automática", "pt-BR": "Folha de atalhos: página automática",
+      "fr": "Fiche de raccourcis : page automatique", "de": "Übersicht: Seite automatisch",
+      "ru": "Подсказки: автоматическая страница", "ar": "ورقة الاختصارات: صفحة تلقائية"
+    },
+    "Full speed while Polar walk is on": {
+      "en": "Full speed while Polar walk is on",
+      "zh-Hans": "Polar 步行开启时全速", "ja": "Polar 歩行中は全速", "ko": "Polar 걷기 사용 중 전속력",
+      "es": "Velocidad máxima con Polar walk activo", "pt-BR": "Velocidade máxima com Polar walk ativo",
+      "fr": "Pleine vitesse avec Polar walk actif", "de": "Volle Geschwindigkeit bei aktivem Polar walk",
+      "ru": "Полная скорость при включённом Polar walk", "ar": "السرعة الكاملة عند تفعيل Polar walk"
+    },
+    "V once; hold 0.8 s for the Tab wheel": {
+      "en": "V once; hold 0.8 s for the Tab wheel",
+      "zh-Hans": "按一次 V；按住 0.8 秒打开 Tab 轮盘", "ja": "V を 1 回、0.8 秒長押しで Tab ホイール", "ko": "V 한 번, 0.8초 누르면 Tab 휠",
+      "es": "V una vez; mantén 0,8 s para la rueda Tab", "pt-BR": "V uma vez; segure 0,8 s para a roda Tab",
+      "fr": "V une fois ; maintenir 0,8 s pour la roue Tab", "de": "Einmal V; 0,8 s halten für das Tab-Rad",
+      "ru": "V один раз; удерживайте 0,8 с для колеса Tab", "ar": "V مرة واحدة؛ اضغط مطولًا 0.8 ث لعجلة Tab"
+    }
+  }
+}

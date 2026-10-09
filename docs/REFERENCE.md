@@ -58,11 +58,20 @@ eyes are produced.
 | --- | --- | --- |
 | `RenderingMethod` = Native Stereo | yes | Unreal's own stereo path. One family holds two views, drawn side by side into a double-wide target (headset width x 2). Both eyes share one game tick. |
 | `NativeStereoFix` | **on** | UEVR splits the family. The renderer runs twice per frame with one view each; eye one goes to the normal target and eye two to UEVR's scene-capture target. For other games UEVR decrements the scene's frame counter before the second pass so motion vectors match; for WuWa, `wuwa_scene_frame` rewinds it instead. This fixed materials that drew in only one eye. The cost: everything the renderer does per frame now happens twice, and game code that assumes one render per frame can misbehave on the second pass. |
-| `NativeStereoFixSamePass` | on | Upstream marks the second view as a primary pass, so Unreal does not skip "secondary eye" work. **Skipped for WuWa**: WuWa numbers its eye passes 2 and 3, and changing them crashed the game on 24 Sep. `WuWaEarlyStereoViews` is our separate attempt (experimental, off). |
+| `NativeStereoFixSamePass` | on | Upstream marks the second view as a primary pass, so Unreal does not skip "secondary eye" work. WuWa numbers its eye passes 2 and 3, and changing them at construction crashed the game on 24 Sep, so the upstream edit is skipped. Instead `wuwa_shadow::PassScope` sets the second view's two pass fields (`+0xc90` and its copy `+0x1a0`) from 3 to 2 **only around that view's own submission**, then restores them. WuWa's primary-view test counts passes 0 and 2, so the second eye now gets its own shadow setup (missing shadows in one eye, fixed 20 Sep). `WuWaEarlyStereoViews` is a separate, experimental attempt (off). |
 | `NativeStereoFixSwapEyes` | on | Renders the eyes in the opposite order. This is why a one-eye bug shows in the **right** eye in our profile and the **left** eye in Indath's build. |
-| `RenderingMethod` = Synchronized Sequential | no | Each eye is a whole frame. On the second frame the game skips its tick (Skip Tick) or its draw (Skip Draw, the default), so both eyes show one game moment. That halves the frame rate per eye. Not tried with WuWa in this project. |
-| `RenderingMethod` = Alternating/AFR | no | Eyes alternate frames with the game ticking in between, so moving things differ between eyes. `GhostingFix` applies only here. |
-| `ExtremeCompatibilityMode` | off | A broad compatibility fallback. Several WuWa candidates require it off. |
+| `RenderingMethod` = Synchronized Sequential | no | Each eye is a whole frame. On the second frame the game skips its tick (Skip Tick) or its draw (Skip Draw, the default), so both eyes show one game moment. That halves the frame rate per eye. **The community's default from May 2024 into 2026**, because native stereo crashed: lobotomy traced that to the game's SDK process checking the resolution (2025). UEVR's FPS overlay counts both eye frames, so it reads double in this mode (markmon, Apr 2025). Not tried in this project. |
+| `RenderingMethod` = Alternating/AFR | no | Eyes alternate frames with the game ticking in between, so moving things differ between eyes. `GhostingFix` applies only here; in Jan 2025 lobotomy found it crashed WuWa at start-up. |
+| `ExtremeCompatibilityMode` | off | A broad fallback. markmon and lobotomy (Dec 2025) describe what it costs: it switches off much of UEVR, renders alternate frames, and shows the game window's own image stretched to the headset. It hides some UI flicker and shadow differences, at about half the resolution. A workaround, not a fix. Several WuWa candidates require it off. |
+
+Indath reported two more limits (1 Oct 2026):
+- **Instanced stereo:** the game hard-codes Unreal's instanced stereo off. The
+  `vr.InstancedStereo` setting exists in the executable, but by his account
+  switching it does nothing.
+- **Without the Native Stereo Fix:** the second eye is only a back-buffer copy,
+  not a real second view.
+
+So every proper per-eye fix goes through the Native Stereo Fix.
 
 ### 1.4 The six causes of "different in one eye"
 
@@ -73,10 +82,10 @@ you what to measure.
 | --- | --- | --- | --- |
 | 1 | A per-view input left at its default for the second view | 1 Oct: the second eye was built with the default 90° FOV, not 75°, so its LOD factor was 1.0, not 0.836 | Diff every field of both views ([EYE-DIFF-HANDOFF.md](EYE-DIFF-HANDOFF.md)) |
 | 2 | A per-view-state cache filled for only one eye | 1 Oct: Kuro's Cascade Lighting Volume (far indirect light) | Swap the eyes' view states; force the cache to refresh |
-| 3 | Temporal history kept per view state | Suspected for AO (open) | Turn off only the temporal part and see whether the eyes agree |
+| 3 | Temporal history kept per view state | Suspected for AO (open). It was also seen in Synchronized Sequential in Oct 2025, so it is not caused by the Native Stereo Fix. | Turn off only the temporal part and see whether the eyes agree |
 | 4 | Work done once per frame, or only for the first view | 4 Oct: cinematic letterbox framing; suspected for the dialogue bars (open) | Does the problem move when you swap eye order? |
 | 5 | Game-thread data read at different moments for each eye | 28 Sep: camera base during ultimate returns (`WuWaStereoBasePose`) | Log the camera inputs for both eyes in one frame |
-| 6 | Screen-space effects with asymmetric eye projections | Not confirmed in WuWa yet | Projection overrides (section 1.5) |
+| 6 | Screen-space effects with asymmetric eye projections | Community: Symmetric horizontal projection fixed UI parts drawn in one eye (polar, Nov 2024), and fixed many one-eye post-process artifacts in native stereo (SannpoKun, Dec 2025) | Projection overrides (section 1.5) |
 
 **First test for any one-eye problem: toggle `NativeStereoFixSwapEyes`.** If the
 problem moves to the other physical eye, it follows render order: causes 1 to 4.
@@ -121,6 +130,21 @@ run on every bug.
   another, the HUD looks squashed or stretched.
 - The executable also contains Kuro's own aspect logic,
   `UUISizeControlByAspectRatio`. That is a name only; its behaviour is unknown.
+- **The game sizes its own VR buffer.** In August 2024 lobotomy found this line
+  in the game's log at 1080p: "Resizing VR buffer to 2040 by 2116". He also saw
+  the whole image stretched vertically. The game reacts to resolution changes
+  itself, so treat window and swapchain resizes as risky.
+- **The UI layout resolution matters for gameplay, not just looks.** Indath
+  (7 Oct 2026) saw Rebecca's ultimate target wrongly when the LGUI canvas was
+  sized to one eye instead of a normal 4K screen.
+
+How the UI has been handled over time:
+- **2024:** 2D screen mode, plus a mod that hides the HUD.
+- **Feb 2025 onwards:** mirudo2's Lua UI fix moved the UI into the world as an
+  object. It worked visually, but the button mappings were offset and it needed a
+  gamepad-to-mouse plugin.
+- **Sep 2026:** Indath and this project both moved to capturing LGUI's draws into
+  UEVR's UI texture.
 
 ### 1.7 Input
 
@@ -145,6 +169,14 @@ run on every bug.
 
 A cvar changing value does not prove the code you care about reads it; WuWa's
 custom paths bypass some standard ones. Judge by the picture in both eyes.
+
+UEVR's CVars panel has a fixed list. It includes `r.AmbientOcclusionLevels`,
+`r.DefaultFeature.AmbientOcclusion`, `r.OneFrameThreadLag`, `r.MotionBlurQuality`,
+`r.DepthOfFieldQuality` and `r.SceneColorFringeQuality`. Players change these
+from there. "The AmbientOcclusion cvar, -1 to 0" in community reports is almost
+certainly `r.AmbientOcclusionLevels`: it is in the panel, and -1 (automatic) is
+its default. For one tester (Oct 2025), a panel change only took effect after a
+UEVR update, so confirm the value actually changed.
 
 The executable contains about 6,150 cvar names, 881 of them Kuro-specific.
 `launcher/dev/wuwa_cvar_inventory.py` lists them with the strings stored beside
@@ -172,7 +204,7 @@ come from the code.
 | `GhostingFix` | off | AFR-only history fix | Only with Alternating/AFR |
 | `HorizontalProjectionOverride`, `VerticalProjectionOverride` | Default | Section 1.5 | Screen-space effects wrong at eye edges |
 | `OpenXR_ResolutionScale` | 1.0 | Eye resolution multiplier | Performance |
-| `WorldScale` | 1.0 | Size of the world relative to you | Scale feels wrong |
+| `WorldScale` | 1.0 | Size of the world relative to you | Scale feels wrong. Third-person players in 2024 preferred 0.7–0.875 |
 | `UI_Size`, `UI_Distance`, `UI_FollowView`, `UI_Y_Offset` | 1.8, 2.27, off, -0.46 | VR panel height, distance, head-follow, height offset | HUD placement |
 | `CinematicFramingFix` | on | Shares the first eye's cutscene framing with the second | Unequal letterbox heights |
 | `MonoTheatreMode`, `2DScreenMode`, `AutoCinema` | off | Manual and automatic screen modes | Cutscene fallbacks |
@@ -184,6 +216,7 @@ come from the code.
 | `Compatibility_SkipUObjectArrayInit` and other `Compatibility_*` | off | UEVR start-up compatibility switches; endlessfalls' initialization work used `find_uobject` / `SkipUObjectArrayInit` | Start-up crashes only |
 | `WindowMode_*` | off; plane 12 x 8 | The 6DOF window (portal) | Portal shape |
 | `r.OneFrameThreadLag` | 0 | Section 1.1 | Must stay 0 |
+| `SnapturnJoystickDeadzone` | 0.200001 | A leftover from mirudo2 and markmon's UI fix (Feb 2025): their gamepad-to-mouse plugin read 0.200001 as "menu mode". Snap turn is off and that plugin ships disabled, so it does nothing in our build. | Leave it, or reset to 0.2 when cleaning the profile |
 
 ## Part 3. Symptoms
 
@@ -208,11 +241,16 @@ teleports. Manual control: WuWa Controls → Refill far lighting now. Related
 cvars: `r.CLV.TriggerRefresh`, `r.CLV.UpdateEveryFrame`.
 
 **Shading on rocks and hills differs per eye (ambient occlusion).**
-**Open**. A tester reported it on 9 Oct in Rinascita. Setting AO from -1 to 0
-removes it. That value is most likely `r.AmbientOcclusionLevels`, which turns
-screen-space AO off entirely: a **workaround**, and it confirms the fault is in
-screen-space AO.
-- **Likely cause:** 3 (AO history per eye) or 2 (a Kuro AO cache).
+**Open**, and older than this project.
+- **Reports:** Lelouche first reported it on 12 Oct 2025, in Septimont, using
+  Synchronized Sequential. They reported it again on 9 Oct 2026 in our build, in
+  Rinascita.
+- **Workaround:** both times, setting AO from -1 to 0 in UEVR's CVars panel
+  removed it. That is `r.AmbientOcclusionLevels` (section 1.8), which turns
+  screen-space AO off entirely. It also confirms the fault is in screen-space AO.
+- **Likely cause:** 3 (AO history kept per eye, or shared between eyes that take
+  turns) or 2 (a Kuro AO cache). Because it happens in Synchronized Sequential
+  too, the Native Stereo Fix is not the cause.
 - **Which AO runs:** `r.AmbientOcclusion.Method` selects SSAO (0), GTAO (1) or
   XeGTAO (2). Read its value first; only that method's settings matter.
 - **What to test:** `launcher/dev/wuwa_ao_batch.py` (branch `claude/ao-eye-mismatch`)
@@ -237,16 +275,44 @@ intended nearby rim light.
 **Camera jumps differently in each eye at the end of an ultimate.**
 **Fixed** 28 Sep (cause 5, `WuWaStereoBasePose`). Owner-confirmed in the headset.
 
-**Shadows differ between the eyes.**
-**No report on our side.** With the Native Stereo Fix, each pass renders its own
-shadow depths and fits its cascades to its own frustum. Relevant settings:
-`r.Shadow.CSM*`, `r.kuro.EnableKuroCustomShadowDepthPass`,
-`r.Kuro.CharacterShadow.*` and `r.kuro.EnableSequenceShadowFix`. Indath mentioned
-shadow work in the thread on 4 Oct.
+**Shadows missing in one eye (walls, pillars, bridges).**
+**Fixed** 20 Sep (game 3.6), ported to 3.7. WuWa treats the second view (pass 3)
+as secondary, so under the Native Stereo Fix it never got the shadow setup.
+`PassScope` presents it as pass 2 only around its own submission (section 1.3,
+Same Pass).
+- **How it was isolated:** `sg.ShadowQuality 0` hides the mismatch.
+- **Community history:** players saw the same in native stereo: "shadows partly
+  missing in the right eye" (Jul 2026). The common workaround was shadows on
+  Low; Lelouche notes "Low means off in this game" (Aug 2026). Indath's build
+  had flicker and darkness with a similar patch. On 6 Oct 2026 he traced that to
+  a gamma vtable his build did not always find.
+- **Other relevant settings:** `r.Shadow.CSM*`,
+  `r.kuro.EnableKuroCustomShadowDepthPass`, `r.Kuro.CharacterShadow.*` and
+  `r.kuro.EnableSequenceShadowFix`.
 
 **NPC names or speech bubbles in one eye.**
-Not seen in 3.7 (1 Oct). `WuWaWorldLabelsStereo` is a candidate, but only for
-the setup without the Native Stereo Fix.
+**Fixed** 26 Sep in this project. Earlier, in native stereo, players saw NPC
+names in only one eye from a distance (Dec 2025). `WuWaWorldLabelsStereo` is an
+older candidate, for the setup without the Native Stereo Fix only.
+
+**Whole right eye black in native stereo.**
+**Not reported in our build.**
+- **Community workaround:** turn off **volumetric fog** in the game's graphics
+  settings (SannpoKun and Ryebread, Nov–Dec 2025).
+- **Indath's builds:** the right eye also went black with the Native Stereo Fix
+  on. He fixed it in Jul 2026 by reverting a scene-view/D3D12 code path. One eye
+  went black again after a game patch in Aug 2026.
+
+**Effects visible in only one eye (skill motion blur, glints, some particles).**
+**Open** in part. Reports so far:
+- **Skill motion blur** shows in the right eye only in native stereo (Lelouche,
+  Dec 2025 and Jul 2026).
+- **Lucilla's hat light effect** shows in one eye (Jun 2026).
+- **Bright butterfly meshes** in Seven Hills flicker in the right eye even in
+  Synchronized Sequential (SannpoKun, Dec 2025).
+- **Our status:** we still see "some materials one eye only" (26 Sep).
+- **Try first:** Symmetric horizontal projection (cause 6). Then check whether
+  the effect moves with Swap Eyes.
 
 ### Cutscenes and letterbox
 
@@ -272,10 +338,23 @@ Mono theatre is the workaround.
 mobile-only. Some bars may be drawn by the UI rather than by post-processing.
 
 **Long scene or dialogue loading stalls.** **Open.**
+- **Indath's build:** loads stalled at 10% with the Native Stereo Fix on. He
+  switched the Fix off during loading screens and back on afterwards (Jul 2026),
+  then added "suspend the Native Stereo Fix during menu loads" (Sep 2026).
+- **Untested here:** whether doing the same shortens our stalls.
 
 **Automatic cinema does not switch.** Experimental and off by default.
-Prerendered movies are **untested**.
 
+**Prerendered movie cutscenes are black (sound and subtitles play).**
+**Untested in our build.**
+- **What the community found:**
+  - With mirudo2's Lua UI fix, flat movies were black in VR and in 2D mode.
+    Turning the Lua script off fixed them (Lelouche and markmon, Nov 2025). The
+    script was moving the movie's UI layer.
+  - Separately, movies were black on DX12 but fine on DX11 with a Mar 2025 UEVR
+    build (markmon).
+- **What to test:** the game's opening movie, with `WuWaLguiRedirect` on and then
+  off. To see the opening again, switch to another server region, as players did.
 ### HUD and menus
 
 **HUD missing, or drawn into the eye images instead of the panel.**
@@ -291,6 +370,15 @@ a byte-matched port (29–30 Sep). Expect it after every patch.
 
 Indath's hint matches this: the UI is sometimes sized from one eye and sometimes
 from the full render resolution, especially after a swapchain rebuild.
+
+It is not unique to our build:
+- **Native stereo:** in Jun 2025 lobotomy reported "weird UI scaling with
+  vertical stretch" in native stereo.
+- **Indath's capture:** his Sep 2026 LGUI capture showed "somewhat squished
+  looking UI", and he found "no way to resize the UI anywhere in the code
+  pipeline".
+
+So the fix is probably the LGUI canvas size, not the panel shape.
 - **What to test:** note the game window size. Check `backend.log` for
   `UI size changed, recreating` at the moment it squashes. Try ESC open and close.
 - **Not verified:** whether WuWa Controls → Reset HUD aspect works. Do not suggest
@@ -309,7 +397,10 @@ the menu at once.
 ### Comfort, timing and performance
 
 **Judder or jitter.**
-**Fixed**: `r.OneFrameThreadLag 0` plus `WuWaNativeFrameTiming`. If it returns:
+**Fixed**: `r.OneFrameThreadLag 0` plus `WuWaNativeFrameTiming`.
+- **Who suggested it:** Indath suggested it here (27 Sep 2026). markmon had
+  already turned it off in all his UEVR games for performance (Nov 2025).
+- **If it returns:**
 1. Confirm `cvars_data.txt` still has the line.
 2. Then compare `SynchronizationMode` settings.
 
@@ -318,6 +409,15 @@ Needs the Native Stereo Fix on in 3.7; the 1 Oct SteamVR test was smooth.
 
 **Low frame rate.**
 - First try `OpenXR_ResolutionScale` and the game's quality settings.
+- **DX11 or DX12:**
+  - DX12 has better lighting and effects (November, polar). DX11 runs faster
+    (markmon, Feb 2025).
+  - Some old maps crashed on loading under DX12 (SannpoKun, Dec 2025).
+  - Players turned ray tracing off for stability. SannpoKun's native launcher set
+    `r.RayTracing.LoadConfig=1` in `Engine.ini` and forced DX11.
+- **The game caps by hardware name:** it limits settings and frame rate by
+  matching CPU and GPU names against a list (lobotomy, Apr 2025). UEVR uncaps the
+  frame rate anyway.
 - Temporal upscalers (`r.NGX.DLSS.*`, `r.XeSS.*`, FSR) keep history per view
   (cause 3). **Untested in VR**; compare both eyes before trusting them.
 - Frame generation (`r.Streamline.DLSSG.Enable`) and Reflex predictive rendering
@@ -351,8 +451,38 @@ expect it to make edge flicker worse, not better. **Untested.**
 **Steam crashes at start-up.** **Fixed** in 1.1.2: the Steam overlay was sending
 the first frames back into our DirectX hook in a loop.
 
-**A silent crash early in start-up.** Look at the `Compatibility_*` switches;
-endlessfalls' work used `SkipUObjectArrayInit`. Copy diagnostics first.
+**The game crashes as soon as UEVR injects, after a game patch.**
+This has happened after several patches.
+- **Game 3.0 (Dec 2025):**
+  - The first workaround was `Compatibility_SkipUObjectArrayInit`, sometimes with
+    `ExtremeCompatibilityMode` (drav, Jan 2026). It breaks `find_uobject`, and
+    with it every Lua UI fix.
+  - The real fix was endlessfalls' UEVR change (Jan 2026):
+    `FEnumProperty::update_offsets` uses `FName::to_string_no_numbers()` instead
+    of `to_string()`. The no-numbers version checks memory safely before reading,
+    which avoids a hard crash. Submitted upstream as
+    [praydog/UESDK#1](https://github.com/praydog/UESDK/pull/1).
+- **Game 3.7 (Sep 2026):** Indath hit a crash at the same function and fixed it
+  by validating UEnum candidates before use; the bad offset was `0x80`. The 1.1.x
+  backend of this project also validates enum objects before reading their class
+  metadata.
+
+Copy diagnostics first. If `log.txt` ends in `FEnumProperty::update_offsets`, it
+is this family of crash.
+
+**"Out of video memory" when entering newer areas (game 3.3).**
+**Community report, May–Jun 2026.**
+- **Lelouche:** turning on `Compatibility_SceneView` gave a picture briefly, then
+  this crash. Without it the screen stayed black.
+- **zelesf:** the error went away for them after a later Kuro patch.
+
+Not seen in our 3.7 build.
+
+**Crash when leaving menus or submenus.**
+- **markmon:** crashed about every 15 minutes when leaving menus (2025).
+- **Indath:** fixed a submenu crash in his build (14 Sep 2026).
+- **Photo mode:** taking a screenshot crashed with mirudo2's profile (2025).
+- **Our build:** report it with the build name if it appears.
 
 **After a game patch, the HUD, menus or camera fixes stop working.** The native
 hooks match bytes in the game, and those bytes move. Re-port them; see 29–30 Sep
@@ -366,8 +496,11 @@ test 2 (section 1.7).
 **Index controllers have no Menu button.** Hold both stick clicks for one second
 (test 2).
 
-**LB+Y fails after Alt-Tab.** Forward Windows focus events; a universal fix is not
-confirmed.
+**LB+Y fails after Alt-Tab.** Players found a simple fix: **press Alt once**
+after returning to the game (SannpoKun and Ryebread, Dec 2025). The game probably
+still thinks Alt is held from the Alt-Tab, so LB+Y reads as a different combo.
+That is a guess. Forwarding Windows focus events also helped; a universal fix is
+not confirmed.
 
 **A treadmill pad and an Xbox pad fight.** Use the slot filter or the VR
 controllers' sharing style.
@@ -379,22 +512,30 @@ controllers' sharing style.
   Planned: a Cinema shape preset; today, use `WindowMode_PlaneWidth`,
   `WindowMode_PlaneHeight` and `WindowMode_LockAspect`.
 
-## Part 4. Community findings
+## Part 4. Community history
 
-Seeded from the Flat2VR thread and earlier credits. To be completed from the
-full thread archive.
+**Source:** the full Flat2VR Modding "Wuthering Waves" thread: 1,761 messages
+from 23 May 2024 to 9 Oct 2026, exported on 9 Oct 2026 and kept privately by the
+project owner. This is a summary, not a copy. Names are the display names used in
+the thread; mirudo2 posts as polar.
 
-| When | Who | Finding | Here |
+| When | Who | What they found or made | Here |
 | --- | --- | --- | --- |
-| Jul 2026 | Indath | Native Stereo Fix running for WuWa | Adopted; required by most fixes |
-| Jul 2026 | Indath | Modified UI script and profile | Studied at the start |
-| 8 Sep | Indath | LGUI draw and pass hook points in his build | Our HUD route began by observing them |
-| 27 Sep | Indath | Turn off the one-frame thread lag | Shipped (`r.OneFrameThreadLag 0`) |
-| 7 Oct | Indath | Ported this project's LGUI capture into his build, keeping his redirect as a backup | — |
-| 9 Oct | Indath | Turn the dialogue bars off with a game setting rather than finding the overlay; UI sized per eye versus full render after swapchain rebuilds | Both open, above |
-| — | endlessfalls | `find_uobject` / `SkipUObjectArrayInit` start-up compatibility (not a stereo fix) | Credited |
-| — | mirudo2 (polar) | Original UI fix and profile, freecam script and control layout, Custom UEVR Injector | Basis of our controls and launch flow |
-| 9 Oct | A tester | AO -1 → 0 removes per-eye AO; GUI squash; one-eye dialogue bars; closer diorama; thinner portal | All open, above |
+| May 2024 | Sky Yuki, Drinking Herta | First reports. UEVR only injects very early because of the anticheat (Anti-Cheat Expert). Native stereo crashes; Synchronized Sequential works. The HUD is unusable. World scale about 0.7 feels right. | — |
+| May 2024 | polar (mirudo2) | Custom UEVR Injector for early injection. praydog asked that UEVR not be bundled into other downloads, and that sources be public. | Our launch flow uses the Custom UEVR Injector; our backend source is public |
+| Aug–Sep 2024 | lobotomy | The UI is LGUI (not UMG/Slate), and game logic runs on Tencent's Puerts (TypeScript). The game logs its own VR buffer size. LOD and shadows behave "as if you're a 100 m tall giant". | LGUI capture since Sep 2026; FOV/LOD mismatch fixed 1 Oct 2026 |
+| Nov 2024 | polar | Profile that switches to 2D screen mode for UI. Symmetric projection fixes UI drawn in one eye. | Cause 6 |
+| Feb–May 2025 | polar, markmon | WuWa UI Fix for UEVR (Lua): UI placed in the world, a closer camera, L3 combos (L3+A recentres the UI). markmon wrote the gamepad-to-mouse plugin for menus. Release 1.2 (May 2025) added freecam and a screenshot plugin. | Our control layout descends from this. `win_screenshot.dll` and a disabled `gamepad_to_mouse.dll`, both built by polar, ship in our profile. |
+| Apr 2025 | jumpomaster | Native stereo with the Stereo Fix worked in Feb 2025 UEVR nightlies (shadows fixed in the 10 Feb build). Later nightlies blacked out the right eye. | — |
+| Jun–Jul 2025 | lobotomy | Native stereo runs once the anticheat's SDK process is not scanning the resolution. First person works with a near-clip mask of about 20. | — |
+| Oct 2025 | Lelouche | AO differs per eye on rocks (Septimont, Synchronized Sequential). Turning AO off fixes it. | Open |
+| Nov 2025–Jan 2026 | SannpoKun | Profile 1.0 to 1.2, built on polar's: smoother UI attachment, a 2D/VR toggle (Back+RB), first-person mode, a native/sequential switch, volumetric fog off for native. | The project owner started from SannpoKun's 1.2 package in Mar 2026 |
+| Dec 2025 | SannpoKun, Ryebread, kousakayou | Alt fixes LB+Y after Alt-Tab. Symmetric projection fixes post-process artifacts. NPC names in one eye at a distance. | Above |
+| Dec 2025–Jan 2026 | drav, Lelouche, endlessfalls | Start-up crash after game 3.0. Workaround: `SkipUObjectArrayInit`. Fix: the `FEnumProperty` change, [praydog/UESDK#1](https://github.com/praydog/UESDK/pull/1). | Credited (endlessfalls) |
+| Jan 2026 | markmon | Set the game's Flat2VR listing to "Works Poorly", because the UI was unworkable. | Lelouche suggested "Works Well" once the one-eye bars are fixed (9 Oct 2026) |
+| Jul–Oct 2026 | Indath | Native Stereo Fix build (26 Jul), GitHub fork (1 Sep), LGUI hook (8 Sep), the one-frame thread lag suggestion (27 Sep), UEnum crash fix (30 Sep). Ported this project's LGUI capture (7 Oct). | Credited |
+| Sep–Oct 2026 | ChronoHax (this project) | Native stereo with the Fix; LGUI capture; fixes for NPC names, ultimate camera, far LOD, far lighting and one-eye shadows, shared in the thread. | — |
+| 9 Oct 2026 | Lelouche | AO again (Rinascita), GUI squashed, one-eye dialogue bars, closer diorama, thinner portal | Open, above |
 
 ## Part 5. Before writing code
 

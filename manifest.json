@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-09T16:55:35.579682+00:00",
+  "updatedAt": "2026-10-09T17:19:03.138652+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -124,7 +124,7 @@
     "docs/LAUNCHER-RELEASE-20261004.md": "69901b1445645408463d6b9998c1a306198ede954e3b8ccf1c7d1e3d26885a12",
     "docs/NEXT-SESSION-3.7.md": "cdf36fea44b63c9e15108c35683dfbb038deee579fac71687cca76e565216206",
     "docs/NEXT-SESSION.md": "8fc7bdae1ccc9671507a867a81bfb9beb556e34fe19c953e24026e3a080da753",
-    "docs/REFERENCE.md": "5177d16576d179c2d2fe9977c52d1e25ffe0a3c157f6efc817db5cec6d6ad96b",
+    "docs/REFERENCE.md": "1b0cd3ff14a1375e446af5d4bd3429abf0253e1968b784015b5d5e382340f3b4",
     "docs/RELEASING.md": "f1b99740baef668dc1dbc2d43cd3cb99e02d64c7a50626162be0240218e4b35e",
     "docs/RISK.md": "1a96339e4fe1ad84465ba5de0096ea0b25bca780290d39beced3ca9c2f01d4aa",
     "docs/SEARCH-AND-ACCEPTANCE-2026-09-28.md": "60efb20fcfb7159799e5789d5fedd767946bb84999f8b98c60939116d821eabe",

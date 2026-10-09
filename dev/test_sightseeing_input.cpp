@@ -219,6 +219,27 @@ int main() {
         check(g.take(2201) == 0, "cancelled pulse still sent");
     }
 
+    // Both stick clicks held turn VR on from off (Index has no usable Menu button).
+    {
+        constexpr std::uint16_t sticks = 0x0040 | 0x0080;
+        MenuGesture g;
+        check(!g.update(true, sticks, false, 0) && g.holding(), "stick chord was not tracked while off");
+        check(!g.update(true, sticks, false, 999), "stick chord fired before one second");
+        check(g.update(true, sticks, false, 1000), "stick chord did not turn VR on");
+        check(!g.update(true, sticks, true, 1500) && !g.holding(), "stick chord fired again once on");
+        check(!g.update(true, 0, true, 1600) && g.take(1600) == 0, "stick chord release sent a pulse");
+        MenuGesture on;
+        check(!on.update(true, sticks, true, 0) && !on.update(true, sticks, true, 2000),
+            "stick chord turned VR off (it must open UEVR settings instead)");
+        MenuGesture single;
+        check(!single.update(true, 0x0040, false, 0) && !single.update(true, 0x0040, false, 2000),
+            "one stick click alone toggled VR");
+        MenuGesture lost;
+        lost.update(true, sticks, false, 0);
+        lost.update(false, 0, false, 600);
+        check(!lost.update(true, sticks, false, 1100), "lost tracking let an old stick chord fire");
+    }
+
     // Readiness reports what the slot actually delivered.
     {
         Mixer mixer;

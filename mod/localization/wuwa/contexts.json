@@ -1353,7 +1353,7 @@
   "VR controllers on (this launch)": [
     "mods/VR.cpp"
   ],
-  "Or hold the left Menu button for 1 second to turn them on or off; a buzz confirms. A quick press is still Start.": [
+  "Or hold the left Menu button for 1 second to turn them on or off; a buzz confirms. A quick press is still Start. Controllers without a Menu button (such as Index): while off, hold both stick clicks for 1 second to turn them on.": [
     "mods/VR.cpp"
   ],
   "The hold gesture is unavailable while Enable motion-controller input is on; use this checkbox.": [
@@ -1416,7 +1416,7 @@
   "A VR button or stick held from before is ignored until you let go of it.": [
     "mods/VR.cpp"
   ],
-  "Status: on. VR controllers steer this menu; the game gets no input until it closes.": [
+  "Status: on. Every controller steers this menu; the game gets no input until it closes.": [
     "mods/VR.cpp"
   ],
   "Status: on, waiting for VR controllers. Wake both and keep the headset on; the Xbox still works.": [

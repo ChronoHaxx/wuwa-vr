@@ -188,9 +188,14 @@ private:
 
 // Hold the left Menu button to turn VR controllers on or off. A shorter press
 // is still Start (or Back with the left grip), sent briefly on release.
+// Controllers without a usable Menu button (Index: SteamVR keeps the system
+// button) turn VR controllers on by holding both stick clicks while they are
+// off. Off is the safe time: the game receives no VR input then, and once on
+// the same chord opens UEVR settings, where they can be turned off.
 class MenuGesture {
 public:
     static constexpr std::uint64_t hold_ms = 1000;
+    static constexpr std::uint16_t stick_bits = 0x0040 | 0x0080; // L3 + R3
     static constexpr std::uint64_t pulse_ms = 100;
     static constexpr int pulse_polls = 2;
 
@@ -198,8 +203,22 @@ public:
     bool update(bool valid, std::uint16_t raw_buttons, bool enabled, std::uint64_t now_ms) noexcept {
         const auto bits = static_cast<std::uint16_t>(valid ? raw_buttons & menu_bits : 0);
         if (!valid) {
-            down_ = fired_ = false; // lost tracking cancels a press; no tap, no toggle
+            down_ = fired_ = sticks_down_ = sticks_fired_ = false; // lost tracking cancels a press
             return false;
+        }
+        if (!enabled && (raw_buttons & stick_bits) == stick_bits) {
+            if (!sticks_down_) {
+                sticks_down_ = true;
+                sticks_fired_ = false;
+                sticks_since_ms_ = now_ms;
+            }
+            if (!sticks_fired_ && now_ms >= sticks_since_ms_ && now_ms - sticks_since_ms_ >= hold_ms) {
+                sticks_fired_ = true;
+                down_ = fired_ = false;
+                return true;
+            }
+        } else {
+            sticks_down_ = sticks_fired_ = false;
         }
         if (bits) {
             if (!down_) {
@@ -235,15 +254,15 @@ public:
         return pulse_;
     }
 
-    bool holding() const noexcept { return down_ && !fired_; }
+    bool holding() const noexcept { return (down_ && !fired_) || (sticks_down_ && !sticks_fired_); }
     void cancel_pulse() noexcept { pulse_ = 0; }
     void reset() noexcept { *this = {}; }
 
 private:
-    bool down_{}, fired_{};
+    bool down_{}, fired_{}, sticks_down_{}, sticks_fired_{};
     std::uint16_t bits_{}, pulse_{};
     int pulse_count_{};
-    std::uint64_t since_ms_{}, pulse_until_ms_{};
+    std::uint64_t since_ms_{}, sticks_since_ms_{}, pulse_until_ms_{};
 };
 
 struct Snapshot {

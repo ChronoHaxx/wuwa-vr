@@ -98,8 +98,12 @@ settings.
 **Turn on or off:** hold the **left Menu** button for 1 second (a buzz
 confirms: long for on, short for off), or tick **VR → WuWa Controls → VR
 controllers for walking (optional) → VR controllers on (this launch)**. A quick
-press of left Menu is still Start. The hold gesture is unavailable while UEVR's
-separate **Enable motion-controller input** is on; use the checkbox then.
+press of left Menu is still Start. Controllers without a usable Menu button,
+such as Valve Index (SteamVR keeps its system button), turn them on by holding
+**both stick clicks for 1 second** while they are off; once on, both stick
+clicks open UEVR settings, where the checkbox turns them off. The hold gestures
+are unavailable while UEVR's separate **Enable motion-controller input** is on;
+use the checkbox then.
 
 **Sharing with Xbox / treadmill** (remembered):
 
@@ -125,6 +129,7 @@ Troubleshooting → Controller check** reports the slots in use.
 | Left Menu (quick press) | Start / Menu |
 | Left grip + left Menu (quick press) | View / Back; consumes LB |
 | Left Menu (hold 1 s) | Turn VR controllers on or off |
+| Both stick clicks (hold 1 s, while off) | Turn VR controllers on (for controllers without Menu) |
 | Both stick clicks | L3 + R3: open/close UEVR settings |
 
 No Quest system-button or D-pad mapping is added. With menus and HUD/mouse
@@ -135,7 +140,8 @@ rules above still apply.
 While on, the selected slot always reports a connected pad, so the game keeps
 reading it even when the controllers sleep, the headset comes off or no Xbox is
 plugged in. If the game is not reading the slot yet, the mod asks it to check
-for controllers again every 2 seconds. A VR button or stick that is already held
+for controllers again every 2 seconds. While UEVR settings are open, every
+controller steers them at once. A VR button or stick that is already held
 when VR input starts, wakes up, or when UEVR opens or closes, is ignored until
 you let go of it; everything else works straight away. **Physical gamepad
 passthrough** or a conflicting **XInput controller slot** filter blocks VR

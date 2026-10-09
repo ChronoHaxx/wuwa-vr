@@ -820,9 +820,8 @@ bool VR::apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* 
         const auto mixed = m_sightseeing_mixer.apply(true, style, physical, connected, vr,
             m_sightseeing_valid, m_sightseeing_sample_ms, now, ui_open);
         m_sightseeing_readiness.poll(mixed, now);
-        // UEVR's menu is navigated by VR when it is available, otherwise by the
-        // Xbox. A treadmill's belt would scroll it, so VR takes priority.
-        delivered = !ui_open ? mixed.pad : mixed.vr_ready ? mixed.vr : physical;
+        // Every controller steers UEVR's menu at once, whatever the sharing style.
+        delivered = ui_open ? wuwa_sightseeing::merge(physical, mixed.vr) : mixed.pad;
         m_sightseeing_packet_owned[slot] = true;
     }
     state->Gamepad = sightseeing_gamepad(delivered);
@@ -847,7 +846,7 @@ void VR::draw_sightseeing_menu() {
     if (!on && m_controllers_allowed->value())
         wuwa_ui::TextWrapped("The hold gesture is unavailable while Enable motion-controller input is on; use this checkbox.");
     else
-        wuwa_ui::TextWrapped("Or hold the left Menu button for 1 second to turn them on or off; a buzz confirms. A quick press is still Start.");
+        wuwa_ui::TextWrapped("Or hold the left Menu button for 1 second to turn them on or off; a buzz confirms. A quick press is still Start. Controllers without a Menu button (such as Index): while off, hold both stick clicks for 1 second to turn them on.");
 
     wuwa_ui::draw(*m_sightseeing_style, "Sharing with Xbox / treadmill");
     const auto style = wuwa_sightseeing::style_from(m_sightseeing_style->value());
@@ -880,7 +879,7 @@ void VR::draw_sightseeing_menu() {
         if (snap.held) wuwa_ui::TextWrapped("A VR button or stick held from before is ignored until you let go of it.");
         break;
     case Status::MenuReady:
-        wuwa_ui::TextWrapped("Status: on. VR controllers steer this menu; the game gets no input until it closes."); break;
+        wuwa_ui::TextWrapped("Status: on. Every controller steers this menu; the game gets no input until it closes."); break;
     case Status::WaitingVr:
         if (xbox_fallback) wuwa_ui::TextWrapped("Status: on, waiting for VR controllers. Wake both and keep the headset on; the Xbox still works.");
         else wuwa_ui::TextWrapped("Status: on, waiting for VR controllers. Wake both and keep the headset on.");

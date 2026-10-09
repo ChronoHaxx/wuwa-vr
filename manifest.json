@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-08T08:05:41.039509+00:00",
+  "updatedAt": "2026-10-09T14:49:29.677555+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -13,7 +13,7 @@
     ".github/PULL_REQUEST_TEMPLATE.md": "2d068684174db47334b463da918d64e97d93986b7152af429211ad04f16359c1",
     ".github/workflows/pages.yml": "023b5ac1bdf741919f47c7b37b6f49647721586daabf3bbb01ac4828122c2674",
     "CONTRIBUTING.md": "7c72cce2abefe55862c6b947e86af9671ca3a4dbf39f49c1e8ec0420fa2ece0e",
-    "CREDITS.md": "16b7fdc6b6f41ded0a4ea151facf33987c8c68bcd2bb8a5d1ca09491728df304",
+    "CREDITS.md": "03bf31be3e4ed6a6086324e5318159e3e6bf6c9b6354e0e84aa84c0964808561",
     "LICENSE.md": "d8886ad3d072c9c2e85006fac0e561bbc20296292717017e45cfb4942352907a",
     "LICENSES/MIT.md": "2f298664b68a2e8a1a198f8ae254b8885693c8f4374c08291b0bb357e9843b5b",
     "LICENSES/fonts/Kanit-OFL.txt": "531d9080b8649114981df7efe23e3bcbeab5a98c42da6fb67caf6c013be8055b",
@@ -515,7 +515,7 @@
     "site/.nojekyll": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
     "site/app.js": "2b0d78f420c1172d23e95405b3caa3ecd623c9a022cbfe66b424bf54c6ceba3e",
     "site/config.js": "3be398fc92929768eaa31da153aa350b99e3b662732e5f1709ff2480ab5b81e5",
-    "site/credits.html": "713212757351c3f4e42c027f4355f27e4e8e02e22260049cd07516ab7440298a",
+    "site/credits.html": "8b1003edc77b24034bfd27bc766cde0df0345a290c8c1bfc810f33649ea974bc",
     "site/developers.html": "76be7e2da5029bdeb4187ff0bb8842058a091f6bf37f9d9a6fe1484525730b43",
     "site/feedback.html": "5c75410a3e284cedd624f5c4c92b396d31ab9e3ac44ec8706b07aba89de54243",
     "site/fonts/kanit-500.woff2": "c1dc128b995a736dda0ce4834f93814a9ed2d8c2334779f5eb24eaf1319adf89",

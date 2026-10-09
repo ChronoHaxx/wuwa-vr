@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-09T16:42:02.139394+00:00",
+  "updatedAt": "2026-10-09T17:21:33.144408+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -13,8 +13,8 @@
     ".github/PULL_REQUEST_TEMPLATE.md": "2d068684174db47334b463da918d64e97d93986b7152af429211ad04f16359c1",
     ".github/workflows/pages.yml": "023b5ac1bdf741919f47c7b37b6f49647721586daabf3bbb01ac4828122c2674",
     "CONTRIBUTING.md": "7c72cce2abefe55862c6b947e86af9671ca3a4dbf39f49c1e8ec0420fa2ece0e",
-    "CREDITS.md": "2d2cd488f52b241e1107b59f2aa34aa911f626ddbdcfcff5f978b50f9560c4ed",
-    "LICENSE.md": "5af47836ee8d4fff2e32e4c794233b206253de76a5435e3677467b50cbb2c220",
+    "CREDITS.md": "a817264aceb3fb70fb993fa568718ab64ed6958743c02dc2f90503b4991b231b",
+    "LICENSE.md": "81adb99c2d1a41ba11eb6e6a57f138886d527035c3a47b8a54c464efb01e6d7b",
     "LICENSES/MIT.md": "2f298664b68a2e8a1a198f8ae254b8885693c8f4374c08291b0bb357e9843b5b",
     "LICENSES/fonts/Kanit-OFL.txt": "531d9080b8649114981df7efe23e3bcbeab5a98c42da6fb67caf6c013be8055b",
     "LICENSES/fonts/SUITE-OFL.txt": "64e304b3a571b8a77ce40f9dea3e50458e2e6da495663db539474eb4f49c38eb",
@@ -515,7 +515,7 @@
     "site/.nojekyll": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
     "site/app.js": "2b0d78f420c1172d23e95405b3caa3ecd623c9a022cbfe66b424bf54c6ceba3e",
     "site/config.js": "3be398fc92929768eaa31da153aa350b99e3b662732e5f1709ff2480ab5b81e5",
-    "site/credits.html": "9d02ea6a998aa0b80d168e73e6f004a289de52d63fa257cd5232880464bd0ad2",
+    "site/credits.html": "c31bbeb3a50692ad52286fd08d927d2baa5ca15eee4d3dc5317fd2ab2767b6a2",
     "site/developers.html": "76be7e2da5029bdeb4187ff0bb8842058a091f6bf37f9d9a6fe1484525730b43",
     "site/feedback.html": "5c75410a3e284cedd624f5c4c92b396d31ab9e3ac44ec8706b07aba89de54243",
     "site/fonts/kanit-500.woff2": "c1dc128b995a736dda0ce4834f93814a9ed2d8c2334779f5eb24eaf1319adf89",

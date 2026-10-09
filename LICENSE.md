@@ -37,8 +37,8 @@ does not mean every bundled component has an open-source licence.
 ## Not covered by that MIT grant
 
 - UEVR backend, native adaptations/patches and bundled dependencies.
-- Community Lua/profile work and its adaptations, including mirudo2 (polar),
-  SannpoKun and Indath contributions.
+- Community Lua/profile work, plugins and their adaptations, including mirudo2
+  (polar), SannpoKun, markmon and Indath contributions.
 - Game code, assets, characters, screenshots, trademarks and other owners' work.
 - The generated controller illustration is not represented as an official
   Xbox asset or as having an exclusive copyright grant from this project.

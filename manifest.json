@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-09T14:46:18.252107+00:00",
+  "updatedAt": "2026-10-09T17:32:37.349015+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -52,6 +52,8 @@
     "dev/i18n/home/zh-Hans.json": "496d52b168950f26904ebf2ec753260183f65601f967087e66fb651fe096146e",
     "dev/i18n/launcher-release.en.json": "8e7a3a072bc5e66aa0fc86b270f9bee107e6468b48820e1dba8ceb61b30d886f",
     "dev/i18n/launcher-release.zh-Hans.json": "d341085c9624299f782590e292a0df8cad92061557c2f7ca28d6946ce78e5351",
+    "dev/imgui-preview/build.cmd": "219b49ccff46f8853b8e78c285b5c5f966f1fdeed8b3ad90a1e37371c593824a",
+    "dev/imgui-preview/preview.cpp": "750e098cc16f3b4c18421d72c5aaceb42369b98cde1dffdd23e4f62c912ff0c2",
     "dev/key-enum-fixture.inc": "ba8ff6ee21b4744b86b5deec14ada22bd5e6d03871266a7fdd27e08a3c338fc6",
     "dev/merge-controls-l10n.py": "87acfd752d2c64a47fcd6a8b32541089cd6e19f2c016cefaedc4b3d334b944f2",
     "dev/package-beta.py": "655e7c5923159c5b637a0341735d3b4c945010b23174173f11683246afa4d533",

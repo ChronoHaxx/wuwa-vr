@@ -162,7 +162,8 @@ public:
     void on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state) override;
     void on_xinput_set_state(uint32_t* retval, uint32_t user_index, XINPUT_VIBRATION* vibration) override;
     void update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_controller, bool sightseeing = false);
-    int sightseeing_mode() const { return wuwa_test::is_wuwa() ? m_sightseeing_mode.load() : 0; }
+    bool sightseeing_on() const { return wuwa_test::is_wuwa() && m_sightseeing_on.load(); }
+    int sightseeing_slot() const { return m_sightseeing_target.load(); }
     void stamp_sightseeing_packet(uint32_t result, uint32_t slot, XINPUT_STATE* state);
 
     void on_pre_engine_tick(sdk::UGameEngine* engine, float delta) override;
@@ -320,13 +321,13 @@ public:
     }
 
     bool is_using_controllers() const {
-        if (sightseeing_mode() != 0) return false; // Xbox emulation must not enable controller aiming.
+        if (sightseeing_on()) return false; // Xbox emulation must not enable controller aiming.
         return !wuwa_test::motion_input_muted() && motion_input_has_focus() && (m_controller_test_mode || (m_controllers_allowed->value() &&
         is_hmd_active() && !m_controllers.empty() && (std::chrono::steady_clock::now() - m_last_controller_update) <= std::chrono::seconds((int32_t)m_motion_controls_inactivity_timer->value())));
     }
 
     bool is_using_controllers_within(std::chrono::seconds seconds) const {
-        if (sightseeing_mode() != 0) return false;
+        if (sightseeing_on()) return false;
         return !wuwa_test::motion_input_muted() && motion_input_has_focus() && m_controllers_allowed->value() && is_hmd_active() && !m_controllers.empty() && (std::chrono::steady_clock::now() - m_last_controller_update) <= seconds;
     }
 
@@ -1210,7 +1211,8 @@ public:
             *m_show_fps,
             *m_show_statistics,
             *m_controllers_allowed,
-            m_sightseeing_choice,
+            *m_sightseeing_style,
+            *m_sightseeing_slot,
             *m_focus_on_gamepad_reconnect,
             *m_wuwa_forward_focus,
             *m_wuwa_gamepad_passthrough,
@@ -1240,25 +1242,30 @@ private:
     bool m_stereo_emulation_mode{false}; // not a good config option, just for debugging
     bool m_wait_for_present{true};
     const ModToggle::Ptr m_controllers_allowed{ ModToggle::create(generate_name("ControllersAllowed"), true) };
-    struct SightseeingChoice : ModCombo {
-        SightseeingChoice() : ModCombo{"VR_WuWaSightseeingControllers", {
-            "Off (normal input)", "VR controllers only", "VR + treadmill / Xbox slot 0",
-            "VR + treadmill / Xbox slot 1", "VR + treadmill / Xbox slot 2", "VR + treadmill / Xbox slot 3"}} {}
-        void config_load(const utility::Config&, bool) override { value() = 0; }
-        void config_save(utility::Config&) override {}
-    } m_sightseeing_choice;
-    std::atomic<int32_t> m_sightseeing_mode{0};
+    // VR controllers as an Xbox pad. On/off is per launch (off = Xbox only);
+    // how VR shares the slot and which slot are remembered.
+    const ModCombo::Ptr m_sightseeing_style{ ModCombo::create(generate_name("WuWaVRControllerStyle"),
+        {"Both together", "Last used wins", "VR only (Xbox ignored)"}, 0) };
+    const ModCombo::Ptr m_sightseeing_slot{ ModCombo::create(generate_name("WuWaVRControllerSlot"),
+        {"Slot 0 (usual)", "Slot 1", "Slot 2", "Slot 3"}, 0) };
+    std::atomic<bool> m_sightseeing_on{false};
+    std::atomic<int32_t> m_sightseeing_target{0};
+    std::atomic<int32_t> m_sightseeing_mix_style{0};
     std::mutex m_sightseeing_mtx;
     wuwa_sightseeing::Pad m_sightseeing_pad{};
     uint64_t m_sightseeing_sample_ms{};
     bool m_sightseeing_valid{};
     wuwa_sightseeing::Mixer m_sightseeing_mixer;
+    wuwa_sightseeing::MenuGesture m_sightseeing_gesture;
     wuwa_sightseeing::Readiness m_sightseeing_readiness;
     wuwa_sightseeing::PacketCounter m_sightseeing_packets;
     std::array<bool, 4> m_sightseeing_packet_owned{};
+    std::chrono::steady_clock::time_point m_sightseeing_last_nudge{};
     void update_sightseeing_sample(bool synced);
     bool apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* state);
     void reset_sightseeing();
+    void set_sightseeing_on(bool on, const char* why);
+    void draw_sightseeing_menu();
     const ModToggle::Ptr m_focus_on_gamepad_reconnect{ ModToggle::create(generate_name("FocusOnGamepadReconnect"), true) };
     // Independent live A/B switches. Preserve the accepted build's behavior
     // until the user enables a candidate; neither controls stereo rendering.

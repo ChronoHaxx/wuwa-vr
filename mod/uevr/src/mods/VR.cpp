@@ -727,82 +727,180 @@ bool sightseeing_focused() {
 }
 
 void VR::reset_sightseeing() {
-    m_sightseeing_choice.value() = 0;
-    m_sightseeing_mode.store(0);
+    // Runtime restarts keep the player's choice; only the input state restarts.
     std::scoped_lock lock{m_sightseeing_mtx};
     m_sightseeing_pad = {};
     m_sightseeing_sample_ms = 0;
     m_sightseeing_valid = false;
     m_sightseeing_mixer.reset();
+    m_sightseeing_gesture.reset();
     m_sightseeing_readiness.reset();
     // Keep delivered packet counters through disabling/reinitialization so a
     // release cannot collide with an unrelated physical driver's packet number.
 }
 
+void VR::set_sightseeing_on(bool on, const char* why) {
+    if (m_sightseeing_on.exchange(on) == on) return;
+    spdlog::info("[VR] VR controllers {} ({}); sharing {}, slot {}", on ? "on" : "off", why,
+        m_sightseeing_mix_style.load(), m_sightseeing_target.load());
+    std::scoped_lock lock{m_sightseeing_mtx};
+    m_sightseeing_mixer.reset();
+    m_sightseeing_readiness.reset();
+    m_sightseeing_gesture.cancel_pulse();
+}
+
 void VR::update_sightseeing_sample(bool synced) {
-    wuwa_sightseeing::Pad pad{};
-    const auto mode = sightseeing_mode();
+    if (!wuwa_test::is_wuwa()) return;
     using Status = wuwa_sightseeing::Status;
-    const auto blocker = mode == 0 ? Status::Off :
-        !synced ? Status::WaitingSample :
+    const bool on = sightseeing_on();
+    const auto blocker = !synced ? Status::WaitingVr :
         physical_gamepad_passthrough() ? Status::Passthrough :
-        wuwa_test::filter_input_slot(gamepad_slot_filter(), wuwa_sightseeing::target_slot(mode)) ? Status::SlotFiltered :
+        wuwa_test::filter_input_slot(gamepad_slot_filter(), sightseeing_slot()) ? Status::SlotFiltered :
         wuwa_test::motion_input_muted() ? Status::InputMuted :
-        !sightseeing_focused() ? Status::GameUnfocused : Status::Armed;
+        !sightseeing_focused() ? Status::GameUnfocused : Status::Active;
     const auto runtime = get_runtime();
     const bool openxr = runtime && runtime->is_openxr();
-    const bool valid = blocker == Status::Armed && openxr && m_openxr->read_sightseeing_pad(pad);
+    wuwa_sightseeing::Pad pad{};
+    const bool valid = blocker == Status::Active && openxr && m_openxr->read_sightseeing_pad(pad);
     // OpenVR never sets synced; still explain the unsupported runtime rather
     // than claiming its controllers simply need waking up.
-    const auto source = mode != 0 && runtime && !openxr ? Status::OpenXRRequired :
-        blocker != Status::Armed ? blocker : valid ? Status::Armed : Status::WaitingSample;
-    // Finish runtime queries before taking the mutex used by XInput.
-    std::scoped_lock lock{m_sightseeing_mtx};
-    m_sightseeing_pad = valid ? pad : wuwa_sightseeing::Pad{};
-    m_sightseeing_sample_ms = GetTickCount64();
-    m_sightseeing_valid = valid;
-    m_sightseeing_readiness.sample(mode, source, m_sightseeing_sample_ms);
-    if (!valid) m_sightseeing_mixer.reset();
+    const auto source = runtime && !openxr ? Status::OpenXRRequired :
+        blocker != Status::Active ? blocker : valid ? Status::Active : Status::WaitingVr;
+    // While VR controllers are off, the legacy motion-controller mapping (if
+    // enabled) already uses the Menu button for Start/Back.
+    const bool gesture = on || !m_controllers_allowed->value();
+    const auto now = GetTickCount64();
+    bool toggle{}, polled{};
+    {
+        // Finish runtime queries before taking the mutex used by XInput.
+        std::scoped_lock lock{m_sightseeing_mtx};
+        toggle = m_sightseeing_gesture.update(valid && gesture, pad.buttons, on, now);
+        m_sightseeing_pad = valid ? pad : wuwa_sightseeing::Pad{};
+        m_sightseeing_sample_ms = now;
+        m_sightseeing_valid = valid;
+        m_sightseeing_readiness.sample(source, now);
+        polled = m_sightseeing_readiness.polled(now);
+    }
+    if (toggle) {
+        set_sightseeing_on(!on, "left Menu held");
+        // One long buzz for on, one short for off.
+        if (openxr) m_openxr->trigger_haptic_vibration(on ? 0.06f : 0.25f, 0.0f, on ? 0.5f : 0.8f, VRRuntime::Hand::LEFT);
+        return;
+    }
+
+    // Unreal stops reading a slot once it reports disconnected and only looks
+    // again after a device-change message. Keep asking while the slot is not
+    // being read, at most every two seconds.
+    const auto steady = std::chrono::steady_clock::now();
+    if (on && !polled && (source == Status::Active || source == Status::WaitingVr)
+        && steady - m_sightseeing_last_nudge >= std::chrono::seconds(2)) {
+        m_sightseeing_last_nudge = steady;
+        spdlog::info("[VR] VR controllers: asking the game to read controller slot {}", sightseeing_slot());
+        g_framework->post_message(WM_DEVICECHANGE, 0x0007 /* DBT_DEVNODES_CHANGED */, 0);
+    }
 }
 
 bool VR::apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* state) {
-    const auto mode = sightseeing_mode();
-    if (mode == 0) return false;
-    // Bypass the legacy motion mapper for all slots; only one explicit source
-    // is mixed. Other connected controllers retain their original state.
-    if (!result || !state || slot != wuwa_sightseeing::target_slot(mode)) return true;
+    if (!sightseeing_on()) return false;
+    // Bypass the legacy motion mapper for all slots; only the chosen slot is
+    // mixed. Other connected controllers retain their original state.
+    if (!result || !state || slot != static_cast<uint32_t>(sightseeing_slot())) return true;
     const bool connected = *result == ERROR_SUCCESS;
     const auto physical = connected ? sightseeing_pad(state->Gamepad) : wuwa_sightseeing::Pad{};
-    using Status = wuwa_sightseeing::Status;
-    const auto blocker = physical_gamepad_passthrough() ? Status::Passthrough :
-        wuwa_test::motion_input_muted() ? Status::InputMuted :
-        !sightseeing_focused() ? Status::GameUnfocused : Status::Armed;
-    const bool permitted = blocker == Status::Armed;
     const bool ui_open = g_framework->is_drawing_ui();
+    const auto style = wuwa_sightseeing::style_from(m_sightseeing_mix_style.load());
+    wuwa_sightseeing::Pad delivered{};
     {
         std::scoped_lock lock{m_sightseeing_mtx};
         const auto now = GetTickCount64();
-        const auto mixed = m_sightseeing_mixer.apply(mode, physical, connected, m_sightseeing_pad,
-            permitted && m_sightseeing_valid, m_sightseeing_sample_ms, now, ui_open);
-        m_sightseeing_readiness.poll(mode, mixed, blocker, ui_open, now);
-        // The VR left stick navigates UEVR even in treadmill mode; walking on
-        // the belt must not scroll this menu. Never send that UI stick to WuWa.
-        const auto delivered = ui_open ? (mixed.vr_active ? m_sightseeing_pad : wuwa_sightseeing::Pad{}) : mixed.pad;
-        state->Gamepad = sightseeing_gamepad(delivered);
-        *result = mixed.connected ? ERROR_SUCCESS : ERROR_DEVICE_NOT_CONNECTED;
+        // The Menu button belongs to the hold gesture; a tap arrives as a pulse.
+        auto vr = m_sightseeing_pad;
+        vr.buttons = static_cast<uint16_t>((vr.buttons & ~wuwa_sightseeing::menu_bits) |
+            (ui_open ? 0 : m_sightseeing_gesture.take(now)));
+        const auto mixed = m_sightseeing_mixer.apply(true, style, physical, connected, vr,
+            m_sightseeing_valid, m_sightseeing_sample_ms, now, ui_open);
+        m_sightseeing_readiness.poll(mixed, now);
+        // UEVR's menu is navigated by VR when it is available, otherwise by the
+        // Xbox. A treadmill's belt would scroll it, so VR takes priority.
+        delivered = !ui_open ? mixed.pad : mixed.vr_ready ? mixed.vr : physical;
         m_sightseeing_packet_owned[slot] = true;
     }
+    state->Gamepad = sightseeing_gamepad(delivered);
+    // Always connected while on, so Unreal never stops reading this slot.
+    *result = ERROR_SUCCESS;
     m_last_xinput_update = std::chrono::steady_clock::now();
-    m_spoofed_gamepad_connection = *result == ERROR_SUCCESS;
-    if (*result == ERROR_SUCCESS) {
-        // Reuse UEVR navigation, but never rotate the treadmill's movement or
-        // apply the legacy controller aiming / D-pad shifting / snap-turn path.
-        update_imgui_state_from_xinput_state(*state, true, true);
-        if (ui_open) state->Gamepad = {}; // Also suppress the poll which closes UEVR.
-    } else {
-        *state = {};
-    }
+    m_spoofed_gamepad_connection = true;
+    // Reuse UEVR navigation, but never rotate the treadmill's movement or
+    // apply the legacy controller aiming / D-pad shifting / snap-turn path.
+    update_imgui_state_from_xinput_state(*state, true, true);
+    if (ui_open) state->Gamepad = {}; // The game sees nothing while UEVR is open.
     return true;
+}
+
+void VR::draw_sightseeing_menu() {
+    using Status = wuwa_sightseeing::Status;
+    using Source = wuwa_sightseeing::Source;
+    using Style = wuwa_sightseeing::Style;
+    bool on = sightseeing_on();
+    const auto label = wuwa_l10n::label("VR controllers on (this launch)");
+    if (ImGui::Checkbox(label.c_str(), &on)) set_sightseeing_on(on, "menu");
+    if (!on && m_controllers_allowed->value())
+        wuwa_ui::TextWrapped("The hold gesture is unavailable while Enable motion-controller input is on; use this checkbox.");
+    else
+        wuwa_ui::TextWrapped("Or hold the left Menu button for 1 second to turn them on or off; a buzz confirms. A quick press is still Start.");
+
+    wuwa_ui::draw(*m_sightseeing_style, "Sharing with Xbox / treadmill");
+    const auto style = wuwa_sightseeing::style_from(m_sightseeing_style->value());
+    switch (style) {
+    case Style::Both:
+        wuwa_ui::TextWrapped("Both work at once: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps working."); break;
+    case Style::LastUsed:
+        wuwa_ui::TextWrapped("Whichever you used last controls the game; the other waits until you press or push something on it."); break;
+    case Style::VrOnly:
+        wuwa_ui::TextWrapped("Only the VR controllers work while on; the Xbox pad on this slot is ignored until you turn them off."); break;
+    }
+    wuwa_ui::draw(*m_sightseeing_slot, "Controller slot");
+    wuwa_ui::TextWrapped("Slot 0 suits most setups. For a treadmill, choose its slot: launcher Troubleshooting > Controller check.");
+
+    wuwa_sightseeing::Snapshot snap{};
+    {
+        std::scoped_lock lock{m_sightseeing_mtx};
+        snap = m_sightseeing_readiness.read(on, GetTickCount64(), g_framework->is_drawing_ui());
+    }
+    const auto slot = sightseeing_slot();
+    const bool xbox_fallback = style != Style::VrOnly;
+    switch (snap.status) {
+    case Status::Off:
+        wuwa_ui::TextWrapped("Status: off. Xbox only."); break;
+    case Status::Active:
+        if (snap.source == Source::Both) wuwa_ui::TextWrapped("Status: on. VR controllers and Xbox both working.");
+        else if (snap.source == Source::Physical) wuwa_ui::TextWrapped("Status: on. Xbox in control; use a VR control to switch.");
+        else if (style == Style::LastUsed) wuwa_ui::TextWrapped("Status: on. VR controllers in control; use the Xbox to switch.");
+        else wuwa_ui::TextWrapped("Status: on. VR controllers working.");
+        if (snap.held) wuwa_ui::TextWrapped("A VR button or stick held from before is ignored until you let go of it.");
+        break;
+    case Status::MenuReady:
+        wuwa_ui::TextWrapped("Status: on. VR controllers steer this menu; the game gets no input until it closes."); break;
+    case Status::WaitingVr:
+        if (xbox_fallback) wuwa_ui::TextWrapped("Status: on, waiting for VR controllers. Wake both and keep the headset on; the Xbox still works.");
+        else wuwa_ui::TextWrapped("Status: on, waiting for VR controllers. Wake both and keep the headset on.");
+        break;
+    case Status::WaitingPoll:
+        wuwa_ui::TextWrapped("Status: on, waiting for the game to read controller slot %d. It is asked again every 2 seconds; keep the game window focused.", slot); break;
+    case Status::GameUnfocused:
+        wuwa_ui::TextWrapped("Status: on, waiting for game focus. Click the game window."); break;
+    case Status::Passthrough:
+        wuwa_ui::TextWrapped("Status: blocked by Physical gamepad passthrough. Turn passthrough off to use VR controllers."); break;
+    case Status::SlotFiltered:
+        wuwa_ui::TextWrapped("Status: blocked by the XInput controller slot filter. Allow slot %d or choose another slot.", slot); break;
+    case Status::InputMuted:
+        wuwa_ui::TextWrapped("Status: paused by the diagnostic motion-input mute."); break;
+    case Status::OpenXRRequired:
+        wuwa_ui::TextWrapped("Status: VR controllers need the OpenXR runtime."); break;
+    }
+
+    wuwa_ui::TextWrapped("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open UEVR. D-pad actions are not mapped.");
+    wuwa_ui::TextWrapped("Choose First person under View modes if wanted; camera and aiming settings stay unchanged.");
 }
 
 void VR::stamp_sightseeing_packet(uint32_t result, uint32_t slot, XINPUT_STATE* state) {
@@ -1789,8 +1887,9 @@ void VR::update_action_states() {
 
     const auto reconnect_now = std::chrono::steady_clock::now();
     const auto last_xinput_update_is_late = reconnect_now - m_last_xinput_update >= std::chrono::seconds(2);
-    const auto should_be_spoofing = !physical_gamepad_passthrough()
-        && ((actively_using_controller && (m_controllers_allowed->value() || sightseeing_mode() != 0)
+    // VR controllers mode asks for its own slot in update_sightseeing_sample.
+    const auto should_be_spoofing = !physical_gamepad_passthrough() && !sightseeing_on()
+        && ((actively_using_controller && m_controllers_allowed->value()
             && !wuwa_test::motion_input_muted() && motion_input_has_focus()) || get_runtime()->handle_pause);
 
     if (m_spoofed_gamepad_connection && last_xinput_update_is_late && should_be_spoofing) {
@@ -1802,7 +1901,7 @@ void VR::update_action_states() {
     if (!m_spoofed_gamepad_connection && last_xinput_update_is_late && should_be_spoofing
         && reconnect_now - m_last_gamepad_reconnect_attempt >= std::chrono::seconds(2)) {
         m_last_gamepad_reconnect_attempt = reconnect_now;
-        const auto focus_on_reconnect = sightseeing_mode() == 0 && m_focus_on_gamepad_reconnect->value();
+        const auto focus_on_reconnect = m_focus_on_gamepad_reconnect->value();
         spdlog::info("[VR] Attempting to spoof gamepad connection (focus_game={})", focus_on_reconnect);
         g_framework->post_message(WM_DEVICECHANGE, 0, 0);
         // A background game may stop polling XInput. Keep reconnecting without
@@ -1829,7 +1928,7 @@ void VR::update_action_states() {
         once2 = false;
     }
 
-    if (sightseeing_mode() == 0) update_dpad_gestures();
+    if (!sightseeing_on()) update_dpad_gestures();
 }
 
 void VR::update_dpad_gestures() {
@@ -1899,6 +1998,7 @@ void VR::on_config_load(const utility::Config& cfg, bool set_defaults) {
     ZoneScopedN(__FUNCTION__);
 
     m_diorama.request(false);
+    set_sightseeing_on(false, "settings loaded");
     reset_sightseeing();
 
     for (IModValue& option : m_options) {
@@ -2120,12 +2220,15 @@ void VR::handle_keybinds() {
 void VR::on_frame() {
     ZoneScopedN(__FUNCTION__);
 
-    const auto walking = std::clamp(m_sightseeing_choice.value(), 0, 5);
-    if (m_sightseeing_mode.exchange(walking) != walking) {
+    // Settings are drawn on another thread; the XInput hook reads these copies.
+    const auto vr_style = std::clamp(m_sightseeing_style->value(), 0, 2);
+    const auto vr_slot = wuwa_sightseeing::slot_from(m_sightseeing_slot->value());
+    const bool style_changed = m_sightseeing_mix_style.exchange(vr_style) != vr_style;
+    const bool slot_changed = m_sightseeing_target.exchange(vr_slot) != vr_slot;
+    if (style_changed || slot_changed) {
         std::scoped_lock lock{m_sightseeing_mtx};
         m_sightseeing_mixer.reset();
         m_sightseeing_readiness.reset();
-        m_sightseeing_valid = false;
     }
 
     m_cvar_manager->on_frame();
@@ -2602,52 +2705,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         if (wuwa_ui::CollapsingHeader("View modes and cutscenes", ImGuiTreeNodeFlags_DefaultOpen))
             draw_view_modes();
         if (wuwa_ui::CollapsingHeader("VR controllers for walking (optional)")) {
-            if (wuwa_ui::draw(m_sightseeing_choice, "Walking input")) {
-                m_sightseeing_mode.store(m_sightseeing_choice.value());
-                std::scoped_lock lock{m_sightseeing_mtx};
-                m_sightseeing_mixer.reset();
-                m_sightseeing_readiness.reset();
-                m_sightseeing_valid = false;
-            }
-            wuwa_ui::TextWrapped("For sightseeing with Quest controllers through OpenXR. Starts off each launch. Choose First person below if wanted; your camera and aiming settings stay unchanged.");
-            wuwa_ui::TextWrapped("VR controllers only: left stick moves, right stick looks. With treadmill / Xbox: choose its connected XInput slot; movement comes only from that device, while VR buttons and right stick are added. Check the slot in launcher Troubleshooting > Controller check.");
-            wuwa_ui::TextWrapped("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu = Start; left grip + Menu = View. Both stick clicks open UEVR. D-pad actions are not mapped in this walking layout.");
-            wuwa_ui::TextWrapped("Wake both controllers, focus the game, then release buttons and center sticks to arm. After closing UEVR, release them again. Physical gamepad passthrough and a conflicting slot filter block VR input. Choose Off to restore normal input.");
-            if (sightseeing_mode() != 0) {
-                using Status = wuwa_sightseeing::Status;
-                Status status{};
-                {
-                    std::scoped_lock lock{m_sightseeing_mtx};
-                    status = m_sightseeing_readiness.read(sightseeing_mode(), GetTickCount64(), g_framework->is_drawing_ui());
-                }
-                switch (status) {
-                case Status::Armed:
-                    wuwa_ui::TextWrapped("Armed: VR controls are being delivered to the selected game controller slot."); break;
-                case Status::MenuReady:
-                    wuwa_ui::TextWrapped("Armed for UEVR menu navigation. Game input is paused while this menu is open; release controls after closing it."); break;
-                case Status::WaitingRelease:
-                    wuwa_ui::TextWrapped("Waiting for release: let go of all VR buttons and triggers, and center both sticks to arm."); break;
-                case Status::MissingSlot:
-                    wuwa_ui::TextWrapped("The selected treadmill / Xbox slot is disconnected. Connect it or choose its connected slot; check launcher Troubleshooting > Controller check."); break;
-                case Status::Passthrough:
-                    wuwa_ui::TextWrapped("VR walking input is blocked by Physical gamepad passthrough. Turn passthrough off to use VR controllers."); break;
-                case Status::SlotFiltered:
-                    wuwa_ui::TextWrapped("VR walking input is blocked by the controller slot filter. Allow the selected walking slot."); break;
-                case Status::InputMuted:
-                    wuwa_ui::TextWrapped("VR walking input is paused by the diagnostic motion-input mute."); break;
-                case Status::GameUnfocused:
-                    wuwa_ui::TextWrapped("Waiting for game focus. Select the game window, then release VR controls to arm."); break;
-                case Status::OpenXRRequired:
-                    wuwa_ui::TextWrapped("VR walking input requires OpenXR. The current runtime is not OpenXR."); break;
-                case Status::StaleSample:
-                    wuwa_ui::TextWrapped("VR controller updates have stopped. No VR input is being added; wake both controllers and focus the game."); break;
-                case Status::WaitingPoll:
-                    wuwa_ui::TextWrapped("VR controllers are available. Waiting for the game to poll the selected controller slot before checking readiness."); break;
-                case Status::WaitingSample:
-                    wuwa_ui::TextWrapped("Waiting for focused OpenXR and both active controllers. No VR input is being added."); break;
-                case Status::Off: break;
-                }
-            }
+            draw_sightseeing_menu();
         }
         if (wuwa_ui::CollapsingHeader("Diorama mode (optional)")) {
             bool miniature = m_diorama.requested();

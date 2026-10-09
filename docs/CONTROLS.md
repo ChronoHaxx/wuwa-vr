@@ -89,49 +89,62 @@ aim and the game's targeting agree.
 
 ## Optional Quest controllers for walking
 
-Open **VR → WuWa Controls → VR controllers for walking (optional) → Walking
-input**. This is an optional OpenXR sightseeing layout, not a tested combat
-layout. It starts **Off (normal input)** each launch. First person remains a
-separate choice in the existing **First person** section; enabling walking
-does not change camera or aim settings, or fix rendering issues.
+Quest controllers can act as an Xbox pad through OpenXR. This is a
+sightseeing layout, not a tested combat layout. They start **off** each launch,
+so only your Xbox pad (or treadmill) works until you turn them on. First person
+is a separate choice under **View modes**; this does not change camera or aim
+settings.
 
-- **VR controllers only:** emulates Xbox input on **slot 0**. Left stick moves;
-  right stick looks. Use the merge mode instead when keeping treadmill input.
-- **VR + treadmill / Xbox slot 0–3:** choose the connected slot used by your
-  device. **Launcher → Troubleshooting → Controller check** reports Windows
-  XInput slots, but a slot number alone does not identify RealityRunner.
-  Movement stays entirely on the selected device's left stick, including when
-  it is neutral; the VR left stick does not replace it. VR buttons are added,
-  and the VR right stick looks unless the device's right stick is moved beyond
-  its deadzone, when that device keeps control of both look axes.
+**Turn on or off:** hold the **left Menu** button for 1 second (a buzz
+confirms: long for on, short for off), or tick **VR → WuWa Controls → VR
+controllers for walking (optional) → VR controllers on (this launch)**. A quick
+press of left Menu is still Start. The hold gesture is unavailable while UEVR's
+separate **Enable motion-controller input** is on; use the checkbox then.
+
+**Sharing with Xbox / treadmill** (remembered):
+
+- **Both together** (default): both work at once. Buttons combine, triggers
+  take the stronger press, and each stick follows whichever controller pushes
+  it further, so treadmill walking keeps working while VR looks around.
+- **Last used wins**: whichever you pressed or pushed last controls the game;
+  the other is ignored until you use it. Holding a stick or button does not
+  switch.
+- **VR only (Xbox ignored)**: only VR controllers work while on.
+
+**Controller slot** (remembered): the Windows XInput slot that VR shares.
+Slot 0 suits most setups. For a treadmill, choose its slot; **Launcher →
+Troubleshooting → Controller check** reports the slots in use.
 
 | Quest control | Xbox input |
 | --- | --- |
 | Right A / B; left X / Y | A / B / X / Y, matching the printed labels |
-| Left / right stick | Left / right stick; left ignored in merge mode |
+| Left / right stick | Left / right stick |
 | Click left / right stick | L3 / R3 |
 | Left / right trigger | LT / RT |
 | Left / right grip | LB / RB |
-| Left Menu | Start / Menu |
-| Left grip + left Menu | View / Back; consumes LB |
+| Left Menu (quick press) | Start / Menu |
+| Left grip + left Menu (quick press) | View / Back; consumes LB |
+| Left Menu (hold 1 s) | Turn VR controllers on or off |
 | Both stick clicks | L3 + R3: open/close UEVR settings |
 
 No Quest system-button or D-pad mapping is added. With menus and HUD/mouse
 adjustment closed, existing **hold L3, then squeeze LT** portal and **hold L3,
-then squeeze RT** diorama shortcuts remain; release all controls before
-repeating. First-person, portal and diorama rules above still apply.
+then squeeze RT** diorama shortcuts remain. First-person, portal and diorama
+rules above still apply.
 
-Wake both controllers and focus the game. Release the VR buttons, grips and
-triggers, and center both sticks before input arms. Do this again after a
-focus change, reconnect, mode change, or opening/closing UEVR. Merge also needs
-the selected Windows slot to remain connected. **Physical gamepad passthrough**
-or a conflicting **XInput controller slot** filter blocks VR input. This mode
-does not change drivers, HidHide, RealityRunner, runtime or device settings.
+While on, the selected slot always reports a connected pad, so the game keeps
+reading it even when the controllers sleep, the headset comes off or no Xbox is
+plugged in. If the game is not reading the slot yet, the mod asks it to check
+for controllers again every 2 seconds. A VR button or stick that is already held
+when VR input starts, wakes up, or when UEVR opens or closes, is ignored until
+you let go of it; everything else works straight away. **Physical gamepad
+passthrough** or a conflicting **XInput controller slot** filter blocks VR
+input. This mode does not change drivers, HidHide, RealityRunner, runtime or
+device settings.
 
-**Headset and RealityRunner acceptance is pending.** **Off (normal input)** removes
-this optional mapping and restores your existing `ControllersAllowed` behavior.
-If that setting was already on, the legacy VR controller mapping resumes. Off
-does not disable that separate mapping or repair Windows controller visibility.
+**Headset and RealityRunner acceptance is pending.** Turning VR controllers off
+restores your existing `ControllersAllowed` behavior. If that setting was
+already on, the legacy VR controller mapping resumes.
 
 ## HUD/mouse adjustment
 

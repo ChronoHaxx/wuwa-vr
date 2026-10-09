@@ -1349,5 +1349,104 @@
   ],
   "Moves supported menus into the VR panel, including with Native Stereo Fix on. Starts off. Disable if a menu looks wrong. Loading screens and blur still need testing.": [
     "mods/VR.cpp"
+  ],
+  "VR controllers on (this launch)": [
+    "mods/VR.cpp"
+  ],
+  "Or hold the left Menu button for 1 second to turn them on or off; a buzz confirms. A quick press is still Start.": [
+    "mods/VR.cpp"
+  ],
+  "The hold gesture is unavailable while Enable motion-controller input is on; use this checkbox.": [
+    "mods/VR.cpp"
+  ],
+  "Sharing with Xbox / treadmill": [
+    "mods/VR.cpp"
+  ],
+  "Both together": [
+    "mods/VR.hpp"
+  ],
+  "Last used wins": [
+    "mods/VR.hpp"
+  ],
+  "VR only (Xbox ignored)": [
+    "mods/VR.hpp"
+  ],
+  "Both work at once: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps working.": [
+    "mods/VR.cpp"
+  ],
+  "Whichever you used last controls the game; the other waits until you press or push something on it.": [
+    "mods/VR.cpp"
+  ],
+  "Only the VR controllers work while on; the Xbox pad on this slot is ignored until you turn them off.": [
+    "mods/VR.cpp"
+  ],
+  "Controller slot": [
+    "mods/VR.cpp"
+  ],
+  "Slot 0 (usual)": [
+    "mods/VR.hpp"
+  ],
+  "Slot 1": [
+    "mods/VR.hpp"
+  ],
+  "Slot 2": [
+    "mods/VR.hpp"
+  ],
+  "Slot 3": [
+    "mods/VR.hpp"
+  ],
+  "Slot 0 suits most setups. For a treadmill, choose its slot: launcher Troubleshooting > Controller check.": [
+    "mods/VR.cpp"
+  ],
+  "Status: off. Xbox only.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on. VR controllers and Xbox both working.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on. Xbox in control; use a VR control to switch.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on. VR controllers in control; use the Xbox to switch.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on. VR controllers working.": [
+    "mods/VR.cpp"
+  ],
+  "A VR button or stick held from before is ignored until you let go of it.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on. VR controllers steer this menu; the game gets no input until it closes.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on, waiting for VR controllers. Wake both and keep the headset on; the Xbox still works.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on, waiting for VR controllers. Wake both and keep the headset on.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on, waiting for the game to read controller slot %d. It is asked again every 2 seconds; keep the game window focused.": [
+    "mods/VR.cpp"
+  ],
+  "Status: on, waiting for game focus. Click the game window.": [
+    "mods/VR.cpp"
+  ],
+  "Status: blocked by Physical gamepad passthrough. Turn passthrough off to use VR controllers.": [
+    "mods/VR.cpp"
+  ],
+  "Status: blocked by the XInput controller slot filter. Allow slot %d or choose another slot.": [
+    "mods/VR.cpp"
+  ],
+  "Status: paused by the diagnostic motion-input mute.": [
+    "mods/VR.cpp"
+  ],
+  "Status: VR controllers need the OpenXR runtime.": [
+    "mods/VR.cpp"
+  ],
+  "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open UEVR. D-pad actions are not mapped.": [
+    "mods/VR.cpp"
+  ],
+  "Choose First person under View modes if wanted; camera and aiming settings stay unchanged.": [
+    "mods/VR.cpp"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-08T08:05:41.039509+00:00",
+  "updatedAt": "2026-10-09T14:52:26.726293+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -212,6 +212,7 @@
     "launcher/dev/wuwa-projection-compare.py": "f76a214f1c05804133329f2d50a6600d97a271ce7ff4dc5dc12cda3ea867bac7",
     "launcher/dev/wuwa-runtime.ps1": "4facca0e7d0f37f7432c8765520513b31f5b1ec79456b608729e846dd19d559e",
     "launcher/dev/wuwa-test.py": "d155d477264582146cddc9fb83b391e8082694255c7d2203ba2c6029890b1921",
+    "launcher/dev/wuwa_ao_batch.py": "3c70850d02d9b1107b408eb961446043fa8ff000b0086e2fe388ce7697022b4a",
     "launcher/dev/wuwa_bench_run.py": "aa7d2cccf64e8df5413e269a2c5306b49883a47858a9abc6ada77140430335fc",
     "launcher/dev/wuwa_clv_check.py": "82d1d66ff8e7a3ed71a19ce8a7713f04e6f4aa5c8a3270df349dc075dba49bf6",
     "launcher/dev/wuwa_eye_diff_summary.py": "136342cb2a6125cc21529feb3233476401cea7381843e1020a163d0f15660b30",

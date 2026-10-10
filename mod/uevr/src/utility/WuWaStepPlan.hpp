@@ -154,6 +154,7 @@ public:
             const bool same = m_plan && m_plan->id == plan.id;
             const int keep = same ? (std::min)(m_index, static_cast<int>(plan.steps.size())) : 0;
             if (m_plan && !same) unload(settings, unix_ms, "plan replaced");
+            if (!same) m_answers.clear();
             m_plan = std::move(plan);
             m_index = keep;
             m_error.clear();
@@ -178,6 +179,7 @@ public:
     void answer(const std::string& answer, const Json& context, std::int64_t unix_ms, const Settings& settings) {
         if (!active()) return;
         log({{"event", "answer"}, {"step", step()->id}, {"index", m_index}, {"answer", answer}, {"context", context}}, unix_ms);
+        m_answers[m_index] = answer;
         ++m_index;
         sync(settings);
         if (finished()) log({{"event", "plan_finished"}}, unix_ms);
@@ -198,8 +200,23 @@ public:
     void restart(std::int64_t unix_ms, const Settings& settings) {
         if (!m_plan) return;
         m_index = 0;
+        m_answers.clear();
         log({{"event", "restart"}}, unix_ms);
         sync(settings);
+    }
+
+    // Jumps to any step without answering; earlier answers stay saved.
+    void go(int index, std::int64_t unix_ms, const Settings& settings) {
+        if (!m_plan || index < 0 || index >= count() || index == m_index) return;
+        m_index = index;
+        log({{"event", "go"}, {"step", m_plan->steps[m_index].id}, {"index", m_index}}, unix_ms);
+        sync(settings);
+    }
+
+    // The latest answer given to a step in this session, or empty.
+    std::string answer_for(int index) const {
+        const auto it = m_answers.find(index);
+        return it == m_answers.end() ? std::string{} : it->second;
     }
 
     // Settings this plan changed, with the values to restore.
@@ -211,6 +228,7 @@ private:
         log({{"event", "plan_unloaded"}, {"why", why}}, unix_ms);
         m_plan.reset();
         m_index = 0;
+        m_answers.clear();
         ++m_revision;
     }
 
@@ -262,5 +280,6 @@ private:
     std::string m_stamp, m_error;
     std::filesystem::path m_folder;
     std::map<std::string, std::string> m_original;
+    std::map<int, std::string> m_answers;
 };
 }

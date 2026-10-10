@@ -912,8 +912,9 @@ bool WuWaControlsComponent::mode_warning_active() const {
 bool WuWaControlsComponent::status_warning_visible() const {
     // A visible sheet includes both recovery hints. Keep its controls and
     // placement available even when mouse mode and hidden UI are combined.
-    return !g_framework->is_drawing_ui() && VR::get()->is_hmd_active() &&
-        !floor_visible() && (menu_warning_active() || mode_warning_active());
+    // The VR menu's cinematic note shows for a few seconds either way.
+    if (g_framework->is_drawing_ui() || !VR::get()->is_hmd_active()) return false;
+    return wuwa_menu_host::hint_active() || (!floor_visible() && (menu_warning_active() || mode_warning_active()));
 }
 
 bool WuWaControlsComponent::floor_visible() const {
@@ -954,6 +955,10 @@ Matrix4x4f WuWaControlsComponent::floor_transform() const {
 
 void WuWaControlsComponent::draw_passive_overlay() {
     if (status_warning_visible()) {
+        if (floor_visible() || (!menu_warning_active() && !mode_warning_active())) {
+            wuwa_menu_host::draw_hint(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize);
+            return;
+        }
         const bool hidden=menu_warning_active();
         const bool shortcut=m_enabled->value() && !VR::get()->physical_gamepad_passthrough();
         if (hidden) wuwa_sheet::draw_hidden_ui_warning(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize,ImGui::GetFont(),shortcut,true);

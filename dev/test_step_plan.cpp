@@ -128,9 +128,23 @@ int main() {
     check(lines[1].value("answer", "") == "Right eye only" && lines[1].at("context").value("recording", "") == "idle",
         "an answer lost its text or context");
 
+    // Free navigation: jump anywhere, answers stay, settings follow the step.
+    check(runner.answer_for(0) == "Right eye only" && runner.answer_for(1) == "Fail" && runner.answer_for(9).empty(),
+        "the latest answer per step was not kept");
+    runner.go(1, now, settings);
+    check(runner.index() == 1 && runner.active() && store["UI_Size"] == "1.5", "jumping back from the end lost the step's settings");
+    runner.go(0, now, settings);
+    check(runner.index() == 0 && store["UI_Size"] == "2.000000" && store["VR_2DScreenMode"] == "false",
+        "jumping to step 1 did not restore later steps' settings");
+    runner.go(-1, now, settings);
+    runner.go(4, now, settings);
+    check(runner.index() == 0, "jumping outside the plan moved");
+    runner.go(3, now, settings);
+    check(runner.index() == 3 && runner.answer_for(0) == "Right eye only", "jumping forward lost earlier answers");
+
     // Restart and reloads.
     runner.restart(now, settings);
-    check(runner.index() == 0 && runner.active(), "restart did not return to step 1");
+    check(runner.index() == 0 && runner.active() && runner.answer_for(0).empty(), "restart did not return to step 1 with no answers");
     runner.answer("No bars", {}, now, settings);
     check(store["VR_2DScreenMode"] == "true", "restart lost the step settings");
     write(folder / "plan.json", "{ \"version\": 1, \"id\": ");

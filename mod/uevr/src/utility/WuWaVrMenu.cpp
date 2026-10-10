@@ -76,17 +76,42 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
     list->AddRectFilled(pos, ImVec2{pos.x + size.x, pos.y + size.y}, backdrop, 20.0f * s);
     list->AddRect(pos, ImVec2{pos.x + size.x, pos.y + size.y}, gold_dim, 20.0f * s, 0, 2.0f * s);
 
-    // Header: title, page tabs (LB / RB when using buttons), close.
+    // Header: page tabs (LB / RB when using buttons), a badge, close. Tabs
+    // shrink to fit; the title shows only when there is room for it.
     list->AddRectFilled(pos, at(width, header_h), header, 20.0f * s, ImDrawFlags_RoundCornersTop);
-    write(at(left, 22.0f), 34.0f, gold, "WuWa VR");
-    float x = 220.0f;
+    const float close_left = right - 52.0f;
+    float limit = close_left - 16.0f;
+    const float badge_w = look.badge.empty() ? 0.0f : measure(24.0f, look.badge).x / s + 34.0f;
+    if (badge_w > 0.0f) {
+        const float bx = close_left - 18.0f - badge_w;
+        list->AddCircleFilled(at(bx + 10.0f, 42.0f), 9.0f * s, IM_COL32(235, 64, 64, 255));
+        write(at(bx + 28.0f, 30.0f), 24.0f, IM_COL32(255, 120, 120, 255), look.badge);
+        limit = bx - 16.0f;
+    }
+    const float hints = pointer ? 0.0f : 40.0f; // room for "LB" and "RB"
+    const float count = static_cast<float>(pages.size());
+    std::vector<std::string> titles;
+    float text_total = 0.0f;
+    for (const auto& item : pages) {
+        titles.push_back(tr(item.title));
+        text_total += measure(26.0f, titles.back()).x / s;
+    }
+    const float title_w = measure(34.0f, "WuWa VR").x / s + 36.0f;
+    const float natural = text_total + count * 36.0f + (count - 1.0f) * 10.0f + 2.0f * hints;
+    float x = left;
+    if (left + title_w + natural <= limit) {
+        write(at(left, 22.0f), 34.0f, gold, "WuWa VR");
+        x += title_w;
+    }
+    const float fit = std::clamp((limit - x - 2.0f * hints - (count - 1.0f) * 10.0f) / (text_total + count * 36.0f), 0.6f, 1.0f);
+    const float tab_px = 26.0f * fit, tab_pad = 36.0f * fit;
     if (!pointer) {
         write(at(x, 30.0f), 22.0f, muted, "LB");
-        x += 40.0f;
+        x += hints;
     }
     for (int index = 0; index < static_cast<int>(pages.size()); ++index) {
-        const auto title = tr(pages[index].title);
-        const float w = measure(26.0f, title).x / s + 36.0f;
+        const auto& title = titles[index];
+        const float w = measure(tab_px, title).x / s + tab_pad;
         const auto min = at(x, 16.0f), max = at(x + w, 68.0f);
         ImGui::PushID(index);
         button("tab", min, max);
@@ -96,12 +121,12 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
         ImGui::PopID();
         if (current) list->AddRectFilled(min, max, gold, 10.0f * s);
         else list->AddRect(min, max, hovered ? gold : gold_dim, 10.0f * s, 0, 2.0f * s);
-        write(at(x + 18.0f, 28.0f), 26.0f, current ? ink_dark : hovered ? ink : muted, title);
+        write(at(x + tab_pad * 0.5f, 42.0f - tab_px * 0.55f), tab_px, current ? ink_dark : hovered ? ink : muted, title);
         x += w + 10.0f;
     }
-    if (!pointer) write(at(x + 6.0f, 30.0f), 22.0f, muted, "RB");
+    if (!pointer) write(at(x + 2.0f, 30.0f), 22.0f, muted, "RB");
     {
-        const auto min = at(right - 52.0f, 16.0f), max = at(right, 68.0f);
+        const auto min = at(close_left, 16.0f), max = at(right, 68.0f);
         button("close", min, max);
         const bool hovered = ImGui::IsItemHovered();
         if (ImGui::IsItemClicked()) state.close_requested = true;
@@ -192,7 +217,8 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
             list->AddRectFilled(t0, t1, !enabled ? track : on ? gold : track, 22.0f * s);
             const float knob = on ? widget_right - 22.0f : widget_right - 74.0f;
             list->AddCircleFilled(at(knob, mid), 17.0f * s, on ? ink_dark : ink);
-            const auto word = tr(on ? "On" : "Off");
+            auto word = item.value_text ? item.value_text() : std::string{}; // live state, e.g. "REC 1:23"
+            if (word.empty()) word = tr(on ? "On" : "Off");
             write(at(widget_right - 112.0f - measure(24.0f, word).x / s, mid - 12.0f), 24.0f, on ? gold_bright : muted, word);
             break;
         }
@@ -263,7 +289,7 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
 }
 
 void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wuwa_steps::Plan& plan, int index,
-    bool recording, const std::string& error) {
+    const std::string& recording, const std::string& error) {
     if (!list || !font) return;
     const bool finished = index >= static_cast<int>(plan.steps.size());
     const auto* step = finished ? nullptr : &plan.steps[index];
@@ -283,9 +309,11 @@ void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wu
     const auto counter = finished ? tr("Finished") : std::to_string(index + 1) + " / " + std::to_string(plan.steps.size());
     const float counter_w = font->CalcTextSizeA(34 * s, FLT_MAX, 0.0f, counter.c_str()).x / s;
     write(1530 - counter_w, 58, 34, muted, counter);
-    if (recording) {
+    if (!recording.empty()) {
+        const auto rec = "REC " + recording;
+        const float rec_w = font->CalcTextSizeA(34 * s, FLT_MAX, 0.0f, rec.c_str()).x / s;
         list->AddCircleFilled(at(1530 - counter_w - 60, 76), 13 * s, IM_COL32(235, 64, 64, 255));
-        write(1530 - counter_w - 140, 58, 34, IM_COL32(235, 90, 90, 255), "REC");
+        write(1530 - counter_w - 90 - rec_w, 58, 34, IM_COL32(235, 90, 90, 255), rec);
     }
 
     float y = 120;
@@ -310,5 +338,26 @@ void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wu
     }
     if (!error.empty()) write(70, 690, 26, IM_COL32(255, 120, 110, 255), "plan.json: " + error, 1460);
     write(70, 800, 32, gold, tr("Answer in the menu: L3 + R3 (or Insert), Test page."));
+}
+
+void draw_note(ImDrawList* list, const ImVec2& size, ImFont* font, const std::string& title, const std::string& line1,
+    const std::string& line2) {
+    if (!list || !font) return;
+    // Low in view, so the scene behind it stays visible.
+    const float s = (std::min)(size.x / 1600.0f, size.y / 900.0f);
+    const ImVec2 origin{(size.x - 1600.0f * s) * 0.5f, (size.y - 900.0f * s) * 0.5f};
+    const auto at = [&](float x, float y) { return ImVec2{origin.x + x * s, origin.y + y * s}; };
+    const auto centered = [&](float y, float px, ImU32 color, const std::string& english) {
+        const auto text = tr(english);
+        const float natural = font->CalcTextSizeA(px * s, FLT_MAX, 0.0f, text.c_str()).x;
+        const float fitted = px * s * (std::min)(1.0f, 1300.0f * s / (std::max)(natural, 1.0f));
+        const float w = font->CalcTextSizeA(fitted, FLT_MAX, 0.0f, text.c_str()).x;
+        list->AddText(font, fitted, ImVec2{size.x * 0.5f - w * 0.5f, origin.y + y * s}, color, text.c_str());
+    };
+    list->AddRectFilled(at(120, 560), at(1480, 790), IM_COL32(10, 10, 14, 236), 22 * s);
+    list->AddRect(at(120, 560), at(1480, 790), gold, 22 * s, 0, 3 * s);
+    centered(584, 46, gold, title);
+    if (!line1.empty()) centered(652, 32, ink, line1);
+    if (!line2.empty()) centered(712, 27, muted, line2);
 }
 }

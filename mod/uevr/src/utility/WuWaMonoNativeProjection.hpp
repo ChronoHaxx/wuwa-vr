@@ -85,6 +85,9 @@ namespace wuwa_cinematic_framing {
 enum class Status { off, waiting, ready, refused };
 inline std::atomic<Status> current_status{Status::off};
 inline std::atomic<uint64_t> authored_views{}, cropped_views{}, refused_pairs{}, differing_camera_decisions{};
+// When the game last drew through an aspect-constrained (letterboxed) camera,
+// as GetTickCount64 milliseconds: in-engine cinematics. 0 means never.
+inline std::atomic<uint64_t> constrained_ms{};
 inline const char* status_text() noexcept {
     switch (current_status.load(std::memory_order_relaxed)) {
     case Status::ready: return "Authored framing applied (headset check pending)";

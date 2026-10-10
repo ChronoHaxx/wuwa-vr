@@ -7,6 +7,8 @@
 // behave the same. Everything here runs on the UI thread.
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstdio>
 #include <functional>
 #include <string>
 #include <vector>
@@ -76,7 +78,72 @@ struct Held {
     bool up{}, down{}, left{}, right{};
 };
 
-constexpr float stick_push = 0.6f; // fraction of full deflection
+// A stick gives at most one direction at a time. A push engages only when it
+// is well past centre and mostly along one axis, so a slightly diagonal push
+// never moves two ways. A held direction lasts until the stick falls back
+// toward centre, so wobble during a push neither flickers nor repeats it.
+enum class Dir { None, Up, Down, Left, Right };
+
+struct StickReader {
+    float engage{0.6f};    // fraction of full deflection along the axis
+    float release{0.35f};  // a held direction ends below this
+    float dominance{1.6f}; // the axis must lead the other by this ratio (about 32 degrees)
+    Dir held{Dir::None};
+
+    static float along(Dir dir, float x, float y) {
+        switch (dir) {
+        case Dir::Up: return y;
+        case Dir::Down: return -y;
+        case Dir::Left: return -x;
+        case Dir::Right: return x;
+        default: return 0.0f;
+        }
+    }
+
+    Dir read(float x, float y) {
+        if (!std::isfinite(x) || !std::isfinite(y)) x = y = 0.0f;
+        const float ax = std::fabs(x), ay = std::fabs(y);
+        Dir candidate = Dir::None;
+        if (ay >= engage && ay >= dominance * ax) candidate = y > 0.0f ? Dir::Up : Dir::Down;
+        else if (ax >= engage && ax >= dominance * ay) candidate = x > 0.0f ? Dir::Right : Dir::Left;
+        if (held != Dir::None && along(held, x, y) >= release && (candidate == Dir::None || candidate == held)) return held;
+        held = candidate;
+        return held;
+    }
+};
+
+// When to show the "cinematic scene" note: once per cinematic, after it has
+// lasted a moment, for a few seconds. A cinematic ends after `gap` without one.
+// Times are milliseconds from any steady clock.
+struct CinemaHint {
+    std::uint64_t settle{1200}, show{8000}, gap{10000};
+    std::uint64_t since{}, last{}, shown{};
+    bool done{};
+
+    bool update(bool cinematic, bool eligible, std::uint64_t now) {
+        if (cinematic) {
+            if (since == 0 || now - last > gap) { since = now; shown = 0; done = false; }
+            last = now;
+        }
+        if (done || since == 0) return false;
+        if (shown != 0 && (!eligible || now - shown >= show)) { done = true; return false; }
+        if (shown == 0) {
+            if (!cinematic || !eligible || now - since < settle) return false;
+            shown = now;
+        }
+        return true;
+    }
+};
+
+// Elapsed time as m:ss, or h:mm:ss past an hour.
+inline std::string clock_text(double seconds) {
+    const long long total = seconds > 0.0 ? static_cast<long long>(seconds) : 0;
+    const long long h = total / 3600, m = (total / 60) % 60, s = total % 60;
+    char text[32];
+    if (h > 0) std::snprintf(text, sizeof(text), "%lld:%02lld:%02lld", h, m, s);
+    else std::snprintf(text, sizeof(text), "%lld:%02lld", m, s);
+    return text;
+}
 
 class MoveReader {
 public:
@@ -210,6 +277,7 @@ struct Look {
     float scale{1.0f};
     ImFont* font{}; // a large baked font (the sheet font); null uses the current font
     bool right_to_left{};
+    std::string badge; // e.g. "REC 1:23", shown in red in the header; empty for none
 };
 
 // Draws the menu into the current ImGui window, filling pos..pos+size. Pointer
@@ -218,6 +286,11 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
 
 // The current step of a guided test plan, drawn where the shortcut sheet goes
 // while the menu is closed. index == steps.size() means the plan is finished.
+// recording is the recorder clock ("1:23") while recording, else empty.
 void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wuwa_steps::Plan& plan, int index,
-    bool recording, const std::string& error);
+    const std::string& recording, const std::string& error);
+
+// A short note in view: a title and up to two lines, on a 1600 x 900 design.
+void draw_note(ImDrawList* list, const ImVec2& size, ImFont* font, const std::string& title, const std::string& line1,
+    const std::string& line2);
 }

@@ -130,7 +130,9 @@ void OverlayComponent::update_input_mouse_emulation() {
             // WuWa VR menu: the pointing hand's trigger clicks too (get_right_joystick follows the swap).
             const bool trigger_click = vr->menu_pointer_active() &&
                 vr->is_action_active(vr->get_action_handle(VR::s_action_trigger), vr->get_right_joystick());
-            if (trigger_click || VR::get()->is_action_active_any_joystick(vr->get_action_handle(a_button_right))) {
+            // In the WuWa menu A selects the focused row instead, so one press never acts twice.
+            const bool a_click = !vr->menu_pointer_active() && VR::get()->is_action_active_any_joystick(vr->get_action_handle(a_button_right));
+            if (trigger_click || a_click) {
                 // Clear any gamepad A events.
                 auto ctx = io.Ctx;
 
@@ -459,8 +461,8 @@ void OverlayComponent::update_slate_openvr() {
     const auto is_d3d12 = g_framework->get_renderer_type() == Framework::RendererType::D3D12;
     const auto size = is_d3d12 ? g_framework->get_d3d12_rt_size() : g_framework->get_d3d11_rt_size();
     const auto aspect = size.x / size.y;
-    float height_meters = m_slate_size->value();
-    float width_meters = height_meters * aspect;
+    float width_meters = m_slate_size->value() * aspect;
+    float height_meters = m_slate_size->value() * std::clamp(m_slate_shape->value(), 0.5f, 2.0f);
     portal_hud_placement(aspect, glm_matrix, width_meters, height_meters);
     const auto steamvr_matrix = Matrix3x4f{glm::rowMajor4(glm_matrix)};
     vr::VROverlay()->SetOverlayTransformAbsolute(m_slate_overlay_handle, vr::TrackingUniverseStanding, (vr::HmdMatrix34_t*)&steamvr_matrix);
@@ -970,7 +972,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
 
     const auto size_meters = m_parent->m_slate_size->value();
     float meters_w = (float)ui_swapchain.width / (float)ui_swapchain.height * size_meters;
-    float meters_h = size_meters;
+    float meters_h = size_meters * std::clamp(m_parent->m_slate_shape->value(), 0.5f, 2.0f);
 
     glm_matrix[3] -= glm_matrix[2] * m_parent->m_slate_distance->value();
     glm_matrix[3] += m_parent->m_slate_x_offset->value() * glm_matrix[0];
@@ -1086,7 +1088,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerCylinderKHR>> OverlayComp
 
     const auto size_meters = m_parent->m_slate_size->value();
     const auto meters_w = (float)ui_swapchain.width / (float)ui_swapchain.height * size_meters;
-    const auto meters_h = size_meters;
+    const auto meters_h = size_meters * std::clamp(m_parent->m_slate_shape->value(), 0.5f, 2.0f);
 
     // OpenXR Docs:
     // radius is the non-negative radius of the cylinder. Values of zero or floating point positive infinity are treated as an infinite cylinder.
@@ -1232,8 +1234,9 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
     layer.pose.orientation = runtimes::OpenXR::to_openxr(glm::quat_cast(glm_matrix));
     layer.pose.position = runtimes::OpenXR::to_openxr(glm_matrix[3]);
 
-    // Check if the controller pointer intersects with the quad, and we can use this to emulate the mouse
-    if (vr->is_using_controllers()) {
+    // Check if the controller pointer intersects with the quad, and we can use this to emulate the mouse.
+    // WuWa: the VR menu's laser works whether or not motion-controller input is on (OpenXR path).
+    if (vr->is_using_controllers() || vr->menu_pointer_active()) {
         // Right only for now for testing
         const auto controller_index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
         const auto right_controller_rot = glm::quat{vr->get_rotation(controller_index, false)};

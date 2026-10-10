@@ -179,6 +179,7 @@ void capture_authored_camera(safetyhook::Context& context) noexcept {
     }
     camera.captured = true;
     ++wuwa_cinematic_framing::authored_views;
+    if (camera.constrained) wuwa_cinematic_framing::constrained_ms.store(GetTickCount64(), std::memory_order_relaxed);
 }
 bool native_mono_output(MonoProjection* data, uint32_t pass) noexcept {
     if (!current_mono_draw || !current_mono_draw->enabled) return false;

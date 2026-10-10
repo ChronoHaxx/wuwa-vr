@@ -246,7 +246,9 @@ private:
     const ModSlider::Ptr m_sheet_tilt{ModSlider::create("WuWaControls_SheetTilt", 0.0f, 90.0f, 60.0f)};
     // Privacy is deliberately outside the control-reset allowlist. Resetting
     // camera/input settings must not accidentally reveal a creator's ID.
-    const ModToggle::Ptr m_privacy{ModToggle::create("WuWaPrivacy_Enabled",false)};
+    // On by default since the VR menu's recorder (Oct 2026), under a new key so
+    // existing profiles start covered too; recordings are meant to be shared.
+    const ModToggle::Ptr m_privacy{ModToggle::create("WuWaPrivacy_HideIDs",true)};
     const ModToggle::Ptr m_privacy_profile{ModToggle::create("WuWaPrivacy_ProfileID",true)};
     const ModCombo::Ptr m_privacy_profile_scope{ModCombo::create("WuWaPrivacy_ProfileScope", {"ESC / overlay menus (detected)", "All detected menus", "Always (manual mask)"},0)};
     const ModSlider::Ptr m_uid_left{ModSlider::create("WuWaPrivacy_UIDLeft",0.0f,1.0f,0.78f)};

@@ -105,6 +105,8 @@ private:
     const ModSlider::Ptr m_slate_x_offset{ ModSlider::create("UI_X_Offset", -10.0f, 10.0f, 0.0f) };
     const ModSlider::Ptr m_slate_y_offset{ ModSlider::create("UI_Y_Offset", -10.0f, 10.0f, 0.0f) };
     const ModSlider::Ptr m_slate_size{ ModSlider::create("UI_Size", 0.5f, 10.0f, 2.0f) };
+    // WuWa: the HUD's height relative to its texture's shape, for a HUD that looks squashed.
+    const ModSlider::Ptr m_slate_shape{ ModSlider::create("UI_WuWaHudShape", 0.5f, 2.0f, 1.0f) };
     const ModSlider::Ptr m_slate_cylinder_angle{ ModSlider::create("UI_Cylinder_Angle", 0.0f, 360.0f, 90.0f) };
     const ModToggle::Ptr m_ui_follows_view{ ModToggle::create("UI_FollowView", false) };
     const ModToggle::Ptr m_ui_invert_alpha{ ModToggle::create("UI_InvertAlpha", false) };
@@ -130,6 +132,7 @@ public:
             *m_slate_y_offset,
             *m_slate_distance,
             *m_slate_size,
+            *m_slate_shape,
             *m_slate_cylinder_angle,
             *m_ui_follows_view,
             *m_ui_invert_alpha,

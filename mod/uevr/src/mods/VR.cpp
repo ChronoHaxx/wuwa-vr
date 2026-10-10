@@ -30,6 +30,7 @@
 
 #include "VR.hpp"
 #include "WindowMode.hpp"
+#include "mods/vr/WuWaVrMenuHost.hpp"
 
 std::shared_ptr<VR>& VR::get() {
     //static std::shared_ptr<VR> instance = std::make_shared<VR>();
@@ -764,6 +765,23 @@ std::string VR::menu_pointer_status() const {
     return std::string("Laser asleep: move the ") + hand + " controller or press a VR button.";
 }
 
+bool VR::menu_controller_pad(MenuPad& pad) const {
+    pad = {};
+    if (!wuwa_test::is_wuwa() || !g_framework->is_drawing_ui() || !is_hmd_active() || m_controllers.empty() ||
+        sightseeing_on() || m_controllers_allowed->value() || wuwa_test::motion_input_muted() || !motion_input_has_focus()) {
+        return false;
+    }
+    const auto runtime = get_runtime();
+    if (runtime == nullptr || !runtime->loaded) return false;
+    const auto left = get_joystick_axis(m_left_joystick), right = get_joystick_axis(m_right_joystick);
+    pad.lx = left.x; pad.ly = left.y; pad.rx = right.x; pad.ry = right.y;
+    pad.accept = is_action_active(m_action_a_button_right, m_right_joystick) || is_action_active(m_action_a_button_left, m_left_joystick);
+    pad.back = is_action_active(m_action_b_button_right, m_right_joystick) || is_action_active(m_action_b_button_left, m_left_joystick);
+    pad.prev_page = is_action_active(m_action_grip, m_left_joystick);
+    pad.next_page = is_action_active(m_action_grip, m_right_joystick);
+    return true;
+}
+
 void VR::update_menu_pointer_motion() {
     if (!wuwa_test::is_wuwa() || !g_framework->is_drawing_ui() || !is_hmd_active() || m_controllers.empty()) return;
     const auto index = !m_swap_controllers->value() ? get_right_controller_index() : get_left_controller_index();
@@ -1437,7 +1455,9 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
 
         // Now that we're drawing the UI, check for special button combos the user can use as shortcuts
         // like recenter view, set standing origin, camera offset modification, etc.
-        m_rt_modifier.draw = gamepad.bRightTrigger >= 128;
+        // WuWa: not in the WuWa VR menu, where the trigger clicks and the sticks only navigate.
+        const bool wuwa_menu = wuwa_menu_host::showing();
+        m_rt_modifier.draw = !wuwa_menu && gamepad.bRightTrigger >= 128;
 
         if (!m_rt_modifier.draw) {
             m_rt_modifier.page = 0;
@@ -1574,7 +1594,9 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
         MAP_BUTTON(ImGuiKey_GamepadL3,              XINPUT_GAMEPAD_LEFT_THUMB);
         MAP_BUTTON(ImGuiKey_GamepadR3,              XINPUT_GAMEPAD_RIGHT_THUMB);
 
-        if (!is_vr_controller) {
+        // The WuWa VR menu reads the stick itself, one direction at a time, so VR controllers
+        // give it the analog stick (and the grips as LB / RB) rather than per-axis D-pad presses.
+        if (!is_vr_controller || wuwa_menu) {
             MAP_ANALOG(ImGuiKey_GamepadLStickLeft,      gamepad.sThumbLX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
             MAP_ANALOG(ImGuiKey_GamepadLStickRight,     gamepad.sThumbLX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
             MAP_ANALOG(ImGuiKey_GamepadLStickUp,        gamepad.sThumbLY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);

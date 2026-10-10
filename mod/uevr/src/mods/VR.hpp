@@ -170,6 +170,15 @@ public:
     // last 30.
     bool menu_pointer_active() const;
     std::string menu_pointer_status() const; // English, for the menu
+    // The VR controllers as the menu sees them, read straight from the runtime
+    // while UEVR's UI is open and nothing else (VR controllers mode, UEVR's
+    // motion-controller input) already turns them into a gamepad. Sticks are
+    // -1..1; A or X selects, B or Y goes back, the grips change page.
+    struct MenuPad {
+        float lx{}, ly{}, rx{}, ry{};
+        bool accept{}, back{}, prev_page{}, next_page{};
+    };
+    bool menu_controller_pad(MenuPad& pad) const;
     float vr_menu_size() const { return m_wuwa_vr_menu_size->value(); }
     int sightseeing_slot() const { return m_sightseeing_target.load(); }
     void stamp_sightseeing_packet(uint32_t result, uint32_t slot, XINPUT_STATE* state);
@@ -667,6 +676,7 @@ public:
     }
 
     bool is_auto_cinema_enabled() const { return m_auto_cinema->value(); }
+    bool is_cinema_hint_enabled() const { return m_cinema_hint->value(); }
     wuwa_auto_cinema::Presentation auto_story_presentation() const {
         const auto mode = m_auto_story_presentation->value();
         return mode >= 0 && mode <= 2 ? static_cast<wuwa_auto_cinema::Presentation>(mode) : wuwa_auto_cinema::Presentation::none;
@@ -1008,6 +1018,8 @@ private:
     const ModToggle::Ptr m_2d_screen_mode{ ModToggle::create(generate_name("2DScreenMode"), false) };
     const ModToggle::Ptr m_mono_theatre_mode{ ModToggle::create(generate_name("MonoTheatreMode"), false) };
     const ModToggle::Ptr m_auto_cinema{ ModToggle::create(generate_name("AutoCinema"), false) };
+    // WuWa: a short note in view when a letterboxed cinematic camera starts while in full VR.
+    const ModToggle::Ptr m_cinema_hint{ ModToggle::create(generate_name("CinemaHint"), true) };
     const ModCombo::Ptr m_auto_story_presentation{ModCombo::create(generate_name("AutoStoryPresentation"), {"Keep immersive", "Stereo screen", "Mono theatre"}, 1)};
     const ModToggle::Ptr m_cinematic_framing_fix{ ModToggle::create(generate_name("CinematicFramingFix"), true) };
     const ModToggle::Ptr m_roomscale_movement{ ModToggle::create(generate_name("RoomscaleMovement"), false) };
@@ -1167,6 +1179,7 @@ public:
             *m_2d_screen_mode,
         *m_mono_theatre_mode,
         *m_auto_cinema,
+        *m_cinema_hint,
         *m_auto_story_presentation,
         *m_cinematic_framing_fix,
             *m_roomscale_movement,

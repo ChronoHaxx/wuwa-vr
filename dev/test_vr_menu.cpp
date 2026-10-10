@@ -166,6 +166,25 @@ int main() {
     const auto buttons = reader.read(Held{}, true, false, false, true, 1.1);
     check(buttons.accept && buttons.next_page && !buttons.up && !buttons.right, "single presses were not passed through");
 
+    // Sticks: one direction at a time, never two from a diagonal push.
+    StickReader stick;
+    check(stick.read(0.0f, -0.9f) == Dir::Down, "a firm push down did not read as down");
+    check(stick.read(0.45f, -0.8f) == Dir::Down, "a push down drifting sideways changed direction");
+    check(stick.read(0.7f, -0.5f) == Dir::Down, "a held push down flipped sideways before it was clearly sideways");
+    check(stick.read(0.9f, -0.2f) == Dir::Right, "a clearly sideways push did not take over");
+    check(stick.read(0.2f, 0.1f) == Dir::None, "a stick back near centre still held a direction");
+    StickReader fresh;
+    check(fresh.read(0.55f, -0.7f) == Dir::None, "a fresh diagonal push engaged a direction");
+    check(fresh.read(0.0f, 0.5f) == Dir::None, "a half push engaged");
+    check(fresh.read(0.0f, 0.65f) == Dir::Up, "a firm push up did not engage");
+    check(fresh.read(0.1f, 0.4f) == Dir::Up, "a push easing off but still past release let go");
+    check(fresh.read(0.1f, 0.3f) == Dir::None, "a push below release still held");
+    check(fresh.read(-0.8f, 0.0f) == Dir::Left, "a firm push left did not engage");
+    check(fresh.read(std::nanf(""), 0.0f) == Dir::None, "a bad stick value held a direction");
+
+    check(clock_text(0.0) == "0:00" && clock_text(75.9) == "1:15" && clock_text(3725.0) == "1:02:05" && clock_text(-4.0) == "0:00",
+        "elapsed time was formatted wrongly");
+
     std::cout << "PASS: " << checks << " VR menu navigation checks (pure C++ values)\n";
     return 0;
 }

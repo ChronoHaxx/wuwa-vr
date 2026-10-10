@@ -158,7 +158,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "WuWaControls_ResetHudAspect", "WuWaControls_HudAspectStatus", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
                 "UI_Distance", "UI_Size", "UI_WuWaHudShape", "UI_FollowView", "WuWaControls_Enabled",
                 "WuWaControls_MouseAssist", "WuWaControls_AutoMouseMenus", "WuWaControls_AdjustMode", "WuWaControls_WarnHiddenUI",
-                "WuWaControls_CameraMode", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
+                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
                 "WuWaControls_FirstRight", "WuWaControls_FirstUp", "WuWaControls_FirstMotion", "WuWaControls_FullFollowLook", "WuWaControls_FollowHeadAnimation", "WuWaControls_LateHeadUpdate",
                 "VR_AimMethod", "VR_AimModifyPlayerControlRotation", "VR_DecoupledPitch",
                 "WuWaControls_KeepCameraOnFocusLoss", "WuWaControls_RecenterPosition", "WuWaControls_SheetPage",

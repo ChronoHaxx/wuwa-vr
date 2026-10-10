@@ -235,6 +235,23 @@ Item live_text(std::function<std::string()> text) {
     return item;
 }
 
+// Close-up match lives in the camera script; the status is its live report.
+Item lens_slider() {
+    return setting_slider("Close-up match",
+        "Dialogue shots use a zoom lens your headset's wide view can't show, so people look small and far. This moves you nearer, "
+        "per shot, so they keep this share of their 2D size. 0% is the game camera's own spot; 100% matches the 2D shot. "
+        "Game camera in full VR only.",
+        "WuWaControls_LensMatch", 0.0f, 100.0f, 5.0f, "%.0f%%");
+}
+
+Item lens_status() {
+    return live_text([] {
+        auto* status = cached("WuWaControls_LensStatus");
+        const auto text = status ? status->get() : std::string{};
+        return text.empty() ? std::string{} : "Now: " + text;
+    });
+}
+
 Item view_choice() {
     auto item = make(Kind::Choice, "View",
         "Full VR: the game all around you. Stereo screen: a big 3D screen, for menus and scenes that look wrong in full VR. "
@@ -373,8 +390,10 @@ Page camera_page() {
     }
     default:
         page.items.push_back(paragraph(
-            "Game camera follows WuWa's own camera, including cutscene and dialogue camera work. "
-            "If a scene leaves you badly placed, Freecam lets you move the camera yourself."));
+            "Game camera follows WuWa's own camera and its dialogue camera work. Close-up match brings you nearer "
+            "in zoomed-in shots, so they frame people like the 2D view does."));
+        page.items.push_back(lens_slider());
+        page.items.push_back(lens_status());
         break;
     }
     page.items.push_back(paragraph("Everyone", true));
@@ -404,6 +423,8 @@ Page cinema_page() {
     page.items.push_back(paragraph(
         "Black bars in cutscenes? In WuWa's graphics settings, change Cinematic from Cutscene to Fullscreen. "
         "The bars go and cutscenes fill your view."));
+    page.items.push_back(lens_slider());
+    page.items.push_back(lens_status());
     page.items.push_back(setting_toggle("Cinematic scene note",
         "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "
         "A fallback for when automatic switching misses a scene.", "VR_CinemaHint"));

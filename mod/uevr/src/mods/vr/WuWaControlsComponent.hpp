@@ -169,6 +169,19 @@ private:
         void config_load(const utility::Config&, bool) override { set("Ready"); }
         void config_save(utility::Config&) override {}
     } m_hud_aspect_status;
+    // Close-up match (02_WuWaVR_PolarControls.lua): how much of a long-lens
+    // shot's subject size full VR keeps, in percent; 0 is off. Its live report
+    // is transient, like the HUD status above.
+    const ModSlider::Ptr m_lens_match{ModSlider::create("WuWaControls_LensMatch", 0.0f, 100.0f, 75.0f)};
+    struct LensStatus : ModString {
+        LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}
+        mutable std::mutex mutex;
+        std::string status;
+        std::string get() const override { std::scoped_lock lock{mutex}; return status; }
+        void set(const std::string& text) override { std::scoped_lock lock{mutex}; status=text.substr(0,240); }
+        void config_load(const utility::Config&, bool) override { set(""); }
+        void config_save(utility::Config&) override {}
+    } m_lens_status;
 
     // Outside control recovery: resetting camera/input does not reset language.
     const ModString::Ptr m_language{ModString::create("WuWaLocale", "en")};

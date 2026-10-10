@@ -123,6 +123,32 @@ REC badge with the elapsed time shows while recording.
 Pages rebuild when a plan step or the camera mode changes; the same page and,
 where it still exists, the same row stay selected.
 
+**Close-up match** (Camera page in Game camera mode, and the Cinema page).
+Measured from the 10 Oct recordings: in full VR the eye sits exactly at the
+game camera (plus `VR_Camera*Offset`), and its angle matches too. What differs
+from the 2D view is the lens. The log's authored cameras use 75-90 degrees in
+play but 20-40 in dialogue (mostly 24-27), while the headset shows about 89
+degrees per eye. From the same spot, a 25-degree close-up's subject looks about
+4.4 times smaller in VR.
+
+Per shot, `02_WuWaVR_PolarControls.lua` moves the eye along the game camera's
+view so the subject at distance d sits at d * k^s, where k = tan(fov/2) /
+tan(45 degrees) and s is the strength (`WuWaControls_LensMatch`, 0-100 %,
+default 75).
+- **Subject distance:** the game's own depth-of-field focus distance (the
+  camera's post-process settings) when it sets one; otherwise a 5 cm sphere
+  trace along the view.
+- **Safety:** the trace also stops the eye 60 cm short of anything in between,
+  and never nearer than 60 cm to the subject.
+- **Per shot:** the distance is measured once at each cut (a camera jump of more
+  than 50 cm or 10 degrees), so the camera's own moves within a shot carry on
+  unchanged.
+- **Where it applies:** only lenses of 60 degrees or less, in Game camera mode,
+  in full VR.
+- **Diagnostics:** every shot is logged as `[WuWaLens] shot=... fov=... focus=...
+  trace=... dolly=...`. The menu shows the live report
+  (`WuWaControls_LensStatus`).
+
 **Report a problem** appends one line per report to
 `<profile>/wuwa-reports/reports.jsonl`: the kind of problem, the time, the
 position in the current video, the view and the main settings. Nothing leaves

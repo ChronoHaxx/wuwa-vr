@@ -29,7 +29,7 @@ inline bool recoverable(std::string_view key) {
         return key!="WuWaControls_Focused" && key!="WuWaControls_Clock" &&
             key!="WuWaControls_Recording" && key!="WuWaControls_AdjustMode" &&
             key!="WuWaControls_NativeMenu" && key!="WuWaControls_ResetHudAspect" &&
-            key!="WuWaControls_HudAspectStatus";
+            key!="WuWaControls_HudAspectStatus" && key!="WuWaControls_LensStatus";
     }
     if (key.starts_with("UI_")) return true;
     constexpr std::array keys{"VR_EnableGUI", "VR_CameraForwardOffset", "VR_CameraRightOffset",

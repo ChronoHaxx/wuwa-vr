@@ -1178,6 +1178,93 @@ cb.on_pre_engine_tick(function(engine,delta)
         emit(nil,false)
     end
 end)
+-- Close-up match. Dialogue and story shots use long lenses (about 20-40 degrees
+-- across) that VR's wide view (about 90 per eye) cannot show: from the game
+-- camera's own spot the subject looks several times smaller than in 2D. Per
+-- shot, move the eye along the game camera's view toward its subject so the
+-- subject keeps a share of its 2D size. The game's own focus distance names the
+-- subject when it sets one; a trace along the view stops the eye short of
+-- anything in between. Normal lenses (above 60 degrees, i.e. gameplay) are left
+-- alone, as are the other camera modes and the screen views.
+local lens={dolly=0,shot=0,report=""}
+function lens.forward(r)
+    local p,y=math.rad(r.x),math.rad(r.y)
+    return {x=math.cos(p)*math.cos(y),y=math.cos(p)*math.sin(y),z=math.sin(p)}
+end
+function lens.publish(text)
+    if text~=lens.report then lens.report=text; set("WuWaControls_LensStatus",text) end
+end
+function lens.focus(pcm)
+    local ok,value=pcall(function()
+        local pp=pcm.CameraCachePrivate.POV.PostProcessSettings
+        if pp.bOverride_DepthOfFieldFocalDistance and type(pp.DepthOfFieldFocalDistance)=="number" then
+            return pp.DepthOfFieldFocalDistance
+        end
+    end)
+    if ok and type(value)=="number" and value>30 and value<5000 then return value end
+end
+function lens.blocked(context,pawn,from,dir)
+    local ok,value=pcall(function()
+        local lib=trace_library(); local out={}; local reach=5000
+        local to={x=from.x+dir.x*reach,y=from.y+dir.y*reach,z=from.z+dir.z*reach}
+        local color={R=0,G=0,B=0,A=0}
+        local hit=lib:SphereTraceSingle(context,vector(from),vector(to),5,0,true,pawn and {pawn} or {},0,out,true,color,color,0)
+        if hit~=true or not out.result then return nil end
+        local t=out.result.Time
+        if type(t)=="number" and t==t and t>=0 and t<=1 then return t*reach end
+    end)
+    if ok then return value end
+end
+function lens.update()
+    local strength=number("WuWaControls_LensMatch",75,0,100)/100
+    if strength<=0 then lens.dolly=0; lens.pos=nil; lens.publish("Off"); return end
+    if mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre") then
+        lens.dolly=0; lens.pos=nil; lens.publish("Paused: game camera in full VR only"); return
+    end
+    local pc=api:get_player_controller(0)
+    local pcm=pc and pc.PlayerCameraManager
+    if not pcm then lens.dolly=0; lens.pos=nil; return end
+    local fov=pcm:GetFOVAngle()
+    local pos,rot=point(pcm:GetCameraLocation()),rotator(pcm:GetCameraRotation())
+    if type(fov)~="number" or fov~=fov or not valid(pos) or not rot then lens.dolly=0; lens.pos=nil; return end
+    if fov>60 or fov<5 then
+        lens.dolly=0; lens.pos=nil
+        lens.publish(string.format("Waiting for a close-up (lens now %.0f degrees)",fov)); return
+    end
+    -- A cut is a jump of the game camera; within a shot its own moves carry on
+    -- and the subject distance measured at the cut is kept, so nothing jitters.
+    local cut=not lens.pos
+    if not cut then
+        local d=math.sqrt((pos.x-lens.pos.x)^2+(pos.y-lens.pos.y)^2+(pos.z-lens.pos.z)^2)
+        local a=lens.forward(rot); local b=lens.forward(lens.rot)
+        cut=d>50 or a.x*b.x+a.y*b.y+a.z*b.z<math.cos(math.rad(10))
+    end
+    lens.pos,lens.rot=pos,rot
+    if cut then
+        local pawn=api:get_local_pawn(0)
+        lens.shot=lens.shot+1
+        lens.subject_focus=lens.focus(pcm)
+        lens.subject_trace=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
+        lens.subject=lens.subject_focus or lens.subject_trace
+    end
+    if not lens.subject then
+        lens.dolly=0; lens.publish(string.format("Close-up at %.0f degrees: subject distance unknown, view unchanged",fov)); return
+    end
+    -- The subject keeps strength^1 of its 2D size: distance d becomes d*k^strength.
+    local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2)
+    local d=lens.subject
+    local dolly=math.max(0,d-math.max(60,d*k^strength))
+    if lens.subject_trace then dolly=math.min(dolly,math.max(0,lens.subject_trace-60)) end
+    lens.dolly=dolly
+    local text=string.format("Close-up at %.0f degrees: subject %.1f m (%s), moved %.1f m nearer",
+        fov,d/100,lens.subject_focus and "game focus" or "trace",dolly/100)
+    if cut then
+        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f focus=%s trace=%s dolly=%.0f strength=%.2f",
+            lens.shot,fov,tostring(lens.subject_focus and math.floor(lens.subject_focus) or "none"),
+            tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength))
+    end
+    lens.publish(text)
+end
 local function update_camera_before_draw()
     -- UGameViewportClient::Draw runs on the game thread after world simulation,
     -- before either eye. Calibrate BEFORE hiding a new head, then refresh its
@@ -1226,6 +1313,11 @@ local function update_camera_before_draw()
 end
 cb.on_pre_viewport_client_draw(function()
     update_camera_before_draw()
+    -- The game camera is final for this frame here, so a cut is seen before either eye.
+    local lens_ok,lens_err=pcall(lens.update)
+    if not lens_ok then
+        lens.dolly=0; lens.pos=nil; lens.publish("Unavailable: "..tostring(lens_err):sub(1,120))
+    end
     if not enabled("WuWaControls_Recording") then return end
     local ok,err=pcall(function()
         local pawn=api:get_local_pawn(0)
@@ -1268,6 +1360,10 @@ cb.on_pre_calculate_stereo_view_offset(function(_,_,_,position,rotation)
         else
             rotation.x=frame.rot.x; rotation.y=frame.rot.y; rotation.z=frame.rot.z
         end
+    elseif mode==0 and lens.dolly>0 and valid(r) then
+        -- Close-up match: along this frame's game camera view, same for both eyes.
+        local f=lens.forward(r)
+        position.x=position.x+f.x*lens.dolly; position.y=position.y+f.y*lens.dolly; position.z=position.z+f.z*lens.dolly
     end
 end)
 cb.on_script_reset(function()

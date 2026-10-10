@@ -64,7 +64,8 @@ past centre and mostly along one axis (`StickReader`), so a slightly diagonal
 push down never also changes a value. A held direction lasts until the stick
 falls back toward centre. While this menu is open, VR controllers feed it the
 analog stick rather than UEVR's per-axis D-pad presses, and holding RT no
-longer switches UEVR into its camera-offset mode.
+longer switches UEVR into its camera-offset mode. The Camera page has the
+offset sliders instead.
 
 **The laser and A never act twice.** In this menu the pointing hand's trigger
 clicks where the laser points; A selects the focused row. (UEVR's own mapping
@@ -98,8 +99,9 @@ REC badge with the elapsed time shows while recording.
 2. **Test:** only while a plan is loaded (see below).
 3. **Camera:** the camera mode, then only the options for that mode: fixed
    distance and height; freecam style, speed, turn speed and collision; first
-   person motion, body visibility and level horizon. Then world scale, reset
-   camera offset and recenter for every mode.
+   person motion, body visibility and level horizon. Then, for every mode:
+   world scale, the camera offset (forward / back, right / left, up / down in
+   cm, and reset), and recenter.
 4. **Cinema:** view, the game's own fix for cutscene black bars (Cinematic:
    Fullscreen in WuWa's graphics settings), the cinematic scene note,
    automatic cinematic screen and what story scenes use, matched framing.

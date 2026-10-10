@@ -381,19 +381,19 @@ Page camera_page() {
     page.items.push_back(setting_slider("World scale",
         "How big the world feels. Above 1 makes you smaller. Diorama uses its own scale and leaves this alone.",
         "VR_WorldScale", 0.5f, 2.0f, 0.025f, "%.3fx"));
-    auto offset = action("Reset camera offset",
-        "Puts the camera back where the profile places it. Holding RT in UEVR's classic menu moves it by accident.", [] {
-            for (const char* key : {"VR_CameraForwardOffset", "VR_CameraRightOffset", "VR_CameraUpOffset"}) {
-                if (auto* v = typed<float>(key)) v->value() = 0.0f;
-            }
-        });
-    offset.value_text = [] {
+    // Hold-RT camera adjustment is off in this menu (the trigger clicks), so the offsets are here.
+    page.items.push_back(setting_slider("Forward / back",
+        "Moves your viewpoint forward from the game camera. Forward brings dialogue close-ups nearer, closer to how the 2D shot frames them. Applies in normal play too.",
+        "VR_CameraForwardOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
+    page.items.push_back(setting_slider("Right / left", "Moves your viewpoint sideways from the game camera.",
+        "VR_CameraRightOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
+    page.items.push_back(setting_slider("Up / down", "Moves your viewpoint up or down from the game camera.",
+        "VR_CameraUpOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
+    page.items.push_back(action("Reset camera offset", "Sets all three offsets back to 0, the game camera's own position.", [] {
         for (const char* key : {"VR_CameraForwardOffset", "VR_CameraRightOffset", "VR_CameraUpOffset"}) {
-            if (auto* v = typed<float>(key); v && std::abs(v->value()) > 0.01f) return std::string{"Moved"};
+            if (auto* v = typed<float>(key)) v->value() = 0.0f;
         }
-        return std::string{"Not moved"};
-    };
-    page.items.push_back(std::move(offset));
+    }));
     page.items.push_back(action("Recenter view", "Faces the view forward from where you are now.", [] { VR::get()->recenter_view(); }));
     return page;
 }

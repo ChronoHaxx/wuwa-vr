@@ -2,6 +2,8 @@
 
 Updated 4 October 2026. This is a beginner's map of the project and an evidence-based
 handoff. Confirmed improvements do not mean every rendering path is finished.
+Before testing a fix, check the
+[reference of symptoms, causes and settings](https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/REFERENCE.md).
 
 ## Start with the current beta
 

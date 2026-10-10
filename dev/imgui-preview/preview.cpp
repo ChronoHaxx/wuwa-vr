@@ -16,7 +16,9 @@
 #include "font_robotomedium.hpp"
 #include "utility/WuWaLocalization.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
+#include "utility/WuWaVrMenu.hpp"
 
+#include <cfloat>
 #include <cstdio>
 #include <cstring>
 #include <utility>
@@ -53,7 +55,101 @@ bool save_png(const fs::path& path, const std::vector<unsigned char>& rgba, UINT
 struct Scene {
     std::string name;
     std::function<void(ImVec2)> draw;
+    ImVec2 mouse{-FLT_MAX, -FLT_MAX};
 };
+
+// Sample values only: the menu model is drawn exactly as in the game.
+struct Sample {
+    bool controllers{true}, diorama{false}, same_shadows{true}, lod_sync{true}, recording{true};
+    int sharing{0}, screen{0}, ao{0}, bars{1};
+    float hud_size{1.1f}, hud_distance{2.0f};
+};
+Sample sample;
+
+std::vector<wuwa_menu::Page> sample_pages() {
+    using namespace wuwa_menu;
+    const auto toggle = [](const char* label, const char* help, bool* value) {
+        Item item = make(Kind::Toggle, label, help);
+        item.get_bool = [value] { return *value; };
+        item.set_bool = [value](bool v) { *value = v; };
+        return item;
+    };
+    const auto choice = [](const char* label, const char* help, int* value, std::vector<std::string> choices) {
+        Item item = make(Kind::Choice, label, help);
+        item.get_int = [value] { return *value; };
+        item.set_int = [value](int v) { *value = v; };
+        item.choices = std::move(choices);
+        return item;
+    };
+    const auto slider = [](const char* label, const char* help, float* value, float min, float max, float step, const char* format) {
+        Item item = make(Kind::Slider, label, help);
+        item.get_float = [value] { return *value; };
+        item.set_float = [value](float v) { *value = v; };
+        item.min = min; item.max = max; item.step = step; item.format = format;
+        return item;
+    };
+    const auto action = [](const char* label, const char* help, const char* value = nullptr) {
+        Item item = make(Kind::Action, label, help);
+        if (value) item.value_text = [value] { return std::string(value); };
+        item.run = [] {};
+        return item;
+    };
+    const auto text = [](const char* label) { return make(Kind::Text, label); };
+    std::vector<Page> pages;
+    pages.push_back({"Quick", {
+        toggle("VR controllers", "Use the VR controllers as an Xbox pad for walking and sightseeing. Holding the left Menu button for 1 second also turns them on or off.", &sample.controllers),
+        choice("Sharing with Xbox / treadmill", "Both together: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps working.", &sample.sharing, {"Both together", "Last used wins", "VR only"}),
+        choice("Screen", "Stereo screen and mono theatre show the game on a flat screen, for menus and cutscenes that look wrong in full VR.", &sample.screen, {"Full VR", "Stereo screen", "Mono theatre"}),
+        toggle("Diorama (miniature world)", "Shows the world as a 10x miniature around you. Needs Native Stereo.", &sample.diorama),
+        slider("HUD size", "How large the game's HUD and menus appear.", &sample.hud_size, 0.5f, 2.0f, 0.05f, "%.2f"),
+        slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.", &sample.hud_distance, 0.5f, 5.0f, 0.1f, "%.1f m"),
+        action("Recenter view", "Faces the view forward from where you are now."),
+        action("All settings (classic UEVR menu)", "Opens UEVR's full settings window. Every setting here edits the same values."),
+    }});
+    pages.push_back({"View & comfort", {
+        text("Camera"),
+        action("First person", "Plays from the character's eyes.", "Off"),
+        action("Fixed camera distance", "Distance for the game / fixed camera (L3 + RB).", "350"),
+    }});
+    pages.push_back({"Graphics", {
+        text("Try these if one eye looks different from the other."),
+        toggle("Same shadows in both eyes", "Keeps shadows identical in both eyes (Same Pass).", &sample.same_shadows),
+        toggle("Same far detail in both eyes", "Keeps distant trees and props on the same level of detail in both eyes.", &sample.lod_sync),
+        choice("Ambient occlusion", "If rocks and hills are shaded differently in each eye, turning ambient occlusion off removes the difference at a small cost in depth.", &sample.ao, {"Game default", "Off"}),
+        choice("Dialogue black bars", "Hides the black bars at the top and bottom of dialogue scenes, which can appear in one eye only.", &sample.bars, {"Game default", "Hidden"}),
+    }});
+    pages.push_back({"Record & test", {
+        text("Playtest: dialogue black bars, step 2 of 5"),
+        action("Pass: no bars in either eye", "Start a dialogue scene with black bars, then close each eye in turn."),
+        action("Bars in the left eye only", "Start a dialogue scene with black bars, then close each eye in turn."),
+        action("Bars in the right eye only", "Start a dialogue scene with black bars, then close each eye in turn."),
+        action("Bars in both eyes", "Start a dialogue scene with black bars, then close each eye in turn."),
+        toggle("Recording", "Records the headset view through the launcher. Marks and answers are linked to the video.", &sample.recording),
+        action("Mark this moment", "Adds a marker to the recording so it is easy to find later."),
+    }});
+    pages.push_back({"More", {
+        action("All settings (classic UEVR menu)", "Opens UEVR's full settings window."),
+    }});
+    return pages;
+}
+
+Scene menu_scene(std::string name, int page, int focus, wuwa_menu::Source source, ImVec2 mouse = ImVec2{-FLT_MAX, -FLT_MAX}) {
+    return {std::move(name), [page, focus, source](ImVec2 size) {
+        static auto pages = sample_pages();
+        wuwa_menu::State state{};
+        wuwa_menu::set_page(pages, state, page);
+        state.focus = focus;
+        state.source = source;
+        // The game draws the menu on the UEVR quad; the preview fills a 1600 x 900 frame.
+        const ImVec2 pos{100.0f, 40.0f}, menu{1400.0f, 820.0f};
+        ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f});
+        ImGui::SetNextWindowSize(size);
+        ImGui::Begin("WuWa VR menu", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollWithMouse);
+        wuwa_menu::draw(pages, state, wuwa_menu::Moves{}, pos, menu, wuwa_menu::Look{1.0f, wuwa_l10n::sheet_font()});
+        ImGui::End();
+    }, mouse};
+}
 }
 
 int wmain(int argc, wchar_t** argv) {
@@ -118,10 +214,17 @@ int wmain(int argc, wchar_t** argv) {
     scenes.push_back({"sheet-3-menus-hud-mode-on", [](ImVec2 size) {
         wuwa_sheet::draw(ImGui::GetBackgroundDrawList(), size, 2, ImGui::GetFont(), 0, true, true);
     }});
+    using wuwa_menu::Source;
+    scenes.push_back(menu_scene("menu-1-quick-gamepad", 0, 2, Source::Buttons));
+    // Laser / mouse resting on the sharing row's value (design units scale by 1400 / 1200).
+    scenes.push_back(menu_scene("menu-2-quick-pointer", 0, 1, Source::Pointer, ImVec2{100.0f + 960.0f * 1400.0f / 1200.0f, 40.0f + 216.0f * 1400.0f / 1200.0f}));
+    scenes.push_back(menu_scene("menu-3-graphics-gamepad", 2, 4, Source::Buttons));
+    scenes.push_back(menu_scene("menu-4-record-test-gamepad", 3, 2, Source::Buttons));
 
     for (const auto& scene : scenes) {
         // Two frames so ImGui settles any first-frame layout.
         for (int frame = 0; frame < 2; ++frame) {
+            io.MousePos = scene.mouse;
             ImGui_ImplDX11_NewFrame();
             ImGui::NewFrame();
             scene.draw(io.DisplaySize);

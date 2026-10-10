@@ -16,5 +16,6 @@ cl /nologo /std:c++20 /EHsc /O2 /MD /utf-8 /W3 /DUNICODE /D_UNICODE ^
   /I"%REPO%\mod\uevr\src" /I"%UEVR%\src" /I"%UEVR%\src\uevr-imgui" /I"%IMGUI%" /I"%JSON%" ^
   /Fo"%OUT%\\" /Fe"%OUT%\preview.exe" ^
   "%~dp0preview.cpp" "%REPO%\mod\uevr\src\utility\WuWaShortcutSheet.cpp" "%REPO%\mod\uevr\src\utility\WuWaLocalization.cpp" ^
+  "%REPO%\mod\uevr\src\utility\WuWaVrMenu.cpp" ^
   "%UEVR%\src\uevr-imgui\imgui_impl_dx11.cpp" "%IMGUI%\imgui.cpp" "%IMGUI%\imgui_draw.cpp" "%IMGUI%\imgui_tables.cpp" "%IMGUI%\imgui_widgets.cpp" ^
   d3d11.lib d3dcompiler.lib windowscodecs.lib ole32.lib icu.lib user32.lib

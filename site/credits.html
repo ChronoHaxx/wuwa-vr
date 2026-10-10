@@ -18,28 +18,24 @@ redistribute another project&#39;s files.</p>
 <td>The VR injection framework, stereo rendering, tracking, compositor/UI and plugin/Lua foundations. Local backend base: <code>4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d</code>.</td>
 </tr>
 <tr>
-<td><a href="https://github.com/mirudo2/WuWa-UI-Fix-for-UEVR">mirudo2&#39;s WuWa UI project</a></td>
-<td>Original game UI/profile work, gamepad helpers and community distribution. The preserved UI script credits polar as the original author and SannpoKun for modifications. Local reference base: <code>3ec30b7beb538254be1007ad7d5d8594dde885b4</code>.</td>
+<td><a href="https://github.com/mirudo2">mirudo2</a>, also known as polar</td>
+<td>One person under two handles, active in the Flat2VR WuWa thread since May 2024: the <a href="https://github.com/mirudo2/Custom-UEVR-Injector">Custom UEVR Injector</a> (May 2024) used in the local launch flow; the original WuWa UI fix and profile for UEVR (<a href="https://github.com/mirudo2/WuWa-UI-Fix-for-UEVR">WuWa-UI-Fix-for-UEVR</a>, Feb–May 2025, local reference base <code>3ec30b7beb538254be1007ad7d5d8594dde885b4</code>), gamepad helpers and community distribution; the original <code>Freecam_by_polar.lua</code> and the sensible Xbox camera/mouse layout on which this project&#39;s controls are based; and the screenshot plugin <code>win_screenshot.dll</code> and the build of <code>gamepad_to_mouse.dll</code> that ship in this project&#39;s profile (the latter disabled).</td>
 </tr>
 <tr>
 <td>SannpoKun</td>
-<td>UI-script modifications credited in the preserved community source. The original authorship and subsequent adaptations remain distinct.</td>
+<td>WuWa VR profile versions 1.0 to 1.2 (Nov 2025 to Jan 2026), built on mirudo2&#39;s UI fix: steadier UI attachment, the 2D/VR and native/sequential toggles, first-person mode and the volumetric-fog guidance for native stereo. The project owner started from the 1.2 package in March 2026, and the preserved UI script credits SannpoKun for modifications. mirudo2&#39;s original authorship and SannpoKun&#39;s adaptations remain distinct.</td>
 </tr>
 <tr>
-<td>polar</td>
-<td>Original <code>Freecam_by_polar.lua</code> and the sensible Xbox camera/mouse layout on which this project&#39;s controls are based. Attribution is to the file/community handle; it is not an assertion that all handles identify the same person.</td>
+<td>markmon</td>
+<td>Wrote the gamepad-to-mouse plugin for mirudo2&#39;s WuWa UI fix (Feb 2025), which lets the left stick and A drive the mouse in menus; mirudo2&#39;s build of it ships disabled in this project&#39;s profile. Long-standing UEVR help in the WuWa thread.</td>
 </tr>
 <tr>
-<td><a href="https://github.com/mirudo2/Custom-UEVR-Injector">mirudo2&#39;s Custom UEVR Injector</a></td>
-<td>The custom injector used in the local launch flow.</td>
-</tr>
-<tr>
-<td>Indath</td>
-<td>WuWa-specific UI/UEVR adaptations and author-provided comparison builds. The July modified Lua and September binary comparisons informed this investigation. They are not relabeled as original work here.</td>
+<td><a href="https://github.com/Indath/UEVR-Wuthering-Waves">Indath</a></td>
+<td>WuWa-specific UEVR work this project builds on: Native Stereo Fix running for WuWa since July 2026; the LGUI draw and pass hook points in his September 8 build, which showed where the HUD could be captured for VR (this project&#39;s HUD route began by observing those exact points); the frame-timing suggestion to turn off the one-frame thread lag, adopted in these profiles; and his modified July UI script and profile, studied at the start.</td>
 </tr>
 <tr>
 <td>endlessfalls</td>
-<td>Community initialization compatibility work; the supplied post described <code>find_uobject</code> / <code>SkipUObjectArrayInit</code>, explicitly not a Native-vs-Synced-Stereo fix. No broader authorship claim is made.</td>
+<td>Fixed the game 3.0 start-up crash in UEVR (Jan 2026): <code>FEnumProperty::update_offsets</code> now uses <code>FName::to_string_no_numbers()</code>, which made the <code>SkipUObjectArrayInit</code> workaround unnecessary (<a href="https://github.com/praydog/UESDK/pull/1">praydog/UESDK#1</a>). Not a Native-vs-Synced-Stereo fix. No broader authorship claim is made.</td>
 </tr>
 <tr>
 <td><a href="https://github.com/elliotttate/UEVR-6DOF-Window">Elliott Tate: UEVR-6DOF-Window</a></td>

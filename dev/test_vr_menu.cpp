@@ -147,6 +147,25 @@ int main() {
     apply_moves(pages, state, Moves{});
     check(state.page == 0 && state.focus == 1, "an out-of-range page was not reset");
 
+    // Held directions: one move on press, a pause, then a steady repeat.
+    MoveReader reader;
+    Held right;
+    right.right = true;
+    const auto held = [&](const Held& h, double t) { return reader.read(h, false, false, false, false, t); };
+    check(held(right, 0.0).right, "a fresh push did not move at once");
+    check(!held(right, 0.2).right && !held(right, 0.44).right, "a held push repeated before the pause");
+    check(held(right, 0.46).right, "a held push did not repeat after the pause");
+    check(!held(right, 0.55).right, "the repeat came faster than every 0.18 s");
+    check(held(right, 0.65).right, "the repeat stopped while held");
+    check(!held(Held{}, 0.70).right, "a released direction still moved");
+    check(held(right, 0.71).right, "a new push after release did not move at once");
+    Held sideways;
+    sideways.left = sideways.right = true;
+    const auto opposite = held(sideways, 1.0);
+    check(!opposite.left && !opposite.right, "opposite directions held together moved");
+    const auto buttons = reader.read(Held{}, true, false, false, true, 1.1);
+    check(buttons.accept && buttons.next_page && !buttons.up && !buttons.right, "single presses were not passed through");
+
     std::cout << "PASS: " << checks << " VR menu navigation checks (pure C++ values)\n";
     return 0;
 }

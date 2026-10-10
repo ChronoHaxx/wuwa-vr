@@ -47,6 +47,11 @@ public:
     nlohmann::json diagnostic_status();
     std::array<wuwa_privacy::Rect, 2> privacy_rectangles(int32_t width, int32_t height) const;
     bool floor_visible() const;
+    // For the VR menu's Test page (UI thread): the launcher recorder's state
+    // ("offline", "unavailable", "waiting" or its own state), and start / stop
+    // with the saved recording settings.
+    std::string menu_recording_state();
+    void menu_recording_toggle();
     bool menu_warning_active() const;
     bool fresh_menu_cursor() const;
     bool menu_warning_visible() const;

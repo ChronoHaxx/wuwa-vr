@@ -12,6 +12,7 @@
 #include "utility/WuWaStereoBasePose.hpp"
 #include "utility/WuWaPlaytestControl.hpp"
 #include "utility/WuWaLguiProbe.hpp"
+#include "WuWaVrMenuHost.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
@@ -916,7 +917,26 @@ bool WuWaControlsComponent::status_warning_visible() const {
 }
 
 bool WuWaControlsComponent::floor_visible() const {
-    return wuwa_test::is_wuwa() && m_sheet->value() && !g_framework->is_drawing_ui() && VR::get()->is_hmd_active();
+    // A guided test plan uses the sheet's place for its current step.
+    return wuwa_test::is_wuwa() && (m_sheet->value() || wuwa_menu_host::overlay_wanted()) &&
+        !g_framework->is_drawing_ui() && VR::get()->is_hmd_active();
+}
+
+std::string WuWaControlsComponent::menu_recording_state() {
+    m_video.poll(Framework::get_persistent_dir());
+    if (!m_video.connected()) return "offline";
+    if (!m_video.available()) return "unavailable";
+    return m_video.pending() ? "waiting" : m_video.state();
+}
+
+void WuWaControlsComponent::menu_recording_toggle() {
+    const auto profile=Framework::get_persistent_dir();
+    m_video.poll(profile,true);
+    const auto state=m_video.state();
+    if (state=="starting" || state=="recording") { m_video.submit(profile,false); return; }
+    constexpr int rates[]{30,45,60},widths[]{720,1024,1280};
+    m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
+                  widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value());
 }
 
 Matrix4x4f WuWaControlsComponent::floor_transform() const {
@@ -940,7 +960,12 @@ void WuWaControlsComponent::draw_passive_overlay() {
         if (mode_warning_active()) wuwa_sheet::draw_mouse_mode_warning(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize,ImGui::GetFont(),m_adjust.value(),hidden);
         return;
     }
+    wuwa_menu_host::tick();
     if (!floor_visible()) return;
+    if (wuwa_menu_host::overlay_wanted()) {
+        wuwa_menu_host::draw_step_overlay(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize);
+        return;
+    }
     int page=m_sheet_page->value()-1;
     if (page<0) {
         std::scoped_lock lock{m_bridge_mutex};

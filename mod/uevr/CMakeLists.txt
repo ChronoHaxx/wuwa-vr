@@ -895,6 +895,7 @@ list(APPEND uevr_SOURCES
 	"src/utility/WuWaStage0Payload.hpp"
 	"src/utility/WuWaStateSwap.hpp"
 	"src/utility/WuWaSteadyView.hpp"
+	"src/utility/WuWaStepPlan.hpp"
 	"src/utility/WuWaStereoBasePose.hpp"
 	"src/utility/WuWaStereoComparison.hpp"
 	"src/utility/WuWaStereoIndex.hpp"

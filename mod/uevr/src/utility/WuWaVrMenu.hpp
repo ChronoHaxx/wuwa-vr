@@ -11,8 +11,10 @@
 #include <string>
 #include <vector>
 
+struct ImDrawList;
 struct ImFont;
 struct ImVec2;
+namespace wuwa_steps { struct Plan; }
 
 namespace wuwa_menu {
 enum class Kind { Toggle, Choice, Slider, Action, Text };
@@ -33,6 +35,8 @@ struct Item {
     const char* format{"%.2f"};
     std::function<void()> run;
     std::function<std::string()> value_text; // live text for Action and Text rows
+    bool wrap{};     // Text: a paragraph, as tall as it needs
+    bool emphasis{}; // Text: a heading in gold
 };
 
 inline Item make(Kind kind, std::string label, std::string help = {}) {
@@ -53,6 +57,45 @@ struct Page {
 struct Moves {
     bool up{}, down{}, left{}, right{}, accept{}, back{}, prev_page{}, next_page{};
     bool any() const { return up || down || left || right || accept || back || prev_page || next_page; }
+};
+
+// Turns a held direction into moves: one when pressed, then, after a pause,
+// a steady repeat. Sticks count as held only when pushed well past centre.
+struct Repeater {
+    double pause{0.45}, every{0.18};
+    double since{-1.0}, last{0.0};
+    bool step(bool held, double now) {
+        if (!held) { since = -1.0; return false; }
+        if (since < 0.0) { since = last = now; return true; }
+        if (now - since >= pause && now - last >= every) { last = now; return true; }
+        return false;
+    }
+};
+
+struct Held {
+    bool up{}, down{}, left{}, right{};
+};
+
+constexpr float stick_push = 0.6f; // fraction of full deflection
+
+class MoveReader {
+public:
+    // Directions repeat; accept, back and page changes are single presses.
+    Moves read(const Held& held, bool accept, bool back, bool prev_page, bool next_page, double now) {
+        Moves moves;
+        moves.up = m_up.step(held.up && !held.down, now);
+        moves.down = m_down.step(held.down && !held.up, now);
+        moves.left = m_left.step(held.left && !held.right, now);
+        moves.right = m_right.step(held.right && !held.left, now);
+        moves.accept = accept;
+        moves.back = back;
+        moves.prev_page = prev_page;
+        moves.next_page = next_page;
+        return moves;
+    }
+
+private:
+    Repeater m_up, m_down, m_left, m_right;
 };
 
 // Whatever was used last decides how focus is shown and hinted.
@@ -172,4 +215,9 @@ struct Look {
 // Draws the menu into the current ImGui window, filling pos..pos+size. Pointer
 // input comes from ImGui's mouse (the host feeds the laser into it).
 void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVec2& pos, const ImVec2& size, const Look& look);
+
+// The current step of a guided test plan, drawn where the shortcut sheet goes
+// while the menu is closed. index == steps.size() means the plan is finished.
+void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wuwa_steps::Plan& plan, int index,
+    bool recording, const std::string& error);
 }

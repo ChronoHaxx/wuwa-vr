@@ -165,9 +165,12 @@ public:
     bool sightseeing_on() const { return wuwa_test::is_wuwa() && m_sightseeing_on.load(); }
     void set_sightseeing_on(bool on, const char* why);
     // The VR menu's laser: works whether or not motion-controller input or VR
-    // controllers mode is on, while UEVR's UI is open and a VR controller was
-    // used in the last 30 seconds.
+    // controllers mode is on, while UEVR's UI is open and the pointing
+    // controller moved in the last 10 seconds or a VR button was used in the
+    // last 30.
     bool menu_pointer_active() const;
+    std::string menu_pointer_status() const; // English, for the menu
+    float vr_menu_size() const { return m_wuwa_vr_menu_size->value(); }
     int sightseeing_slot() const { return m_sightseeing_target.load(); }
     void stamp_sightseeing_packet(uint32_t result, uint32_t slot, XINPUT_STATE* state);
 
@@ -1219,6 +1222,7 @@ public:
             *m_sightseeing_style,
             *m_sightseeing_slot,
             *m_wuwa_vr_menu,
+            *m_wuwa_vr_menu_size,
             *m_focus_on_gamepad_reconnect,
             *m_wuwa_forward_focus,
             *m_wuwa_gamepad_passthrough,
@@ -1256,6 +1260,12 @@ private:
         {"Slot 0 (usual)", "Slot 1", "Slot 2", "Slot 3"}, 0) };
     // VR-first menu (WuWaVrMenuHost) in place of UEVR's window; off restores the classic window.
     const ModToggle::Ptr m_wuwa_vr_menu{ ModToggle::create(generate_name("WuWaVrMenu"), true) };
+    // How much of UEVR's menu layer the VR menu fills; its distance is UI_Framework_Distance.
+    const ModSlider::Ptr m_wuwa_vr_menu_size{ ModSlider::create(generate_name("WuWaVrMenuSize"), 0.4f, 1.0f, 0.6f) };
+    // Turning the pointing controller keeps the menu laser awake, not only buttons.
+    glm::vec3 m_menu_pointer_aim{};
+    std::chrono::steady_clock::time_point m_menu_pointer_motion{};
+    void update_menu_pointer_motion();
     std::atomic<bool> m_sightseeing_on{false};
     std::atomic<int32_t> m_sightseeing_target{0};
     std::atomic<int32_t> m_sightseeing_mix_style{0};

@@ -750,8 +750,31 @@ void VR::set_sightseeing_on(bool on, const char* why) {
 }
 
 bool VR::menu_pointer_active() const {
-    return wuwa_test::is_wuwa() && m_wuwa_vr_menu->value() && g_framework->is_drawing_ui() && is_hmd_active() &&
-        !m_controllers.empty() && std::chrono::steady_clock::now() - m_last_controller_update <= std::chrono::seconds(30);
+    if (!wuwa_test::is_wuwa() || !m_wuwa_vr_menu->value() || !g_framework->is_drawing_ui() || !is_hmd_active() || m_controllers.empty()) {
+        return false;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    return now - m_menu_pointer_motion <= std::chrono::seconds(10) || now - m_last_controller_update <= std::chrono::seconds(30);
+}
+
+std::string VR::menu_pointer_status() const {
+    if (!is_hmd_active() || m_controllers.empty()) return "Laser: no VR controllers found.";
+    const char* hand = m_swap_controllers->value() ? "left" : "right";
+    if (menu_pointer_active()) return std::string("Laser on: point the ") + hand + " controller and pull its trigger.";
+    return std::string("Laser asleep: move the ") + hand + " controller or press a VR button.";
+}
+
+void VR::update_menu_pointer_motion() {
+    if (!wuwa_test::is_wuwa() || !g_framework->is_drawing_ui() || !is_hmd_active() || m_controllers.empty()) return;
+    const auto index = !m_swap_controllers->value() ? get_right_controller_index() : get_left_controller_index();
+    const auto aim = glm::quat{get_rotation(index, false)} * glm::vec3{0.0f, 0.0f, -1.0f};
+    if (glm::length(aim) < 0.5f) return;
+    // A turn of more than about 1.5 degrees since the last mark counts as use;
+    // a controller resting on a desk lets the laser sleep so the mouse works.
+    if (glm::dot(glm::normalize(aim), m_menu_pointer_aim) < 0.99966f) {
+        m_menu_pointer_aim = glm::normalize(aim);
+        m_menu_pointer_motion = std::chrono::steady_clock::now();
+    }
 }
 
 void VR::update_sightseeing_sample(bool synced) {
@@ -1881,6 +1904,7 @@ void VR::update_action_states() {
     }
 
     update_sightseeing_sample(sightseeing_synced);
+    update_menu_pointer_motion();
 
     bool actively_using_controller = false;
 

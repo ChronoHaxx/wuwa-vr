@@ -16,6 +16,7 @@
 #include "font_robotomedium.hpp"
 #include "utility/WuWaLocalization.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
+#include "utility/WuWaStepPlan.hpp"
 #include "utility/WuWaVrMenu.hpp"
 
 #include <cfloat>
@@ -118,16 +119,27 @@ std::vector<wuwa_menu::Page> sample_pages() {
         choice("Ambient occlusion", "If rocks and hills are shaded differently in each eye, turning ambient occlusion off removes the difference at a small cost in depth.", &sample.ao, {"Game default", "Off"}),
         choice("Dialogue black bars", "Hides the black bars at the top and bottom of dialogue scenes, which can appear in one eye only.", &sample.bars, {"Game default", "Hidden"}),
     }});
-    pages.push_back({"Record & test", {
-        text("Playtest: dialogue black bars, step 2 of 5"),
-        action("Pass: no bars in either eye", "Start a dialogue scene with black bars, then close each eye in turn."),
-        action("Bars in the left eye only", "Start a dialogue scene with black bars, then close each eye in turn."),
-        action("Bars in the right eye only", "Start a dialogue scene with black bars, then close each eye in turn."),
-        action("Bars in both eyes", "Start a dialogue scene with black bars, then close each eye in turn."),
-        toggle("Recording", "Records the headset view through the launcher. Marks and answers are linked to the video.", &sample.recording),
-        action("Mark this moment", "Adds a marker to the recording so it is easy to find later."),
+    const auto paragraph = [](const char* label, bool emphasis = false) {
+        Item item = make(Kind::Text, label);
+        item.wrap = !emphasis;
+        item.emphasis = emphasis;
+        return item;
+    };
+    pages.push_back({"Test", {
+        paragraph("Dialogue black bars  ·  step 2 of 5", true),
+        paragraph("Where: any dialogue scene with black bars at the top and bottom (the replayable 1.3 Shorekeeper quest has several)."),
+        paragraph("Letterbox off", true),
+        paragraph("Do: Start the same dialogue again. Close your left eye, then your right eye."),
+        paragraph("Expect: No black bars in either eye."),
+        action("No bars", "Saves this answer with the settings now in use, then shows the next step."),
+        action("Left eye only", "Saves this answer with the settings now in use, then shows the next step."),
+        action("Right eye only", "Saves this answer with the settings now in use, then shows the next step."),
+        action("Both eyes", "Saves this answer with the settings now in use, then shows the next step."),
+        action("Skip this step", "Saves \"skipped\" and shows the next step."),
+        action("Mark this moment", "Saves the time and current settings, so the moment is easy to find later."),
+        toggle("Record video", "Records the headset view through the launcher. Answers and marks are saved with the time.", &sample.recording),
     }});
-    pages.push_back({"More", {
+    pages.push_back({"Menu", {
         action("All settings (classic UEVR menu)", "Opens UEVR's full settings window."),
     }});
     return pages;
@@ -219,7 +231,20 @@ int wmain(int argc, wchar_t** argv) {
     // Laser / mouse resting on the sharing row's value (design units scale by 1400 / 1200).
     scenes.push_back(menu_scene("menu-2-quick-pointer", 0, 1, Source::Pointer, ImVec2{100.0f + 960.0f * 1400.0f / 1200.0f, 40.0f + 216.0f * 1400.0f / 1200.0f}));
     scenes.push_back(menu_scene("menu-3-graphics-gamepad", 2, 4, Source::Buttons));
-    scenes.push_back(menu_scene("menu-4-record-test-gamepad", 3, 2, Source::Buttons));
+    scenes.push_back(menu_scene("menu-4-test-gamepad", 3, 5, Source::Buttons));
+    // The step card that replaces the shortcut sheet while a plan runs.
+    static const auto plan = wuwa_steps::parse(nlohmann::json::parse(R"({"version": 1, "id": "bars-1", "title": "Dialogue black bars",
+        "steps": [
+            {"id": "baseline", "title": "Baseline", "do": "Start a dialogue scene with black bars. Close your left eye, then your right eye.",
+             "expect": "Bars in both eyes, or none.", "answers": ["No bars", "Left eye only", "Right eye only", "Both eyes"]},
+            {"id": "letterbox-off", "title": "Letterbox off", "do": "Start the same dialogue again. Close your left eye, then your right eye.",
+             "expect": "No black bars in either eye.", "answers": ["No bars", "Left eye only", "Right eye only", "Both eyes"]}]})"));
+    scenes.push_back({"step-1-card-recording", [](ImVec2 size) {
+        wuwa_menu::draw_step_card(ImGui::GetBackgroundDrawList(), size, wuwa_l10n::sheet_font(), plan, 1, true, "");
+    }});
+    scenes.push_back({"step-2-card-finished", [](ImVec2 size) {
+        wuwa_menu::draw_step_card(ImGui::GetBackgroundDrawList(), size, wuwa_l10n::sheet_font(), plan, 2, false, "");
+    }});
 
     for (const auto& scene : scenes) {
         // Two frames so ImGui settles any first-frame layout.

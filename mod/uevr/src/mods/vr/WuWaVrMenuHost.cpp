@@ -1,6 +1,10 @@
 #include "WuWaVrMenuHost.hpp"
 
+#include <imgui_internal.h>
+
 #include <algorithm>
+#include <cfloat>
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -9,6 +13,7 @@
 #include "Mods.hpp"
 #include "mods/VR.hpp"
 #include "utility/WuWaLocalization.hpp"
+#include "utility/WuWaStepPlan.hpp"
 #include "utility/WuWaVrMenu.hpp"
 
 namespace wuwa_menu_host {
@@ -17,6 +22,19 @@ using namespace wuwa_menu;
 
 bool classic{};
 State state{};
+MoveReader mover{};
+wuwa_steps::Runner steps{};
+std::vector<Page> pages{};
+std::uint64_t built_revision{~0ull};
+bool built_with_test{};
+
+std::int64_t unix_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+double seconds() {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 // Settings are found once by config key; UEVR's mods live for the whole process.
 IModValue* find(std::string_view key) {
@@ -35,6 +53,58 @@ ModValue<T>* typed(const char* key) {
     auto* value = dynamic_cast<ModValue<T>*>(find(key));
     if (value) cache.emplace_back(key, value);
     return value;
+}
+
+// Test plans switch settings by config key, exactly like the plugin API
+// (including the diorama, which is a request rather than a saved setting).
+wuwa_steps::Settings settings_access() {
+    wuwa_steps::Settings access;
+    access.get = [](const std::string& key) -> std::optional<std::string> {
+        if (key == "WuWaDiorama_Enabled") return VR::get()->is_diorama_enabled() ? "true" : "false";
+        if (auto* value = find(key)) return value->get();
+        return std::nullopt;
+    };
+    access.set = [](const std::string& key, const std::string& value) {
+        if (key == "WuWaDiorama_Enabled") {
+            if (VR::get()->physical_gamepad_passthrough()) return false;
+            VR::get()->set_diorama_enabled(value == "true");
+            return true;
+        }
+        auto* setting = find(key);
+        if (!setting) return false;
+        setting->set(value);
+        return true;
+    };
+    return access;
+}
+
+// Saved with every answer and mark, so results say what was actually on.
+nlohmann::json context() {
+    auto* vr = VR::get().get();
+    nlohmann::json settings = nlohmann::json::object();
+    for (const char* key : {"VR_RenderingMethod", "VR_NativeStereoFix", "VR_ExtremeCompatibilityMode", "VR_2DScreenMode",
+             "VR_MonoTheatreMode", "VR_HorizontalProjectionOverride", "UI_Size", "UI_Distance"}) {
+        if (auto* value = find(key)) settings[key] = value->get();
+    }
+    for (const auto& [key, original] : steps.touched()) {
+        if (auto* value = find(key)) settings[key] = value->get();
+    }
+    return {{"recording", vr->get_wuwa_controls().menu_recording_state()}, {"diorama", vr->is_diorama_enabled()},
+        {"vr_controllers", vr->sightseeing_on()}, {"settings", settings}};
+}
+
+bool recording(const std::string& state) { return state == "starting" || state == "recording"; }
+
+std::string recorder_line(const std::string& state) {
+    if (state == "offline") return "Recorder: start the WuWa VR launcher to record.";
+    if (state == "unavailable") return "Recorder: missing from this launcher package.";
+    if (state == "waiting") return "Recorder: waiting for the launcher...";
+    if (state == "starting") return "Recorder: starting.";
+    if (state == "recording") return "Recorder: recording. Answers and marks note the time.";
+    if (state == "finishing") return "Recorder: finishing the video.";
+    if (state == "saved") return "Recorder: saved. Open recordings from the launcher.";
+    if (state == "error") return "Recorder: failed. See WuWa Controls > Recording.";
+    return "Recorder: ready.";
 }
 
 Item setting_toggle(const char* label, const char* help, const char* key) {
@@ -63,16 +133,21 @@ Item setting_choice(const char* label, const char* help, const char* key, std::v
     return item;
 }
 
-Item action(const char* label, const char* help, std::function<void()> run) {
-    auto item = make(Kind::Action, label, help);
+Item action(std::string label, std::string help, std::function<void()> run) {
+    auto item = make(Kind::Action, std::move(label), std::move(help));
     item.run = std::move(run);
     return item;
 }
 
-std::vector<Page> build_pages() {
-    auto* vr = VR::get().get();
-    std::vector<Page> pages;
+Item paragraph(std::string text, bool emphasis = false) {
+    auto item = make(Kind::Text, std::move(text));
+    item.wrap = !emphasis;
+    item.emphasis = emphasis;
+    return item;
+}
 
+Page quick_page() {
+    auto* vr = VR::get().get();
     Page quick{"Quick"};
     auto controllers = make(Kind::Toggle, "VR controllers",
         "Use the VR controllers as an Xbox pad for walking and sightseeing. Holding the left Menu button for 1 second also turns them on or off.");
@@ -101,12 +176,71 @@ std::vector<Page> build_pages() {
     quick.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear.", "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
     quick.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.", "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
     quick.items.push_back(action("Recenter view", "Faces the view forward from where you are now.", [vr] { vr->recenter_view(); }));
-    quick.items.push_back(action("All settings (classic UEVR menu)",
-        "Opens UEVR's full settings window. Every setting here edits the same values.", [] { classic = true; }));
-    pages.push_back(std::move(quick));
+    return quick;
+}
 
-    Page more{"More"};
-    more.items.push_back(action("All settings (classic UEVR menu)",
+Page test_page() {
+    Page page{"Test"};
+    const auto* plan = steps.plan();
+    if (!plan) return page;
+    auto head = paragraph(plan->title, true);
+    head.value_text = [] {
+        return steps.finished() ? std::string{"·  finished"}
+                                : "·  step " + std::to_string(steps.index() + 1) + " of " + std::to_string(steps.count());
+    };
+    page.items.push_back(std::move(head));
+    if (!plan->scene.empty()) page.items.push_back(paragraph("Where: " + plan->scene));
+    if (const auto* step = steps.step()) {
+        page.items.push_back(paragraph(step->title, true));
+        if (!step->action.empty()) page.items.push_back(paragraph("Do: " + step->action));
+        if (!step->expect.empty()) page.items.push_back(paragraph("Expect: " + step->expect));
+        for (const auto& answer : step->answers) {
+            page.items.push_back(action(answer, "Saves this answer with the settings now in use, then shows the next step.",
+                [answer] { steps.answer(answer, context(), unix_ms(), settings_access()); }));
+        }
+        page.items.push_back(action("Skip this step", "Saves \"skipped\" and shows the next step.",
+            [] { steps.answer("skipped", context(), unix_ms(), settings_access()); }));
+        auto back = action("Previous step", "Goes back one step. Your earlier answer stays saved.",
+            [] { steps.back(unix_ms(), settings_access()); });
+        back.enabled = [] { return steps.index() > 0; };
+        page.items.push_back(std::move(back));
+    } else {
+        page.items.push_back(paragraph("Plan finished. Your answers are saved for Claude in wuwa-steps / results.jsonl."));
+        page.items.push_back(action("Restart plan", "Starts again from step 1.", [] { steps.restart(unix_ms(), settings_access()); }));
+    }
+    page.items.push_back(action("Mark this moment", "Saves the time and current settings, so the moment is easy to find later.",
+        [] { steps.mark(context(), unix_ms()); }));
+    auto record = make(Kind::Toggle, "Record video", "Records the headset view through the launcher. Answers and marks are saved with the time.");
+    record.enabled = [] {
+        const auto state = VR::get()->get_wuwa_controls().menu_recording_state();
+        return state != "offline" && state != "unavailable" && state != "waiting" && state != "finishing" && state != "busy";
+    };
+    record.get_bool = [] { return recording(VR::get()->get_wuwa_controls().menu_recording_state()); };
+    record.set_bool = [](bool on) {
+        if (on != recording(VR::get()->get_wuwa_controls().menu_recording_state())) VR::get()->get_wuwa_controls().menu_recording_toggle();
+    };
+    page.items.push_back(std::move(record));
+    auto status = make(Kind::Text, "");
+    status.value_text = [] { return recorder_line(VR::get()->get_wuwa_controls().menu_recording_state()); };
+    page.items.push_back(std::move(status));
+    auto problem = make(Kind::Text, "");
+    problem.wrap = true;
+    problem.value_text = [] { return steps.error().empty() ? std::string{} : "plan.json was not read: " + steps.error(); };
+    page.items.push_back(std::move(problem));
+    return page;
+}
+
+Page menu_page() {
+    auto* vr = VR::get().get();
+    Page page{"Menu"};
+    page.items.push_back(setting_slider("Menu size", "How much of its layer this menu fills. Smaller also reads as further away.",
+        "VR_WuWaVrMenuSize", 0.4f, 1.0f, 0.05f, "%.2f"));
+    page.items.push_back(setting_slider("Menu distance", "How far away this menu floats. UEVR's classic window uses the same distance.",
+        "UI_Framework_Distance", 0.8f, 4.0f, 0.1f, "%.1f m"));
+    auto laser = make(Kind::Text, "");
+    laser.value_text = [vr] { return vr->menu_pointer_status(); };
+    page.items.push_back(std::move(laser));
+    page.items.push_back(action("All settings (classic UEVR menu)",
         "Opens UEVR's full settings window. Every setting here edits the same values.", [] { classic = true; }));
     auto use = setting_toggle("Use this menu when opening UEVR",
         "Off: UEVR opens its classic window, as before. You can turn this menu back on under VR > WuWa Controls.", "VR_WuWaVrMenu");
@@ -114,36 +248,68 @@ std::vector<Page> build_pages() {
         if (auto* v = typed<bool>("VR_WuWaVrMenu")) v->value() = on;
         if (!on) classic = true;
     };
-    more.items.push_back(std::move(use));
-    pages.push_back(std::move(more));
-    return pages;
+    page.items.push_back(std::move(use));
+    return page;
+}
+
+// Pages follow the plan: a Test page appears while one is loaded and is
+// rebuilt as its steps change. The page you were on stays selected.
+void refresh_pages() {
+    const bool want_test = steps.loaded();
+    if (!pages.empty() && want_test == built_with_test && (!want_test || steps.revision() == built_revision)) return;
+    const auto current = pages.empty() ? std::string{"Quick"} : pages[std::clamp(state.page, 0, static_cast<int>(pages.size()) - 1)].title;
+    pages.clear();
+    pages.push_back(quick_page());
+    if (want_test) pages.push_back(test_page());
+    pages.push_back(menu_page());
+    int index = 0;
+    for (int i = 0; i < static_cast<int>(pages.size()); ++i) {
+        if (pages[i].title == current) index = i;
+    }
+    if (want_test && !built_with_test) index = 1; // a new plan opens on its Test page
+    set_page(pages, state, index);
+    built_with_test = want_test;
+    built_revision = steps.revision();
 }
 
 Moves read_moves() {
     const auto& io = ImGui::GetIO();
-    const auto pressed = [](ImGuiKey key) { return ImGui::IsKeyPressed(key, true); };
+    const auto down = [](ImGuiKey key) { return ImGui::IsKeyDown(key); };
+    const auto pushed = [](ImGuiKey key) { return ImGui::GetKeyData(key)->AnalogValue >= stick_push; };
     const auto once = [](ImGuiKey key) { return ImGui::IsKeyPressed(key, false); };
-    Moves moves;
-    moves.up = pressed(ImGuiKey_GamepadDpadUp) || pressed(ImGuiKey_GamepadLStickUp) || pressed(ImGuiKey_UpArrow);
-    moves.down = pressed(ImGuiKey_GamepadDpadDown) || pressed(ImGuiKey_GamepadLStickDown) || pressed(ImGuiKey_DownArrow);
-    moves.left = pressed(ImGuiKey_GamepadDpadLeft) || pressed(ImGuiKey_GamepadLStickLeft) || pressed(ImGuiKey_LeftArrow);
-    moves.right = pressed(ImGuiKey_GamepadDpadRight) || pressed(ImGuiKey_GamepadLStickRight) || pressed(ImGuiKey_RightArrow);
-    moves.accept = once(ImGuiKey_GamepadFaceDown) || once(ImGuiKey_Enter) || once(ImGuiKey_KeypadEnter) || once(ImGuiKey_Space);
-    moves.back = once(ImGuiKey_GamepadFaceRight) || once(ImGuiKey_Escape);
-    moves.prev_page = once(ImGuiKey_GamepadL1) || (once(ImGuiKey_Tab) && io.KeyShift);
-    moves.next_page = once(ImGuiKey_GamepadR1) || (once(ImGuiKey_Tab) && !io.KeyShift);
-    return moves;
+    Held held;
+    held.up = down(ImGuiKey_GamepadDpadUp) || down(ImGuiKey_UpArrow) || pushed(ImGuiKey_GamepadLStickUp);
+    held.down = down(ImGuiKey_GamepadDpadDown) || down(ImGuiKey_DownArrow) || pushed(ImGuiKey_GamepadLStickDown);
+    held.left = down(ImGuiKey_GamepadDpadLeft) || down(ImGuiKey_LeftArrow) || pushed(ImGuiKey_GamepadLStickLeft);
+    held.right = down(ImGuiKey_GamepadDpadRight) || down(ImGuiKey_RightArrow) || pushed(ImGuiKey_GamepadLStickRight);
+    const bool accept = once(ImGuiKey_GamepadFaceDown) || once(ImGuiKey_Enter) || once(ImGuiKey_KeypadEnter) || once(ImGuiKey_Space);
+    const bool back = once(ImGuiKey_GamepadFaceRight) || once(ImGuiKey_Escape);
+    const bool prev_page = once(ImGuiKey_GamepadL1) || (once(ImGuiKey_Tab) && io.KeyShift);
+    const bool next_page = once(ImGuiKey_GamepadR1) || (once(ImGuiKey_Tab) && !io.KeyShift);
+    return mover.read(held, accept, back, prev_page, next_page, seconds());
 }
+}
+
+void tick() {
+    if (!wuwa_test::is_wuwa()) return;
+    steps.poll(Framework::get_persistent_dir() / "wuwa-steps", unix_ms(), settings_access());
+}
+
+bool overlay_wanted() {
+    return wuwa_test::is_wuwa() && steps.loaded();
 }
 
 bool draw(const ImVec2& target_size) {
-    if (!wuwa_test::is_wuwa() || classic) return false;
+    if (!wuwa_test::is_wuwa()) return false;
+    tick();
+    if (classic) return false;
     auto* enabled = typed<bool>("VR_WuWaVrMenu");
     if (enabled && !enabled->value()) return false;
-    static auto pages = build_pages();
+    refresh_pages();
 
-    // 1200 x 780 design, as large as the UI target allows.
-    const float width = (std::min)(target_size.x * 0.92f, target_size.y * 0.92f * 1200.0f / 780.0f);
+    // 1200 x 780 design, scaled to the chosen share of the UI target.
+    const float fraction = std::clamp(VR::get()->vr_menu_size(), 0.4f, 1.0f);
+    const float width = (std::min)(target_size.x, target_size.y * 1200.0f / 780.0f) * fraction;
     const ImVec2 size{width, width * 780.0f / 1200.0f};
     const ImVec2 pos{(target_size.x - size.x) * 0.5f, (target_size.y - size.y) * 0.5f};
     ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f});
@@ -170,5 +336,13 @@ void on_closed() {
     state.focus = -1;
     state.dragging = -1;
     state.close_requested = false;
+}
+
+void draw_step_overlay(ImDrawList* list, const ImVec2& size) {
+    const auto* plan = steps.plan();
+    if (!plan || !list) return;
+    ImFont* font = wuwa_l10n::sheet_font() ? wuwa_l10n::sheet_font() : ImGui::GetFont();
+    wuwa_menu::draw_step_card(list, size, font, *plan, steps.index(),
+        recording(VR::get()->get_wuwa_controls().menu_recording_state()), steps.error());
 }
 }

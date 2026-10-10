@@ -91,6 +91,63 @@ agree.
    - the current playtest step with Pass, Fail, Blocked and preset answers.
 5. **All settings (classic).**
 
+## Guided test plans
+
+A plan is a JSON file at `%APPDATA%\UnrealVRMod\Client-Win64-Shipping\wuwa-steps\plan.json`.
+The game reads it at most once a second, and again whenever the file changes.
+
+**While a plan is loaded:**
+- **Step card:** its current step is shown where the shortcut sheet goes.
+- **Test page:** the menu gains one with the step's text and answer buttons, plus:
+  - Skip and Previous;
+  - Mark this moment;
+  - Record video (through the launcher's recorder).
+
+**Results file:** every answer and mark is appended to `wuwa-steps\results.jsonl`, each with:
+- the time;
+- the recorder state;
+- the main stereo, screen and HUD settings in use.
+
+Nothing is uploaded.
+
+```json
+{
+  "version": 1,
+  "id": "bars-1",
+  "title": "Dialogue black bars",
+  "scene": "Any dialogue scene with black bars",
+  "steps": [
+    {
+      "id": "baseline",
+      "title": "Baseline",
+      "do": "Start a dialogue. Close one eye, then the other.",
+      "expect": "Bars in both eyes, or none.",
+      "answers": ["No bars", "Left eye only", "Right eye only", "Both eyes"]
+    },
+    {
+      "id": "screen",
+      "title": "Stereo screen",
+      "settings": {"VR_2DScreenMode": true}
+    }
+  ]
+}
+```
+
+**Field rules:**
+- **Ids:** letters, digits, `- _ .`, at most 64 characters.
+- **Answers:** a step has 1 to 8. A step without answers gets Pass / Fail.
+- **`settings`:** maps UEVR config keys (as in `config.txt`, plus `WuWaDiorama_Enabled`) to values.
+  - They apply while that step is current.
+  - Anything a step changed goes back to its original value once no step needs it.
+  - The same happens when the plan finishes, is removed, or is replaced.
+  - Unknown keys are ignored.
+- **Same `id`:** editing a plan without changing its `id` keeps the current step.
+- **Write atomically:** write a temporary file, then rename it.
+  - A half-written file is reported on the card.
+  - The running plan keeps going.
+- **No cvars yet:** console variables can't be set by a plan.
+  - For now, the PC side applies them with `launcher/dev/wuwa-test.py` leases while the step is shown.
+
 ## Phases
 
 1. **Menu shell.**

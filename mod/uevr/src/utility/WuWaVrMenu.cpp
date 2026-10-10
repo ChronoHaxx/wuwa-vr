@@ -3,8 +3,10 @@
 #include <imgui.h>
 #include <cfloat>
 #include <cstdio>
+#include <vector>
 
 #include "WuWaLocalization.hpp"
+#include "WuWaStepPlan.hpp"
 
 namespace wuwa_menu {
 namespace {
@@ -112,14 +114,43 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
     // Rows, scrolled so a button-focused row is always in view.
     auto& page = pages[state.page];
     const float top = header_h + 12.0f, bottom = height - help_h - 8.0f, area = bottom - top;
-    const float content = page.items.size() * (row_h + row_gap) - row_gap;
+    // Paragraphs are as tall as their wrapped text; every other row is row_h.
+    const auto text_of = [&](const Item& item) {
+        auto text = item.label.empty() ? std::string{} : tr(item.label);
+        const auto extra = item.value_text ? item.value_text() : std::string{};
+        if (!extra.empty()) text += (text.empty() ? "" : item.wrap ? "\n" : "  ") + extra;
+        return text;
+    };
+    const float paragraph_px = 26.0f, paragraph_wrap = right - left - 16.0f;
+    std::vector<float> tops, heights;
+    float content = 0.0f;
+    for (const auto& item : page.items) {
+        float h = row_h;
+        if (item.kind == Kind::Text) {
+            const auto text = text_of(item);
+            if (text.empty()) { // an empty status line takes no space
+                tops.push_back(content);
+                heights.push_back(0.0f);
+                continue;
+            }
+            h = item.emphasis ? 52.0f : 44.0f;
+            if (item.wrap) h = font->CalcTextSizeA(paragraph_px * s, FLT_MAX, paragraph_wrap * s, text.c_str()).y / s + 14.0f;
+        }
+        tops.push_back(content);
+        heights.push_back(h);
+        content += h + row_gap;
+    }
+    content = (std::max)(0.0f, content - row_gap);
     const auto content_min = at(0.0f, top), content_max = at(width, bottom);
     const bool over_content = ImGui::IsWindowHovered() && io.MousePos.y >= content_min.y && io.MousePos.y < content_max.y;
     if (over_content && io.MouseWheel != 0.0f) state.scroll -= io.MouseWheel * (row_h + row_gap);
-    if (!pointer && state.focus >= 0) {
-        const float row_top = state.focus * (row_h + row_gap);
+    if (!pointer && state.focus >= 0 && state.focus < static_cast<int>(tops.size())) {
+        const float row_top = tops[state.focus], row_bottom = row_top + heights[state.focus];
+        // Keep the paragraph just above the focused row in view too, when it fits.
+        const float lead = state.focus > 0 && page.items[state.focus - 1].kind == Kind::Text ? tops[state.focus - 1] : row_top;
+        if (lead < state.scroll && row_bottom - lead <= area) state.scroll = lead;
         if (row_top < state.scroll) state.scroll = row_top;
-        if (row_top + row_h > state.scroll + area) state.scroll = row_top + row_h - area;
+        if (row_bottom > state.scroll + area) state.scroll = row_bottom - area;
     }
     state.scroll = std::clamp(state.scroll, 0.0f, (std::max)(0.0f, content - area));
 
@@ -127,16 +158,16 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
     list->PushClipRect(content_min, content_max, true);
     for (int index = 0; index < static_cast<int>(page.items.size()); ++index) {
         auto& item = page.items[index];
-        const float y = top + index * (row_h + row_gap) - state.scroll;
-        if (y + row_h < top || y > bottom) continue;
+        const float y = top + tops[index] - state.scroll, h = heights[index];
+        if (h <= 0.0f || y + h < top || y > bottom) continue;
         const bool enabled = !item.enabled || item.enabled();
         const auto min = at(left, y), max = at(right, y + row_h);
         const float mid = y + row_h * 0.5f;
 
         if (item.kind == Kind::Text) {
-            auto text = tr(item.label);
-            if (item.value_text) text += "  " + item.value_text();
-            write(at(left + 8.0f, mid - 13.0f), 24.0f, muted, text);
+            if (item.wrap) write(at(left + 8.0f, y + 6.0f), paragraph_px, IM_COL32(222, 214, 198, 255), text_of(item), paragraph_wrap);
+            else if (item.emphasis) write(at(left + 8.0f, y + h * 0.5f - 16.0f), 32.0f, gold, text_of(item));
+            else write(at(left + 8.0f, y + h * 0.5f - 12.0f), 24.0f, muted, text_of(item));
             continue;
         }
 
@@ -229,5 +260,55 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
     const auto hint = tr(pointer ? "Point and pull the trigger, or click. Scroll to see more."
                                  : "A select  ·  Left / right change  ·  LB / RB pages  ·  B close");
     write(at(left, height - 36.0f), 22.0f, gold_dim, hint);
+}
+
+void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wuwa_steps::Plan& plan, int index,
+    bool recording, const std::string& error) {
+    if (!list || !font) return;
+    const bool finished = index >= static_cast<int>(plan.steps.size());
+    const auto* step = finished ? nullptr : &plan.steps[index];
+    // 1600 x 900 design, like the shortcut sheet whose place this takes.
+    const float s = size.x / 1600.0f;
+    const auto at = [&](float x, float y) { return ImVec2{x * s, y * s}; };
+    const auto tall = [&](float px, const std::string& text, float wrap) {
+        return font->CalcTextSizeA(px * s, FLT_MAX, wrap * s, text.c_str()).y / s;
+    };
+    const auto write = [&](float x, float y, float px, ImU32 color, const std::string& text, float wrap = 0.0f) {
+        list->AddText(font, px * s, at(x, y), color, text.c_str(), nullptr, wrap * s);
+    };
+    list->AddRectFilled(at(30, 30), at(1570, 870), IM_COL32(10, 10, 14, 238), 24 * s);
+    list->AddRect(at(30, 30), at(1570, 870), IM_COL32(150, 118, 56, 255), 24 * s, 0, 3 * s);
+
+    write(70, 58, 34, gold, tr("TEST") + "  ·  " + plan.title);
+    const auto counter = finished ? tr("Finished") : std::to_string(index + 1) + " / " + std::to_string(plan.steps.size());
+    const float counter_w = font->CalcTextSizeA(34 * s, FLT_MAX, 0.0f, counter.c_str()).x / s;
+    write(1530 - counter_w, 58, 34, muted, counter);
+    if (recording) {
+        list->AddCircleFilled(at(1530 - counter_w - 60, 76), 13 * s, IM_COL32(235, 64, 64, 255));
+        write(1530 - counter_w - 140, 58, 34, IM_COL32(235, 90, 90, 255), "REC");
+    }
+
+    float y = 120;
+    if (step) {
+        write(70, y, 62, ink, step->title, 1460);
+        y += tall(62, step->title, 1460) + 24;
+        if (!step->action.empty()) {
+            write(70, y, 28, gold, tr("DO"));
+            write(70, y + 36, 40, ink, step->action, 1460);
+            y += 36 + tall(40, step->action, 1460) + 22;
+        }
+        if (!step->expect.empty()) {
+            write(70, y, 28, gold, tr("EXPECT"));
+            write(70, y + 36, 36, muted, step->expect, 1460);
+        }
+        std::string answers;
+        for (const auto& answer : step->answers) answers += (answers.empty() ? "" : "   ·   ") + answer;
+        write(70, 742, 30, muted, answers, 1460);
+    } else {
+        write(70, y, 56, ink, tr("Plan finished. Thank you!"), 1460);
+        write(70, y + 90, 36, muted, tr("Your answers are saved. Restart it from the menu's Test page."), 1460);
+    }
+    if (!error.empty()) write(70, 690, 26, IM_COL32(255, 120, 110, 255), "plan.json: " + error, 1460);
+    write(70, 800, 32, gold, tr("Answer in the menu: L3 + R3 (or Insert), Test page."));
 }
 }

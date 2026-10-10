@@ -62,10 +62,12 @@ struct Scene {
 // Sample values only: the menu model is drawn exactly as in the game, with the
 // game's page and row layout (mods/vr/WuWaVrMenuHost.cpp).
 struct Sample {
-    bool controllers{true}, diorama{false}, recording{true}, hide_ids{true}, profile_row{true}, telemetry{true}, note{true},
+    bool controllers{true}, diorama{false}, recording{true}, profile_row{true}, telemetry{true}, note{true},
         automatic{false}, framing{true}, follow{false}, sheet{true}, collide{false};
-    int view{0}, camera{2}, style{0}, fps{2}, size{1}, kind{1}, step{1};
-    float hud_size{1.1f}, hud_distance{2.0f}, hud_shape{1.33f}, hud_up{-0.15f}, hud_side{0.0f}, speed{600.0f}, turn{90.0f}, scale{0.875f};
+    bool dof{false};
+    int view{0}, camera{2}, style{0}, fps{2}, size{1}, kind{1}, step{1}, privacy{1}, resolution{3};
+    float hud_size{1.1f}, hud_distance{2.0f}, hud_shape{1.33f}, hud_up{-0.15f}, hud_side{0.0f}, speed{600.0f}, turn{90.0f}, scale{0.875f},
+        lens{75.0f}, nearest{30.0f};
 };
 Sample sample;
 
@@ -113,7 +115,7 @@ std::vector<wuwa_menu::Page> sample_pages() {
             &sample.camera, {"Game camera", "Fixed third person", "Freecam", "First person"});
     };
     const auto record = [&] {
-        return toggle("Record video", "Records the headset view through the WuWa VR app, which must be open. Player IDs are hidden while the option below is on.", &sample.recording, "REC 12:34");
+        return toggle("Record video", "Records the headset view through the WuWa VR app, which must be open. Player IDs are covered while it records (Hide player IDs, on the Record page).", &sample.recording, "REC 12:34");
     };
     std::vector<Page> pages;
     pages.push_back({"Quick", {
@@ -157,6 +159,10 @@ std::vector<wuwa_menu::Page> sample_pages() {
     pages.push_back({"Cinema", {
         view(),
         paragraph("Black bars in cutscenes? In WuWa's graphics settings, change Cinematic from Cutscene to Fullscreen. The bars go and cutscenes fill your view."),
+        slider("Close-up match", "Dialogue shots use a zoom lens your headset's wide view can't show, so people look small and far. This moves you nearer, per shot.", &sample.lens, 0.0f, 100.0f, 5.0f, "%.0f%%"),
+        slider("Closest distance", "How near Close-up match may bring you to the person in the shot.", &sample.nearest, 10.0f, 150.0f, 5.0f, "%.0f cm"),
+        paragraph("Now: Close-up at 28 degrees: subject 1.4 m (game focus), moved 1.1 m nearer, stopped at the closest 30 cm"),
+        toggle("Depth of field (experiment)", "Asks the engine for the background blur the 2D view has, in full VR and on the stereo screen.", &sample.dof),
         toggle("Cinematic scene note", "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut.", &sample.note),
         toggle("Automatic cinematic screen", "Switches to a screen during videos and story scenes it can detect, then back to full VR. Experimental.", &sample.automatic),
         toggle("Match cinematic framing", "Gives both eyes the same framing during letterboxed scenes.", &sample.framing),
@@ -164,8 +170,8 @@ std::vector<wuwa_menu::Page> sample_pages() {
     pages.push_back({"HUD", {
         slider("HUD size", "How large the game's HUD and menus appear.", &sample.hud_size, 0.5f, 5.0f, 0.05f, "%.2f"),
         slider("HUD distance", "How far away the HUD sits.", &sample.hud_distance, 0.5f, 6.0f, 0.1f, "%.1f m"),
-        slider("HUD shape", "Stretches the HUD taller (above 1) or flatter. If round icons look like flat ovals, raise this until they look round.", &sample.hud_shape, 0.5f, 2.0f, 0.01f, "%.2f"),
-        action("Reset HUD shape", "Back to the shape of the game's HUD image."),
+        slider("HUD shape (full VR)", "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. The stereo screen and mono theatre always keep the game's own shape.", &sample.hud_shape, 0.5f, 2.0f, 0.01f, "%.2f"),
+        action("Reset HUD shape", "Back to 1.33, the full VR default."),
         slider("Up / down", "Moves the HUD up or down.", &sample.hud_up, -1.5f, 1.5f, 0.05f, "%+.2f m"),
         slider("Left / right", "Moves the HUD sideways.", &sample.hud_side, -1.5f, 1.5f, 0.05f, "%+.2f m"),
         toggle("HUD follows your head", "On: the HUD stays in front of your eyes.", &sample.follow),
@@ -173,10 +179,18 @@ std::vector<wuwa_menu::Page> sample_pages() {
         toggle("Shortcut sheet", "The controller shortcut card below you while playing.", &sample.sheet),
     }});
     pages.push_back({"Comfort", {}});
-    pages.push_back({"Fixes", {}});
+    pages.push_back({"Fixes", {
+        toggle("Match far detail between eyes", "Far trees and props switch detail together in both eyes. Recommended.", &sample.framing),
+        toggle("Refresh far lighting", "Refreshes the far-lighting cache so distant lighting matches between eyes.", &sample.framing),
+        toggle("Match cinematic framing", "Gives both eyes the same framing during letterboxed scenes.", &sample.framing),
+        paragraph("Smoothness", true),
+        paragraph("Full VR draws two large eye images every frame, far more pixels than the stereo screen, so busy scenes such as dialogue run slower there. A lower resolution is smoother and a little softer."),
+        choice("Render resolution", "Pixels per eye compared with what your headset asks for. Lower is smoother in full VR.", &sample.resolution, {"60%", "70%", "80%", "90%", "100%", "110%", "120%"}),
+        paragraph("Each eye: 2963 x 2963 pixels. Now about 36 fps."),
+    }});
     pages.push_back({"Record", {
         record(),
-        toggle("Hide player IDs", "Covers your UID in the corner, and the profile ID row in menus, with black boxes, in the headset and in videos. Check a short video before sharing: other names and chat are not hidden.", &sample.hide_ids),
+        choice("Hide player IDs", "Black boxes over your UID in the corner and the profile ID row in menus. While recording: only while the WuWa VR app records. Always: for other recorders such as OBS too.", &sample.privacy, {"Off", "While recording", "Always"}),
         toggle("Also hide the profile ID row", "Covers the ID row on the ESC profile screen too.", &sample.profile_row),
         paragraph("Recorder: recording. Reports and marks note the time in the video."),
         choice("Frame rate", "Frames per second in the video.", &sample.fps, {"30 fps", "45 fps", "60 fps"}),
@@ -285,6 +299,8 @@ int wmain(int argc, wchar_t** argv) {
     scenes.push_back(menu_scene("menu-4-camera-gamepad", 2, 3, Source::Buttons));
     scenes.push_back(menu_scene("menu-5-hud-gamepad", 4, 2, Source::Buttons));
     scenes.push_back(menu_scene("menu-6-record-gamepad", 7, 10, Source::Buttons));
+    scenes.push_back(menu_scene("menu-8-fixes-gamepad", 6, 5, Source::Buttons));
+    scenes.push_back(menu_scene("menu-9-cinema-gamepad", 3, 3, Source::Buttons));
     scenes.push_back(menu_scene("menu-7-cinema-pointer", 3, 2, Source::Pointer, ImVec2{100.0f + 500.0f * 1400.0f / 1200.0f, 40.0f + 330.0f * 1400.0f / 1200.0f}));
     // The step card that replaces the shortcut sheet while a plan runs.
     static const auto plan = wuwa_steps::parse(nlohmann::json::parse(R"({"version": 1, "id": "bars-1", "title": "Dialogue black bars",

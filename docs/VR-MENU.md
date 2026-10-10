@@ -67,6 +67,12 @@ analog stick rather than UEVR's per-axis D-pad presses, and holding RT no
 longer switches UEVR into its camera-offset mode. The Camera page has the
 offset sliders instead.
 
+**Holding left / right speeds up.** A held direction repeats after 0.45 s,
+every 0.18 s, then twice as often after 1.5 s and three times after 3 s. On a
+slider each move also grows: 2 steps after 1.2 s, 5 after 2 s, 10 after 3 s,
+never more than a tenth of the slider's range at once. Choices and toggles
+always move one entry, so a held Step row never skips a test step.
+
 **The laser and A never act twice.** In this menu the pointing hand's trigger
 clicks where the laser points; A selects the focused row. (UEVR's own mapping
 also clicks with A, which toggled a row twice.)
@@ -84,6 +90,15 @@ and the site.
 controller is tracked, the pointer and trigger drive the menu, whether or not
 *Enable motion-controller input* is on. Both quad hit tests (OpenVR overlay and
 OpenXR framework layer) honour this.
+
+**A visible beam (OpenXR).** OpenXR has no laser of its own, so the menu draws
+one: a second quad layer, 8 mm wide, from 3 cm ahead of the pointing controller
+to the hit point on the menu (or 1.2 m ahead when it points away), turned with
+its flat side to the eyes. It samples a 32 x 4 px swatch that the menu draws in
+the top-left corner of the UI image (soft at both sides); the menu's own quad
+leaves those top rows out at the same pixel scale, and the hit test maps into
+the remaining rows. Shown only while this menu is open and only when the menu
+quad is placed in stage space (`UI_Framework_FollowView` off, the default).
 
 **Nothing is lost.** *All settings (classic)* opens UEVR's full menu. Every new
 page edits the same settings objects as the classic menu, so the two always
@@ -103,25 +118,43 @@ REC badge with the elapsed time shows while recording.
    world scale, the camera offset (forward / back, right / left, up / down in
    cm, and reset), and recenter.
 4. **Cinema:** view, the game's own fix for cutscene black bars (Cinematic:
-   Fullscreen in WuWa's graphics settings), the cinematic scene note,
+   Fullscreen in WuWa's graphics settings), close-up match and its closest
+   distance, **depth of field (experiment)**, the cinematic scene note,
    automatic cinematic screen and what story scenes use, matched framing.
-5. **HUD:** size, distance, **HUD shape** (`UI_WuWaHudShape`, the HUD's height
-   relative to its texture, for a squashed-looking HUD), up / down, left /
-   right, follow head, refresh layout, shortcut sheet.
+5. **HUD:** size, distance, **HUD shape (full VR)** (`UI_WuWaHudShape`,
+   default 1.33; see below), up / down, left / right, follow head, refresh
+   layout, shortcut sheet.
 6. **Comfort:** decoupled pitch (and its HUD adjustment), smooth camera turns
    and tilt, walk by default, L3 + A also resets position.
 7. **Fixes:** matched far detail, far lighting, matched framing, and
-   **Restart VR runtime** (sets the runtime's reinitialize flag: for stutter
-   that stays after a view-mode switch, or a stuck SteamVR dashboard).
-8. **Record:** record video, then **Hide player IDs** directly below (now on
-   by default, under the new key `WuWaPrivacy_HideIDs`, so existing profiles
-   start covered too), the profile-row option, recorder status, frame rate,
-   picture size, telemetry, and **Report a problem**.
+   **Smoothness**: render resolution (`OpenXR_ResolutionScale` as 60-120 %
+   steps, applied live like a view switch) with the live eye size and frame
+   rate. Test 3's *Restart VR runtime* is gone: in the headset it made things
+   worse, and the 10 Oct recording showed the slowness was not a stuck state
+   but full VR's cost (dialogue at 24-30 fps in full VR, about 45 on the
+   stereo screen, with 3292 x 3292 px per eye at scale 1.0).
+8. **Record:** record video, then **Hide player IDs** directly below
+   (`WuWaPrivacy_Mode`: Off, While recording, Always; default While
+   recording, because the boxes are approximate and can cover useful HUD), the
+   profile-row option, recorder status, frame rate, picture size, telemetry,
+   and **Report a problem**. While recording means the launcher's recorder
+   reports starting, recording or finishing (polled twice a second, and set at
+   once when this menu or the classic one sends the start request); other
+   recorders such as OBS need Always. A profile that had test 2's
+   `WuWaPrivacy_Enabled=true` and no mode yet starts on Always.
 9. **Menu:** menu size and distance, laser status, how each input works,
    the classic menu, and the switch back to UEVR's window.
 
 Pages rebuild when a plan step or the camera mode changes; the same page and,
 where it still exists, the same row stay selected.
+
+**Why the HUD looks squashed in full VR only.** The log shows the UI pass
+drawn for the square eye (`stage3_fit original=0,0,3292,3292`) and fitted into
+the 2560 x 1440 HUD image. WuWa lays its UI out for screens no narrower than
+4:3 (it supports 4:3 tablets), so the square eye gets a 4:3 layout, which the
+16:9 image widens by (16/9) / (4/3) = 1.33. That is the value testers picked by
+eye. The stereo screen and mono theatre render each eye at 2560 x 1440 (16:9),
+so nothing is widened there and the slate keeps 1.0 regardless of the setting.
 
 **Close-up match** (Camera page in Game camera mode, and the Cinema page).
 Measured from the 10 Oct recordings: in full VR the eye sits exactly at the
@@ -134,12 +167,17 @@ degrees per eye. From the same spot, a 25-degree close-up's subject looks about
 Per shot, `02_WuWaVR_PolarControls.lua` moves the eye along the game camera's
 view so the subject at distance d sits at d * k^s, where k = tan(fov/2) /
 tan(45 degrees) and s is the strength (`WuWaControls_LensMatch`, 0-100 %,
-default 75).
+default 75), stopping no nearer than the closest distance
+(`WuWaControls_LensNearest`, 10-150 cm, default 30).
 - **Subject distance:** the game's own depth-of-field focus distance (the
   camera's post-process settings) when it sets one; otherwise a 5 cm sphere
   trace along the view.
-- **Safety:** the trace also stops the eye 60 cm short of anything in between,
-  and never nearer than 60 cm to the subject.
+- **Safety:** the trace also stops the eye the closest distance short of
+  anything in between. Without the game's focus the trace is only a guess
+  (often a far wall), so such a shot moves at most 1 m.
+- **Why the closest distance is a setting:** test 3c used a fixed 60 cm. The
+  game's focus distances are mostly 0.7-2.2 m, so at 75 % the 60 cm floor
+  already applied, and anything above about 40 % changed nothing.
 - **Per shot:** the distance is measured once at each cut (a camera jump of more
   than 50 cm or 10 degrees), so the camera's own moves within a shot carry on
   unchanged.
@@ -148,6 +186,18 @@ default 75).
 - **Diagnostics:** every shot is logged as `[WuWaLens] shot=... fov=... focus=...
   trace=... dolly=...`. The menu shows the live report
   (`WuWaControls_LensStatus`).
+
+**Depth of field (experiment)** (`WuWaStereo_DepthOfField`, default off). The
+2D view's background blur is missing in full VR and on the stereo screen,
+probably because the engine leaves depth of field out of stereo views (not
+confirmed); mono theatre is a single view, and it keeps the blur. The camera script sets the engine's
+`ShowFlag.DepthOfField` console variable to 1 (force on) and back to 2 (the
+game decides), logging `[WuWaDoF]`. If the variable is missing from this build
+the Now line says so. Blur size follows the lens's focal length, so at the
+headset's wide view a close-up's blur would almost vanish: in full VR, for
+lenses of 60 degrees or less, the f-stop is scaled by k squared (the same k as
+close-up match), and the focus distance moves with the close-up dolly. Both
+are rewritten every frame from the game's values. Untested in the headset.
 
 **Report a problem** appends one line per report to
 `<profile>/wuwa-reports/reports.jsonl`: the kind of problem, the time, the

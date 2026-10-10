@@ -9,6 +9,7 @@
 #include "../utility/ImGui.hpp"
 
 #include "OverlayComponent.hpp"
+#include "WuWaVrMenuHost.hpp"
 
 namespace vrmod {
 void OverlayComponent::on_reset() {
@@ -462,7 +463,7 @@ void OverlayComponent::update_slate_openvr() {
     const auto size = is_d3d12 ? g_framework->get_d3d12_rt_size() : g_framework->get_d3d11_rt_size();
     const auto aspect = size.x / size.y;
     float width_meters = m_slate_size->value() * aspect;
-    float height_meters = m_slate_size->value() * std::clamp(m_slate_shape->value(), 0.5f, 2.0f);
+    float height_meters = m_slate_size->value() * hud_shape();
     portal_hud_placement(aspect, glm_matrix, width_meters, height_meters);
     const auto steamvr_matrix = Matrix3x4f{glm::rowMajor4(glm_matrix)};
     vr::VROverlay()->SetOverlayTransformAbsolute(m_slate_overlay_handle, vr::TrackingUniverseStanding, (vr::HmdMatrix34_t*)&steamvr_matrix);
@@ -972,7 +973,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
 
     const auto size_meters = m_parent->m_slate_size->value();
     float meters_w = (float)ui_swapchain.width / (float)ui_swapchain.height * size_meters;
-    float meters_h = size_meters * std::clamp(m_parent->m_slate_shape->value(), 0.5f, 2.0f);
+    float meters_h = size_meters * m_parent->hud_shape();
 
     glm_matrix[3] -= glm_matrix[2] * m_parent->m_slate_distance->value();
     glm_matrix[3] += m_parent->m_slate_x_offset->value() * glm_matrix[0];
@@ -1088,7 +1089,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerCylinderKHR>> OverlayComp
 
     const auto size_meters = m_parent->m_slate_size->value();
     const auto meters_w = (float)ui_swapchain.width / (float)ui_swapchain.height * size_meters;
-    const auto meters_h = size_meters * std::clamp(m_parent->m_slate_shape->value(), 0.5f, 2.0f);
+    const auto meters_h = size_meters * m_parent->hud_shape();
 
     // OpenXR Docs:
     // radius is the non-negative radius of the cylinder. Values of zero or floating point positive infinity are treated as an infinite cylinder.
@@ -1146,7 +1147,19 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
 }
 
 
+float OverlayComponent::hud_shape() const {
+    auto& vr = VR::get();
+    if (vr->is_using_2d_screen() || vr->is_using_mono_theatre()) return 1.0f;
+    return std::clamp(m_slate_shape->value(), 0.5f, 2.0f);
+}
+
+std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::OpenXR::generate_framework_beam_quad() {
+    if (!m_framework_beam_ready) return std::nullopt;
+    return m_framework_beam_layer;
+}
+
 std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::OpenXR::generate_framework_ui_quad() {
+    m_framework_beam_ready = false;
     if (!g_framework->is_drawing_anything()) {
         m_parent->m_framework_intersect_state.intersecting = false;
         return std::nullopt;
@@ -1214,9 +1227,18 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
     // Adjust size_meters based on scaling factor.
     const float adjusted_size_meters = size_meters * scale_factor;
 
+    // WuWa: the VR menu keeps the laser's swatch in the image's top rows; leave
+    // them out of this quad at the same pixel scale.
+    const bool wuwa_beam = g_framework->is_drawing_ui() && wuwa_menu_host::showing() &&
+        (int32_t)ui_swapchain.height > wuwa_menu_host::beam_swatch_rows * 4;
+    const int32_t skipped_rows = wuwa_beam ? wuwa_menu_host::beam_swatch_rows : 0;
+    const int32_t shown_rows = (int32_t)ui_swapchain.height - skipped_rows;
+    layer.subImage.imageRect.offset.y = skipped_rows;
+    layer.subImage.imageRect.extent.height = shown_rows;
+
     // Compute the new dimensions in meters.
     const auto meters_w = (float)ui_swapchain.width / (float)ui_swapchain.height * adjusted_size_meters;
-    const auto meters_h = adjusted_size_meters;
+    const auto meters_h = adjusted_size_meters * (float)shown_rows / (float)ui_swapchain.height;
 
     layer.size = {meters_w, meters_h};
 
@@ -1249,6 +1271,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
         const auto plane_pos = glm::vec3{glm_matrix[3]};
 
         float intersection_distance = 0.0f;
+        float beam_length = 1.2f; // pointing away from the menu
         if (glm::intersectRayPlane<glm::vec3>(start, fwd, plane_pos, glm::normalize(glm::vec3{glm_matrix[2]}), intersection_distance)) {
             const auto intersection_point = start + (fwd * intersection_distance);
 
@@ -1263,15 +1286,49 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
 
                 m_parent->m_framework_intersect_state.quad_intersection_point = {x, y};
                 m_parent->m_framework_intersect_state.intersecting = true;
+                beam_length = intersection_distance;
 
                 if (auto it = vr->m_openxr->swapchains.find((uint32_t)runtimes::OpenXR::SwapchainIndex::FRAMEWORK_UI); it != vr->m_openxr->swapchains.end()) {
                     const auto client_x = (int32_t)((float)it->second.width * x);
-                    const auto client_y = (int32_t)((float)it->second.height * y);
+                    const auto client_y = skipped_rows + (int32_t)((float)shown_rows * y);
 
                     m_parent->m_framework_intersect_state.swapchain_intersection_point = {client_x, client_y};
                 }
             } else {
                 m_parent->m_framework_intersect_state.intersecting = false;
+            }
+        }
+
+        // WuWa: a visible beam. Stage space only: in view space the ray above is
+        // not in the quad's space either.
+        if (wuwa_beam && layer.space == vr->m_openxr->stage_space && std::isfinite(beam_length)) {
+            const auto head = glm::vec3{vr->get_position(vr->get_hmd_index(), false)};
+            const auto from = start + fwd * 0.03f;
+            const auto to = start + fwd * std::clamp(beam_length, 0.05f, 20.0f);
+            const auto along = to - from;
+            const float length = glm::length(along);
+            if (length > 0.01f) {
+                // Long axis along the ray, flat side turned toward the eyes.
+                const auto y_axis = along / length;
+                auto x_axis = glm::cross(y_axis, head - (from + to) * 0.5f);
+                if (glm::length(x_axis) < 1e-4f) x_axis = glm::cross(y_axis, glm::vec3{0.0f, 1.0f, 0.0f});
+                if (glm::length(x_axis) > 1e-4f) {
+                    x_axis = glm::normalize(x_axis);
+                    const auto z_axis = glm::cross(x_axis, y_axis);
+                    auto& beam = m_framework_beam_layer;
+                    beam = {};
+                    beam.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
+                    beam.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+                    beam.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+                    beam.space = layer.space;
+                    beam.subImage.swapchain = ui_swapchain.handle;
+                    beam.subImage.imageRect.offset = {0, 0};
+                    beam.subImage.imageRect.extent = {wuwa_menu_host::beam_swatch_width, wuwa_menu_host::beam_swatch_rows};
+                    beam.size = {0.008f, length};
+                    beam.pose.orientation = runtimes::OpenXR::to_openxr(glm::quat_cast(glm::mat3{x_axis, y_axis, z_axis}));
+                    beam.pose.position = runtimes::OpenXR::to_openxr((from + to) * 0.5f);
+                    m_framework_beam_ready = true;
+                }
             }
         }
     } else {

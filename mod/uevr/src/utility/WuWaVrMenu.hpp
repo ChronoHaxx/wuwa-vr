@@ -58,21 +58,31 @@ struct Page {
 // new presses (or key repeats), never as held state.
 struct Moves {
     bool up{}, down{}, left{}, right{}, accept{}, back{}, prev_page{}, next_page{};
+    int scale{1}; // steps per left / right move on a slider; grows while held
     bool any() const { return up || down || left || right || accept || back || prev_page || next_page; }
 };
 
 // Turns a held direction into moves: one when pressed, then, after a pause,
-// a steady repeat. Sticks count as held only when pushed well past centre.
+// a repeat that speeds up the longer it is held (twice as often after 1.5 s,
+// three times after 3 s). Sticks count as held only when pushed well past centre.
 struct Repeater {
     double pause{0.45}, every{0.18};
     double since{-1.0}, last{0.0};
+    double interval(double held) const { return held >= 3.0 ? every / 3.0 : held >= 1.5 ? every / 2.0 : every; }
     bool step(bool held, double now) {
         if (!held) { since = -1.0; return false; }
         if (since < 0.0) { since = last = now; return true; }
-        if (now - since >= pause && now - last >= every) { last = now; return true; }
+        if (now - since >= pause && now - last >= interval(now - since) - 1e-9) { last = now; return true; }
         return false;
     }
+    double held_for(double now) const { return since < 0.0 ? 0.0 : now - since; }
 };
+
+// Slider steps per move after holding left / right this long, so extreme values
+// are seconds away instead of a minute. nudge() caps it at a tenth of the range.
+inline int hold_scale(double held) {
+    return held >= 3.0 ? 10 : held >= 2.0 ? 5 : held >= 1.2 ? 2 : 1;
+}
 
 struct Held {
     bool up{}, down{}, left{}, right{};
@@ -154,6 +164,7 @@ public:
         moves.down = m_down.step(held.down && !held.up, now);
         moves.left = m_left.step(held.left && !held.right, now);
         moves.right = m_right.step(held.right && !held.left, now);
+        moves.scale = hold_scale(moves.left ? m_left.held_for(now) : moves.right ? m_right.held_for(now) : 0.0);
         moves.accept = accept;
         moves.back = back;
         moves.prev_page = prev_page;
@@ -202,8 +213,9 @@ inline float snap(const Item& item, float value) {
     return std::clamp(value, item.min, item.max);
 }
 
-// Left / right on a row: choices and sliders move one step, toggles set off / on.
-inline void nudge(Item& item, int direction) {
+// Left / right on a row: choices move one entry, toggles set off / on, sliders
+// move `scale` steps (at most a tenth of their range at once).
+inline void nudge(Item& item, int direction, int scale = 1) {
     switch (item.kind) {
     case Kind::Toggle:
         if (item.set_bool) item.set_bool(direction > 0);
@@ -215,7 +227,14 @@ inline void nudge(Item& item, int direction) {
         }
         break;
     case Kind::Slider:
-        if (item.get_float && item.set_float) item.set_float(snap(item, item.get_float() + direction * item.step));
+        if (item.get_float && item.set_float) {
+            int steps = (std::max)(scale, 1);
+            if (item.step > 0.0f) {
+                const int tenth = static_cast<int>((item.max - item.min) / (10.0f * item.step) + 0.5f);
+                steps = (std::min)(steps, (std::max)(tenth, 1));
+            }
+            item.set_float(snap(item, item.get_float() + direction * steps * item.step));
+        }
         break;
     default:
         break;
@@ -268,8 +287,8 @@ inline void apply_moves(std::vector<Page>& pages, State& state, const Moves& mov
     if (moves.up) state.focus = step_focus(page, state.focus, -1);
     if (moves.down) state.focus = step_focus(page, state.focus, +1);
     auto& item = page.items[state.focus];
-    if (moves.left) nudge(item, -1);
-    if (moves.right) nudge(item, +1);
+    if (moves.left) nudge(item, -1, moves.scale);
+    if (moves.right) nudge(item, +1, moves.scale);
     if (moves.accept) activate(item);
 }
 

@@ -52,6 +52,9 @@ public:
     // with the saved recording settings.
     std::string menu_recording_state();
     void menu_recording_toggle();
+    // Privacy boxes: 0 off, 1 while the launcher records, 2 always.
+    int privacy_mode() const { return m_privacy->value(); }
+    bool recording_live() const { return m_recording_live.load(std::memory_order_relaxed); }
     bool menu_warning_active() const;
     bool fresh_menu_cursor() const;
     bool menu_warning_visible() const;
@@ -173,6 +176,10 @@ private:
     // shot's subject size full VR keeps, in percent; 0 is off. Its live report
     // is transient, like the HUD status above.
     const ModSlider::Ptr m_lens_match{ModSlider::create("WuWaControls_LensMatch", 0.0f, 100.0f, 75.0f)};
+    // The closest the eye may come to the subject, in cm.
+    const ModSlider::Ptr m_lens_nearest{ModSlider::create("WuWaControls_LensNearest", 10.0f, 150.0f, 30.0f)};
+    // Experiment: depth of field in stereo views (the camera script sets the show flag).
+    const ModToggle::Ptr m_stereo_dof{ModToggle::create("WuWaStereo_DepthOfField", false)};
     struct LensStatus : ModString {
         LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}
         mutable std::mutex mutex;
@@ -259,9 +266,13 @@ private:
     const ModSlider::Ptr m_sheet_tilt{ModSlider::create("WuWaControls_SheetTilt", 0.0f, 90.0f, 60.0f)};
     // Privacy is deliberately outside the control-reset allowlist. Resetting
     // camera/input settings must not accidentally reveal a creator's ID.
-    // On by default since the VR menu's recorder (Oct 2026), under a new key so
-    // existing profiles start covered too; recordings are meant to be shared.
-    const ModToggle::Ptr m_privacy{ModToggle::create("WuWaPrivacy_HideIDs",true)};
+    // The boxes are approximate and can cover useful HUD, so by default they
+    // show only while the launcher records (test 3d, Oct 2026). A profile that
+    // had the old WuWaPrivacy_Enabled on keeps covering always (see on_config_load).
+    const ModCombo::Ptr m_privacy{ModCombo::create("WuWaPrivacy_Mode",{"Off","While recording","Always"},1)};
+    // Set on the UI thread from the launcher's status, read by the render thread.
+    std::atomic<bool> m_recording_live{false};
+    void refresh_recording_live();
     const ModToggle::Ptr m_privacy_profile{ModToggle::create("WuWaPrivacy_ProfileID",true)};
     const ModCombo::Ptr m_privacy_profile_scope{ModCombo::create("WuWaPrivacy_ProfileScope", {"ESC / overlay menus (detected)", "All detected menus", "Always (manual mask)"},0)};
     const ModSlider::Ptr m_uid_left{ModSlider::create("WuWaPrivacy_UIDLeft",0.0f,1.0f,0.78f)};

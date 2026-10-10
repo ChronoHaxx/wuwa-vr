@@ -1215,21 +1215,71 @@ function lens.blocked(context,pawn,from,dir)
     end)
     if ok then return value end
 end
+-- Depth of field in VR (experiment). The engine leaves depth of field out of
+-- stereo views; ShowFlag.DepthOfField=1 asks for it anyway and 2 gives the
+-- choice back to the game. Blur size follows the lens: at the headset's wide
+-- view a dialogue close-up's blur would almost vanish, so in full VR the f-stop
+-- is scaled by the zoom ratio squared, and the focus distance follows the
+-- close-up move. The game rewrites its camera every tick, so both are written
+-- again each frame from the game's own values.
+local dof={want=nil,flag="",wrote_f=nil,wrote_d=nil,base_f=nil,base_d=nil}
+function dof.set_flag(on)
+    local ok,value=pcall(function()
+        local cvar=api:get_console_manager():find_variable("ShowFlag.DepthOfField")
+        if not cvar then return "missing" end
+        cvar:set_int(on and 1 or 2)
+        return tostring(cvar:get_int())
+    end)
+    local result=ok and value or ("error: "..tostring(value):sub(1,80))
+    functions.log_info("[WuWaDoF] ShowFlag.DepthOfField "..(on and "on" or "off").." -> "..result)
+    return result
+end
+function dof.update(pcm,fov,dolly)
+    local on=enabled("WuWaStereo_DepthOfField")
+    if on~=dof.want then dof.want=on; dof.flag=dof.set_flag(on); dof.wrote_f=nil; dof.wrote_d=nil end
+    if not on or not pcm or mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre") then return end
+    pcall(function()
+        local pp=pcm.CameraCachePrivate.POV.PostProcessSettings
+        local f,d=pp.DepthOfFieldFstop,pp.DepthOfFieldFocalDistance
+        -- A value equal to last frame's write means the game did not refresh it.
+        if dof.wrote_f and math.abs(f-dof.wrote_f)<1e-4 then f=dof.base_f else dof.base_f=f end
+        if dof.wrote_d and math.abs(d-dof.wrote_d)<1e-3 then d=dof.base_d else dof.base_d=d end
+        if pp.bOverride_DepthOfFieldFstop and type(f)=="number" and f>0 and type(fov)=="number" and fov<60 then
+            local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2)
+            dof.wrote_f=math.max(0.05,f*k*k); pp.DepthOfFieldFstop=dof.wrote_f
+        end
+        if pp.bOverride_DepthOfFieldFocalDistance and type(d)=="number" and dolly>0 then
+            dof.wrote_d=math.max(10,d-dolly); pp.DepthOfFieldFocalDistance=dof.wrote_d
+        end
+    end)
+end
+function dof.text()
+    if not dof.want then return "" end
+    if dof.flag=="missing" then return "; depth of field: not in this game build" end
+    if dof.flag:sub(1,5)=="error" then return "; depth of field: "..dof.flag end
+    return "; depth of field forced on"
+end
 function lens.update()
-    local strength=number("WuWaControls_LensMatch",75,0,100)/100
-    if strength<=0 then lens.dolly=0; lens.pos=nil; lens.publish("Off"); return end
-    if mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre") then
-        lens.dolly=0; lens.pos=nil; lens.publish("Paused: game camera in full VR only"); return
-    end
     local pc=api:get_player_controller(0)
     local pcm=pc and pc.PlayerCameraManager
-    if not pcm then lens.dolly=0; lens.pos=nil; return end
+    local strength=number("WuWaControls_LensMatch",75,0,100)/100
+    -- How close the eye may come to the subject. The old fixed 60 cm capped
+    -- the effect at about 40% for the game's usual 1-2 m focus distances.
+    local nearest=number("WuWaControls_LensNearest",30,10,150)
+    local paused=mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre")
+    if strength<=0 or paused or not pcm then
+        lens.dolly=0; lens.pos=nil
+        if pcm then dof.update(pcm,pcm:GetFOVAngle(),0) end
+        if strength<=0 then lens.publish("Off"..dof.text())
+        elseif paused then lens.publish("Paused: game camera in full VR only"..dof.text()) end
+        return
+    end
     local fov=pcm:GetFOVAngle()
     local pos,rot=point(pcm:GetCameraLocation()),rotator(pcm:GetCameraRotation())
     if type(fov)~="number" or fov~=fov or not valid(pos) or not rot then lens.dolly=0; lens.pos=nil; return end
     if fov>60 or fov<5 then
-        lens.dolly=0; lens.pos=nil
-        lens.publish(string.format("Waiting for a close-up (lens now %.0f degrees)",fov)); return
+        lens.dolly=0; lens.pos=nil; dof.update(pcm,fov,0)
+        lens.publish(string.format("Waiting for a close-up (lens now %.0f degrees)",fov)..dof.text()); return
     end
     -- A cut is a jump of the game camera; within a shot its own moves carry on
     -- and the subject distance measured at the cut is kept, so nothing jitters.
@@ -1248,22 +1298,27 @@ function lens.update()
         lens.subject=lens.subject_focus or lens.subject_trace
     end
     if not lens.subject then
-        lens.dolly=0; lens.publish(string.format("Close-up at %.0f degrees: subject distance unknown, view unchanged",fov)); return
+        lens.dolly=0; dof.update(pcm,fov,0)
+        lens.publish(string.format("Close-up at %.0f degrees: subject distance unknown, view unchanged",fov)..dof.text()); return
     end
     -- The subject keeps strength^1 of its 2D size: distance d becomes d*k^strength.
     local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2)
     local d=lens.subject
-    local dolly=math.max(0,d-math.max(60,d*k^strength))
-    if lens.subject_trace then dolly=math.min(dolly,math.max(0,lens.subject_trace-60)) end
+    local dolly=math.max(0,d-math.max(nearest,d*k^strength))
+    if lens.subject_trace then dolly=math.min(dolly,math.max(0,lens.subject_trace-nearest)) end
+    -- Without the game's focus the trace is only a guess (often a far wall): at most 1 m.
+    if not lens.subject_focus then dolly=math.min(dolly,100) end
     lens.dolly=dolly
+    dof.update(pcm,fov,dolly)
     local text=string.format("Close-up at %.0f degrees: subject %.1f m (%s), moved %.1f m nearer",
         fov,d/100,lens.subject_focus and "game focus" or "trace",dolly/100)
+    if dolly>0 and d-dolly<=nearest+1 then text=text..string.format(", stopped at the closest %.0f cm",nearest) end
     if cut then
-        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f focus=%s trace=%s dolly=%.0f strength=%.2f",
+        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f focus=%s trace=%s dolly=%.0f strength=%.2f nearest=%.0f",
             lens.shot,fov,tostring(lens.subject_focus and math.floor(lens.subject_focus) or "none"),
-            tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength))
+            tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength,nearest))
     end
-    lens.publish(text)
+    lens.publish(text..dof.text())
 end
 local function update_camera_before_draw()
     -- UGameViewportClient::Draw runs on the game thread after world simulation,

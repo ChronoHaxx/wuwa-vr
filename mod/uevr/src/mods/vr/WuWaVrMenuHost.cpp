@@ -9,6 +9,8 @@
 #include <atomic>
 #include <cfloat>
 #include <chrono>
+#include <cmath>
+#include <cstdio>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -151,7 +153,8 @@ nlohmann::json context() {
     nlohmann::json settings = nlohmann::json::object();
     for (const char* key : {"VR_RenderingMethod", "VR_NativeStereoFix", "VR_ExtremeCompatibilityMode", "VR_2DScreenMode",
              "VR_MonoTheatreMode", "VR_HorizontalProjectionOverride", "VR_AutoCinema", "VR_DecoupledPitch",
-             "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape"}) {
+             "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape", "WuWaControls_LensMatch",
+             "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "OpenXR_ResolutionScale", "WuWaPrivacy_Mode"}) {
         if (auto* value = cached(key)) settings[key] = value->get();
     }
     for (const auto& [key, original] : steps.touched()) {
@@ -244,12 +247,41 @@ Item lens_slider() {
         "WuWaControls_LensMatch", 0.0f, 100.0f, 5.0f, "%.0f%%");
 }
 
+Item lens_nearest_slider() {
+    return setting_slider("Closest distance",
+        "How near Close-up match may bring you to the person in the shot. Lower comes closer; below about 30 cm can feel "
+        "uncomfortably close.", "WuWaControls_LensNearest", 10.0f, 150.0f, 5.0f, "%.0f cm");
+}
+
 Item lens_status() {
     return live_text([] {
         auto* status = cached("WuWaControls_LensStatus");
         const auto text = status ? status->get() : std::string{};
         return text.empty() ? std::string{} : "Now: " + text;
     });
+}
+
+// The OpenXR render resolution, in a few steps. Each change rebuilds the eye
+// images (as a view switch does), so it is a choice rather than a held slider.
+Item resolution_choice() {
+    static const float scales[]{0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f};
+    auto item = make(Kind::Choice, "Render resolution",
+        "Pixels per eye compared with what your headset asks for. Lower is smoother in full VR. It changes after a moment.");
+    item.enabled = [] { return typed<float>("OpenXR_ResolutionScale") != nullptr; };
+    item.get_int = [] {
+        auto* v = typed<float>("OpenXR_ResolutionScale");
+        const float now = v ? v->value() : 1.0f;
+        int best = 4;
+        for (int i = 0; i < 7; ++i) {
+            if (std::fabs(scales[i] - now) < std::fabs(scales[best] - now)) best = i;
+        }
+        return best;
+    };
+    item.set_int = [](int value) {
+        if (auto* v = typed<float>("OpenXR_ResolutionScale")) v->value() = scales[std::clamp(value, 0, 6)];
+    };
+    item.choices = {"60%", "70%", "80%", "90%", "100%", "110%", "120%"};
+    return item;
 }
 
 Item view_choice() {
@@ -282,7 +314,8 @@ Item camera_choice() {
 
 Item record_toggle() {
     auto record = make(Kind::Toggle, "Record video",
-        "Records the headset view through the WuWa VR app, which must be open. Player IDs are hidden while the option below is on.");
+        "Records the headset view through the WuWa VR app, which must be open. Player IDs are covered while it records "
+        "(Hide player IDs, on the Record page).");
     record.enabled = [] {
         return rec_state != "offline" && rec_state != "unavailable" && rec_state != "waiting" && rec_state != "finishing" &&
             rec_state != "busy";
@@ -393,6 +426,7 @@ Page camera_page() {
             "Game camera follows WuWa's own camera and its dialogue camera work. Close-up match brings you nearer "
             "in zoomed-in shots, so they frame people like the 2D view does."));
         page.items.push_back(lens_slider());
+        page.items.push_back(lens_nearest_slider());
         page.items.push_back(lens_status());
         break;
     }
@@ -424,7 +458,12 @@ Page cinema_page() {
         "Black bars in cutscenes? In WuWa's graphics settings, change Cinematic from Cutscene to Fullscreen. "
         "The bars go and cutscenes fill your view."));
     page.items.push_back(lens_slider());
+    page.items.push_back(lens_nearest_slider());
     page.items.push_back(lens_status());
+    page.items.push_back(setting_toggle("Depth of field (experiment)",
+        "Asks the engine for the background blur the 2D view has, in full VR and on the stereo screen. In full VR the blur is "
+        "scaled for the headset's wider view. It may do nothing in this game build: the Now line above says.",
+        "WuWaStereo_DepthOfField"));
     page.items.push_back(setting_toggle("Cinematic scene note",
         "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "
         "A fallback for when automatic switching misses a scene.", "VR_CinemaHint"));
@@ -447,11 +486,12 @@ Page hud_page() {
     page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear.", "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
     page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
         "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
-    page.items.push_back(setting_slider("HUD shape",
-        "Stretches the HUD taller (above 1) or flatter. If round icons look like flat ovals, raise this until they look round.",
+    page.items.push_back(setting_slider("HUD shape (full VR)",
+        "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. Raise it if round "
+        "icons still look like flat ovals. The stereo screen and mono theatre always keep the game's own shape.",
         "UI_WuWaHudShape", 0.5f, 2.0f, 0.01f, "%.2f"));
-    page.items.push_back(action("Reset HUD shape", "Back to the shape of the game's HUD image.", [] {
-        if (auto* v = typed<float>("UI_WuWaHudShape")) v->value() = 1.0f;
+    page.items.push_back(action("Reset HUD shape", "Back to 1.33, the full VR default.", [] {
+        if (auto* v = typed<float>("UI_WuWaHudShape")) v->value() = 4.0f / 3.0f;
     }));
     page.items.push_back(setting_slider("Up / down", "Moves the HUD up or down.", "UI_Y_Offset", -1.5f, 1.5f, 0.05f, "%+.2f m"));
     page.items.push_back(setting_slider("Left / right", "Moves the HUD sideways.", "UI_X_Offset", -1.5f, 1.5f, 0.05f, "%+.2f m"));
@@ -503,24 +543,33 @@ Page fixes_page() {
         "Refreshes the far-lighting cache so distant lighting matches between eyes. A limited workaround.", "WuWaStereo_RefillFarLighting"));
     page.items.push_back(setting_toggle("Match cinematic framing",
         "Gives both eyes the same framing during letterboxed scenes.", "VR_CinematicFramingFix"));
-    page.items.push_back(action("Restart VR runtime",
-        "Reconnects to the VR runtime. Try it if stutter stays after switching view modes, or the SteamVR dashboard will not open. "
-        "The view goes dark for a moment.", [] {
-            if (auto* runtime = VR::get()->get_runtime()) runtime->wants_reinitialize = true;
-        }));
+    page.items.push_back(paragraph("Smoothness", true));
+    page.items.push_back(paragraph(
+        "Full VR draws two large eye images every frame, far more pixels than the stereo screen, so busy scenes such as "
+        "dialogue run slower there. A lower resolution is smoother and a little softer."));
+    page.items.push_back(resolution_choice());
+    page.items.push_back(live_text([] {
+        auto* vr = VR::get().get();
+        char text[160];
+        std::snprintf(text, sizeof(text), "Each eye: %u x %u pixels. Now about %.0f fps.", vr->get_hmd_width(),
+            vr->get_hmd_height(), ImGui::GetIO().Framerate);
+        return std::string{text};
+    }));
     return page;
 }
 
 Page record_page() {
     Page page{"Record"};
     page.items.push_back(record_toggle());
-    page.items.push_back(setting_toggle("Hide player IDs",
-        "Covers your UID in the corner, and the profile ID row in menus, with black boxes, in the headset and in videos. "
-        "Check a short video before sharing: other names and chat are not hidden.", "WuWaPrivacy_HideIDs"));
+    page.items.push_back(setting_choice("Hide player IDs",
+        "Black boxes over your UID in the corner and the profile ID row in menus. While recording: only while the WuWa VR app "
+        "records, so the boxes never cover HUD you need in play. Always: for other recorders such as OBS too. The boxes are "
+        "approximate; check a short video before sharing. Other names and chat are not hidden.",
+        "WuWaPrivacy_Mode", {"Off", "While recording", "Always"}));
     auto profile = setting_toggle("Also hide the profile ID row", "Covers the ID row on the ESC profile screen too.", "WuWaPrivacy_ProfileID");
     profile.enabled = [] {
-        auto* hide = typed<bool>("WuWaPrivacy_HideIDs");
-        return hide && hide->value() && typed<bool>("WuWaPrivacy_ProfileID") != nullptr;
+        auto* hide = typed<int32_t>("WuWaPrivacy_Mode");
+        return hide && hide->value() > 0 && typed<bool>("WuWaPrivacy_ProfileID") != nullptr;
     };
     page.items.push_back(std::move(profile));
     page.items.push_back(live_text([] { return recorder_line(); }));
@@ -662,6 +711,16 @@ void refresh_pages() {
     built_key = key;
 }
 
+// Soft-edged across its width, so the thin beam quad has no hard sides.
+// Premultiplied, like everything ImGui draws into the cleared UI image.
+void draw_beam_swatch(ImDrawList* list) {
+    if (!list) return;
+    const float w = static_cast<float>(beam_swatch_width), h = static_cast<float>(beam_swatch_rows);
+    const ImU32 edge = IM_COL32(255, 236, 190, 0), core = IM_COL32(255, 236, 190, 235);
+    list->AddRectFilledMultiColor(ImVec2{0.0f, 0.0f}, ImVec2{w * 0.5f, h}, edge, core, core, edge);
+    list->AddRectFilledMultiColor(ImVec2{w * 0.5f, 0.0f}, ImVec2{w, h}, core, edge, edge, core);
+}
+
 Moves read_moves() {
     const auto& io = ImGui::GetIO();
     const auto down = [](ImGuiKey key) { return ImGui::IsKeyDown(key); };
@@ -738,6 +797,7 @@ bool draw(const ImVec2& target_size) {
     if (rec_since >= 0.0) look.badge = "REC " + rec_clock();
     wuwa_menu::draw(pages, state, read_moves(), pos, size, look);
     ImGui::End();
+    draw_beam_swatch(ImGui::GetForegroundDrawList());
     if (state.close_requested) {
         state.close_requested = false;
         g_framework->set_draw_ui(false);

@@ -797,6 +797,9 @@ vr::EVRCompositorError D3D11Component::on_frame(VR* vr) {
                 if (framework_quad) {
                     quad_layers.push_back((XrCompositionLayerBaseHeader*)&framework_quad->get());
                 }
+                if (const auto beam = openxr_overlay.generate_framework_beam_quad()) {
+                    quad_layers.push_back((XrCompositionLayerBaseHeader*)&beam->get());
+                }
             }
             
             auto result = vr->m_openxr->end_frame(quad_layers, scene_depth_tex != nullptr, is_mono_theatre);

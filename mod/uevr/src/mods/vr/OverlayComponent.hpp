@@ -105,8 +105,12 @@ private:
     const ModSlider::Ptr m_slate_x_offset{ ModSlider::create("UI_X_Offset", -10.0f, 10.0f, 0.0f) };
     const ModSlider::Ptr m_slate_y_offset{ ModSlider::create("UI_Y_Offset", -10.0f, 10.0f, 0.0f) };
     const ModSlider::Ptr m_slate_size{ ModSlider::create("UI_Size", 0.5f, 10.0f, 2.0f) };
-    // WuWa: the HUD's height relative to its texture's shape, for a HUD that looks squashed.
-    const ModSlider::Ptr m_slate_shape{ ModSlider::create("UI_WuWaHudShape", 0.5f, 2.0f, 1.0f) };
+    // WuWa: the HUD's height relative to its texture's shape, full VR only. There the
+    // game lays its UI out for 4:3 (its square eye is narrower than any screen it
+    // supports) and the redirect fits that into the 16:9 HUD image, a 1.33 squash.
+    // The stereo screen and mono theatre show the game's 16:9 frame as it is.
+    const ModSlider::Ptr m_slate_shape{ ModSlider::create("UI_WuWaHudShape", 0.5f, 2.0f, 4.0f / 3.0f) };
+    float hud_shape() const;
     const ModSlider::Ptr m_slate_cylinder_angle{ ModSlider::create("UI_Cylinder_Angle", 0.0f, 360.0f, 90.0f) };
     const ModToggle::Ptr m_ui_follows_view{ ModToggle::create("UI_FollowView", false) };
     const ModToggle::Ptr m_ui_invert_alpha{ ModToggle::create("UI_InvertAlpha", false) };
@@ -172,6 +176,9 @@ private:
             XrEyeVisibility eye = XR_EYE_VISIBILITY_BOTH
         );
         std::optional<std::reference_wrapper<XrCompositionLayerQuad>> generate_framework_ui_quad();
+        // WuWa: the VR menu's laser, from the controller to where it points. Set up
+        // by generate_framework_ui_quad, so call it after that.
+        std::optional<std::reference_wrapper<XrCompositionLayerQuad>> generate_framework_beam_quad();
         
     private:
         XrCompositionLayerQuad m_slate_layer{};
@@ -179,6 +186,8 @@ private:
         XrCompositionLayerCylinderKHR m_slate_layer_cylinder{};
         XrCompositionLayerCylinderKHR m_slate_layer_cylinder_right{};
         XrCompositionLayerQuad m_framework_ui_layer{};
+        XrCompositionLayerQuad m_framework_beam_layer{};
+        bool m_framework_beam_ready{false};
         OverlayComponent* m_parent{ nullptr };
         
         friend class OverlayComponent;

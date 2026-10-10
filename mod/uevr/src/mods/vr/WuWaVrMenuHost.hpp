@@ -17,6 +17,12 @@ void on_closed();
 // Any thread.
 bool showing();
 
+// The laser beam (OpenXR) is a thin quad textured from a small swatch that the
+// VR menu draws in the top-left corner of the UI image; the menu's own quad
+// leaves those rows out. Pixels.
+inline constexpr int beam_swatch_width = 32;
+inline constexpr int beam_swatch_rows = 4;
+
 // Guided test plans: picks up <profile>/wuwa-steps/plan.json (at most once a
 // second). Called every UI frame, menu open or not.
 void tick();

@@ -182,6 +182,43 @@ int main() {
     check(fresh.read(-0.8f, 0.0f) == Dir::Left, "a firm push left did not engage");
     check(fresh.read(std::nanf(""), 0.0f) == Dir::None, "a bad stick value held a direction");
 
+    // Holding longer repeats faster and, on sliders, takes bigger steps.
+    MoveReader accel;
+    const auto hold = [&](double t) { return accel.read(right, false, false, false, false, t); };
+    check(hold(0.0).right && hold(0.0).scale == 1, "a fresh push was not a single step");
+    int moves_first = 0, moves_late = 0, biggest = 1;
+    for (int frame = 1; frame <= 90; ++frame) { // 0 - 1.5 s at 60 fps
+        const auto m = hold(frame / 60.0);
+        if (m.right) { ++moves_first; biggest = (std::max)(biggest, m.scale); }
+    }
+    for (int frame = 181; frame <= 270; ++frame) { // 3 - 4.5 s
+        const auto m = hold(frame / 60.0);
+        if (m.right) { ++moves_late; biggest = (std::max)(biggest, m.scale); }
+    }
+    check(moves_late >= 2 * moves_first, "the repeat did not speed up while held");
+    check(biggest == 10, "a long hold did not reach ten steps per move");
+    check(hold_scale(0.5) == 1 && hold_scale(1.3) == 2 && hold_scale(2.5) == 5 && hold_scale(3.5) == 10,
+        "hold scale thresholds changed");
+    Values wide;
+    auto wide_pages = pages_for(wide);
+    auto& amount = wide_pages[0].items[4];
+    wide.amount = 0.5f;
+    nudge(amount, +1, 10); // range 0.5 - 2.0 in 0.25 steps: a tenth is under one step
+    check(wide.amount == 0.75f, "a scaled move on a short slider took more than one step");
+    Item offset = make(Kind::Slider, "Offset");
+    float cm = 0.0f;
+    offset.get_float = [&cm] { return cm; };
+    offset.set_float = [&cm](float value) { cm = value; };
+    offset.min = -150.0f; offset.max = 150.0f; offset.step = 1.0f;
+    nudge(offset, +1, 10);
+    check(cm == 10.0f, "a scaled move on a long slider did not take ten steps");
+    nudge(offset, -1, 50);
+    check(cm == -20.0f, "a scaled move was not capped at a tenth of the range");
+    Values picks;
+    auto choice_pages = pages_for(picks);
+    nudge(choice_pages[0].items[3], +1, 10);
+    check(picks.pick == 1, "a scaled move skipped choices");
+
     check(clock_text(0.0) == "0:00" && clock_text(75.9) == "1:15" && clock_text(3725.0) == "1:02:05" && clock_text(-4.0) == "0:00",
         "elapsed time was formatted wrongly");
 

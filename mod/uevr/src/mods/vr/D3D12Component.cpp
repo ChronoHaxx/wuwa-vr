@@ -825,6 +825,9 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 if (framework_quad) {
                     quad_layers.push_back((XrCompositionLayerBaseHeader*)&framework_quad->get());
                 }
+                if (const auto beam = openxr_overlay.generate_framework_beam_quad()) {
+                    quad_layers.push_back((XrCompositionLayerBaseHeader*)&beam->get());
+                }
             }
 
             const bool world_ready = is_actually_afr ?

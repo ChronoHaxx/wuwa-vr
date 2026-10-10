@@ -318,7 +318,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, m_lens_status,
+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, m_lens_status,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -334,6 +334,10 @@ WuWaControlsComponent::~WuWaControlsComponent() {
 void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_defaults) {
     reset_auto_cinema();
     ModComponent::on_config_load(cfg,set_defaults);
+    // Before test 3d privacy was a single toggle; someone who had it on keeps
+    // the boxes on always rather than only while the launcher records.
+    if (!set_defaults && !cfg.get("WuWaPrivacy_Mode") && cfg.get<bool>("WuWaPrivacy_Enabled").value_or(false))
+        m_privacy->value()=2;
     if (wuwa_test::is_wuwa())
         wuwa_l10n::request(m_language->value(), Framework::get_persistent_dir("wuwa-languages"));
     if (!wuwa_test::is_wuwa() || set_defaults || !m_recovery.launch().empty()) return;
@@ -630,7 +634,7 @@ void WuWaControlsComponent::on_draw_experiments() {
 
 void WuWaControlsComponent::on_draw_recording() {
     const auto profile=Framework::get_persistent_dir();
-    m_video.poll(profile);
+    refresh_recording_live();
     const auto state=m_video.state();
     if (!m_video.connected())
         wuwa_ui::TextWrapped("Keep WuWa VR Launcher running to record from here. Its browser tab can be closed.");
@@ -651,8 +655,9 @@ void WuWaControlsComponent::on_draw_recording() {
     ImGui::BeginDisabled(!m_video.available() || busy || m_video.pending());
     if (wuwa_ui::Button("Start video recording")) {
         constexpr int rates[]{30,45,60},widths[]{720,1024,1280};
-        m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
-                      widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value());
+        if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
+                      widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value()))
+            m_recording_live.store(true,std::memory_order_relaxed);
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
@@ -686,6 +691,7 @@ void WuWaControlsComponent::on_draw_recording() {
     ImGui::Separator();
     wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
     if (m_privacy->value()) {
+        if (m_privacy->value()==1) wuwa_ui::TextWrapped("While recording: the boxes appear only while the WuWa VR app records. Recording with other software (OBS) needs Always.");
         wuwa_ui::TextWrapped("Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.");
         if (wuwa_ui::TreeNode("Privacy box placement")) {
             wuwa_ui::draw(*m_privacy_profile,"Also cover the ESC profile ID row");
@@ -923,8 +929,16 @@ bool WuWaControlsComponent::floor_visible() const {
         !g_framework->is_drawing_ui() && VR::get()->is_hmd_active();
 }
 
-std::string WuWaControlsComponent::menu_recording_state() {
+void WuWaControlsComponent::refresh_recording_live() {
     m_video.poll(Framework::get_persistent_dir());
+    const auto state=m_video.state();
+    // Starting and finishing count too: frames are captured around both.
+    m_recording_live.store(state=="starting" || state=="recording" || state=="finishing" ||
+        (m_video.pending() && m_recording_live.load(std::memory_order_relaxed)),std::memory_order_relaxed);
+}
+
+std::string WuWaControlsComponent::menu_recording_state() {
+    refresh_recording_live();
     if (!m_video.connected()) return "offline";
     if (!m_video.available()) return "unavailable";
     return m_video.pending() ? "waiting" : m_video.state();
@@ -936,8 +950,10 @@ void WuWaControlsComponent::menu_recording_toggle() {
     const auto state=m_video.state();
     if (state=="starting" || state=="recording") { m_video.submit(profile,false); return; }
     constexpr int rates[]{30,45,60},widths[]{720,1024,1280};
-    m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
-                  widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value());
+    // Cover the IDs from the request on, before the launcher reports "starting".
+    if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
+                  widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value()))
+        m_recording_live.store(true,std::memory_order_relaxed);
 }
 
 Matrix4x4f WuWaControlsComponent::floor_transform() const {
@@ -954,6 +970,8 @@ Matrix4x4f WuWaControlsComponent::floor_transform() const {
 }
 
 void WuWaControlsComponent::draw_passive_overlay() {
+    // Recordings started from the launcher window are seen here (twice a second).
+    if (wuwa_test::is_wuwa()) refresh_recording_live();
     if (status_warning_visible()) {
         if (floor_visible() || (!menu_warning_active() && !mode_warning_active())) {
             wuwa_menu_host::draw_hint(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize);
@@ -980,7 +998,8 @@ void WuWaControlsComponent::draw_passive_overlay() {
 }
 
 std::array<wuwa_privacy::Rect, 2> WuWaControlsComponent::privacy_rectangles(int32_t width,int32_t height) const {
-    if (!wuwa_test::is_wuwa() || !m_privacy->value()) return {};
+    const int mode=m_privacy->value();
+    if (!wuwa_test::is_wuwa() || mode<=0 || (mode==1 && !recording_live())) return {};
     return {wuwa_privacy::pixels(m_uid_left->value(),m_uid_top->value(),m_uid_right->value(),m_uid_bottom->value(),width,height),
         m_privacy_profile->value() && wuwa_menu::profile_mask(m_privacy_profile_scope->value(),GetTickCount64(),fresh_menu_cursor()) ?
             wuwa_privacy::pixels(m_id_left->value(),m_id_top->value(),m_id_right->value(),m_id_bottom->value(),width,height) : wuwa_privacy::Rect{}};

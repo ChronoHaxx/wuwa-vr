@@ -102,7 +102,7 @@ void OverlayComponent::update_input_mouse_emulation() {
         return;
     }
 
-    if (m_framework_intersect_state.intersecting && VR::get()->is_using_controllers()) {
+    if (m_framework_intersect_state.intersecting && (VR::get()->is_using_controllers() || VR::get()->menu_pointer_active())) {
         auto vr = VR::get();
         auto& io = ImGui::GetIO();
         const auto is_initial_frame = !vr->is_using_afr() || vr->get_frame_count() % 2 == vr->m_left_eye_interval;
@@ -127,7 +127,10 @@ void OverlayComponent::update_input_mouse_emulation() {
 
             // Left click.
             const auto& a_button_right = !vr->m_swap_controllers->value() ? VR::s_action_a_button_right : VR::s_action_a_button_left;
-            if (VR::get()->is_action_active_any_joystick(vr->get_action_handle(a_button_right))) {
+            // WuWa VR menu: the pointing hand's trigger clicks too (get_right_joystick follows the swap).
+            const bool trigger_click = vr->menu_pointer_active() &&
+                vr->is_action_active(vr->get_action_handle(VR::s_action_trigger), vr->get_right_joystick());
+            if (trigger_click || VR::get()->is_action_active_any_joystick(vr->get_action_handle(a_button_right))) {
                 // Clear any gamepad A events.
                 auto ctx = io.Ctx;
 
@@ -859,7 +862,7 @@ void OverlayComponent::update_overlay_openvr() {
             return;
         }
         // Check if the controller pointer intersects with the quad, and we can use this to emulate the mouse
-        if (vr->is_using_controllers()) {
+        if (vr->is_using_controllers() || vr->menu_pointer_active()) {
             // Right only for now for testing
             const auto controller_index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
             const auto right_controller_rot = glm::quat{vr->get_rotation(controller_index, false)};

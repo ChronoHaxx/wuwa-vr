@@ -749,6 +749,11 @@ void VR::set_sightseeing_on(bool on, const char* why) {
     m_sightseeing_gesture.cancel_pulse();
 }
 
+bool VR::menu_pointer_active() const {
+    return wuwa_test::is_wuwa() && m_wuwa_vr_menu->value() && g_framework->is_drawing_ui() && is_hmd_active() &&
+        !m_controllers.empty() && std::chrono::steady_clock::now() - m_last_controller_update <= std::chrono::seconds(30);
+}
+
 void VR::update_sightseeing_sample(bool synced) {
     if (!wuwa_test::is_wuwa()) return;
     using Status = wuwa_sightseeing::Status;
@@ -2699,6 +2704,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         const bool draw_wuwa = ImGui::BeginChild("WuWaControlsScroll", ImVec2(0, 0), false,
             ImGuiWindowFlags_AlwaysVerticalScrollbar);
         if (draw_wuwa) {
+        wuwa_ui::draw(*m_wuwa_vr_menu, "Open the WuWa VR menu instead of this window");
         m_wuwa_controls.on_draw_language();
         m_wuwa_controls.on_draw_recovery();
         if (wuwa_ui::CollapsingHeader("View modes and cutscenes", ImGuiTreeNodeFlags_DefaultOpen))

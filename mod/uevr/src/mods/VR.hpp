@@ -163,6 +163,11 @@ public:
     void on_xinput_set_state(uint32_t* retval, uint32_t user_index, XINPUT_VIBRATION* vibration) override;
     void update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_controller, bool sightseeing = false);
     bool sightseeing_on() const { return wuwa_test::is_wuwa() && m_sightseeing_on.load(); }
+    void set_sightseeing_on(bool on, const char* why);
+    // The VR menu's laser: works whether or not motion-controller input or VR
+    // controllers mode is on, while UEVR's UI is open and a VR controller was
+    // used in the last 30 seconds.
+    bool menu_pointer_active() const;
     int sightseeing_slot() const { return m_sightseeing_target.load(); }
     void stamp_sightseeing_packet(uint32_t result, uint32_t slot, XINPUT_STATE* state);
 
@@ -1213,6 +1218,7 @@ public:
             *m_controllers_allowed,
             *m_sightseeing_style,
             *m_sightseeing_slot,
+            *m_wuwa_vr_menu,
             *m_focus_on_gamepad_reconnect,
             *m_wuwa_forward_focus,
             *m_wuwa_gamepad_passthrough,
@@ -1248,6 +1254,8 @@ private:
         {"Both together", "Last used wins", "VR only (Xbox ignored)"}, 0) };
     const ModCombo::Ptr m_sightseeing_slot{ ModCombo::create(generate_name("WuWaVRControllerSlot"),
         {"Slot 0 (usual)", "Slot 1", "Slot 2", "Slot 3"}, 0) };
+    // VR-first menu (WuWaVrMenuHost) in place of UEVR's window; off restores the classic window.
+    const ModToggle::Ptr m_wuwa_vr_menu{ ModToggle::create(generate_name("WuWaVrMenu"), true) };
     std::atomic<bool> m_sightseeing_on{false};
     std::atomic<int32_t> m_sightseeing_target{0};
     std::atomic<int32_t> m_sightseeing_mix_style{0};
@@ -1264,7 +1272,6 @@ private:
     void update_sightseeing_sample(bool synced);
     bool apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* state);
     void reset_sightseeing();
-    void set_sightseeing_on(bool on, const char* why);
     void draw_sightseeing_menu();
     const ModToggle::Ptr m_focus_on_gamepad_reconnect{ ModToggle::create(generate_name("FocusOnGamepadReconnect"), true) };
     // Independent live A/B switches. Preserve the accepted build's behavior

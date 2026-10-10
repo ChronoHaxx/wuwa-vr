@@ -198,6 +198,9 @@ public:
     static constexpr std::uint16_t stick_bits = 0x0040 | 0x0080; // L3 + R3
     static constexpr std::uint64_t pulse_ms = 100;
     static constexpr int pulse_polls = 2;
+    // A tap the game has not read this long after its pulse ended (loading, or
+    // not polling the slot yet) is dropped rather than arriving as a surprise.
+    static constexpr std::uint64_t pulse_late_ms = 1000;
 
     // Engine thread, once per VR sample. Returns true when the hold completes.
     bool update(bool valid, std::uint16_t raw_buttons, bool enabled, std::uint64_t now_ms) noexcept {
@@ -246,7 +249,8 @@ public:
     // least pulse_polls polls, so a slow frame cannot swallow the tap.
     std::uint16_t take(std::uint64_t now_ms) noexcept {
         if (!pulse_) return 0;
-        if (now_ms >= pulse_until_ms_ && pulse_count_ >= pulse_polls) {
+        if ((now_ms >= pulse_until_ms_ && pulse_count_ >= pulse_polls) ||
+            now_ms >= pulse_until_ms_ + pulse_late_ms) {
             pulse_ = 0;
             return 0;
         }

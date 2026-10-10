@@ -202,8 +202,11 @@ int main() {
         check(g.take(400) == 0, "pulse outlived its time");
         g.update(true, back_bit, true, 1000);
         g.update(true, 0, true, 1200);
-        check(g.take(5000) == back_bit && g.take(5001) == back_bit && g.take(5002) == 0,
+        check(g.take(2299) == back_bit && g.take(2299) == back_bit && g.take(2299) == 0,
             "late polls missed the Back pulse");
+        g.update(true, start_bit, true, 3000);
+        g.update(true, 0, true, 3200);
+        check(g.take(4300) == 0 && g.take(4301) == 0, "unread tap reached the game over a second late");
     }
     {
         MenuGesture g;

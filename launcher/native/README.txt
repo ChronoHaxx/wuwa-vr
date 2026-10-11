@@ -20,9 +20,10 @@ then deliberately select/install the new VR package in step 02. Checking for
 updates preserves your selection, including a rollback. Settings, backups,
 recordings and logs are kept. Older packages remain available for rollback.
 
-L3 + R3 opens UEVR; custom controls are under VR > WuWa Controls.
-Hold both triggers first, then click R3 for mono theatre, or hold L3 for
-0.8 seconds for a stereo screen. Release all controls before repeating.
+L3 + R3 opens the WuWa VR menu (laser, gamepad or mouse); UEVR's full
+settings are inside under All settings (classic). Hold both triggers first,
+then click R3 for the next view (full VR, stereo screen, mono theatre), or
+hold R3 for 0.8 seconds for full VR. Release all controls before repeating.
 PlayStation setup, input limitations and the complete controls are in PlayerGuide.html.
 Automatic cinema is experimental, off by default, and untested with real
 prerendered movies. Scene stalls, HUD reset and some rendering issues remain.
@@ -57,8 +58,8 @@ Steam 通过 Steam 启动；库洛用户还需在库洛启动器点击开始游�
 启动器应用和 VR 包分别显示版本与更新状态。更新应用后，在第 02 步明确选择
 并安装新 VR 包。检查更新不会覆盖当前选择或主动回退。用户数据会保留。
 
-L3 + R3 打开 UEVR，专用控制在 VR > WuWa Controls。
-先按住两个扳机，再点击 R3 切换单目影院；或按住 L3 0.8 秒切换立体屏幕。
+L3 + R3 打开鸣潮 VR 菜单（激光、手柄或鼠标）；UEVR 完整设置在“全部设置（经典）”中。
+先按住两个扳机，再点击 R3 切换下一视图（完整 VR、立体屏幕、单目影院），或按住 R3 0.8 秒回到完整 VR。
 每次操作后松开全部按键。PlayStation 配置和完整限制见 PlayerGuide.html。
 自动影院为实验功能，默认关闭，真正的预渲染影片仍未验证。加载停顿、HUD
 刷新和部分渲染问题仍未解决。

@@ -26,11 +26,13 @@ Older date-and-fix-name packages are historical builds. New releases use a reada
 
 ## Controls and current limits
 
-Open UEVR with **L3 + R3**, then **VR → WuWa Controls**. Both stick clicks are L3/R3 on Xbox and PlayStation.
+**L3 + R3** (both stick clicks) opens the **WuWa VR menu**. Point with a VR controller's laser and pull the trigger, or use the gamepad (A select, B back, LB / RB pages) or mouse and keyboard. UEVR's full settings are still inside: **All settings (classic)**.
 
-- Hold both triggers first, then click **R3** for **mono theatre**: the same scene and HUD in both eyes.
-- Hold both triggers first, then hold **L3 for 0.8 seconds** for a **stereoscopic screen**.
-- Release all controls before repeating, with UEVR and HUD/mouse adjustment closed.
+- Hold both triggers first, then click **R3** for the next view: full VR, stereo screen, mono theatre (the same scene and HUD in both eyes). Hold **R3 for 0.8 seconds** instead to go straight back to full VR.
+- Hold both triggers first, then click **L3** to turn blur (depth of field) on or off.
+- Release all controls before repeating, with the menu and HUD/mouse adjustment closed.
+
+[All controls](CONTROLS.md), including the optional VR controllers for walking.
 
 Cinematic framing is on by default and was accepted in a simulator replay. Automatic cinematic switching is experimental, **off by default**, and has not been verified with a real prerendered movie. Keep the manual shortcuts available.
 

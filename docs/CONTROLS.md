@@ -1,21 +1,46 @@
 # WuWa VR controls
 
-Reference for **1.1.0**, package **beta-1-1-0**, VR build
-**player-ready-1-1-0**, targeting **WuWa 3.7**. The launcher app and VR package
-update separately; check both identities when reporting a problem.
+Reference for **1.2.0 beta**, targeting **WuWa 3.7**. The launcher app and VR
+package update separately; check both identities when reporting a problem.
 
 Xbox/XInput remains the usual gameplay path. **L3 / R3** mean click the left /
 right stick; **View** is the two-squares button and **Menu** is the three-lines
-button. Use gameplay shortcuts with UEVR settings closed. Release controls
+button. Use gameplay shortcuts with the menu closed. Release controls
 between gestures and after switching focus. **Insert** is the keyboard recovery
-path for opening UEVR. Physical gamepad passthrough bypasses mod shortcuts.
+path for opening the menu. Physical gamepad passthrough bypasses mod shortcuts.
 
-Startup on the affected Windows 11 Steam PC with the simulator was confirmed by
-the user on **1.0.10**. This does not establish **1.1.0 PlayStation, headset or
-optional-feature acceptance**; those checks remain pending. Historical build
-results are recorded in [release notes](https://github.com/ChronoHaxx/wuwa-vr/releases).
-The [bilingual player guide](../launcher/native/PlayerGuide.html) covers setup,
+Results for each build are recorded in
+[release notes](https://github.com/ChronoHaxx/wuwa-vr/releases). The
+[bilingual player guide](../launcher/native/PlayerGuide.html) covers setup,
 updates, runtime selection, recording and recovery.
+
+## WuWa VR menu
+
+**L3 + R3** (both stick clicks) opens and closes the WuWa VR menu. Every input
+works at once; whatever you used last shows the focus.
+
+| Input | Move | Select | Back / close | Switch page |
+| --- | --- | --- | --- | --- |
+| VR controller | Point the laser | Trigger, or A / X | B / Y | Grips, or point at a tab |
+| Gamepad | D-pad or either stick | A | B | LB / RB |
+| Mouse and keyboard | Point, scroll; arrow keys | Click; Enter or Space | Esc | Click a tab; Tab / Shift+Tab |
+
+Left / right changes a choice or slider. Pages: **Quick** (view, camera, VR
+controllers, diorama, HUD size and distance, recording, recenter), **Camera**,
+**Cinema**, **HUD**, **Comfort**, **Fixes** (including render resolution),
+**Record** and **Menu**. They change the same settings as UEVR's own menu:
+**All settings (classic)** opens UEVR's full menu, and the **Menu** page can
+switch L3 + R3 back to UEVR's window.
+
+**Move the menu:** press **Y** (gamepad) or choose **Move menu** on the Menu
+page. Gamepad: left stick moves it, right stick changes the distance, A puts it
+down. VR controller: point where you want it, push the thumbstick up or down
+for the distance, pull the trigger to put it down. The Menu page also has fixed
+places (Front, Low, Left, Right) and the menu size. On the stereo screen and in
+mono theatre the menu stays in front of the picture.
+
+A VR controller that is put down or switched off stops driving the menu after
+8 seconds; any gamepad or keyboard press takes over at once.
 
 ## PlayStation controllers (experimental)
 
@@ -54,7 +79,7 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 
 | Input | Action |
 | --- | --- |
-| L3 + R3 | Open/close UEVR settings |
+| L3 + R3 | Open/close the WuWa VR menu |
 | Fully hold LT + RT first, then click R3 | Next view: full VR, stereo screen, mono theatre (one scene and HUD shown identically to both eyes), then full VR again. Release R3 before the triggers |
 | Fully hold LT + RT first, then hold R3 for 0.8 seconds | Back to full VR from any view |
 | Fully hold LT + RT first, then click L3 | Blur (depth of field) on / off |
@@ -103,7 +128,7 @@ controllers for walking (optional) → VR controllers on (this launch)**. A quic
 press of left Menu is still Start. Controllers without a usable Menu button,
 such as Valve Index (SteamVR keeps its system button), turn them on by holding
 **both stick clicks for 1 second** while they are off; once on, both stick
-clicks open UEVR settings, where the checkbox turns them off. The hold gestures
+clicks open the menu, where **VR controllers** on the Quick page turns them off. The hold gestures
 are unavailable while UEVR's separate **Enable motion-controller input** is on;
 use the checkbox then.
 
@@ -132,7 +157,7 @@ Troubleshooting → Controller check** reports the slots in use.
 | Left grip + left Menu (quick press) | View / Back; consumes LB |
 | Left Menu (hold 1 s) | Turn VR controllers on or off |
 | Both stick clicks (hold 1 s, while off) | Turn VR controllers on (for controllers without Menu) |
-| Both stick clicks | L3 + R3: open/close UEVR settings |
+| Both stick clicks | L3 + R3: open/close the WuWa VR menu |
 
 No Quest system-button or D-pad mapping is added. With menus and HUD/mouse
 adjustment closed, existing **hold L3, then squeeze LT** portal and **hold L3,
@@ -328,7 +353,10 @@ can disarm. Menus and focus loss disarm it. **Double R3** exits. Full acro roll
 needs its own headset comfort check. Optional collision depends on the scene's
 traceable geometry and cannot stop physical headset leaning through a wall.
 
-## UEVR settings open
+## UEVR's classic settings open
+
+These apply in UEVR's own window (**All settings (classic)**, or with L3 + R3
+switched back to it on the Menu page).
 
 | Input | Action |
 | --- | --- |

@@ -156,6 +156,15 @@ the 2560 x 1440 HUD image. WuWa lays its UI out for screens no narrower than
 eye. The stereo screen and mono theatre render each eye at 2560 x 1440 (16:9),
 so nothing is widened there and the slate keeps 1.0 regardless of the setting.
 
+**Why ESC fixes it, and what did not (tests 3i-3k).** The 3j probe showed the
+root HUD canvas at the eye size (3292 x 3292) keeping the scale WuWa's one
+LGUICanvasScaler worked out for 2560 x 1440 (1.0) until the ESC menu closes,
+when it becomes 1.286 (3292 / 2560). Nudging a scaler setting (3i, 3j) did not
+make it rescale. Test 3k switched the scaler off and on, but WuWa's LGUI build
+has no reflected `SetEnable(bool)` on the scaler, so nothing ran ("HUD refresh
+unavailable ... no SetEnable(bool)"). The release keeps the 3j nudge; ESC
+remains the fix.
+
 **Close-up match** (Camera page in Game camera mode, and the Cinema page).
 Measured from the 10 Oct recordings: in full VR the eye sits exactly at the
 game camera (plus `VR_Camera*Offset`), and its angle matches too. What differs
@@ -198,6 +207,15 @@ since test 3f (closer than the 2D shot).
   dolly=...`, plus `people_error`/`trace_error` when a lookup fails. The menu
   shows the live report (`WuWaControls_LensStatus`), including "held behind the
   person in front".
+- **Test 3k (11 Oct), withdrawn:** the subject was measured in the rendered
+  scene depth (the middle 35 % of the 2D frame, read back from the eye's depth
+  target just after each cut). In the headset the view moved into people and
+  into the ground, and depth of field blurred everything because the eye moved
+  while the game's focus distance did not. The measured region did not match
+  the 2D frame's subject (logged subjects of 15 and 40 cm, and 4.7 m behind a
+  near character). The release keeps the 3j behaviour above; the depth code is
+  in commit 80dee81 for a later attempt, which must also move the depth-of-field
+  focus by the same distance as the eye.
 - **Limit:** a long lens cannot be matched in full VR. Moving nearer gives the
   subject its 2D size, but the perspective is the headset's wide one: the
   foreground stays big and the background is not compressed. The stereo screen

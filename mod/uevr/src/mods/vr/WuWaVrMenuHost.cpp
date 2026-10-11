@@ -340,10 +340,9 @@ Item lens_nearest_slider() {
 
 Item lens_subject_choice() {
     return setting_choice("Close-up aims at",
-        "Rendered depth: how far away the middle of the 2D shot really is, measured in the picture just after each cut, so "
-        "every shot works; Close-up match stops behind anything nearer, such as a shoulder or a prop. Game focus only: the "
-        "test 3j behaviour (shots without a focus stay at the game camera).",
-        "WuWaControls_LensSubject", {"Rendered depth", "Game focus only (3j)"});
+        "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match "
+        "stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: the test 3f behaviour.",
+        "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"});
 }
 
 Item lens_follow_choice() {

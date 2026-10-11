@@ -10,8 +10,9 @@ native source of record. Run this after editing anything under mod/uevr.
 The clone only has to contain the pinned commit; its own working tree is not
 touched. A temporary detached worktree of the pin gets the current patch,
 then mod/uevr in that checkout's own line endings, and the patch is rewritten
-from `git diff --binary --full-index` against the pin. Files deleted from
-mod/uevr are not removed from the patch. --check compares without writing.
+from `git diff --binary --full-index` against the pin. A file the patch adds
+is dropped when it is deleted from mod/uevr; removing an upstream file still
+needs a hand edit. --check compares without writing.
 """
 import shutil
 import subprocess
@@ -43,6 +44,13 @@ def main():
         git(tree, 'config', 'core.autocrlf', 'false')
         git(tree, 'apply', '--whitespace=nowarn', '--exclude=dependencies/submodules/UESDK', str(PATCH))
         changed = []
+        git(tree, 'add', '-A')
+        added = git(tree, 'diff', '--cached', '--name-only', '--diff-filter=A', '-z', BASE).decode('utf-8').split('\0')
+        for name in filter(None, added):
+            if not (SOURCE / name).is_file():
+                git(tree, 'rm', '-q', '--cached', '--', name)
+                (tree / name).unlink()
+                changed.append(name + ' (removed)')
         lf = lambda b: b.replace(b'\r\n', b'\n')
         for source in sorted(p for p in SOURCE.rglob('*') if p.is_file()):
             target = tree / source.relative_to(SOURCE)

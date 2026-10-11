@@ -306,28 +306,4 @@ test("audit failure cannot turn a rejected HUD request into success or repeated 
     assert(f.state.status:find("HUD refresh unavailable", 1, true))
     package.loaded.wuwa_hud_schema, json = old_module, old_json
 end)
-test("a newly loaded world is refreshed 3 s and 6 s after it appears", function()
-    -- Seen within ~1 s (checked once a second), then 3 s and 6 s later.
-    local f = fixture()
-    for _ = 1, 35 do f:tick() end; assert(#f.writes == 0 and f.queries == 0)
-    for _ = 1, 15 do f:tick() end; assert(table.concat(f.writes, ",") == "force,projection")
-    for _ = 1, 15 do f:tick() end; assert(#f.writes == 2)
-    for _ = 1, 15 do f:tick() end; assert(#f.writes == 4)
-    for _ = 1, 40 do f:tick() end; assert(#f.writes == 4)
-end)
-test("without ForceUpdate the scaler is switched off and on and the canvas scale reported", function()
-    local f = fixture(); f.classes.scaler.functions.ForceUpdate = nil
-    local scale = 1.0
-    f.classes.canvas.functions.GetCanvasScale = callable({{"ReturnValue", "FloatProperty"}}, function() return scale end)
-    f.classes.scaler.functions.SetEnable = callable({{"value", "BoolProperty"}}, function(_, on)
-        f.writes[#f.writes + 1] = "enable:" .. tostring(on)
-        if on then scale = 1.286 end
-    end)
-    f:manual()
-    assert(table.concat(f.writes, ",") == "enable:false,enable:true")
-    assert(f.state.status:find("re-enabled (1)", 1, true) and f.state.status:find("1.000 -> 1.286", 1, true))
-    f = fixture(); f.classes.scaler.functions.ForceUpdate = nil; f.active = false
-    f.classes.scaler.functions.SetEnable = callable({{"value", "BoolProperty"}}, function() error("inactive scaler toggled") end)
-    f:manual(); assert(#f.writes == 0)
-end)
 print("HUD refresh tests passed: " .. count)

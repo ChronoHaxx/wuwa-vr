@@ -12,7 +12,6 @@
 #include "utility/WuWaStereoBasePose.hpp"
 #include "utility/WuWaPlaytestControl.hpp"
 #include "utility/WuWaLguiProbe.hpp"
-#include "utility/WuWaDepthProbe.hpp"
 #include "WuWaVrMenuHost.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/gtx/transform.hpp>
@@ -322,7 +321,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, m_depth_probe, *m_stereo_effects, *m_lens_subject, m_lens_status,
+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -333,17 +332,6 @@ WuWaControlsComponent::WuWaControlsComponent() {
 WuWaControlsComponent::~WuWaControlsComponent() {
     wuwa_ps_hid::release_on_process_exit(m_playstation,
         wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
-}
-
-std::string WuWaControlsComponent::DepthProbe::get() const {
-    return wuwa_depth_probe::report();
-}
-
-void WuWaControlsComponent::DepthProbe::set(const std::string& text) {
-    wuwa_depth_probe::request(text);
-    // The engine's depth target is only named once the render target pool hook
-    // runs; UEVR otherwise switches it on with depth submission alone.
-    if (wuwa_depth_probe::fov.load() > 0.0f) VR::get()->get_render_target_pool_hook()->activate();
 }
 
 void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_defaults) {

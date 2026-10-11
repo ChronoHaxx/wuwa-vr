@@ -6,8 +6,6 @@
 #include <utility/Logging.hpp>
 #include <utility/WuWaLguiProbe.hpp>
 #include <utility/WuWaRunMarker.hpp>
-#include <utility/WuWaDepthProbe.hpp>
-#include <sdk/Globals.hpp>
 
 #include "Framework.hpp"
 #include "../VR.hpp"
@@ -567,11 +565,6 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
             scene_depth_tex.Reset();
         }
     #endif
-    }
-
-    // WuWa test 3k: close-up match reads the scene depth (full VR only).
-    if (!is_mono_theatre && !is_2d_screen) {
-        sample_wuwa_depth(vr, device, scene_depth_tex.Get());
     }
 
     // If m_frame_count is even, we're rendering the left eye.
@@ -1244,50 +1237,6 @@ void D3D12Component::on_post_present(VR* vr) {
     }
 }
 
-// WuWa test 3k: close-up match (camera script) measures its subject in the
-// rendered depth, around where the 2D frame's centre lands in the eye (both
-// eyes' tangents averaged: the depth may be either eye's). The engine's depth
-// target is named by the render target pool hook, which the request switches
-// on (utility/WuWaDepthProbe.hpp).
-void D3D12Component::sample_wuwa_depth(VR* vr, ID3D12Device* device, ID3D12Resource* scene_depth) {
-    if (!m_depth_sampler) {
-        if (!wuwa_depth_probe::wanted()) return;
-        m_depth_sampler = std::make_unique<wuwa_depth::Sampler>();
-    }
-    ComPtr<ID3D12Resource> depth{scene_depth};
-    wuwa_depth::Sampler::View view{};
-    if (wuwa_depth_probe::wanted()) {
-        if (!depth) depth = vr->get_render_target_pool_hook()->get_texture<ID3D12Resource>(L"SceneDepthZ");
-        if (!m_depth_batch && m_graphics_memory) {
-            D3D12_BLEND_DESC opaque{};
-            opaque.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-            m_depth_batch = setup_sprite_batch_pso(DXGI_FORMAT_R32_FLOAT, {}, {}, DirectX::SpriteBatchPipelineStateDescription{
-                DirectX::RenderTargetState{DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_UNKNOWN}, &opaque});
-        }
-        const auto runtime = vr->get_runtime();
-        {
-            std::shared_lock _{runtime->projections_mtx};
-            const auto& a = runtime->raw_projections[0];
-            const auto& b = runtime->raw_projections[1];
-            const float half = (std::abs(a[0]) + std::abs(a[1]) + std::abs(b[0]) + std::abs(b[1])) * 0.25f;
-            view.left = -half;
-            view.right = half;
-            view.top = (a[2] + b[2]) * 0.5f;
-            view.bottom = (a[3] + b[3]) * 0.5f;
-        }
-        view.eye_w = (float)m_backbuffer_size[0] / 2.0f;
-        view.eye_h = (float)m_backbuffer_size[1];
-        // The 2D camera looks along the recentred forward; the head turns the eye away from it.
-        const auto head = glm::quat_cast(vr->get_hmd_rotation(static_cast<uint32_t>(vr->m_render_frame_count)));
-        const auto forward = glm::inverse(head) * (glm::inverse(vr->get_rotation_offset()) * glm::vec3{0.0f, 0.0f, -1.0f});
-        view.x = forward.x;
-        view.y = forward.y;
-        view.z = forward.z;
-        view.near_cm = sdk::globals::get_near_clipping_plane();
-    }
-    m_depth_sampler->update(device, depth.Get(), view, m_depth_batch.get());
-}
-
 void D3D12Component::on_reset(VR* vr) {
     m_mono_openvr_ready = false;
     m_force_reset = true;
@@ -1325,8 +1274,6 @@ void D3D12Component::on_reset(VR* vr) {
     m_backbuffer_batch.reset();
     m_game_batch.reset();
     m_ui_batch_alpha_invert.reset();
-    m_depth_sampler.reset(); // waits for its last sample
-    m_depth_batch.reset();
     m_graphics_memory.reset();
 
     if (runtime->is_openxr() && runtime->loaded) {

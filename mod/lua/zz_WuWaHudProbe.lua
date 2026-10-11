@@ -109,10 +109,9 @@ local function dump(reason)
             modes[mode] = (modes[mode] or 0) + 1
             if root == true and roots < 24 then
                 roots = roots + 1
-                local item = try(function() return c:GetUIItem() end)
-                local size = type(item) == "userdata" and try(function() return string.format("%.0fx%.0f", item:GetWidth(), item:GetHeight()) end) or tostring(item)
-                L(string.format("root canvas %d: mode=%s active=%s in_viewport_world=%s size=%s scale=%s | %s", i, mode,
-                    tostring(try(function() return c:GetIsActiveAndEnable() end)), tostring(w), tostring(size),
+                -- 3h: GetUIItem / GetIsActiveAndEnable do not exist in WuWa's LGUI.
+                L(string.format("root canvas %d: mode=%s actual=%s visible=%s in_viewport_world=%s viewport=%s scale=%s | %s", i, mode,
+                    call(c, "GetActualRenderMode"), call(c, "IsUIVisible"), tostring(w), call(c, "GetViewportSize"),
                     call(c, "GetCanvasScale"), full_of(c):sub(1, 160)))
             end
         end
@@ -125,7 +124,7 @@ local function dump(reason)
         if i > 4 then break end
         if alive(s) then
             L(string.format("scaler %d: in_viewport_world=%s | %s", i, tostring(in_world(s, world)), full_of(s):sub(1, 160)))
-            L("scaler " .. i .. " settings: " .. props(s, 80))
+            L("scaler " .. i .. " settings: " .. props(s, 12))
         end
     end
 end

@@ -269,6 +269,13 @@ Item lens_subject_choice() {
         "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"});
 }
 
+Item lens_follow_choice() {
+    return setting_choice("Within a shot",
+        "Track the camera: the distance is measured at each cut, then follows only the game camera's own moves, so a focus "
+        "change cannot move you. Fixed per shot: test 3g. Follow the focus: test 3h (moved with focus changes).",
+        "WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"});
+}
+
 Item lens_status() {
     return live_text([] {
         auto* status = cached("WuWaControls_LensStatus");
@@ -303,7 +310,8 @@ Item resolution_choice() {
 Item view_choice() {
     auto item = make(Kind::Choice, "View",
         "Full VR: the game all around you. Stereo screen: a big 3D screen, for menus and scenes that look wrong in full VR. "
-        "Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then hold L3 (screen) or click R3 (mono).");
+        "Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then click R3 for the next view "
+        "(hold R3: back to full VR).");
     item.get_int = [] {
         auto* vr = VR::get().get();
         return vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
@@ -482,6 +490,7 @@ Page cinema_page() {
     page.items.push_back(lens_slider());
     page.items.push_back(lens_nearest_slider());
     page.items.push_back(lens_subject_choice());
+    page.items.push_back(lens_follow_choice());
     page.items.push_back(lens_status());
     page.items.push_back(paragraph("Depth of field and camera effects", true));
     page.items.push_back(setting_toggle("Depth of field",
@@ -494,8 +503,11 @@ Page cinema_page() {
     page.items.push_back(setting_choice("Copy from",
         "Auto uses the eye that has the camera's focus. If both eyes stay sharp or look wrong, try First or Second.",
         "WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}));
-    page.items.push_back(setting_slider("Blur strength", "Multiplies the blur. 1x is the 2D view's look.",
+    page.items.push_back(setting_slider("Blur strength, full VR", "Multiplies the blur in full VR. 0.5x suited best in test 3h.",
+        "WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.25f, "%.2fx"));
+    page.items.push_back(setting_slider("Blur strength, screens", "Multiplies the blur on the stereo screen and mono theatre. 1x is the 2D view's look.",
         "WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 0.25f, "%.2fx"));
+    page.items.push_back(paragraph("Shortcut: hold LT + RT, then click L3 to turn the blur on or off."));
     page.items.push_back(live_text([] {
         auto* on = typed<bool>("WuWaStereo_DepthOfField");
         auto* all = typed<int32_t>("WuWaStereo_EyeEffects");
@@ -879,7 +891,7 @@ bool hint_active() {
 void draw_hint(ImDrawList* list, const ImVec2& size) {
     ImFont* font = wuwa_l10n::sheet_font() ? wuwa_l10n::sheet_font() : ImGui::GetFont();
     wuwa_menu::draw_note(list, size, font, "Cinematic scene",
-        "Looks wrong? Hold LT + RT, then hold L3 for a stereo screen (R3: mono).",
+        "Looks wrong? Hold LT + RT, then click R3 for the next view (stereo screen, then mono).",
         "Turn this note off in the menu, Cinema page.");
 }
 }

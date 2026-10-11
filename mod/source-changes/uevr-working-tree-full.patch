@@ -311249,7 +311249,7 @@ index f7d93967b39ece43a2e556805e46846550cb8c3e..0b0391133ea4ad3876f2054d4a6d1a70
      for (auto&& cb : m_on_custom_event_cbs) {
          try {
 diff --git a/src/mods/VR.cpp b/src/mods/VR.cpp
-index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..72a11269750984be01a1693565b0256707c7a7e6 100644
+index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd9e60c301 100644
 --- a/src/mods/VR.cpp
 +++ b/src/mods/VR.cpp
 @@ -1,5 +1,7 @@
@@ -311884,7 +311884,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..72a11269750984be01a1693565b02567
 +            }
 +        }
 +        wuwa_ui::TextWrapped("Mono shows the same scene and HUD to both eyes. Use it for troublesome cutscenes or flat menus.");
-+        wuwa_ui::TextWrapped("Hold LT + RT: hold L3 for 0.8 s for stereo screen, or click R3 for mono. Release controls before repeating.");
++        wuwa_ui::TextWrapped("Hold LT + RT: click R3 for the next view (hold: full VR), click L3 for blur on / off (hold: stereo screen). Release controls before repeating.");
 +        wuwa_ui::draw(*m_cinematic_framing_fix, "Match cinematic framing between eyes (default on)");
 +        if (wuwa_ui::TreeNode("Automatic cutscene switching (unverified)")) {
 +            if (wuwa_ui::draw(*m_auto_cinema, "Enable automatic switching"))
@@ -312114,7 +312114,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..72a11269750984be01a1693565b02567
 +        bool effective_mono = is_using_mono_theatre();
 +        if (ImGui::Checkbox(wuwa_l10n::label("Mono theatre (no stereo)").c_str(), &effective_mono))
 +            set_mono_theatre_manually(effective_mono);
-+        wuwa_ui::TextWrapped("Hold LT + RT: hold L3 for 0.8 s to toggle the screen, or click R3 to toggle mono. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.");
++        wuwa_ui::TextWrapped("Hold LT + RT: click R3 for the next view (full VR, stereo screen, mono), hold R3 for full VR; hold L3 for 0.8 s to toggle the screen. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.");
 +        if (wuwa_ui::draw(*m_auto_cinema, "Automatic cinematic screen (experimental)"))
 +            m_wuwa_controls.reset_auto_cinema();
 +        wuwa_ui::draw(*m_auto_story_presentation, "Story cutscenes and dialogue");
@@ -314061,7 +314061,7 @@ index 71b0927f732d914b9287a1356e27ad8a59372c3a..4a2a199997f734f7bf7f32b4c87b5900
      imgui.new_enum("ImGuiStyleVar",
          "Alpha", ImGuiStyleVar_Alpha,
 diff --git a/src/mods/vr/CVarManager.cpp b/src/mods/vr/CVarManager.cpp
-index 0c13a86648ccee2502da971039984b807c0be775..9fe2f09088b60682530fb215e02b28e28286e269 100644
+index 0c13a86648ccee2502da971039984b807c0be775..2789af93415021dc68ea8ac4fb4eccd915800382 100644
 --- a/src/mods/vr/CVarManager.cpp
 +++ b/src/mods/vr/CVarManager.cpp
 @@ -2,6 +2,7 @@
@@ -314151,7 +314151,7 @@ index 0c13a86648ccee2502da971039984b807c0be775..9fe2f09088b60682530fb215e02b28e2
 +                "WuWaControls_ResetHudAspect", "WuWaControls_HudAspectStatus", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
 +                "UI_Distance", "UI_Size", "UI_WuWaHudShape", "UI_FollowView", "WuWaControls_Enabled",
 +                "WuWaControls_MouseAssist", "WuWaControls_AutoMouseMenus", "WuWaControls_AdjustMode", "WuWaControls_WarnHiddenUI",
-+                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject",
++                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject", "WuWaStereo_DepthOfFieldStrengthFullVR", "WuWaControls_LensFollow",
 +                "VR_WuWaScreenLens", "VR_WuWaScreenDepth", "WuWaPrivacy_Mode", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
 +                "WuWaControls_FirstRight", "WuWaControls_FirstUp", "WuWaControls_FirstMotion", "WuWaControls_FullFollowLook", "WuWaControls_FollowHeadAnimation", "WuWaControls_LateHeadUpdate",
 +                "VR_AimMethod", "VR_AimModifyPlayerControlRotation", "VR_DecoupledPitch",
@@ -317359,10 +317359,10 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..48b550f028dc3cbd5f3e670f34b5854e
 +};}
 diff --git a/src/mods/vr/WuWaControlsComponent.cpp b/src/mods/vr/WuWaControlsComponent.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..13a6572dfcb9333e4d5c401aee525fffc2e16297
+index 0000000000000000000000000000000000000000..eca61116ab96b265320ce6fc1ffd2221ad8acd0b
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.cpp
-@@ -0,0 +1,1271 @@
+@@ -0,0 +1,1276 @@
 +#define NOMINMAX
 +#include "utility/WuWaLocalizedUI.hpp"
 +#include "utility/WuWaMenuSignals.hpp"
@@ -317483,7 +317483,7 @@ index 0000000000000000000000000000000000000000..13a6572dfcb9333e4d5c401aee525fff
 +    {"L3 + R3    UEVR menu", "L3 + RB    Game / fixed camera"},
 +    {"L3 + A     Recenter view / portal", "L3 + Y/X   Fixed / first-person height"},
 +    {"L3 + LT / F7   Portal on / off", "L3 + RT    Diorama on / off (10x)"},
-+    {"LT + RT, then hold L3 0.8 s: stereo screen", "LT + RT, then click R3: mono theatre"},
++    {"LT + RT, R3: next view (hold: full VR)", "LT + RT, L3: blur (hold: stereo screen)"},
 +    {"Double L3  Windows screenshot", "LB + LT/RT Fixed camera farther / closer"},
 +    {"Double R3  Freecam on / off", "Freecam: left stick moves, right looks"},
 +    {"L3 + B     Show / hide game UI", "Freecam: LT rises, RT boosts speed"},
@@ -317626,17 +317626,20 @@ index 0000000000000000000000000000000000000000..13a6572dfcb9333e4d5c401aee525fff
 +    if (kind == 1) return "lease-v1";
 +    if (kind == 2) return owner.auto_cinema_status();
 +    if (kind == 3) return VR::get()->is_using_mono_theatre() ? "true" : "false";
-+    if (kind == 4 || kind == 5) return "effective-v1";
++    // v2 (test 3i): explicit "on" / "off" as well as "toggle", for the view cycle.
++    if (kind == 4 || kind == 5) return "effective-v2";
 +    if (kind == 6) return VR::get()->is_using_2d_screen() ? "true" : "false";
 +    std::scoped_lock lock{owner.m_cinema_mutex};
 +    return std::to_string(owner.m_cinema_lease.generation());
 +}
 +void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
 +    if (kind == 4 || kind == 5) {
-+        if (text == "toggle") {
-+            if (kind == 4) VR::get()->set_mono_theatre_manually(!VR::get()->is_using_mono_theatre());
-+            else VR::get()->set_stereo_screen_manually(!VR::get()->is_using_2d_screen());
-+        }
++        const auto mono = kind == 4;
++        const auto now = mono ? VR::get()->is_using_mono_theatre() : VR::get()->is_using_2d_screen();
++        const auto want = text == "toggle" ? !now : text == "on" ? true : text == "off" ? false : now;
++        if (text != "toggle" && text != "on" && text != "off") return;
++        if (mono) VR::get()->set_mono_theatre_manually(want);
++        else VR::get()->set_stereo_screen_manually(want);
 +        return;
 +    }
 +    if (kind > 1 || text.size() > 512) return;
@@ -317683,7 +317686,7 @@ index 0000000000000000000000000000000000000000..13a6572dfcb9333e4d5c401aee525fff
 +        *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
 +        *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
 +        *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_effects, *m_lens_subject, m_lens_status,
++        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_stereo_effects, *m_lens_subject, m_lens_status,
 +        m_playstation_state, m_playstation_status,
 +        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
 +        *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -317833,14 +317836,16 @@ index 0000000000000000000000000000000000000000..13a6572dfcb9333e4d5c401aee525fff
 +    if (ImGui::BeginTable("Everyday controller shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
 +        wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
 +        wuwa_ui::TableSetupColumn("Action");
-+        for (const auto& row : std::array<std::array<const char*,2>,12>{{
++        for (const auto& row : std::array<std::array<const char*,2>,14>{{
 +            {{"L3 + R3", "Open / close UEVR settings"}},
 +            {{"L3 + B", "Show / hide game HUD and menus"}},
 +            {{"L3 + A", "Recenter headset / portal"}},
 +            {{"L3 + LT / F7", "Portal on / off"}},
 +            {{"L3 + RT", "Diorama on / off (10x)"}},
++            {{"LT + RT, then click R3", "Next view: full VR, stereo screen, mono theatre"}},
++            {{"LT + RT, then hold R3", "Back to full VR (hold 0.8 s)"}},
++            {{"LT + RT, then click L3", "Blur (depth of field) on / off"}},
 +            {{"LT + RT, then hold L3", "Stereo screen on / off (hold 0.8 s)"}},
-+            {{"LT + RT, then click R3", "Mono theatre on / off (no stereo depth)"}},
 +            {{"L3 + Menu", "Show / hide shortcut sheet"}},
 +            {{"L3 + LB, release", "Toggle HUD / mouse adjustment"}},
 +            {{"L3 + View", "First person on / off"}},
@@ -317854,7 +317859,7 @@ index 0000000000000000000000000000000000000000..13a6572dfcb9333e4d5c401aee525fff
 +    }
 +    if (wuwa_ui::TreeNode("How to use view toggles")) {
 +        wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
-+        wuwa_ui::TextWrapped("Fully hold both triggers first: hold L3 for 0.8 seconds for the stereo screen, or click R3 for mono theatre with no stereo depth. Release all controls and center the sticks before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
++        wuwa_ui::TextWrapped("Fully hold both triggers first. R3: click for the next view (full VR, stereo screen, mono theatre), hold 0.8 seconds to go back to full VR. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen. Release the stick before the triggers; release all controls before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
 +        wuwa_ui::TextWrapped("Mono preserves your saved stereo-screen choice; screen off exits both screen modes. Neither changes portal or normal world scale. Manual toggles take priority over automatic cinema for the current scene.");
 +        wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
 +        ImGui::TreePop();
@@ -318636,10 +318641,10 @@ index 0000000000000000000000000000000000000000..13a6572dfcb9333e4d5c401aee525fff
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaControlsComponent.hpp b/src/mods/vr/WuWaControlsComponent.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..6483e62e31624b629a2bd5f3692f58e03b050ddc
+index 0000000000000000000000000000000000000000..79ab4bda157bf0824951353694e4f0181b48d1eb
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.hpp
-@@ -0,0 +1,330 @@
+@@ -0,0 +1,335 @@
 +#pragma once
 +
 +#include <chrono>
@@ -318834,6 +318839,11 @@ index 0000000000000000000000000000000000000000..6483e62e31624b629a2bd5f3692f58e0
 +    // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
 +    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
 +    const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
++    // Full VR has its own strength (test 3h: half looked right in full VR, 1x on screens).
++    const ModSlider::Ptr m_stereo_dof_strength_vr{ModSlider::create("WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.5f)};
++    // Close-up match within a shot: track the game camera's own moves from the cut (3i),
++    // keep the cut's distance (3g), or follow the game's focus distance (3h).
++    const ModCombo::Ptr m_lens_follow{ModCombo::create("WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"}, 0)};
 +    struct LensStatus : ModString {
 +        LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}
 +        mutable std::mutex mutex;
@@ -318972,10 +318982,10 @@ index 0000000000000000000000000000000000000000..6483e62e31624b629a2bd5f3692f58e0
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaVrMenuHost.cpp b/src/mods/vr/WuWaVrMenuHost.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..626d39ff506c188bef8e28296e054ceda5660642
+index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9ad881bd7f
 --- /dev/null
 +++ b/src/mods/vr/WuWaVrMenuHost.cpp
-@@ -0,0 +1,885 @@
+@@ -0,0 +1,897 @@
 +#include "WuWaVrMenuHost.hpp"
 +
 +// Before windows.h (via Framework.hpp), whose min / max macros break std::min in it.
@@ -319247,6 +319257,13 @@ index 0000000000000000000000000000000000000000..626d39ff506c188bef8e28296e054ced
 +        "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"});
 +}
 +
++Item lens_follow_choice() {
++    return setting_choice("Within a shot",
++        "Track the camera: the distance is measured at each cut, then follows only the game camera's own moves, so a focus "
++        "change cannot move you. Fixed per shot: test 3g. Follow the focus: test 3h (moved with focus changes).",
++        "WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"});
++}
++
 +Item lens_status() {
 +    return live_text([] {
 +        auto* status = cached("WuWaControls_LensStatus");
@@ -319281,7 +319298,8 @@ index 0000000000000000000000000000000000000000..626d39ff506c188bef8e28296e054ced
 +Item view_choice() {
 +    auto item = make(Kind::Choice, "View",
 +        "Full VR: the game all around you. Stereo screen: a big 3D screen, for menus and scenes that look wrong in full VR. "
-+        "Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then hold L3 (screen) or click R3 (mono).");
++        "Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then click R3 for the next view "
++        "(hold R3: back to full VR).");
 +    item.get_int = [] {
 +        auto* vr = VR::get().get();
 +        return vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
@@ -319460,6 +319478,7 @@ index 0000000000000000000000000000000000000000..626d39ff506c188bef8e28296e054ced
 +    page.items.push_back(lens_slider());
 +    page.items.push_back(lens_nearest_slider());
 +    page.items.push_back(lens_subject_choice());
++    page.items.push_back(lens_follow_choice());
 +    page.items.push_back(lens_status());
 +    page.items.push_back(paragraph("Depth of field and camera effects", true));
 +    page.items.push_back(setting_toggle("Depth of field",
@@ -319472,8 +319491,11 @@ index 0000000000000000000000000000000000000000..626d39ff506c188bef8e28296e054ced
 +    page.items.push_back(setting_choice("Copy from",
 +        "Auto uses the eye that has the camera's focus. If both eyes stay sharp or look wrong, try First or Second.",
 +        "WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}));
-+    page.items.push_back(setting_slider("Blur strength", "Multiplies the blur. 1x is the 2D view's look.",
++    page.items.push_back(setting_slider("Blur strength, full VR", "Multiplies the blur in full VR. 0.5x suited best in test 3h.",
++        "WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.25f, "%.2fx"));
++    page.items.push_back(setting_slider("Blur strength, screens", "Multiplies the blur on the stereo screen and mono theatre. 1x is the 2D view's look.",
 +        "WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 0.25f, "%.2fx"));
++    page.items.push_back(paragraph("Shortcut: hold LT + RT, then click L3 to turn the blur on or off."));
 +    page.items.push_back(live_text([] {
 +        auto* on = typed<bool>("WuWaStereo_DepthOfField");
 +        auto* all = typed<int32_t>("WuWaStereo_EyeEffects");
@@ -319857,7 +319879,7 @@ index 0000000000000000000000000000000000000000..626d39ff506c188bef8e28296e054ced
 +void draw_hint(ImDrawList* list, const ImVec2& size) {
 +    ImFont* font = wuwa_l10n::sheet_font() ? wuwa_l10n::sheet_font() : ImGui::GetFont();
 +    wuwa_menu::draw_note(list, size, font, "Cinematic scene",
-+        "Looks wrong? Hold LT + RT, then hold L3 for a stereo screen (R3: mono).",
++        "Looks wrong? Hold LT + RT, then click R3 for the next view (stereo screen, then mono).",
 +        "Turn this note off in the menu, Cinema page.");
 +}
 +}

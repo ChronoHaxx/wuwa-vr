@@ -55,8 +55,10 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 | Input | Action |
 | --- | --- |
 | L3 + R3 | Open/close UEVR settings |
-| Fully hold LT + RT first, then click R3 | Toggle mono theatre: one scene and HUD shown identically to both eyes; useful for problematic menus/cinematics |
-| Fully hold LT + RT first, then hold L3 for 0.8 seconds | Toggle stereoscopic screen, retaining scene depth; release all controls before repeating. Works in dialogue, with UEVR and adjustment closed |
+| Fully hold LT + RT first, then click R3 | Next view: full VR, stereo screen, mono theatre (one scene and HUD shown identically to both eyes), then full VR again. Release R3 before the triggers |
+| Fully hold LT + RT first, then hold R3 for 0.8 seconds | Back to full VR from any view |
+| Fully hold LT + RT first, then click L3 | Blur (depth of field) on / off |
+| Fully hold LT + RT first, then hold L3 for 0.8 seconds | Toggle stereoscopic screen, retaining scene depth (also from mono theatre); release all controls before repeating. Works in dialogue, with UEVR and adjustment closed |
 | L3 + B | Hide/show game UI, including game menus |
 | L3 + A | Recenter view and enabled portal; position reset is a separate option |
 | Hold L3, then fully squeeze LT; or F7 | Toggle the portal; release controls before repeating |

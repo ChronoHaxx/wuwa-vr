@@ -192,6 +192,11 @@ private:
     // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
     const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
     const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
+    // Full VR has its own strength (test 3h: half looked right in full VR, 1x on screens).
+    const ModSlider::Ptr m_stereo_dof_strength_vr{ModSlider::create("WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.5f)};
+    // Close-up match within a shot: track the game camera's own moves from the cut (3i),
+    // keep the cut's distance (3g), or follow the game's focus distance (3h).
+    const ModCombo::Ptr m_lens_follow{ModCombo::create("WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"}, 0)};
     struct LensStatus : ModString {
         LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}
         mutable std::mutex mutex;

@@ -109,6 +109,37 @@ function M.new(env)
         end
         return {object = o, canvas = canvas, force = force, set = set, values = values}
     end
+    -- A setter with exactly one plain float parameter.
+    local function float_setter(o, name)
+        local fn = o:get_class():find_function(name)
+        if not fn then return nil end
+        local p = fn:get_child_properties()
+        if not p or kind(p) ~= "FloatProperty" or p:get_next() then return nil end
+        local property = fn:find_property(p:get_fname():to_string())
+        if not property or not property:is_param() or property:is_out_param() or property:is_return_param() then return nil end
+        return fn
+    end
+    -- Experiment (test 3i). WuWa's whole UI hangs off one LGUICanvasScaler (3h
+    -- probe: one scaler, reference 2560 x 1440, match mode 2), which has no
+    -- ForceUpdate. LGUI recomputes the layout when a scaler setting changes,
+    -- so change MatchFromWidthToHeight by 0.001 now and restore it next tick.
+    local function nudge(context, objects, scaler_class)
+        local count = 0
+        for _, o in ipairs(objects) do
+            if valid(o) and o:is_a(scaler_class) and in_world(o, context.world) then
+                local get = method(o, "GetMatchFromWidthToHeight", RETURNS.float)
+                local set = float_setter(o, "SetMatchFromWidthToHeight")
+                local value = get and get(o)
+                if set and finite(value) and value >= 0 and value <= 1 then
+                    set(o, value < 0.5 and value + 0.001 or value - 0.001)
+                    s.restore = s.restore or {}
+                    s.restore[#s.restore + 1] = {object = o, set = set, value = value}
+                    count = count + 1
+                end
+            end
+        end
+        return count
+    end
     local function refresh(context)
         local hook = env.types and env.types.UObjectHook
         if not hook or not hook.get_objects_by_class then return false, "Object index unavailable" end
@@ -136,6 +167,12 @@ function M.new(env)
             local parts = {}
             for _, reason in ipairs(order) do parts[#parts + 1] = reasons[reason] .. "x " .. reason end
             s.last_rejections = #objects .. " scalers: " .. (#parts > 0 and table.concat(parts, ", ") or "none found")
+            local ok, nudged = pcall(nudge, context, objects, scaler_class)
+            if ok and nudged > 0 then
+                local size = context.dims and (" at " .. context.dims[1] .. "x" .. context.dims[2]) or ""
+                return true, "HUD scaler nudged (" .. nudged .. ")" .. size .. " (experiment); check the headset / HUD 已刷新（实验），请在头显中确认"
+            end
+            if not ok then s.last_rejections = s.last_rejections .. "; nudge error " .. tostring(nudged):sub(1, 80) end
             return false, "No active HUD with the supported LGUI schema"
         end
         local refreshed = 0
@@ -275,6 +312,13 @@ function M.new(env)
         end
     end
     function s:tick(mode, delta)
+        -- Restore nudged scaler values on the tick after the nudge.
+        if self.restore then
+            if self.restore_armed then
+                for _, r in ipairs(self.restore) do pcall(function() if valid(r.object) then r.set(r.object, r.value) end end) end
+                self.restore, self.restore_armed = nil, nil
+            else self.restore_armed = true end
+        end
         local ok = pcall(tick, self, mode, delta)
         if not ok then self.pending = nil; self.status = "HUD refresh unavailable: reflection changed / 反射接口不可用，未继续刷新" end
     end

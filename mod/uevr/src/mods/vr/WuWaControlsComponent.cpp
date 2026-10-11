@@ -118,7 +118,7 @@ constexpr const char* sheet[][2] = {
     {"L3 + R3    UEVR menu", "L3 + RB    Game / fixed camera"},
     {"L3 + A     Recenter view / portal", "L3 + Y/X   Fixed / first-person height"},
     {"L3 + LT / F7   Portal on / off", "L3 + RT    Diorama on / off (10x)"},
-    {"LT + RT, then hold L3 0.8 s: stereo screen", "LT + RT, then click R3: mono theatre"},
+    {"LT + RT, R3: next view (hold: full VR)", "LT + RT, L3: blur (hold: stereo screen)"},
     {"Double L3  Windows screenshot", "LB + LT/RT Fixed camera farther / closer"},
     {"Double R3  Freecam on / off", "Freecam: left stick moves, right looks"},
     {"L3 + B     Show / hide game UI", "Freecam: LT rises, RT boosts speed"},
@@ -261,17 +261,20 @@ std::string WuWaControlsComponent::CinemaValue::get() const {
     if (kind == 1) return "lease-v1";
     if (kind == 2) return owner.auto_cinema_status();
     if (kind == 3) return VR::get()->is_using_mono_theatre() ? "true" : "false";
-    if (kind == 4 || kind == 5) return "effective-v1";
+    // v2 (test 3i): explicit "on" / "off" as well as "toggle", for the view cycle.
+    if (kind == 4 || kind == 5) return "effective-v2";
     if (kind == 6) return VR::get()->is_using_2d_screen() ? "true" : "false";
     std::scoped_lock lock{owner.m_cinema_mutex};
     return std::to_string(owner.m_cinema_lease.generation());
 }
 void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
     if (kind == 4 || kind == 5) {
-        if (text == "toggle") {
-            if (kind == 4) VR::get()->set_mono_theatre_manually(!VR::get()->is_using_mono_theatre());
-            else VR::get()->set_stereo_screen_manually(!VR::get()->is_using_2d_screen());
-        }
+        const auto mono = kind == 4;
+        const auto now = mono ? VR::get()->is_using_mono_theatre() : VR::get()->is_using_2d_screen();
+        const auto want = text == "toggle" ? !now : text == "on" ? true : text == "off" ? false : now;
+        if (text != "toggle" && text != "on" && text != "off") return;
+        if (mono) VR::get()->set_mono_theatre_manually(want);
+        else VR::get()->set_stereo_screen_manually(want);
         return;
     }
     if (kind > 1 || text.size() > 512) return;
@@ -318,7 +321,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_effects, *m_lens_subject, m_lens_status,
+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_stereo_effects, *m_lens_subject, m_lens_status,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -468,14 +471,16 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     if (ImGui::BeginTable("Everyday controller shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
         wuwa_ui::TableSetupColumn("Action");
-        for (const auto& row : std::array<std::array<const char*,2>,12>{{
+        for (const auto& row : std::array<std::array<const char*,2>,14>{{
             {{"L3 + R3", "Open / close UEVR settings"}},
             {{"L3 + B", "Show / hide game HUD and menus"}},
             {{"L3 + A", "Recenter headset / portal"}},
             {{"L3 + LT / F7", "Portal on / off"}},
             {{"L3 + RT", "Diorama on / off (10x)"}},
+            {{"LT + RT, then click R3", "Next view: full VR, stereo screen, mono theatre"}},
+            {{"LT + RT, then hold R3", "Back to full VR (hold 0.8 s)"}},
+            {{"LT + RT, then click L3", "Blur (depth of field) on / off"}},
             {{"LT + RT, then hold L3", "Stereo screen on / off (hold 0.8 s)"}},
-            {{"LT + RT, then click R3", "Mono theatre on / off (no stereo depth)"}},
             {{"L3 + Menu", "Show / hide shortcut sheet"}},
             {{"L3 + LB, release", "Toggle HUD / mouse adjustment"}},
             {{"L3 + View", "First person on / off"}},
@@ -489,7 +494,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     }
     if (wuwa_ui::TreeNode("How to use view toggles")) {
         wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
-        wuwa_ui::TextWrapped("Fully hold both triggers first: hold L3 for 0.8 seconds for the stereo screen, or click R3 for mono theatre with no stereo depth. Release all controls and center the sticks before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
+        wuwa_ui::TextWrapped("Fully hold both triggers first. R3: click for the next view (full VR, stereo screen, mono theatre), hold 0.8 seconds to go back to full VR. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen. Release the stick before the triggers; release all controls before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
         wuwa_ui::TextWrapped("Mono preserves your saved stereo-screen choice; screen off exits both screen modes. Neither changes portal or normal world scale. Manual toggles take priority over automatic cinema for the current scene.");
         wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
         ImGui::TreePop();

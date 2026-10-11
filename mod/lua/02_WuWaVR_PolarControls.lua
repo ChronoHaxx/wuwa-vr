@@ -540,24 +540,33 @@ local function process_pad(index,state,result)
         s.rt=false; s.tap_rt=-100; s.turbo=false
         local trigger=s.view_chord=="portal" and lt or s.view_chord=="diorama" and rt or 0
         local fire=l3 and trigger>=180
-        if s.view_chord=="mono" then fire=has(rising,B.R3) and lt>=180 and rt>=180 end
-        if s.view_chord=="screen" then
-            -- Continuous input is required: a polling pause, clock reversal,
-            -- released modifier or trigger drop cannot finish an old long hold.
-            local interrupted=not l3 or lt<30 or rt<30 or
-                (s.view_hold_at and (lt<180 or rt<180)) or
+        local kind=s.view_chord
+        -- Test 3i: each stick has a click and a hold. R3: click for the next
+        -- view (full VR, stereo screen, mono theatre), hold 0.8 s for full VR.
+        -- L3: click for blur on / off, hold 0.8 s for the stereo screen. A click
+        -- fires when the stick is released with both triggers still held.
+        if s.view_chord=="mono" or s.view_chord=="screen" then
+            local stick_down=s.view_chord=="mono" and r3 or (s.view_chord=="screen" and l3)
+            -- Continuous input is required: a polling pause, clock reversal or
+            -- trigger drop cannot finish an old hold or click.
+            local interrupted=lt<30 or rt<30 or (s.view_hold_at and (lt<180 or rt<180)) or
                 (s.view_sample_at and (t<s.view_sample_at or t-s.view_sample_at>0.25))
+            fire=false
             if interrupted then s.view_chord="cancelled"; actions.view=nil
             else
                 s.view_sample_at=t
-                if lt>=180 and rt>=180 then
-                    s.view_hold_at=s.view_hold_at or t
-                    fire=t-s.view_hold_at>=0.8
+                if stick_down then
+                    if lt>=180 and rt>=180 then
+                        s.view_hold_at=s.view_hold_at or t
+                        if t-s.view_hold_at>=0.8 then fire=true; kind=s.view_chord=="mono" and "full" or "screen" end
+                    end
+                elseif s.view_hold_at and not s.view_fired then
+                    fire=true; kind=s.view_chord=="mono" and "cycle" or "blur"
                 end
             end
         end
         if fire and not s.view_fired then
-            actions.view={kind=s.view_chord,slot=index,at=t}; s.view_fired=true
+            actions.view={kind=kind,slot=index,at=t}; s.view_fired=true
         end
         state.Gamepad.wButtons=b & (~stick)
         state.Gamepad.bLeftTrigger=0; state.Gamepad.bRightTrigger=0
@@ -1051,12 +1060,29 @@ local function tick(_,delta)
         if view.kind=="portal" then set("WindowMode_Enabled",not enabled("WindowMode_Enabled"))
         elseif view.kind=="diorama" and not game_menu then
             set("WuWaDiorama_Enabled",not enabled("WuWaDiorama_Enabled"))
-        elseif view.kind=="screen" then
-            -- The original screen remains stereoscopic. Mono theatre is an
-            -- independent overlay setting, so exiting restores this choice.
-            if get("WuWaControls_ToggleStereoScreen")=="effective-v1" then
-                set("WuWaControls_ToggleStereoScreen","toggle")
-            else set("VR_2DScreenMode",not enabled("VR_2DScreenMode")) end
+        elseif view.kind=="screen" or view.kind=="cycle" or view.kind=="full" then
+            -- Mono theatre is drawn over the screen setting, so a plain screen
+            -- toggle did nothing from mono (test 3h). Go to an explicit view.
+            local mono_now=enabled("WuWaControls_EffectiveMonoTheatre")
+            local screen_now=enabled("WuWaControls_EffectiveScreen") and not mono_now
+            local target
+            if view.kind=="full" then target="full"
+            elseif view.kind=="screen" then target=screen_now and "full" or "stereo"
+            else target=mono_now and "full" or screen_now and "mono" or "stereo" end
+            if get("WuWaControls_ToggleStereoScreen")=="effective-v2" then
+                if target=="full" then set("WuWaControls_ToggleStereoScreen","off")
+                elseif target=="stereo" then set("WuWaControls_ToggleMonoTheatre","off"); set("WuWaControls_ToggleStereoScreen","on")
+                else set("WuWaControls_ToggleMonoTheatre","on") end
+            else
+                if target~="mono" then set("VR_MonoTheatreMode",false) end
+                if target=="full" then set("VR_2DScreenMode",false)
+                elseif target=="stereo" then set("VR_2DScreenMode",true)
+                else set("VR_MonoTheatreMode",true) end
+            end
+            functions.log_info("[WuWaView] shortcut "..view.kind.." -> "..target)
+        elseif view.kind=="blur" then
+            set("WuWaStereo_DepthOfField",not enabled("WuWaStereo_DepthOfField"))
+            functions.log_info("[WuWaView] shortcut blur -> "..tostring(enabled("WuWaStereo_DepthOfField")))
         elseif view.kind=="mono" then
             if get("WuWaControls_ToggleMonoTheatre")=="effective-v1" then
                 set("WuWaControls_ToggleMonoTheatre","toggle")
@@ -1379,7 +1405,7 @@ function dof.update(pcm,fov,dolly)
     -- Screens use the game's own lens (test 3f), so only full VR needs the lens
     -- compensation; the strength multiplier applies everywhere.
     local screen=enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre")
-    local strength=number("WuWaStereo_DepthOfFieldStrength",1,0.25,4)
+    local strength=screen and number("WuWaStereo_DepthOfFieldStrength",1,0.25,4) or number("WuWaStereo_DepthOfFieldStrengthFullVR",0.5,0.25,4)
     pcall(function()
         local pp=pcm.CameraCachePrivate.POV.PostProcessSettings
         local f,d=pp.DepthOfFieldFstop,pp.DepthOfFieldFocalDistance
@@ -1447,9 +1473,18 @@ end
 -- Within a shot: dialogue cameras glide and settle (test 3g: full VR kept the
 -- distance from the cut until a view switch re-measured it, then jumped).
 -- Follow the same people, or the game's focus, four times a second.
-function lens.follow(pcm,pos,rot,fov)
+function lens.follow(pcm,pos,rot,fov,how)
     local pawn=api:get_local_pawn(0); local pc=api:get_player_controller(0)
     lens.subject_trace=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
+    -- Test 3i default: the subject stays where it was at the cut; only the
+    -- camera's own move along the cut's view changes the distance. The game's
+    -- focus also changes when focus moves to another person (34 -> 105 -> 34
+    -- cm within one shot in 3h), which slid the eye while the 2D camera stood still.
+    if how==0 and lens.cut_pos and lens.cut_subject and not lens.subject_entry then
+        local moved=(pos.x-lens.cut_pos.x)*lens.cut_f.x+(pos.y-lens.cut_pos.y)*lens.cut_f.y+(pos.z-lens.cut_pos.z)*lens.cut_f.z
+        lens.subject=math.max(10,lens.cut_subject-moved)
+        return
+    end
     local fr=people.frame(pos,rot,fov)
     local function where(entry)
         if not entry then return nil end
@@ -1501,13 +1536,15 @@ function lens.update()
     end
     lens.pos,lens.rot=pos,rot
     lens.frames=(lens.frames or 0)+1
+    local how=number("WuWaControls_LensFollow",0,0,2)
     if cut then
         lens.shot=lens.shot+1
         lens.pick(pcm,pos,rot,fov)
+        lens.cut_pos,lens.cut_f,lens.cut_subject=pos,lens.forward(rot),lens.subject
         lens.next_follow=lens.frames+8
-    elseif lens.frames>=(lens.next_follow or 0) then
+    elseif how~=1 and lens.frames>=(lens.next_follow or 0) then
         lens.next_follow=lens.frames+8
-        local ok=pcall(lens.follow,pcm,pos,rot,fov)
+        local ok=pcall(lens.follow,pcm,pos,rot,fov,how)
         if not ok then lens.subject_entry,lens.foreground_entry=nil,nil end
     end
     if not lens.subject then

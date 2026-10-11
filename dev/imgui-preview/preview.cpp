@@ -288,6 +288,8 @@ int wmain(int argc, wchar_t** argv) {
     const auto overrides = fs::temp_directory_path() / "wuwa-preview-languages";
     fs::create_directories(overrides);
     wuwa_l10n::request(language, overrides);
+    // apply_pending waits for a request to settle for 400 ms (the in-game picker debounce).
+    Sleep(450);
     wuwa_l10n::apply_pending(module);
     io.Fonts->AddFontFromMemoryCompressedTTF(RobotoMedium_compressed_data, RobotoMedium_compressed_size, 16.0f);
     wuwa_l10n::reserve_fonts(io.Fonts, module, 16.0f);

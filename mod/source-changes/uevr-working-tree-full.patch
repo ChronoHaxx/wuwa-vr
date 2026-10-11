@@ -322189,10 +322189,10 @@ index 0000000000000000000000000000000000000000..cd83c1519393030b6d5e27b2bbb9afca
 +} // namespace wuwa_diorama
 diff --git a/src/utility/WuWaDofSync.hpp b/src/utility/WuWaDofSync.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..e82b7e569ba41d024af7538a613b5575ac0dfb65
+index 0000000000000000000000000000000000000000..675604ef7200b84fbe1f742799e14132fa42c83a
 --- /dev/null
 +++ b/src/utility/WuWaDofSync.hpp
-@@ -0,0 +1,227 @@
+@@ -0,0 +1,228 @@
 +#pragma once
 +
 +// Camera effects for both eyes (test 3f/3g). The game builds the second stereo
@@ -322332,10 +322332,11 @@ index 0000000000000000000000000000000000000000..e82b7e569ba41d024af7538a613b5575
 +        read_u32(block + layout.blades, c.blades);
 +    return c;
 +}
-+// Any real camera: a filmback between 1 and 200 mm, f-stops above zero, at most 32 blades.
++// Any real camera: a filmback between 1 and 200 mm, an f-stop above zero, at most 32
++// blades. Story cameras set the minimum f-stop to 0 (test 3g log), so 0 is allowed there.
 +inline bool plausible(const Camera& c) {
 +    return c.read && std::isfinite(c.sensor) && c.sensor >= 1.0f && c.sensor <= 200.0f &&
-+        std::isfinite(c.min_fstop) && c.min_fstop > 0.0f && c.min_fstop <= 64.0f && c.blades <= 32 &&
++        std::isfinite(c.min_fstop) && c.min_fstop >= 0.0f && c.min_fstop <= 64.0f && c.blades <= 32 &&
 +        std::isfinite(c.fstop) && c.fstop > 0.0f && c.fstop < 1000.0f && std::isfinite(c.focal) && c.focal >= 0.0f && c.focal < 1.0e7f;
 +}
 +

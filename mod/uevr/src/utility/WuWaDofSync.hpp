@@ -137,10 +137,11 @@ inline Camera camera_at(uintptr_t block) {
         read_u32(block + layout.blades, c.blades);
     return c;
 }
-// Any real camera: a filmback between 1 and 200 mm, f-stops above zero, at most 32 blades.
+// Any real camera: a filmback between 1 and 200 mm, an f-stop above zero, at most 32
+// blades. Story cameras set the minimum f-stop to 0 (test 3g log), so 0 is allowed there.
 inline bool plausible(const Camera& c) {
     return c.read && std::isfinite(c.sensor) && c.sensor >= 1.0f && c.sensor <= 200.0f &&
-        std::isfinite(c.min_fstop) && c.min_fstop > 0.0f && c.min_fstop <= 64.0f && c.blades <= 32 &&
+        std::isfinite(c.min_fstop) && c.min_fstop >= 0.0f && c.min_fstop <= 64.0f && c.blades <= 32 &&
         std::isfinite(c.fstop) && c.fstop > 0.0f && c.fstop < 1000.0f && std::isfinite(c.focal) && c.focal >= 0.0f && c.focal < 1.0e7f;
 }
 

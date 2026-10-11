@@ -1203,36 +1203,91 @@ function lens.focus(pcm)
     end)
     if ok and type(value)=="number" and value>30 and value<5000 then return value end
 end
--- Characters inside the game camera's 2D frame (test 3g). Over-the-shoulder
+-- People inside the game camera's 2D frame (tests 3g-3h). Over-the-shoulder
 -- shots put one person at the frame's edge in front of the speaker; the
--- centre trace misses them (and does not hit characters at all), so in test
--- 3f the eye passed straight through her. Capsules are tested against the 2D
--- frustum (16:9 at the game's FOV); hidden actors are skipped.
-local character_class
-function lens.characters(pos,rot,fov)
-    local hook=uevr.types and uevr.types.UObjectHook
-    if not hook or not hook.get_objects_by_class then return nil,"object index unavailable" end
-    if not character_class then character_class=api:find_uobject("Class /Script/Engine.Character") end
-    if not character_class then return nil,"Character class not found" end
-    local list=hook.get_objects_by_class(character_class,false)
-    if type(list)~="table" then return nil,"no character list" end
-    local f=lens.forward(rot)
+-- centre trace misses them (it does not hit characters at all), so in test 3f
+-- the eye passed straight through her. In test 3g all 20 Engine.Character
+-- actors were outside every story shot (the performers are other actors), so
+-- skeletal meshes drawn in the last 0.25 s, one per owning actor, are the
+-- second source. Bodies are tested against the 2D frustum (16:9 at the game's FOV).
+local people={}
+function people.frame(pos,rot,fov)
     local yaw,pitch=math.rad(rot.y),math.rad(rot.x)
-    local right={x=-math.sin(yaw),y=math.cos(yaw)}
-    local up={x=-math.sin(pitch)*math.cos(yaw),y=-math.sin(pitch)*math.sin(yaw),z=math.cos(pitch)}
-    local th=math.tan(math.rad(fov)/2); local tv=th/(16/9)
-    local out={}
-    for i,c in ipairs(list) do
+    local th=math.tan(math.rad(fov)/2)
+    return {pos=pos,f=lens.forward(rot),right={x=-math.sin(yaw),y=math.cos(yaw)},
+        up={x=-math.sin(pitch)*math.cos(yaw),y=-math.sin(pitch)*math.sin(yaw),z=math.cos(pitch)},th=th,tv=th/(16/9)}
+end
+-- A body (centre, radius, half height) against the frame: its depth, or nil and a reason.
+function people.place(fr,c,r,h)
+    local v={x=c.x-fr.pos.x,y=c.y-fr.pos.y,z=c.z-fr.pos.z}
+    local t=v.x*fr.f.x+v.y*fr.f.y+v.z*fr.f.z
+    if t<=0 then return nil,"behind" end
+    if t>3000 then return nil,"far" end
+    local x=v.x*fr.right.x+v.y*fr.right.y
+    local z=v.x*fr.up.x+v.y*fr.up.y+v.z*fr.up.z
+    if math.abs(x)-r>t*fr.th or z-h>t*fr.tv or z+h<-t*fr.tv then return nil,"outside" end
+    return {t=t,near=t-r,r=r,angle=math.abs(x)/t+math.abs(z)/(t*3)}
+end
+function people.objects(path)
+    local hook=uevr.types and uevr.types.UObjectHook
+    if not hook or not hook.get_objects_by_class then return nil end
+    people.classes=people.classes or {}
+    local class=people.classes[path]
+    if class==nil then class=api:find_uobject(path) or false; people.classes[path]=class end
+    if not class then return nil end
+    local list=hook.get_objects_by_class(class,false)
+    return type(list)=="table" and list or nil
+end
+local bounds_names={"Component","Origin","BoxExtent","SphereRadius"}
+function people.bounds_lib()
+    if people.lib~=nil then return people.lib or nil end
+    people.lib=false
+    local klass=api:find_uobject("Class /Script/Engine.KismetSystemLibrary")
+    local lib=klass and klass:get_class_default_object()
+    local fn=lib and lib:get_class():find_function("GetComponentBounds")
+    if not fn then return nil end
+    -- Same contract check as the trace: the exact reflected parameter order.
+    local field=fn:get_child_properties(); local count=0
+    while field and count<8 do
+        count=count+1
+        if field:get_fname():to_string()~=bounds_names[count] then return nil end
+        field=field:get_next()
+    end
+    if count~=#bounds_names then return nil end
+    people.lib=lib
+    return lib
+end
+-- Where a tracked body is now: centre, radius, half height.
+function people.body(entry)
+    local o=entry.object
+    if not alive(o) then return nil end
+    if entry.source=="character" then
+        local loc=point(o:K2_GetActorLocation())
+        if not valid(loc) then return nil end
+        return loc,entry.r,entry.h
+    end
+    local lib=people.bounds_lib()
+    if lib then
+        local origin,extent,radius={},{},{}
+        lib:GetComponentBounds(o,origin,extent,radius)
+        local c=origin.result and point(origin.result); local e=extent.result and point(extent.result)
+        if valid(c) and valid(e) then return c,math.max(10,math.min(80,math.max(e.x,e.y))),math.max(5,e.z) end
+    end
+    local loc=point(o:K2_GetComponentLocation())
+    if not valid(loc) then return nil end
+    loc.z=loc.z+85
+    return loc,34,85
+end
+local function tally(stats,reason) stats[reason]=(stats[reason] or 0)+1 end
+function people.scan(pos,rot,fov)
+    local fr=people.frame(pos,rot,fov)
+    local found,stats={},{}
+    local list=people.objects("Class /Script/Engine.Character")
+    stats.characters=list and #list or 0
+    for i,c in ipairs(list or {}) do
         if i>400 then break end
-        local ok,info=pcall(function()
-            if c.bHidden==true then return nil end
-            local loc=point(c:K2_GetActorLocation())
-            if not valid(loc) then return nil end
-            local v={x=loc.x-pos.x,y=loc.y-pos.y,z=loc.z-pos.z}
-            local t=v.x*f.x+v.y*f.y+v.z*f.z
-            if t<=0 or t>3000 then return nil end
-            local x=v.x*right.x+v.y*right.y
-            local z=v.x*up.x+v.y*up.y+v.z*up.z
+        local ok,info,reason=pcall(function()
+            if c.bHidden==true then return nil,"hidden" end
             local r,h=34,88
             local cap=c.CapsuleComponent
             if cap then
@@ -1241,12 +1296,49 @@ function lens.characters(pos,rot,fov)
                 local okh,hh=pcall(function() return cap:GetScaledCapsuleHalfHeight() end)
                 if okh and type(hh)=="number" and hh>10 and hh<400 then h=hh end
             end
-            if math.abs(x)-r>t*th or z-h>t*tv or z+h<-t*tv then return nil end
-            return {t=t,near=t-r,r=r,angle=math.abs(x)/t+math.abs(z)/(t*3)}
+            local entry={object=c,source="character",r=r,h=h}
+            local centre=people.body(entry)
+            if not centre then return nil,"no location" end
+            local placed,why=people.place(fr,centre,r,h)
+            if not placed then return nil,why end
+            for k,v in pairs(entry) do placed[k]=v end
+            return placed
         end)
-        if ok and info then out[#out+1]=info end
+        if not ok then tally(stats,"c_error") elseif info then found[#found+1]=info else tally(stats,"c_"..tostring(reason)) end
     end
-    return out,#list
+    if #found==0 then
+        local meshes=people.objects("Class /Script/Engine.SkeletalMeshComponent")
+        stats.meshes=meshes and #meshes or 0
+        local by_owner={}
+        for i,m in ipairs(meshes or {}) do
+            if i>1500 then tally(stats,"m_capped"); break end
+            local ok,info,reason=pcall(function()
+                if m:WasRecentlyRendered(0.25)~=true then return nil,"unseen" end
+                local entry={object=m,source="mesh"}
+                local centre,r,h=people.body(entry)
+                if not centre then return nil,"no location" end
+                if h<30 or h>300 then return nil,"not body sized" end
+                local placed,why=people.place(fr,centre,r,h)
+                if not placed then return nil,why end
+                entry.r,entry.h=r,h
+                for k,v in pairs(entry) do placed[k]=v end
+                local owner=m:GetOwner()
+                placed.owner=owner and owner:get_address() or m:get_address()
+                return placed
+            end)
+            if not ok then tally(stats,"m_error")
+            elseif info then
+                -- Hair, clothes and weapons are separate meshes: keep the owner's largest.
+                local had=by_owner[info.owner]
+                if not had or info.h>had.h then by_owner[info.owner]=info end
+            else tally(stats,"m_"..tostring(reason)) end
+        end
+        for _,info in pairs(by_owner) do found[#found+1]=info end
+    end
+    local parts={}
+    for k,v in pairs(stats) do parts[#parts+1]=k.."="..tostring(v) end
+    table.sort(parts)
+    return found,table.concat(parts," ")
 end
 function lens.blocked(context,pawn,from,dir)
     local ok,value=pcall(function()
@@ -1312,6 +1404,70 @@ function dof.text()
     if dof.flag:sub(1,5)=="error" then return "; depth of field: "..dof.flag end
     return "; depth of field forced on"
 end
+-- At a cut: who the shot is about, and who stands in front of them.
+function lens.pick(pcm,pos,rot,fov)
+    local pawn=api:get_local_pawn(0); local pc=api:get_player_controller(0)
+    lens.subject_focus=lens.focus(pcm)
+    lens.subject_trace,lens.trace_error=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
+    lens.subject_entry,lens.foreground_entry,lens.foreground,lens.people_stats,lens.people_seen=nil,nil,nil,nil,nil
+    local found
+    if number("WuWaControls_LensSubject",0,0,1)==0 then
+        local ok,list,stats=pcall(people.scan,pos,rot,fov)
+        if ok then found,lens.people_stats=list,stats else lens.people_stats="error "..tostring(list):sub(1,80) end
+    end
+    lens.people_seen=found and #found or nil
+    if found and #found>0 then
+        -- The subject is the person at the game's focus distance, else the one
+        -- nearest the middle of the frame; anyone clearly in front of them is
+        -- foreground the eye must stay behind.
+        local subject,kind
+        if lens.subject_focus then
+            for _,c in ipairs(found) do
+                local miss=math.abs(c.t-lens.subject_focus)
+                if miss<=math.max(80,c.r*2) and (not subject or miss<math.abs(subject.t-lens.subject_focus)) then subject=c end
+            end
+            kind="focused person"
+        end
+        if not subject then
+            kind="person in the middle"
+            for _,c in ipairs(found) do if not subject or c.angle<subject.angle then subject=c end end
+        end
+        local front
+        for _,c in ipairs(found) do
+            if c~=subject and c.near<subject.near-30 and (not front or c.near<front.near) then front=c end
+        end
+        lens.subject_entry,lens.foreground_entry,lens.subject_kind=subject,front,kind
+        lens.subject=math.max(10,subject.t-subject.r*0.5)
+        lens.foreground=front and front.near or nil
+    else
+        lens.subject=lens.subject_focus or lens.subject_trace
+        lens.subject_kind=lens.subject_focus and "game focus" or "trace"
+    end
+end
+-- Within a shot: dialogue cameras glide and settle (test 3g: full VR kept the
+-- distance from the cut until a view switch re-measured it, then jumped).
+-- Follow the same people, or the game's focus, four times a second.
+function lens.follow(pcm,pos,rot,fov)
+    local pawn=api:get_local_pawn(0); local pc=api:get_player_controller(0)
+    lens.subject_trace=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
+    local fr=people.frame(pos,rot,fov)
+    local function where(entry)
+        if not entry then return nil end
+        local ok,c,r,h=pcall(people.body,entry)
+        if not ok or not c then return nil end
+        return people.place(fr,c,r or entry.r,h or entry.h)
+    end
+    if lens.subject_entry then
+        local p=where(lens.subject_entry)
+        if p then lens.subject=math.max(10,p.t-p.r*0.5) end
+        local q=where(lens.foreground_entry)
+        lens.foreground=q and q.near or nil
+    elseif lens.subject_kind=="game focus" then
+        lens.subject=lens.focus(pcm) or lens.subject
+    elseif lens.subject_kind=="trace" then
+        lens.subject=lens.subject_trace or lens.subject
+    end
+end
 function lens.update()
     local pc=api:get_player_controller(0)
     local pcm=pc and pc.PlayerCameraManager
@@ -1335,8 +1491,8 @@ function lens.update()
         lens.dolly=0; lens.pos=nil; dof.update(pcm,fov,0)
         lens.publish(string.format("Waiting for a close-up (lens now %.0f degrees)",fov)..dof.text()); return
     end
-    -- A cut is a jump of the game camera; within a shot its own moves carry on
-    -- and the subject distance measured at the cut is kept, so nothing jitters.
+    -- A cut is a jump of the game camera: the subject is picked again and the
+    -- eye moves at once. Within a shot it is followed and the eye eases.
     local cut=not lens.pos
     if not cut then
         local d=math.sqrt((pos.x-lens.pos.x)^2+(pos.y-lens.pos.y)^2+(pos.z-lens.pos.z)^2)
@@ -1344,43 +1500,15 @@ function lens.update()
         cut=d>50 or a.x*b.x+a.y*b.y+a.z*b.z<math.cos(math.rad(10))
     end
     lens.pos,lens.rot=pos,rot
+    lens.frames=(lens.frames or 0)+1
     if cut then
-        local pawn=api:get_local_pawn(0)
         lens.shot=lens.shot+1
-        lens.subject_focus=lens.focus(pcm)
-        lens.subject_trace,lens.trace_error=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
-        lens.foreground=nil; lens.chars_seen=nil; lens.chars_total=nil; lens.chars_error=nil
-        local chars
-        if number("WuWaControls_LensSubject",0,0,1)==0 then
-            chars,lens.chars_total=lens.characters(pos,rot,fov)
-            if not chars then lens.chars_error=lens.chars_total; lens.chars_total=nil end
-        end
-        lens.chars_seen=chars and #chars or nil
-        if chars and #chars>0 then
-            -- The subject is the person at the game's focus distance, else the
-            -- one nearest the middle of the frame; anyone clearly in front of
-            -- them is foreground the eye must stay behind.
-            local subject,kind
-            if lens.subject_focus then
-                for _,c in ipairs(chars) do
-                    local miss=math.abs(c.t-lens.subject_focus)
-                    if miss<=math.max(80,c.r*2) and (not subject or miss<math.abs(subject.t-lens.subject_focus)) then subject=c end
-                end
-                kind="focused person"
-            end
-            if not subject then
-                kind="person in the middle"
-                for _,c in ipairs(chars) do if not subject or c.angle<subject.angle then subject=c end end
-            end
-            for _,c in ipairs(chars) do
-                if c~=subject and c.near<subject.near-30 and (not lens.foreground or c.near<lens.foreground) then lens.foreground=c.near end
-            end
-            lens.subject=math.max(10,subject.t-subject.r*0.5)
-            lens.subject_kind=kind
-        else
-            lens.subject=lens.subject_focus or lens.subject_trace
-            lens.subject_kind=lens.subject_focus and "game focus" or "trace"
-        end
+        lens.pick(pcm,pos,rot,fov)
+        lens.next_follow=lens.frames+8
+    elseif lens.frames>=(lens.next_follow or 0) then
+        lens.next_follow=lens.frames+8
+        local ok=pcall(lens.follow,pcm,pos,rot,fov)
+        if not ok then lens.subject_entry,lens.foreground_entry=nil,nil end
     end
     if not lens.subject then
         lens.dolly=0; dof.update(pcm,fov,0)
@@ -1389,29 +1517,42 @@ function lens.update()
     -- The subject keeps strength^1 of its 2D size: distance d becomes d*k^strength.
     local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2)
     local d=lens.subject
-    local dolly=math.max(0,d-math.max(nearest,d*k^strength))
-    if lens.subject_trace then dolly=math.min(dolly,math.max(0,lens.subject_trace-nearest)) end
+    local target=math.max(0,d-math.max(nearest,d*k^strength))
+    if lens.subject_trace then target=math.min(target,math.max(0,lens.subject_trace-nearest)) end
     -- Someone in front of the subject (over-the-shoulder): stay at least 30 cm behind them.
     local held=false
     if lens.foreground then
         local limit=math.max(0,lens.foreground-math.max(nearest,30))
-        if limit<dolly then dolly=limit; held=true end
+        if limit<target then target=limit; held=true end
     end
     -- Without the game's focus or a person the trace is only a guess (often a far wall): at most 1 m.
-    if lens.subject_kind=="trace" then dolly=math.min(dolly,100) end
-    lens.dolly=dolly
+    if lens.subject_kind=="trace" then target=math.min(target,100) end
+    -- Ease toward the target within a shot (0.35 s, at most 1.5 m/s); jump at a cut.
+    local t=now()
+    if cut or not lens.eased_at or type(lens.dolly)~="number" then
+        lens.dolly=target
+    else
+        local dt=t-lens.eased_at
+        if not (dt>0) then dt=1/45 end
+        dt=math.min(dt,0.1)
+        local step=(target-lens.dolly)*(1-math.exp(-dt/0.35))
+        local cap=150*dt
+        lens.dolly=lens.dolly+math.max(-cap,math.min(cap,step))
+    end
+    lens.eased_at=t
+    local dolly=lens.dolly
     dof.update(pcm,fov,dolly)
     local text=string.format("Close-up at %.0f degrees: %s %.1f m away, moved %.1f m nearer",
         fov,lens.subject_kind or "subject",d/100,dolly/100)
     if held then text=text..string.format(", held behind the person in front (%.1f m)",lens.foreground/100)
     elseif dolly>0 and d-dolly<=nearest+1 then text=text..string.format(", stopped at the closest %.0f cm",nearest) end
     if cut then
-        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f subject=%.0f (%s) people=%s/%s foreground=%s focus=%s trace=%s dolly=%.0f strength=%.2f nearest=%.0f%s",
-            lens.shot,fov,d,tostring(lens.subject_kind),tostring(lens.chars_seen or "-"),tostring(lens.chars_total or "-"),
+        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f subject=%.0f (%s) people=%s [%s] foreground=%s focus=%s trace=%s dolly=%.0f strength=%.2f nearest=%.0f%s",
+            lens.shot,fov,d,tostring(lens.subject_kind),tostring(lens.people_seen or "-"),tostring(lens.people_stats or ""),
             tostring(lens.foreground and math.floor(lens.foreground) or "none"),
             tostring(lens.subject_focus and math.floor(lens.subject_focus) or "none"),
             tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength,nearest,
-            (lens.chars_error and (" people_error="..tostring(lens.chars_error)) or "")..(lens.trace_error and (" trace_error="..lens.trace_error) or "")))
+            lens.trace_error and (" trace_error="..lens.trace_error) or ""))
     end
     lens.publish(text..dof.text())
 end

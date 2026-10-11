@@ -62,7 +62,7 @@
       "Ready: all three steps are ticked, SteamVR is detected and Launch in VR is enabled."
     ],
     "caption": "Actual launcher screens, rendered from the app in English. Your paths and runtime will differ.",
-    "controls": "In game, L3 + R3 opens UEVR settings. WuWa options are under VR → WuWa Controls.",
+    "controls": "In game, L3 + R3 opens the WuWa VR menu. UEVR's full settings are on its Menu page: All settings (classic UEVR menu).",
     "guide": "Full setup, update and recovery guide",
     "names": [
       "Find Wuthering Waves",

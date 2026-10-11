@@ -21,7 +21,7 @@ works at once; whatever you used last shows the focus.
 
 | Input | Move | Select | Back / close | Switch page |
 | --- | --- | --- | --- | --- |
-| VR controller | Point the laser | Trigger, or A / X | B / Y | Grips, or point at a tab |
+| VR controller | Point the laser, or either stick | Trigger, or A | B | Grips, or point at a tab |
 | Gamepad | D-pad or either stick | A | B | LB / RB |
 | Mouse and keyboard | Point, scroll; arrow keys | Click; Enter or Space | Esc | Click a tab; Tab / Shift+Tab |
 
@@ -29,8 +29,9 @@ Left / right changes a choice or slider. Pages: **Quick** (view, camera, VR
 controllers, diorama, HUD size and distance, recording, recenter), **Camera**,
 **Cinema**, **HUD**, **Comfort**, **Fixes** (including render resolution),
 **Record** and **Menu**. They change the same settings as UEVR's own menu:
-**All settings (classic)** opens UEVR's full menu, and the **Menu** page can
-switch L3 + R3 back to UEVR's window.
+**All settings (classic UEVR menu)** on the Menu page opens UEVR's full window,
+and turning off **Use this menu when opening UEVR** makes L3 + R3 open UEVR's
+window again.
 
 **Move the menu:** press **Y** (gamepad) or choose **Move menu** on the Menu
 page. Gamepad: left stick moves it, right stick changes the distance, A puts it
@@ -355,8 +356,8 @@ traceable geometry and cannot stop physical headset leaning through a wall.
 
 ## UEVR's classic settings open
 
-These apply in UEVR's own window (**All settings (classic)**, or with L3 + R3
-switched back to it on the Menu page).
+These apply in UEVR's own window (**All settings (classic UEVR menu)**, or
+with **Use this menu when opening UEVR** turned off).
 
 | Input | Action |
 | --- | --- |

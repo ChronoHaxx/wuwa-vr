@@ -44,7 +44,7 @@
       "Pronto: os três passos estão marcados, o SteamVR foi detectado e Iniciar em VR está disponível."
     ],
     "caption": "Telas reais do launcher, geradas pelo app em português. Seus caminhos e seu runtime serão diferentes.",
-    "controls": "No jogo, L3 + R3 abre as configurações do UEVR. As opções do WuWa ficam em VR → WuWa Controls.",
+    "controls": "No jogo, L3 + R3 abre o menu do WuWa VR. As configurações completas do UEVR ficam na página Menu: All settings (classic UEVR menu).",
     "guide": "Guia completo de instalação, atualização e recuperação",
     "names": ["Encontrar Wuthering Waves", "Instalar VR", "Headset ou simulador"]
   },

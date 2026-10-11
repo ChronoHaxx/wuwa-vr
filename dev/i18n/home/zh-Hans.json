@@ -44,7 +44,7 @@
       "准备就绪：三个步骤均已勾选，已检测到 SteamVR，“以 VR 模式启动”可用。"
     ],
     "caption": "启动器的真实界面，由应用以简体中文渲染。你的路径和运行时会有所不同。",
-    "controls": "游戏中按 L3 + R3 打开 UEVR 设置。WuWa 选项位于 VR → WuWa Controls。",
+    "controls": "游戏中按 L3 + R3 打开鸣潮 VR 菜单。UEVR 完整设置在菜单的 Menu 页：All settings (classic UEVR menu)。",
     "guide": "完整的安装、更新与恢复指南",
     "names": ["找到《鸣潮》", "安装 VR", "头显或模拟器"]
   },

@@ -53,7 +53,7 @@ function verifyReleaseSections() {
   const recovery = /<section id="recovery">([\s\S]*?)<\/section>/.exec(guide)[1];
   assert(controls.includes('Fixture: current controls source.'));
   assert(recovery.includes('Fixture: current recovery source.'));
-  for (const text of ['Toggle mono theatre', 'Toggle stereoscopic screen', 'Toggle the temporary 10× diorama', 'Optional Quest controllers for walking']) {
+  for (const text of ['Next view: full VR, stereo screen, mono theatre', 'Open/close the WuWa VR menu', 'Toggle stereoscopic screen', 'Toggle the temporary 10× diorama', 'Optional Quest controllers for walking']) {
     assert(controls.includes(text), 'Current control missing: ' + text);
   }
   assert.equal((controls.match(/id="control-search"/g) || []).length, 1);

@@ -44,7 +44,7 @@
       "준비 완료: 세 단계 모두 체크되고 SteamVR이 감지되었으며 'VR로 실행'을 누를 수 있습니다."
     ],
     "caption": "앱이 한국어로 그린 실제 런처 화면입니다. 경로와 런타임은 환경마다 다릅니다.",
-    "controls": "게임 중 L3 + R3으로 UEVR 설정을 엽니다. WuWa 옵션은 VR → WuWa Controls에 있습니다.",
+    "controls": "게임 중 L3 + R3으로 WuWa VR 메뉴를 엽니다. UEVR 전체 설정은 메뉴의 Menu 페이지에 있는 All settings (classic UEVR menu)에 있습니다.",
     "guide": "설치·업데이트·복구 전체 가이드",
     "names": ["명조 찾기", "VR 설치", "헤드셋 또는 시뮬레이터"]
   },

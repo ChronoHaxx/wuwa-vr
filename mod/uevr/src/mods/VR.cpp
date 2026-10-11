@@ -971,7 +971,7 @@ void VR::draw_sightseeing_menu() {
         wuwa_ui::TextWrapped("Status: VR controllers need the OpenXR runtime."); break;
     }
 
-    wuwa_ui::TextWrapped("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open UEVR. D-pad actions are not mapped.");
+    wuwa_ui::TextWrapped("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped.");
     wuwa_ui::TextWrapped("Choose First person under View modes if wanted; camera and aiming settings stay unchanged.");
 }
 
@@ -2795,7 +2795,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
     if (selected_page == PAGE_WUWA && wuwa_test::is_wuwa()) {
         wuwa_ui::FontScope language_font;
         // Give this long page its own bounded scrolling region. In particular,
-        // expanding the shortcut sheet must not push camera controls off-screen.
+        // expanding the controls card settings must not push camera controls off-screen.
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 18.0f);
         const bool draw_wuwa = ImGui::BeginChild("WuWaControlsScroll", ImVec2(0, 0), false,
             ImGuiWindowFlags_AlwaysVerticalScrollbar);

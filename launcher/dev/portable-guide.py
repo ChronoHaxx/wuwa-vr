@@ -31,7 +31,7 @@ CHECKS = (
 RECOVERY = (
     'Blurred ESC menu with no buttons: L3+B restores hidden game UI. Later builds also offer Show game UI now. Additional-menu extraction and Native Stereo Fix defaults depend on the build; see its supplied values below.',
     'The optional stereo-renderer comparison turns Native Stereo Fix off in both choices. Use its Restore button to return to your previous settings; choosing Use native stereo alone does not restore NSF. No renderer comparison is required for this playtest.',
-    'Buttons move the HUD or mouse unexpectedly: L3+LB exits latched adjustment in newer builds. Release the controls before continuing. The in-game shortcut sheet describes older bindings.',
+    'Buttons move the HUD or mouse unexpectedly: L3+LB exits latched adjustment in newer builds. Release the controls before continuing. In VR, hold L3 for half a second to see your build’s bindings.',
     'Use headset restores the OpenXR runtime saved before enabling the simulator; that may be VDXR rather than SteamVR. An explicit runtime switch requires the game/injector closed and may need Windows permission.',
     'Reset this build restores that build’s supplied settings with a backup. Restore my settings from before WuWa VR restores the saved profile and injector selection; it does not change the OpenXR runtime.',
     'Before deleting the package, restore the headset runtime if this package’s simulator is active, restore your settings, then Stop launcher. Keep backups and recordings if wanted.',
@@ -96,7 +96,7 @@ def documents(catalog, profiles, sources, default):
         parts += ['<tr><th scope="row">' + escape(k) + '</th><td>' + escape(v) + '</td></tr>' for k, v in rows]
         parts += ['</tbody></table></div><details><summary>Build identity</summary><p><code>' + escape(b['id']) + '</code></p><p>Source: <code>' + escape(tag) + '</code></p><p>Backend SHA-256: <code>' + escape(b['sha256']) + '</code></p></details></article>']
     parts += ['<h2 id="check">One grouped playtest</h2><p>At the next normal playtest, report pass / fail / not tried for the groups together. No countdown or repeated short relaunches. Stop if it crashes or becomes uncomfortable.</p>',
-              '<img class="controller" src="app/site/media/xbox-controller.png" alt="Xbox controller layout; use the in-game shortcut sheet for your build’s bindings"><ul>']
+              '<img class="controller" src="app/site/media/xbox-controller.png" alt="Xbox controller layout; in VR, hold L3 to see your build’s bindings"><ul>']
     parts += ['<li><label><input type="checkbox">' + escape(title) + '</label>: ' + escape(text) + '</li>' for title, text in CHECKS]
     parts += ['</ul><p>These checkboxes are a local reminder, not recorded acceptance.</p>', '<h2 id="recovery">Quick recovery</h2><ul>']
     parts += ['<li>' + escape(text) + '</li>' for text in RECOVERY]

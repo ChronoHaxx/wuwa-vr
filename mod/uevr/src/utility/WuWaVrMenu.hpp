@@ -303,7 +303,7 @@ struct Look {
 // input comes from ImGui's mouse (the host feeds the laser into it).
 void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVec2& pos, const ImVec2& size, const Look& look);
 
-// The current step of a guided test plan, drawn where the shortcut sheet goes
+// The current step of a guided test plan, drawn where the controls card goes
 // while the menu is closed. index == steps.size() means the plan is finished.
 // recording is the recorder clock ("1:23") while recording, else empty.
 void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wuwa_steps::Plan& plan, int index,

@@ -74,7 +74,7 @@ async function build() {
     if (!filter) throw Error('Missing guide controls filter');
     text = replace(text, /<section id="controls">[\s\S]*?<\/section>/,
       `<section id="controls"><h2>Controller shortcuts</h2>${filter[0]}${render('docs/CONTROLS.md', true)}</section>`, 'guide controls');
-    // Controller images: the shared card and the four sheet pages, from mod/controls.json.
+    // Controller images: the shared card and the five control groups, from mod/controls.json.
     const padCopy = JSON.parse(fs.readFileSync(path.join(__dirname, 'home/en.json'), 'utf8')).pad;
     text = replace(text, /<section id="visual-controls">[\s\S]*?<\/section>/, controlsSection.renderGuide({copy: padCopy}), 'guide controller images');
     text = replace(text, /<section id="recovery">[\s\S]*?<\/section>/,

@@ -44,6 +44,27 @@ mono theatre the menu stays in front of the picture.
 A VR controller that is put down or switched off stops driving the menu after
 8 seconds; any gamepad or keyboard press takes over at once.
 
+## Controls cards
+
+You do not need to remember the shortcuts. In VR, **hold L3** (click and hold
+the left stick) for half a second and a card rises under your view with every
+L3 + button shortcut. **Hold LT + RT** for half a second for the views card:
+full VR, stereo screen, mono theatre and blur. Each button lights up while you
+press it, and the card sinks away when you let go. A quick click of L3 shows
+nothing.
+
+- **L3 + Menu** keeps the card open (**Pinned**) until you press it again.
+- The WuWa VR menu's **HUD** page has **Controls cards** (on / off), **Keep the
+  controls card open** and **Card size**.
+- On the first three launches, a one-line tip below your view says how to find
+  the cards. After each view switch, a line shows for 3 seconds with how to go
+  on or come back.
+- With VR controllers in use, the card names their buttons (L trigger, R grip
+  and so on).
+- Close the WuWa VR menu to see the card. It is drawn in the headset only, not
+  in the game's flat spectator window. While a test plan is loaded, its current
+  step takes the card's place.
+
 ## PlayStation controllers (experimental)
 
 A working **Steam Input / Xbox-XInput mapping** uses the bindings below. In
@@ -63,7 +84,7 @@ not install a driver or write controller output reports.
 | Options | Menu / Start |
 
 For example, **L2 + R2 first, then R3** toggles mono theatre; **L3 + Share/Create**
-toggles first person, and **L3 + Options** opens the shortcut sheet. Release all
+toggles first person, and **L3 + Options** keeps the controls card open. Release all
 controls between gestures and after reconnects or source changes. Read the UEVR
 shortcut-panel status for the active input source or pause reason.
 
@@ -73,8 +94,8 @@ you need the mod to consume a chord. The direct reader pauses with physical
 gamepad passthrough or an explicit XInput slot filter. No touchpad/PS-button
 shortcut, rumble, adaptive-trigger or light controls are added. A third-party
 pad or unusual report format is not implied to work.
-Direct input can open/close UEVR with L3 + R3, but does not add menu navigation;
-use keyboard/mouse, mapped XInput or existing VR menu controls. Physical PS4/PS5 acceptance
+Direct input can open/close the WuWa VR menu with L3 + R3, but cannot move
+around in it; use keyboard/mouse, mapped XInput or the VR controllers. Physical PS4/PS5 acceptance
 is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 
 ## Everyday
@@ -94,9 +115,9 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 | L3 + RB | Game/fixed camera |
 | Double R3 | Freecam on/off |
 | Double L3 | Windows screenshot (Win + Print Screen) |
-| L3 + Menu | Show/hide the illustrated shortcut sheet |
-| L3 + D-pad Left / Right | Previous/next sheet page while the sheet is open |
-| L3 + D-pad Up | Automatic sheet page |
+| Hold L3 for half a second | Controls card: every L3 + button shortcut |
+| Fully hold LT + RT for half a second | Views card: full VR, stereo screen, mono theatre, blur |
+| L3 + Menu | Keep the controls card open / let it close |
 | L3 + D-pad Down | In first person: toggle full animation follow / previous motion choice |
 | L3 + LB, then release | Toggle HUD/mouse adjustment; controller mouse shortcuts must be enabled |
 | LB + R3 | Original utility assist: V; hold 0.8 seconds for the Tab wheel |
@@ -196,15 +217,15 @@ not need to hold a bumper. The mode starts off at each launch.
 | LT / RT | HUD nearer / farther |
 | LB / RB | HUD down / up |
 | L3 + LB | Leave adjustment |
-| L3 + R3 | Open UEVR settings |
+| L3 + R3 | Open the WuWa VR menu |
 
 The game does not receive ordinary pad input during adjustment. First-person
 placement remains; freecam motion pauses. **Game time continues.** With the mode
 off, menus keep their normal gamepad controls by default. The legacy automatic
 mouse-in-menus option is separate and starts off.
 
-The **HUD / MOUSE MODE** notice and shortcut sheet show the current mode;
-the automatic sheet page uses page 03. Use **L3 + LB** or
+The **HUD / MOUSE MODE** notice shows the current mode, and the controls card
+marks it **On**. Use **L3 + LB** or
 **WuWa Controls → Exit mouse mode now** to exit. The button also disables legacy
 automatic mouse-in-menus. Release all controls before resuming play.
 
@@ -370,6 +391,6 @@ with **Use this menu when opening UEVR** turned off).
 | RT page 1: B / Y / X | Reset camera offsets / recenter view / reset standing origin |
 | RT page 2 or 3: X / Y / B | Load or save camera slots 0 / 1 / 2 |
 
-Page 04 on the shortcut sheet is a reference to this **settings-open** context.
-It is not a second set of gameplay bindings. If scrolling seems absent, release
+These work only while UEVR's window is open; they are not a second set of
+gameplay bindings. If scrolling seems absent, release
 RT and focus the panel. Insert remains a keyboard recovery path.

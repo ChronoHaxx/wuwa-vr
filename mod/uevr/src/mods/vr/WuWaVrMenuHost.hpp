@@ -32,7 +32,7 @@ inline constexpr int beam_swatch_rows = 4;
 // Guided test plans: picks up <profile>/wuwa-steps/plan.json (at most once a
 // second). Called every UI frame, menu open or not.
 void tick();
-// A plan is loaded, so its current step replaces the shortcut sheet.
+// A plan is loaded, so its current step replaces the controls card.
 bool overlay_wanted();
 // Draws the current step into the passive overlay (the sheet's place).
 void draw_step_overlay(ImDrawList* list, const ImVec2& size);

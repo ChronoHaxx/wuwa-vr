@@ -20,18 +20,20 @@ build/runtime are usually enough to start.
 
 ## Translations
 
-Getting started, common Xbox shortcuts, feedback and support expectations are
-available in English, Simplified Chinese, Japanese, Korean, Spanish, Brazilian
-Portuguese, French, German, Russian and Arabic. These are initial translations
-and community language review is welcome. The full technical guide and native
-UEVR interface remain English; game language is not changed.
+The VR mod (the WuWa VR menu, the controls cards and notices), the offline
+player guide, the launcher, the portable web tool and the website home pages
+are in English, Simplified Chinese, Japanese, Korean, Spanish, Brazilian
+Portuguese, French, German, Russian and Arabic. Most translations started as
+machine drafts, so review by speakers of each language is very welcome: a
+correction to a single phrase helps.
 
-Edit the appropriate `site/languages/*.js` source and run
-`node dev/build-community.cjs`. Each translated phrase has the same key as the
-English reference. Keep exact in-game option names and Xbox button names
+[dev/i18n/README.md](dev/i18n/README.md) shows where each piece of text lives
+and how to change it. Keep exact in-game option names and Xbox button names
 unchanged so players can find them. Do not add a remote translation service.
 Right-to-left languages use `dir="rtl"`; controller chords remain left-to-right.
-Test keyboard use, small screens, long labels and the copy/report flow.
+
+New player-facing text needs all ten languages before a release:
+`python dev/i18n/check_all.py` must print `All translations complete.`
 
 ## Code, forks and sharing
 

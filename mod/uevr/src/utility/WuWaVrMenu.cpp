@@ -293,7 +293,7 @@ void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wu
     if (!list || !font) return;
     const bool finished = index >= static_cast<int>(plan.steps.size());
     const auto* step = finished ? nullptr : &plan.steps[index];
-    // 1600 x 900 design, like the shortcut sheet whose place this takes.
+    // 1600 x 900 design, like the controls card whose place this takes.
     const float s = size.x / 1600.0f;
     const auto at = [&](float x, float y) { return ImVec2{x * s, y * s}; };
     const auto tall = [&](float px, const std::string& text, float wrap) {

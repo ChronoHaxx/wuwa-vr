@@ -131,16 +131,14 @@ back, or swap away/back as the user found helpful. Record the character and
 movement state if it repeats; do not save a large permanent height offset to
 compensate for a transient rig problem.
 
-## Shortcut sheet
+## Controls cards
 
-L3+Menu toggles it. Select front placement first to verify visibility; then try
-feet placement and adjust width, drop, forward distance and tilt. Its anchor is
-your **recentered tracking origin**, not your avatar. A desktop spectator view
-may omit compositor layers. UEVR settings can temporarily take priority over
-the sheet, so close them to inspect placement. The 17:30 candidate keeps the
-sheet visible during manual or automatic mouse mode, including with game UI
-hidden. The sheet contains amber mouse and red hidden-UI hints; if you hide the
-sheet, standalone recovery notices remain.
+Hold L3, or LT + RT, for half a second and a card rises under your view; let go
+and it sinks away. L3 + Menu keeps it open. **Card size** on the WuWa VR menu's
+HUD page sets its width. If you cannot see it, close the WuWa VR menu, recenter
+with L3 + A and look in the headset: the desktop spectator view does not show
+it. The amber mouse-mode and red hidden-UI notices are separate and appear
+whether or not a card is open.
 
 ## The window
 
@@ -197,7 +195,8 @@ HMD position/orientation and recent per-eye rendered poses. Choose **Playtest
 with camera and Xbox data** for these sidecars. **Content creation: clean video
 only** also supports older backends without motion recording.
 
-For showcase footage, hide the shortcut sheet and close UEVR first; the recorder
+For showcase footage, unpin the controls card (L3 + Menu) and close the WuWa VR
+menu first; the recorder
 does not remove game HUD, menus or account identifiers. Keep the original clip
 and diagnostic sidecars for debugging, and review any footage before publishing.
 Simulator video capture and automatic upload are not included.

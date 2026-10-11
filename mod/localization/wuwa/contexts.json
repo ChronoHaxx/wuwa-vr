@@ -62,7 +62,7 @@
   "A. Physical gamepad baseline": [
     "mods/VR.cpp"
   ],
-  "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open UEVR. D-pad actions are not mapped.": [
+  "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped.": [
     "mods/VR.cpp"
   ],
   "Acro drone": [

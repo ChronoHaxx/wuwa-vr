@@ -26,7 +26,7 @@
     "A select  ·  Left / right change  ·  LB / RB pages  ·  B close": "A 선택  ·  좌 / 우 변경  ·  LB / RB 페이지  ·  B 닫기",
     "A-D restore all controller slots for a fair comparison. Each records until stopped or 1000 changes. Close with Insert, test LB+Y before and after Alt-Tab, then return with Insert. Restore above to undo this batch. UEVR saves the current settings on exit.": "A-D는 공정한 비교를 위해 모든 컨트롤러 슬롯을 복원합니다. 각 기록은 중지하거나 변경 1000회에 도달할 때까지 계속됩니다. Insert로 닫고, Alt-Tab 전후로 LB+Y를 테스트한 뒤 Insert로 돌아오세요. 위의 복원으로 이번 묶음을 취소할 수 있습니다. UEVR은 종료 시 현재 설정을 저장합니다.",
     "A. Physical gamepad baseline": "A. 실제 게임패드 기준",
-    "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open UEVR. D-pad actions are not mapped.": "A/B/X/Y는 라벨을 유지합니다. 트리거 = LT/RT, 그립 = LB/RB, 스틱 클릭 = L3/R3. 왼쪽 Menu 짧게 = Start, 왼쪽 그립 + Menu 짧게 = View. 양쪽 스틱 클릭은 UEVR을 엽니다. 방향 패드 기능은 매핑되지 않습니다.",
+    "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped.": "A/B/X/Y는 라벨을 유지합니다. 트리거 = LT/RT, 그립 = LB/RB, 스틱 클릭 = L3/R3. 왼쪽 Menu 짧게 = Start, 왼쪽 그립 + Menu 짧게 = View. 양쪽 스틱 클릭은 WuWa VR 메뉴를 엽니다. 방향 패드 기능은 매핑되지 않습니다.",
     "Acro drone": "아크로 드론",
     "Acro drone (manual)": "아크로 드론 (수동)",
     "Acro throttle control": "아크로 스로틀 조작",

@@ -26,7 +26,7 @@
     "A select  ·  Left / right change  ·  LB / RB pages  ·  B close": "A 确认  ·  左／右切换  ·  LB／RB 翻页  ·  B 关闭",
     "A-D restore all controller slots for a fair comparison. Each records until stopped or 1000 changes. Close with Insert, test LB+Y before and after Alt-Tab, then return with Insert. Restore above to undo this batch. UEVR saves the current settings on exit.": "A-D 会恢复所有手柄槽位，以便公平对比。每个槽位会记录到停止或达到 1000 次更改为止。用 Insert 关闭，在 Alt-Tab 前后测试 LB+Y，然后用 Insert 返回。用上方的还原选项可撤销本批次。UEVR 退出时会保存当前设置。",
     "A. Physical gamepad baseline": "A. 实体手柄基准",
-    "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open UEVR. D-pad actions are not mapped.": "A／B／X／Y 按键名称一一对应。扳机 = LT／RT，握持键 = LB／RB，按下摇杆 = L3／R3。短按左侧 Menu 键 = Start；左握持键 + 短按 Menu = View。同时按下两侧摇杆打开 UEVR。不映射十字键操作。",
+    "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped.": "A／B／X／Y 按键名称一一对应。扳机 = LT／RT，握持键 = LB／RB，按下摇杆 = L3／R3。短按左侧 Menu 键 = Start；左握持键 + 短按 Menu = View。同时按下两侧摇杆打开 WuWa VR 菜单。不映射十字键操作。",
     "Acro drone": "Acro 无人机",
     "Acro drone (manual)": "Acro 无人机（手动）",
     "Acro throttle control": "Acro 油门控制",

@@ -42,11 +42,12 @@ the affected character/mode. Game time continues in every camera mode.
    now the default. Confirm swaps do not require re-toggling it, no unused wing
    shadows appear, and leaving first person restores the character. Check normal
    menus/dialogue, the WuWa scrollbar and Alt-Tab/LB+Y without the UEVR overlay.
-3. [ ] **Shortcut sheet and HUD/mouse mode.** Show the sheet with L3+Menu, leave
-   page selection automatic, then use L3+LB and release. The sheet should stay
-   put, show page 03 and explain how to exit. Hide game UI with L3+B: normal play
-   should show no hidden-UI warning. Open ESC/map to see the restore hint. Hide
-   the sheet to check the standalone menu warning. Restore UI and exit mouse mode using the same shortcuts. Automatic
+3. [ ] **Controls cards and HUD/mouse mode.** Hold L3: the card rises and
+   lights each button you press; let go and it sinks. Pin it with L3+Menu, then
+   use L3+LB and release: the card should stay put and mark mouse mode **On**.
+   Hide game UI with L3+B: normal play should show no hidden-UI warning. Open
+   ESC/map to see the restore hint. Unpin the card to check the standalone menu
+   warning. Restore UI and exit mouse mode using the same shortcuts. Automatic
    mouse-in-menus stays off by default and is a separate legacy option.
 4. [ ] **Streamer privacy and reset.** Enable **Streamer privacy: cover player
    IDs**. Inspect a short gameplay, ESC-menu and character/menu recording: both

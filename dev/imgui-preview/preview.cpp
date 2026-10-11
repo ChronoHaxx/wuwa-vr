@@ -176,7 +176,7 @@ std::vector<wuwa_menu::Page> sample_pages() {
         slider("Left / right", "Moves the HUD sideways.", &sample.hud_side, -1.5f, 1.5f, 0.05f, "%+.2f m"),
         toggle("HUD follows your head", "On: the HUD stays in front of your eyes.", &sample.follow),
         action("Refresh HUD layout", "Asks the game to lay out its HUD again."),
-        toggle("Shortcut sheet", "The controller shortcut card below you while playing.", &sample.sheet),
+        toggle("Controls cards", "Hold L3, or LT + RT, for half a second to see what each button does.", &sample.sheet),
     }});
     pages.push_back({"Comfort", {}});
     pages.push_back({"Fixes", {
@@ -330,7 +330,7 @@ int wmain(int argc, wchar_t** argv) {
     scenes.push_back(menu_scene("menu-8-fixes-gamepad", 6, 5, Source::Buttons));
     scenes.push_back(menu_scene("menu-9-cinema-gamepad", 3, 3, Source::Buttons));
     scenes.push_back(menu_scene("menu-7-cinema-pointer", 3, 2, Source::Pointer, ImVec2{100.0f + 500.0f * 1400.0f / 1200.0f, 40.0f + 330.0f * 1400.0f / 1200.0f}));
-    // The step card that replaces the shortcut sheet while a plan runs.
+    // The step card that replaces the controls card while a plan runs.
     static const auto plan = wuwa_steps::parse(nlohmann::json::parse(R"({"version": 1, "id": "bars-1", "title": "Dialogue black bars",
         "steps": [
             {"id": "baseline", "title": "Baseline", "do": "Start a dialogue scene with black bars. Close your left eye, then your right eye.",

@@ -123,7 +123,7 @@ REC badge with the elapsed time shows while recording.
    automatic cinematic screen and what story scenes use, matched framing.
 5. **HUD:** size, distance, **HUD shape (full VR)** (`UI_WuWaHudShape`,
    default 1.33; see below), up / down, left / right, follow head, refresh
-   layout, shortcut sheet.
+   layout, controls cards (on / off, keep open, card size).
 6. **Comfort:** decoupled pitch (and its HUD adjustment), smooth camera turns
    and tilt, walk by default, L3 + A also resets position.
 7. **Fixes:** matched far detail, far lighting, matched framing, and
@@ -295,7 +295,7 @@ the PC; testers share the folder with the video.
 drew through an aspect-constrained (letterboxed) camera. When that lasts more
 than 1.2 s in full VR, a note appears in view for 8 s with the screen shortcut,
 once per cinematic (a cinematic ends after 10 s without one). It uses the
-head-locked warning slot, so it shows even with the shortcut sheet on.
+head-locked warning slot, so it shows even with the controls card open.
 Setting: `VR_CinemaHint` (default on).
 
 ## Guided test plans
@@ -304,7 +304,7 @@ A plan is a JSON file at `%APPDATA%\UnrealVRMod\Client-Win64-Shipping\wuwa-steps
 The game reads it at most once a second, and again whenever the file changes.
 
 **While a plan is loaded:**
-- **Step card:** its current step is shown where the shortcut sheet goes.
+- **Step card:** its current step is shown where the controls card goes.
 - **Test page:** the menu gains one with the step's text and answer buttons, plus:
   - a **Step** row at the top: left / right moves to any step without
     answering (logged as `go`), and earlier answers stay saved;

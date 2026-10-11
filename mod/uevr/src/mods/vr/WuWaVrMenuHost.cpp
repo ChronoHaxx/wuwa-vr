@@ -102,6 +102,13 @@ ModValue<T>* typed(const char* key) {
     return value;
 }
 
+// The OpenXR runtime keeps its own options, outside the mods' settings that
+// find() searches, so this setting is reached through the runtime.
+ModSlider* resolution_scale() {
+    auto* openxr = VR::get()->get_openxr_runtime();
+    return openxr && openxr->loaded ? openxr->resolution_scale.get() : nullptr;
+}
+
 int camera_mode() {
     auto* mode = typed<int32_t>("WuWaControls_CameraMode");
     return mode ? mode->value() : 0;
@@ -154,9 +161,10 @@ nlohmann::json context() {
     for (const char* key : {"VR_RenderingMethod", "VR_NativeStereoFix", "VR_ExtremeCompatibilityMode", "VR_2DScreenMode",
              "VR_MonoTheatreMode", "VR_HorizontalProjectionOverride", "VR_AutoCinema", "VR_DecoupledPitch",
              "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape", "WuWaControls_LensMatch",
-             "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "OpenXR_ResolutionScale", "WuWaPrivacy_Mode"}) {
+             "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
         if (auto* value = cached(key)) settings[key] = value->get();
     }
+    if (auto* scale = resolution_scale()) settings["OpenXR_ResolutionScale"] = scale->get();
     for (const auto& [key, original] : steps.touched()) {
         if (auto* value = find(key)) settings[key] = value->get();
     }
@@ -249,8 +257,8 @@ Item lens_slider() {
 
 Item lens_nearest_slider() {
     return setting_slider("Closest distance",
-        "How near Close-up match may bring you to the person in the shot. Lower comes closer; below about 30 cm can feel "
-        "uncomfortably close.", "WuWaControls_LensNearest", 10.0f, 150.0f, 5.0f, "%.0f cm");
+        "How near Close-up match may bring you to the person in the shot. Lower comes closer. 100% Close-up match "
+        "already gives the 2D size; this only stops it short when the shot is very tight.", "WuWaControls_LensNearest", 5.0f, 150.0f, 5.0f, "%.0f cm");
 }
 
 Item lens_status() {
@@ -267,9 +275,9 @@ Item resolution_choice() {
     static const float scales[]{0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f};
     auto item = make(Kind::Choice, "Render resolution",
         "Pixels per eye compared with what your headset asks for. Lower is smoother in full VR. It changes after a moment.");
-    item.enabled = [] { return typed<float>("OpenXR_ResolutionScale") != nullptr; };
+    item.enabled = [] { return resolution_scale() != nullptr; };
     item.get_int = [] {
-        auto* v = typed<float>("OpenXR_ResolutionScale");
+        auto* v = resolution_scale();
         const float now = v ? v->value() : 1.0f;
         int best = 4;
         for (int i = 0; i < 7; ++i) {
@@ -278,7 +286,7 @@ Item resolution_choice() {
         return best;
     };
     item.set_int = [](int value) {
-        if (auto* v = typed<float>("OpenXR_ResolutionScale")) v->value() = scales[std::clamp(value, 0, 6)];
+        if (auto* v = resolution_scale()) v->value() = scales[std::clamp(value, 0, 6)];
     };
     item.choices = {"60%", "70%", "80%", "90%", "100%", "110%", "120%"};
     return item;

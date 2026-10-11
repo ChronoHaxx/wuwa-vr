@@ -957,8 +957,31 @@ void VR::stamp_sightseeing_packet(uint32_t result, uint32_t slot, XINPUT_STATE* 
         connected ? sightseeing_pad(state->Gamepad) : wuwa_sightseeing::Pad{}, state->dwPacketNumber);
 }
 
+void VR::hold_back_menu_buttons(uint32_t slot, XINPUT_GAMEPAD& pad, bool ui_open) {
+    if (slot >= m_menu_release_latch.size()) return;
+    auto& latch = m_menu_release_latch[slot];
+    if (ui_open) {
+        // Everything still held at the moment the UI closes is held back.
+        latch = {0xFFFF, true, true};
+        // The WuWa VR menu owns every pad while open, including a physical
+        // pad that UEVR would otherwise pass through beside VR controllers.
+        if (wuwa_menu_host::showing()) pad = {};
+        return;
+    }
+    latch.buttons &= pad.wButtons; // a released button is the game's again
+    pad.wButtons &= static_cast<WORD>(~latch.buttons);
+    if (latch.lt) { if (pad.bLeftTrigger < XINPUT_GAMEPAD_TRIGGER_THRESHOLD) latch.lt = false; else pad.bLeftTrigger = 0; }
+    if (latch.rt) { if (pad.bRightTrigger < XINPUT_GAMEPAD_TRIGGER_THRESHOLD) latch.rt = false; else pad.bRightTrigger = 0; }
+}
+
 void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state) {
     ZoneScopedN(__FUNCTION__);
+
+    // Runs on every return path below, after the state is final for the game.
+    utility::ScopeGuard menu_release{[&]() {
+        if (retval && state && *retval == ERROR_SUCCESS && wuwa_test::is_wuwa())
+            hold_back_menu_buttons(user_index, state->Gamepad, g_framework->is_drawing_ui());
+    }};
 
     // Uses an engine-thread snapshot, never XR or Unreal calls from XInput.
     if (apply_sightseeing_input(retval, user_index, state)) return;

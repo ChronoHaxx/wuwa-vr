@@ -130,7 +130,8 @@ function M.new(env)
             fresh.set(fresh.canvas, table.unpack(fresh.values))
             refreshed = refreshed + 1
         end
-        return true, "HUD layout refreshed (" .. refreshed .. "); check the headset / HUD 已刷新，请在头显中确认"
+        local size = context.dims and (" at " .. context.dims[1] .. "x" .. context.dims[2]) or ""
+        return true, "HUD layout refreshed (" .. refreshed .. ")" .. size .. "; check the headset / HUD 已刷新，请在头显中确认"
     end
     local function save_schema_once(self)
         if self.schema_audited then return end
@@ -161,7 +162,7 @@ function M.new(env)
         self.status = "HUD refresh queued / HUD 刷新已排队"
     end
     function s:reset()
-        self.pending, self.last_mode = nil, nil
+        self.pending, self.last_mode, self.followups = nil, nil, nil
     end
     local function tick(self, mode, delta)
         if type(mode) ~= "boolean" then
@@ -173,8 +174,28 @@ function M.new(env)
             local manual = self.pending and self.pending.manual
             self.pending = {manual = manual, age = 0, ticks = 0, stable = 0}
             self.status = "Waiting for HUD dimensions / 等待 HUD 尺寸稳定"
+            -- Test 3d: back in full VR the HUD could stay squashed until the ESC
+            -- menu, so the first refresh may run before the new eye images are in
+            -- use. Refresh again 1 s and 2.5 s after the switch (cheap, same calls).
+            local started = env.clock and env.clock() or nil
+            self.followups = {1.0, 2.5}
+            self.follow_age, self.follow_start = 0, finite(started) and started or nil
         end
         self.last_mode = mode
+        if self.followups then
+            self.follow_age = self.follow_age + (finite(delta) and math.max(0, math.min(delta, 0.25)) or 0)
+            local now = env.clock and env.clock() or nil
+            local elapsed = (self.follow_start and finite(now) and now >= self.follow_start) and now - self.follow_start or self.follow_age
+            if not self.pending and elapsed >= self.followups[1] then
+                local at = table.remove(self.followups, 1)
+                if #self.followups == 0 then self.followups = nil end
+                local context = current_context()
+                if context then
+                    local ok, message = refresh(context)
+                    self.status = (ok and message or ("HUD refresh unavailable: " .. message)) .. " (follow-up at " .. at .. " s)"
+                end
+            end
+        end
         local p = self.pending
         if not p then return end
         p.age = p.age + (finite(delta) and math.max(0, math.min(delta, 0.25)) or 0)

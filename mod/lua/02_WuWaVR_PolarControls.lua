@@ -1264,8 +1264,9 @@ function lens.update()
     local pcm=pc and pc.PlayerCameraManager
     local strength=number("WuWaControls_LensMatch",75,0,100)/100
     -- How close the eye may come to the subject. The old fixed 60 cm capped
-    -- the effect at about 40% for the game's usual 1-2 m focus distances.
-    local nearest=number("WuWaControls_LensNearest",30,10,150)
+    -- the effect at about 40% for the game's usual 1-2 m focus distances; in
+    -- the headset 10 cm suited best (test 3d).
+    local nearest=number("WuWaControls_LensNearest",10,5,150)
     local paused=mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre")
     if strength<=0 or paused or not pcm then
         lens.dolly=0; lens.pos=nil

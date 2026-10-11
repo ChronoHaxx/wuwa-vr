@@ -273,9 +273,13 @@ if hud_load_error then
     log.log_error("WuWaComfort HUD module: " .. hud_load_error)
 end
 
+local logged_hud_status = nil
 local function publish_hud_status()
     local status = hud_refresh.status
     if type(status) ~= "string" then return end
+    -- Each refresh attempt lands in the UEVR log, so a headset test shows
+    -- which refresh (if any) fixed the HUD after a view switch.
+    if status ~= logged_hud_status then logged_hud_status = status; log.log_info("WuWaHud: " .. status) end
     local bounded = status
     if #bounded > 240 then
         local boundary = utf8.offset(bounded, 0, 241)

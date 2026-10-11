@@ -177,7 +177,7 @@ private:
     // is transient, like the HUD status above.
     const ModSlider::Ptr m_lens_match{ModSlider::create("WuWaControls_LensMatch", 0.0f, 100.0f, 75.0f)};
     // The closest the eye may come to the subject, in cm.
-    const ModSlider::Ptr m_lens_nearest{ModSlider::create("WuWaControls_LensNearest", 10.0f, 150.0f, 30.0f)};
+    const ModSlider::Ptr m_lens_nearest{ModSlider::create("WuWaControls_LensNearest", 5.0f, 150.0f, 10.0f)};
     // Experiment: depth of field in stereo views (the camera script sets the show flag).
     const ModToggle::Ptr m_stereo_dof{ModToggle::create("WuWaStereo_DepthOfField", false)};
     struct LensStatus : ModString {

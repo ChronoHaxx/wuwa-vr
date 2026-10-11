@@ -677,6 +677,12 @@ public:
 
     bool is_auto_cinema_enabled() const { return m_auto_cinema->value(); }
     bool is_cinema_hint_enabled() const { return m_cinema_hint->value(); }
+    // WuWa: buttons still held when UEVR's UI closes (B to close it, A to
+    // select) stay hidden from the game until released, so the game never
+    // sees them as fresh presses (they advanced dialogue). Triggers too.
+    struct MenuReleaseLatch { uint16_t buttons{}; bool lt{}, rt{}; };
+    std::array<MenuReleaseLatch, 4> m_menu_release_latch{};
+    void hold_back_menu_buttons(uint32_t slot, XINPUT_GAMEPAD& pad, bool ui_open);
     wuwa_auto_cinema::Presentation auto_story_presentation() const {
         const auto mode = m_auto_story_presentation->value();
         return mode >= 0 && mode <= 2 ? static_cast<wuwa_auto_cinema::Presentation>(mode) : wuwa_auto_cinema::Presentation::none;

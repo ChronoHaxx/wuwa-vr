@@ -318768,7 +318768,7 @@ index 0000000000000000000000000000000000000000..8fb1040076bfed623b49d0f6cd7a987c
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaControlsComponent.hpp b/src/mods/vr/WuWaControlsComponent.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..738f58462006db259f864cf9ed908d2878b12ea8
+index 0000000000000000000000000000000000000000..5c8298f5077e2fec86525b6d6fe6b4eb1a25f2bd
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.hpp
 @@ -0,0 +1,338 @@
@@ -318956,13 +318956,13 @@ index 0000000000000000000000000000000000000000..738f58462006db259f864cf9ed908d28
 +    // The closest the eye may come to the subject, in cm.
 +    const ModSlider::Ptr m_lens_nearest{ModSlider::create("WuWaControls_LensNearest", 5.0f, 150.0f, 10.0f)};
 +    // Experiment: depth of field in stereo views (the camera script sets the show flag).
-+    const ModToggle::Ptr m_stereo_dof{ModToggle::create("WuWaStereo_DepthOfField", false)};
++    const ModToggle::Ptr m_stereo_dof{ModToggle::create("WuWaStereo_DepthOfField", true)};
 +    // Which eye's depth of field both eyes use (the second view lacks it), and a
 +    // blur multiplier the camera script applies to the f-stop in full VR.
 +    const ModCombo::Ptr m_stereo_dof_source{ModCombo::create("WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}, 2)};
 +    // The second eye is built from a default camera: copy only the blur, or every
 +    // plain post-process value (grading, vignette, exposure...) as well (test 3g).
-+    const ModCombo::Ptr m_stereo_effects{ModCombo::create("WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}, 0)};
++    const ModCombo::Ptr m_stereo_effects{ModCombo::create("WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}, 1)};
 +    // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
 +    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
 +    const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
@@ -322531,10 +322531,10 @@ index 0000000000000000000000000000000000000000..cd83c1519393030b6d5e27b2bbb9afca
 +} // namespace wuwa_diorama
 diff --git a/src/utility/WuWaDofSync.hpp b/src/utility/WuWaDofSync.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..675604ef7200b84fbe1f742799e14132fa42c83a
+index 0000000000000000000000000000000000000000..af69d0c18425dcd646d8c1f4f8c28e02a5e4cf5f
 --- /dev/null
 +++ b/src/utility/WuWaDofSync.hpp
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,244 @@
 +#pragma once
 +
 +// Camera effects for both eyes (test 3f/3g). The game builds the second stereo
@@ -322682,13 +322682,29 @@ index 0000000000000000000000000000000000000000..675604ef7200b84fbe1f742799e14132
 +        std::isfinite(c.fstop) && c.fstop > 0.0f && c.fstop < 1000.0f && std::isfinite(c.focal) && c.focal >= 0.0f && c.focal < 1.0e7f;
 +}
 +
-+inline bool find_block(uintptr_t first, uintptr_t second) {
++inline uint32_t scan_anchors(uintptr_t view, uint32_t& found) {
 +    constexpr uint32_t search = 0x6000;
-+    uint32_t found{}, matches{};
++    uint32_t matches{};
 +    for (uint32_t base = 0; base < search; base += 4) {
-+        if (anchors_match(first + base)) { found = base; ++matches; }
++        if (anchors_match(view + base)) { found = base; ++matches; }
 +    }
-+    if (matches != 1 || !anchors_match(second + found)) {
++    return matches;
++}
++
++inline bool find_block(uintptr_t first, uintptr_t second) {
++    uint32_t found{}, matches = scan_anchors(first, found);
++    bool ok = matches == 1 && anchors_match(second + found);
++    // A story camera replaces the engine defaults in the view built from it, but
++    // the other eye is built from a default camera and keeps them (test 3l: a
++    // whole session in a story replay never found the block in the first view).
++    if (!ok && matches == 0) {
++        uint32_t other{};
++        if (scan_anchors(second, other) == 1 && plausible(camera_at(first + other))) {
++            found = other; matches = 1; ok = true;
++            spdlog::info("[WuWaDoF] block found in the second view (the first holds a story camera)");
++        }
++    }
++    if (!ok) {
 +        status = matches == 0 ? "Post-process block not found in the view (try again outside a story scene)" :
 +            matches > 1 ? "Post-process block ambiguous" : "Second view does not match the first";
 +        spdlog::warn("[WuWaDoF] block search failed: {} matches, {}", matches, status.load());

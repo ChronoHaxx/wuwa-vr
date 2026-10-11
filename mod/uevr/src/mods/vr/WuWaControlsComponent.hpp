@@ -182,13 +182,13 @@ private:
     // The closest the eye may come to the subject, in cm.
     const ModSlider::Ptr m_lens_nearest{ModSlider::create("WuWaControls_LensNearest", 5.0f, 150.0f, 10.0f)};
     // Experiment: depth of field in stereo views (the camera script sets the show flag).
-    const ModToggle::Ptr m_stereo_dof{ModToggle::create("WuWaStereo_DepthOfField", false)};
+    const ModToggle::Ptr m_stereo_dof{ModToggle::create("WuWaStereo_DepthOfField", true)};
     // Which eye's depth of field both eyes use (the second view lacks it), and a
     // blur multiplier the camera script applies to the f-stop in full VR.
     const ModCombo::Ptr m_stereo_dof_source{ModCombo::create("WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}, 2)};
     // The second eye is built from a default camera: copy only the blur, or every
     // plain post-process value (grading, vignette, exposure...) as well (test 3g).
-    const ModCombo::Ptr m_stereo_effects{ModCombo::create("WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}, 0)};
+    const ModCombo::Ptr m_stereo_effects{ModCombo::create("WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}, 1)};
     // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
     const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
     const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};

@@ -35,8 +35,9 @@ window again.
 
 **Move the menu:** press **Y** (gamepad) or choose **Move menu** on the Menu
 page. Gamepad: left stick moves it, right stick changes the distance, A puts it
-down. VR controller: point where you want it, push the thumbstick up or down
-for the distance, pull the trigger to put it down. The Menu page also has fixed
+down. VR controller: point where you want it and pull the trigger to put it
+down; set the distance with **Menu distance** on the Menu page (the thumbstick
+does not change it yet). The Menu page also has fixed
 places (Front, Low, Left, Right) and the menu size. On the stereo screen and in
 mono theatre the menu stays in front of the picture.
 
@@ -83,7 +84,7 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 | L3 + R3 | Open/close the WuWa VR menu |
 | Fully hold LT + RT first, then click R3 | Next view: full VR, stereo screen, mono theatre (one scene and HUD shown identically to both eyes), then full VR again. Release R3 before the triggers |
 | Fully hold LT + RT first, then hold R3 for 0.8 seconds | Back to full VR from any view |
-| Fully hold LT + RT first, then click L3 | Blur (depth of field) on / off |
+| Fully hold LT + RT first, then click L3 | Blur (depth of field) on / off; on by default, in both eyes |
 | Fully hold LT + RT first, then hold L3 for 0.8 seconds | Toggle stereoscopic screen, retaining scene depth (also from mono theatre); release all controls before repeating. Works in dialogue, with UEVR and adjustment closed |
 | L3 + B | Hide/show game UI, including game menus |
 | L3 + A | Recenter view and enabled portal; position reset is a separate option |

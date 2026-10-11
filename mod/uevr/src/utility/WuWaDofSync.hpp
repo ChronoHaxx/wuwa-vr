@@ -145,13 +145,29 @@ inline bool plausible(const Camera& c) {
         std::isfinite(c.fstop) && c.fstop > 0.0f && c.fstop < 1000.0f && std::isfinite(c.focal) && c.focal >= 0.0f && c.focal < 1.0e7f;
 }
 
-inline bool find_block(uintptr_t first, uintptr_t second) {
+inline uint32_t scan_anchors(uintptr_t view, uint32_t& found) {
     constexpr uint32_t search = 0x6000;
-    uint32_t found{}, matches{};
+    uint32_t matches{};
     for (uint32_t base = 0; base < search; base += 4) {
-        if (anchors_match(first + base)) { found = base; ++matches; }
+        if (anchors_match(view + base)) { found = base; ++matches; }
     }
-    if (matches != 1 || !anchors_match(second + found)) {
+    return matches;
+}
+
+inline bool find_block(uintptr_t first, uintptr_t second) {
+    uint32_t found{}, matches = scan_anchors(first, found);
+    bool ok = matches == 1 && anchors_match(second + found);
+    // A story camera replaces the engine defaults in the view built from it, but
+    // the other eye is built from a default camera and keeps them (test 3l: a
+    // whole session in a story replay never found the block in the first view).
+    if (!ok && matches == 0) {
+        uint32_t other{};
+        if (scan_anchors(second, other) == 1 && plausible(camera_at(first + other))) {
+            found = other; matches = 1; ok = true;
+            spdlog::info("[WuWaDoF] block found in the second view (the first holds a story camera)");
+        }
+    }
+    if (!ok) {
         status = matches == 0 ? "Post-process block not found in the view (try again outside a story scene)" :
             matches > 1 ? "Post-process block ambiguous" : "Second view does not match the first";
         spdlog::warn("[WuWaDoF] block search failed: {} matches, {}", matches, status.load());

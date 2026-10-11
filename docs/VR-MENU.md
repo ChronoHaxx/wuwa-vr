@@ -216,6 +216,18 @@ since test 3f (closer than the 2D shot).
   near character). The release keeps the 3j behaviour above; the depth code is
   in commit 80dee81 for a later attempt, which must also move the depth-of-field
   focus by the same distance as the eye.
+- **Test 3l (11 Oct), the release candidate:** close-ups as in 3j. Blur was
+  missing: it had always been off by default (one-eye blur in 1.1.x), and the
+  3g-3k plans had switched it on. Switched on by hand, the copy into the second
+  eye still never ran, because the search for the post-process block only
+  looked in the eye built from the story camera, which no longer holds the
+  engine defaults it looks for (130 failed searches in a story replay). The
+  search now also tries the other eye, which is built from a default camera,
+  and blur in both eyes with all camera effects is on by default: the 3h-3i
+  state the owner confirmed ("Both eyes, like 2D", "Eyes match", "Both right").
+  Also from 3l: the menu stays in front of the stereo screen and Low fits; a
+  gamepad takes over at once from a put-down controller; the VR thumbstick does
+  not change the distance in Move menu yet.
 - **Limit:** a long lens cannot be matched in full VR. Moving nearer gives the
   subject its 2D size, but the perspective is the headset's wide one: the
   foreground stays big and the background is not compressed. The stereo screen

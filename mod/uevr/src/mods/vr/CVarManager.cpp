@@ -167,7 +167,8 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "WuWaControls_AcroThrottle", "WuWaControls_AcroRate", "WuWaControls_AcroYawRate", "WuWaControls_AcroExpo",
                 "WuWaControls_AcroThrust", "WuWaControls_AcroDrag", "WuWaControls_AcroTilt", "WuWaControls_AcroInvertPitch",
                 "WuWaControls_FreeCollision", "WuWaControls_CollisionComplex", "WuWaControls_CollisionRadius",
-                "WuWaControls_LevelFirstPerson", "WuWaControls_PinCard", "WuWaControls_CardWidth"}) {
+                "WuWaControls_LevelFirstPerson", "WuWaControls_PinCard", "WuWaControls_CardWidth",
+                "WuWaControls_CardBelow", "WuWaControls_CardDistance", "WuWaControls_ViewHints"}) {
             if (const auto value = VR::get()->get_value(name)) options[name] = value->get();
         }
         return options;

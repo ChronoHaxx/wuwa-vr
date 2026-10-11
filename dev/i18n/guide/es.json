@@ -27,7 +27,7 @@
     "controls.input": "Entrada",
     "controls.action": "Acción",
     "controls.cards.input": "Mantén L3, o LT + RT, durante medio segundo",
-    "controls.cards.action": "Una tarjeta con los botones de esa combinación. Si sueltas, se oculta; L3 + Menu la mantiene abierta.",
+    "controls.cards.action": "Una tarjeta con los botones de esa combinación. Si sueltas, se oculta. La tarjeta de L3 empieza fijada, baja frente a ti; L3 + Menu la oculta o la vuelve a fijar.",
     "controls.menu.input": "L3 + R3",
     "controls.menu.action": "Abre o cierra el menú de WuWa VR: apunta con el láser de un mando de VR y pulsa el gatillo, o usa A / B y LB / RB. Ajustes completos de UEVR: Menu → Todos los ajustes (menú clásico de UEVR).",
     "controls.next.input": "Mantén primero LT + RT y luego pulsa R3",

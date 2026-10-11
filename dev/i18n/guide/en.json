@@ -27,7 +27,7 @@
     "controls.input": "Input",
     "controls.action": "Action",
     "controls.cards.input": "Hold L3, or LT + RT, for half a second",
-    "controls.cards.action": "A card with the buttons for that hold. Let go and it sinks away; L3 + Menu keeps it open.",
+    "controls.cards.action": "A card with the buttons for that hold. Let go and it sinks away. The L3 card starts pinned, low in front of you; L3 + Menu hides it or pins it again.",
     "controls.menu.input": "L3 + R3",
     "controls.menu.action": "Open or close the WuWa VR menu: point with a VR controller's laser and pull the trigger, or use A / B and LB / RB. UEVR's full settings: Menu → All settings (classic UEVR menu).",
     "controls.next.input": "Hold both LT + RT first, then click R3",

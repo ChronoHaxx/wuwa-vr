@@ -324,7 +324,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
+        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -505,6 +505,9 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     wuwa_ui::draw(*m_cards,"Controls cards (hold L3, or LT + RT)");
     wuwa_ui::draw(*m_pin_card,"Keep the controls card open");
     wuwa_ui::draw(*m_card_width,"Card width (meters)");
+    wuwa_ui::draw(*m_card_below,"Card height");
+    wuwa_ui::draw(*m_card_distance,"Card distance");
+    wuwa_ui::draw(*m_view_hints,"View hints");
     wuwa_ui::TextWrapped("Hold L3, or both triggers, for half a second: a card rises under your view and lights each button as you use it. Let go and it sinks away. L3 + Menu keeps it open. Close UEVR settings to see it; it is absent from the game's flat spectator view.");
     if (FrameworkConfig::get()->is_always_show_cursor())
         wuwa_ui::TextWrapped("The card is blocked by FrameworkConfig > Always Show Cursor. Turn that off to display it.");
@@ -944,11 +947,17 @@ bool WuWaControlsComponent::held_card(wuwa_sheet::CardState& state) const {
     return true;
 }
 
+namespace {
+// How many view switches show the hint before it switches itself off.
+constexpr int view_hint_count = 5;
+}
+
 bool WuWaControlsComponent::card_visible() const {
     const bool eligible = wuwa_test::is_wuwa() && m_cards->value() && !g_framework->is_drawing_ui() && VR::get()->is_hmd_active();
     wuwa_sheet::CardState state;
     // A loaded test plan's step keeps the card's place unless you hold a card up.
-    const bool wanted = eligible && (held_card(state) || (m_pin_card->value() && !wuwa_menu_host::overlay_wanted()));
+    const bool holding = eligible && held_card(state);
+    const bool wanted = eligible && (holding || (m_pin_card->value() && !wuwa_menu_host::overlay_wanted()));
     const auto now = GetTickCount64();
     std::scoped_lock lock{m_card_mutex};
     if (!eligible) {
@@ -957,10 +966,18 @@ bool WuWaControlsComponent::card_visible() const {
         return false;
     }
     if (wanted) {
-        if (!m_card_up) {
+        // A pinned card follows when you turn well away from it: it rises again
+        // in front of you.
+        bool follow = false;
+        if (m_card_up && !holding) {
+            glm::vec3 back{};
+            card_anchor(back);
+            follow = glm::dot(back, m_card_back) < 0.5f;
+        }
+        if (!m_card_up || follow) {
             m_card_up = true;
             m_card_since = now;
-            m_card_anchor = card_anchor();
+            m_card_anchor = card_anchor(m_card_back);
         }
         m_card_released = 0;
         return true;
@@ -972,9 +989,9 @@ bool WuWaControlsComponent::card_visible() const {
     return m_card_released != 0 && now - m_card_released < card_sink_ms;
 }
 
-Matrix4x4f WuWaControlsComponent::card_anchor() const {
-    // Where the head faces when the card is called up, level, a little below
-    // the line of sight and tilted to face the eyes. It then stays put, so a
+Matrix4x4f WuWaControlsComponent::card_anchor(glm::vec3& out_back) const {
+    // Where the head faces when the card is called up, level, below the line of
+    // sight (Card height) and tilted to face the eyes. It then stays put, so a
     // glance down reads it and looking around leaves it behind.
     auto& vr = VR::get();
     const auto head = vr->get_transform(vr->get_hmd_index());
@@ -983,12 +1000,13 @@ Matrix4x4f WuWaControlsComponent::card_anchor() const {
     if (glm::length(back) < 0.2f) back = glm::vec3{-head[1].x, 0.0f, -head[1].z};
     if (glm::length(back) < 0.01f) back = glm::vec3{0.0f, 0.0f, 1.0f};
     back = glm::normalize(back);
+    out_back = back;
     const glm::vec3 up{0.0f, 1.0f, 0.0f}, right = glm::cross(up, back);
     Matrix4x4f basis{1.0f};
     basis[0] = glm::vec4{right, 0.0f};
     basis[1] = glm::vec4{up, 0.0f};
     basis[2] = glm::vec4{back, 0.0f};
-    const float distance = 0.9f, below = glm::radians(24.0f);
+    const float distance = m_card_distance->value(), below = glm::radians(m_card_below->value());
     auto transform = basis * glm::rotate(-below, glm::vec3{1.0f, 0.0f, 0.0f});
     const glm::vec3 eye{head[3]};
     transform[3] = glm::vec4{eye - back * (distance * std::cos(below)) - up * (distance * std::sin(below)), 1.0f};
@@ -1001,9 +1019,20 @@ int WuWaControlsComponent::tip_kind() const {
     auto& vr = VR::get();
     const int view = vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
     {
-        // After a view switch: what you are in and how to get back, for 3 seconds.
+        // After a view switch: what you are in and how to get back, for 3 seconds,
+        // for the first five switches. The fifth turns View hints off.
         std::scoped_lock lock{m_card_mutex};
-        if (m_view_seen >= 0 && view != m_view_seen) m_view_chip_until = now + 3000;
+        if (m_view_seen >= 0 && view != m_view_seen && m_view_hints->value()) {
+            m_view_chip_until = now + 3000;
+            m_view_hint = (std::max)(m_view_hints_shown->value(), 0) + 1;
+            if (m_view_hint >= view_hint_count) {
+                m_view_hints->value() = false;
+                m_view_hints_shown->value() = 0;
+            } else {
+                m_view_hints_shown->value() = m_view_hint;
+            }
+            g_framework->deferred_save_config();
+        }
         m_view_seen = view;
         if (now < m_view_chip_until) return 2;
     }
@@ -1121,8 +1150,13 @@ void WuWaControlsComponent::draw_passive_overlay() {
             wuwa_menu_host::draw_hint(list,size);
         } else if (tip_kind()==2) {
             static constexpr const char* names[]{N_("Full VR"),N_("Stereo screen"),N_("Mono theatre")};
+            char note[512]{};
+            std::snprintf(note,sizeof(note),wuwa_l10n::translate(
+                "Hint %d of %d. It then switches off; View hints on the WuWa VR menu's HUD page turns it back on.").c_str(),
+                m_view_hint,view_hint_count);
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),names[view],
-                view==0 ? "{LT}+{RT}, click {R3} for the next view" : "{LT}+{RT}, hold {R3} for full VR",vr_controllers);
+                view==0 ? "{LT}+{RT}, click {R3} for the next view" : "{LT}+{RT}, hold {R3} for full VR",vr_controllers,
+                wuwa_l10n::visual(note));
         } else {
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",
                 "hold {L3} or {LT}+{RT} to see what each button does \xC2\xB7 {L3}+{R3} opens the WuWa VR menu",vr_controllers);

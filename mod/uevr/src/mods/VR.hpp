@@ -1289,8 +1289,10 @@ private:
     // how VR shares the slot and which slot are remembered.
     const ModCombo::Ptr m_sightseeing_style{ ModCombo::create(generate_name("WuWaVRControllerStyle"),
         {"Both together", "Last used wins", "VR only (Xbox ignored)"}, 0) };
+    // Automatic (last, so saved fixed slots keep their index) is the default:
+    // it follows a treadmill's virtual pad when the real pad is hidden.
     const ModCombo::Ptr m_sightseeing_slot{ ModCombo::create(generate_name("WuWaVRControllerSlot"),
-        {"Slot 0 (usual)", "Slot 1", "Slot 2", "Slot 3"}, 0) };
+        {"Slot 0", "Slot 1", "Slot 2", "Slot 3", "Automatic"}, wuwa_sightseeing::automatic_slot) };
     // VR-first menu (WuWaVrMenuHost) in place of UEVR's window; off restores the classic window.
     const ModToggle::Ptr m_wuwa_vr_menu{ ModToggle::create(generate_name("WuWaVrMenu"), true) };
     // How much of UEVR's menu layer the VR menu fills; its distance is UI_Framework_Distance.
@@ -1302,6 +1304,8 @@ private:
     void update_menu_pointer_motion();
     std::atomic<bool> m_sightseeing_on{false};
     std::atomic<int32_t> m_sightseeing_target{0};
+    // When each XInput slot last really reported a controller, for the automatic slot.
+    std::array<std::atomic<uint64_t>, 4> m_sightseeing_connected_ms{};
     std::atomic<int32_t> m_sightseeing_mix_style{0};
     std::mutex m_sightseeing_mtx;
     wuwa_sightseeing::Pad m_sightseeing_pad{};
@@ -1313,6 +1317,10 @@ private:
     wuwa_sightseeing::PacketCounter m_sightseeing_packets;
     std::array<bool, 4> m_sightseeing_packet_owned{};
     std::chrono::steady_clock::time_point m_sightseeing_last_nudge{};
+    // Each nudge makes the game rescan every input device, which can stutter:
+    // at most three a minute.
+    std::chrono::steady_clock::time_point m_sightseeing_nudge_window{};
+    int m_sightseeing_nudges{};
     void update_sightseeing_sample(bool synced);
     bool apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* state);
     void reset_sightseeing();

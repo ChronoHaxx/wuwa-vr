@@ -27,7 +27,7 @@
     "controls.input": "Eingabe",
     "controls.action": "Aktion",
     "controls.cards.input": "Halte L3 oder LT + RT eine halbe Sekunde lang",
-    "controls.cards.action": "Eine Karte mit den Tasten für dieses Halten. Lass los, und sie verschwindet; L3 + Menu hält sie offen.",
+    "controls.cards.action": "Eine Karte mit den Tasten für dieses Halten. Lass los, und sie verschwindet. Die L3-Karte ist anfangs tief vor dir angeheftet; L3 + Menu blendet sie aus oder heftet sie wieder an.",
     "controls.menu.input": "L3 + R3",
     "controls.menu.action": "Öffne oder schließe das WuWa VR-Menü: ziele mit dem Laser eines VR-Controllers und drücke den Trigger, oder verwende A / B und LB / RB. UEVRs vollständige Einstellungen: Menu → All settings (klassisches UEVR-Menü).",
     "controls.next.input": "Halte zuerst LT + RT, dann drücke R3",

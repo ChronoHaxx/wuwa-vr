@@ -28,6 +28,7 @@ local function fixture()
         self.clock=self.clock+.02; self.values.WuWaControls_PlayStationState='unavailable'
         local p={Gamepad={wButtons=b or 0,bLeftTrigger=lt or 0,bRightTrigger=rt or 0,sThumbLX=0,sThumbLY=0,sThumbRX=0,sThumbRY=0}}
         self.in_xinput=true; self.cb.on_xinput_get_state(nil,0,p,0); self.in_xinput=false; self:tick()
+        return p
     end
     function f:count(k,n) assert((self.writes[k] or 0)==n,k..' count '..(self.writes[k] or 0)..' expected '..n) end
     return f
@@ -122,5 +123,17 @@ test('portal still toggles while the L3 card is up',function()
     for i=1,30 do f:xp(L3) end
     f:xp(L3,255,0); f:count('WindowMode_Enabled',1)
     assert(f.values.WuWaControls_Card:sub(1,3)=='l3:',tostring(f.values.WuWaControls_Card))
+end)
+test('L3 + Y / X never reach the game, in every camera',function()
+    -- They move the camera in first person (3) and the fixed camera (1); in the
+    -- game camera (0) they do nothing, but the game must not see them either.
+    for _,mode in ipairs({'0','1','3'}) do
+        local f=fixture(); f.values.WuWaControls_CameraMode=mode; f:xp(); f:xp(L3)
+        for _,button in ipairs({0x8000,0x4000}) do
+            local p=f:xp(L3+button)
+            assert(p.Gamepad.wButtons & button==0,'camera '..mode..' passed button '..button)
+            f:xp(L3)
+        end
+    end
 end)
 print('PASS '..passed..' PlayStation shared-shortcut integration groups; no device/game access')

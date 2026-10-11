@@ -33,6 +33,18 @@ constexpr Style style_from(int value) noexcept {
     return value == 1 ? Style::LastUsed : value == 2 ? Style::VrOnly : Style::Both;
 }
 constexpr int slot_from(int value) noexcept { return value >= 0 && value <= 3 ? value : 0; }
+// The slot setting's last choice: follow whichever slot has a controller.
+constexpr int automatic_slot = 4;
+// Automatic: the lowest slot that really reported a connected controller in
+// the last 1.5 s (before VR input is mixed in), such as a treadmill's virtual
+// pad while the real pad is hidden. With none, the current slot stays.
+// connected_ms: when each slot last reported connected (0 = never).
+constexpr int choose_slot(const std::uint64_t (&connected_ms)[4], std::uint64_t now, int current) noexcept {
+    for (int slot = 0; slot < 4; ++slot) {
+        if (connected_ms[slot] != 0 && now - connected_ms[slot] <= 1500) return slot;
+    }
+    return slot_from(current);
+}
 
 enum class Source { None, Vr, Physical, Both };
 

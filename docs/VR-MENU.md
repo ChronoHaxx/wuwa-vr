@@ -123,7 +123,8 @@ REC badge with the elapsed time shows while recording.
    automatic cinematic screen and what story scenes use, matched framing.
 5. **HUD:** size, distance, **HUD shape (full VR)** (`UI_WuWaHudShape`,
    default 1.33; see below), up / down, left / right, follow head, refresh
-   layout, controls cards (on / off, keep open, card size).
+   layout, controls cards (on / off, keep open, size, height, distance) and
+   view hints.
 6. **Comfort:** decoupled pitch (and its HUD adjustment), smooth camera turns
    and tilt, walk by default, L3 + A also resets position.
 7. **Fixes:** matched far detail, far lighting, matched framing, and
@@ -142,7 +143,7 @@ REC badge with the elapsed time shows while recording.
    once when this menu or the classic one sends the start request); other
    recorders such as OBS need Always. A profile that had test 2's
    `WuWaPrivacy_Enabled=true` and no mode yet starts on Always.
-9. **Menu:** menu size and distance, laser status, how each input works,
+9. **Menu:** language, menu size and distance, laser status, how each input works,
    the classic menu, and the switch back to UEVR's window.
 
 Pages rebuild when a plan step or the camera mode changes; the same page and,

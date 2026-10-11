@@ -28,7 +28,8 @@ works at once; whatever you used last shows the focus.
 Left / right changes a choice or slider. Pages: **Quick** (view, camera, VR
 controllers, diorama, HUD size and distance, recording, recenter), **Camera**,
 **Cinema**, **HUD**, **Comfort**, **Fixes** (including render resolution),
-**Record** and **Menu**. They change the same settings as UEVR's own menu:
+**Record** and **Menu** (including the **Language** of the menu, cards and
+notices). They change the same settings as UEVR's own menu:
 **All settings (classic UEVR menu)** on the Menu page opens UEVR's full window,
 and turning off **Use this menu when opening UEVR** makes L3 + R3 open UEVR's
 window again.
@@ -53,12 +54,19 @@ full VR, stereo screen, mono theatre and blur. Each button lights up while you
 press it, and the card sinks away when you let go. A quick click of L3 shows
 nothing.
 
-- **L3 + Menu** keeps the card open (**Pinned**) until you press it again.
+- The L3 card starts **pinned**: it stays open low in front of you, below the
+  HUD, and moves in front of you again when you turn well away. **L3 + Menu**
+  hides it, and pressing it again pins it back.
 - The WuWa VR menu's **HUD** page has **Controls cards** (on / off), **Keep the
-  controls card open** and **Card size**.
+  controls card open**, **Card size**, **Card height** (degrees below your line
+  of sight; more is lower) and **Card distance**.
+- **Y / X** move the camera up and down in first person and the fixed camera.
+  In the game camera they do nothing (the card greys that row out), and with L3
+  held they never reach the game.
 - On the first three launches, a one-line tip below your view says how to find
-  the cards. After each view switch, a line shows for 3 seconds with how to go
-  on or come back.
+  the cards. After a view switch, a line shows for 3 seconds with how to go on
+  or come back. It shows for the first 5 switches and then turns itself off;
+  **View hints** on the HUD page turns it back on.
 - With VR controllers in use, the card names their buttons (L trigger, R grip
   and so on).
 - Close the WuWa VR menu to see the card. It is drawn in the headset only, not

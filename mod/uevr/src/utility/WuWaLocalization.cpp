@@ -21,9 +21,20 @@ std::vector<Language> choices{{"en","English"}};
 std::string active="en", requested="en", font_kind="latin", message;
 std::filesystem::path override_dir;
 bool pending=true, initialized=false, rtl=false;
+// Stepping through the language picker asks for several languages in a row;
+// only the one it stops on rebuilds the fonts.
+ULONGLONG requested_at=0;
 ImFontAtlas* font_owner{};
 ImFont *menu{}, *sheet{};
 ImVector<ImWchar> glyph_ranges;
+// Each language's own name, for the language picker, and the script font that draws it.
+struct Native { const char* id; const char* name; const char* font; };
+constexpr Native natives[]{{"en","English","latin"},{"zh-Hans","简体中文","sc"},{"ja","日本語","jp"},{"ko","한국어","kr"},
+    {"de","Deutsch","latin"},{"es","Español","latin"},{"fr","Français","latin"},{"pt-BR","Português (Brasil)","latin"},
+    {"ru","Русский","latin"},{"ar","العربية","arabic"}};
+// The script fonts other than the active one add only those names' glyphs.
+constexpr std::pair<const char*,int> script_fonts[]{{"sc",4821},{"jp",4822},{"kr",4823},{"arabic",4824}};
+ImVector<ImWchar> name_ranges[4];
 
 struct Icu {
     HMODULE module=LoadLibraryExW(L"icu.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
@@ -93,8 +104,10 @@ Json read_override(const std::filesystem::path& path) {
     std::ifstream stream{path,std::ios::binary};
     return Json::parse(stream,nullptr,false);
 }
-std::string shape_line(std::string_view value) {
-    if(!rtl || !icu().ready() || value.empty()) return std::string(value);
+// Shapes and orders one line for drawing; always=true also when Arabic is not
+// the active language (its name in the language picker).
+std::string shape_line(std::string_view value,bool always=false) {
+    if((!rtl && !always) || !icu().ready() || value.empty()) return std::string(value);
     const int count=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,value.data(),static_cast<int>(value.size()),nullptr,0);
     if(count<=0 || count>8192) return std::string(value);
     std::vector<UChar> input(count), arabic(count*2+32), output(count*2+32);
@@ -126,12 +139,12 @@ void request(std::string_view id,const std::filesystem::path& path,bool reload) 
     std::scoped_lock lock{mutex};
     const auto next=safe_id(id) ? std::string(id) : "en";
     if(reload || next!=requested || path!=override_dir) {
-        requested=next; override_dir=path; pending=true;
+        requested=next; override_dir=path; pending=true; requested_at=GetTickCount64();
     }
 }
 bool apply_pending(HMODULE module) {
     std::scoped_lock lock{mutex};
-    if(!pending) return false;
+    if(!pending || GetTickCount64()-requested_at<400) return false;
     pending=false; message.clear();
     try {
     if(!initialized) {
@@ -191,8 +204,18 @@ bool apply_pending(HMODULE module) {
     return true;
 }
 std::string language() { std::scoped_lock lock{mutex}; return active; }
+std::string requested_language() { std::scoped_lock lock{mutex}; return requested; }
 std::string status() { std::scoped_lock lock{mutex}; return message; }
 std::vector<Language> languages() { std::scoped_lock lock{mutex}; return choices; }
+std::string native_name(std::string_view id) {
+    std::scoped_lock lock{mutex};
+    for(const auto& n : natives) {
+        // Arabic goes through visual() while it is the active language; otherwise it arrives shaped.
+        if(id==n.id) return std::string_view{n.font}=="arabic" && !rtl ? shape_line(n.name,true) : std::string(n.name);
+    }
+    const auto found=std::find_if(choices.begin(),choices.end(),[&](const Language& x){return x.id==id;});
+    return found==choices.end() ? std::string(id) : found->name;
+}
 bool rtl_available() { return icu().ready(); }
 bool right_to_left() { std::scoped_lock lock{mutex}; return rtl; }
 std::string translate(std::string_view english) {
@@ -231,8 +254,24 @@ void reserve_fonts(ImFontAtlas* atlas,HMODULE module,float menu_size) {
     for(const auto& [key,value] : strings) {
         ranges.AddText(value.c_str()); ranges.AddText(visual(value).c_str());
     }
+    // Every language's own name for the picker; Latin and Cyrillic come from the main font.
+    for(const auto& n : natives) if(std::string_view{n.font}=="latin") ranges.AddText(n.name);
     glyph_ranges.clear();
     ranges.BuildRanges(&glyph_ranges);
+    std::vector<std::pair<std::string_view,const ImWchar*>> name_fonts;
+    for(size_t i=0;i<std::size(script_fonts);++i) {
+        const auto& [kind,id]=script_fonts[i];
+        if(font_kind==kind) continue;
+        ImFontGlyphRangesBuilder names;
+        for(const auto& n : natives) {
+            if(std::string_view{n.font}!=kind) continue;
+            names.AddText(n.name); names.AddText(shape_line(n.name,true).c_str());
+        }
+        name_ranges[i].clear();
+        names.BuildRanges(&name_ranges[i]);
+        const auto data=resource(module,id);
+        if(!data.empty()) name_fonts.emplace_back(data,name_ranges[i].Data);
+    }
     const auto latin=resource(module,4820);
     int extra_id=font_kind=="sc" ? 4821 : font_kind=="jp" ? 4822 : font_kind=="kr" ? 4823 : font_kind=="arabic" ? 4824 : 0;
     const auto extra=extra_id ? resource(module,extra_id) : std::string_view{};
@@ -243,6 +282,10 @@ void reserve_fonts(ImFontAtlas* atlas,HMODULE module,float menu_size) {
         if(!extra.empty()) {
             cfg.MergeMode=true;
             atlas->AddFontFromMemoryTTF(const_cast<char*>(extra.data()),static_cast<int>(extra.size()),size,&cfg,glyph_ranges.Data);
+        }
+        for(const auto& [data,glyphs] : name_fonts) {
+            ImFontConfig names; names.FontDataOwnedByAtlas=false; names.MergeMode=true;
+            atlas->AddFontFromMemoryTTF(const_cast<char*>(data.data()),static_cast<int>(data.size()),size,&names,glyphs);
         }
         return font;
     };

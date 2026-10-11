@@ -1210,6 +1210,15 @@ void Framework::invalidate_device_objects() {
     if (m_renderer_type == RendererType::D3D11) {
         ImGui_ImplDX11_InvalidateDeviceObjects();
     } else if (m_renderer_type == RendererType::D3D12) {
+        // The font texture and draw buffers are about to be released (a language
+        // change rebuilds the fonts). Let every frame that still reads them finish
+        // on the GPU first: a D3D12 resource released while a submitted command
+        // list uses it can hang the device. Rare, so the wait costs nothing per frame.
+        for (auto& ctx : m_d3d12.cmd_ctxs) {
+            if (ctx != nullptr) {
+                ctx->wait(2000);
+            }
+        }
         ImGui_ImplDX12_InvalidateDeviceObjects();
     }
 

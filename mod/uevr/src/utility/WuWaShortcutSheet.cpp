@@ -342,6 +342,7 @@ struct Row {
     float tx, ty, radius;   // the button, in pad units
     const char* state;
     ImU32 state_color;
+    bool dim = false;       // does nothing in the current camera
 };
 void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, const Row& row) {
     constexpr float w = 440.0f, h = 62.0f, key_px = 26.0f;
@@ -362,7 +363,7 @@ void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, con
     const float state_w = row.state ? pill_width(c, row.state, 18.0f) + 12.0f : 0.0f;
     const float text_w = w - 32.0f - keys - 16.0f - state_w;
     const float text_x = left ? x + 16.0f + state_w : x + 16.0f + keys + 16.0f;
-    draw_fit(c, fit(c, row.english, 27.0f, text_w), text_x, middle, ink, left ? 1.0f : 0.0f, text_w);
+    draw_fit(c, fit(c, row.english, 27.0f, text_w), text_x, middle, row.dim ? muted : ink, left ? 1.0f : 0.0f, text_w);
     if (row.state) pill(c, left ? x + 16.0f : x + w - 16.0f - state_w + 12.0f, middle, 18.0f, row.state, row.state_color);
     // Leader: out from the box, then straight to the button's edge.
     const ImVec2 start = c.at(left ? x + w : x, middle), bend = c.at(left ? x + w + 16.0f : x - 16.0f, middle);
@@ -384,17 +385,20 @@ void l3_card(const Canvas& c, const CardState& st) {
     const float k = 0.834f;
     const Pad pad{c, o, k};
     const auto held = [&](unsigned mask) { return (st.buttons & mask) != 0; };
+    const bool camera_moves = st.first_person || st.fixed_camera;
     const Row left[] = {
         {"LT", N_("Portal window"), st.lt, 182, 39, 17, st.portal ? N_("On") : nullptr, green},
         {"LB", N_("HUD / mouse mode"), held(lb), 182, 74, 12, st.mouse_mode ? N_("On") : nullptr, green},
         {"View", N_("First person"), held(view), 283, 158.5f, 9, st.first_person ? N_("On") : nullptr, green},
-        {"Down", N_("First person: full animation"), held(dpad_down), 262, 260, 9, nullptr, 0},
+        {"Down", N_("First person: full animation"), held(dpad_down), 262, 260, 9, nullptr, 0, !st.first_person},
     };
     const Row right[] = {
         {"RT", N_("Diorama (10\xC3\x97)"), st.rt, 458, 39, 17, st.diorama ? N_("On") : nullptr, green},
         {"RB", N_("Game / fixed camera"), held(rb), 458, 74, 12, st.fixed_camera ? N_("Fixed") : nullptr, green},
         {"Menu", N_("Keep this card open"), held(menu), 357, 158.5f, 9, st.pinned ? N_("Pinned") : nullptr, green},
-        {"YX", N_("Camera up / down"), held(button_x | button_y), 439, 151, 0, nullptr, 0},
+        // Y / X only move the camera in first person and the fixed camera.
+        {"YX", camera_moves ? N_("Camera up / down") : N_("Camera up / down: first person, fixed camera"),
+            held(button_x | button_y), 439, 151, 0, nullptr, 0, !camera_moves},
         {"B", N_("Show / hide game UI"), held(button_b), 490, 168, 17, st.ui_hidden ? N_("Hidden") : nullptr, red},
         {"A", N_("Recenter view"), held(button_a), 456, 202, 17, nullptr, 0},
         {"R3", N_("WuWa VR menu"), held(r3), 388, 244, 25, nullptr, 0},
@@ -525,7 +529,8 @@ void draw_card(ImDrawList* draw, ImVec2 size, ImFont* font, const CardState& sta
     draw->PopClipRect();
 }
 
-void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& lead, const std::string& line, bool vr_controllers) {
+void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& lead, const std::string& line, bool vr_controllers,
+    const std::string& note) {
     const auto c = canvas(draw, size, font, vr_controllers);
     if (!c.font) return;
     constexpr float px = 26.0f, top = 618.0f, h = 58.0f;
@@ -543,6 +548,12 @@ void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& le
     } else {
         if (!lead.empty()) c.text(x0 + 24.0f, text_top, px, accent, lead_text);
         rich(c, x0 + 24.0f + lead_w, text_top, px, ink, line, max_line);
+    }
+    if (!note.empty()) {
+        constexpr float note_px = 20.0f;
+        const float scale = (std::min)(1.0f, 1480.0f / (std::max)(c.width(note_px, note), 1.0f));
+        const float note_w = c.width(note_px * scale, note);
+        c.text(800.0f - note_w * 0.5f, top + h + 12.0f, note_px * scale, muted, note);
     }
 }
 

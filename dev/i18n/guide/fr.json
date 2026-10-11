@@ -27,7 +27,7 @@
     "controls.input": "Entrée",
     "controls.action": "Action",
     "controls.cards.input": "Maintenez L3, ou LT + RT, une demi-seconde",
-    "controls.cards.action": "Une fiche avec les boutons de ce maintien. Relâchez et elle disparaît ; L3 + Menu la garde ouverte.",
+    "controls.cards.action": "Une fiche avec les boutons de ce maintien. Relâchez et elle disparaît. La fiche L3 est épinglée d'office, bas devant vous ; L3 + Menu la masque ou l'épingle à nouveau.",
     "controls.menu.input": "L3 + R3",
     "controls.menu.action": "Ouvrir ou fermer le menu WuWa VR : pointez avec le laser d'une manette VR et appuyez sur la gâchette, ou utilisez A / B et LB / RB. Réglages complets d'UEVR : Menu → Tous les réglages (menu UEVR classique).",
     "controls.next.input": "Maintenez d'abord LT + RT, puis cliquez sur R3",

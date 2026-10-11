@@ -284,8 +284,16 @@ private:
     // as it is used; L3 + Menu keeps it open. New keys, so a saved "sheet
     // always on" does not pin the new card open.
     const ModToggle::Ptr m_cards{ModToggle::create("WuWaControls_Cards", true)};
-    const ModToggle::Ptr m_pin_card{ModToggle::create("WuWaControls_PinCard", false)};
+    // Pinned from the start, low enough to stay out of the HUD's way (test 3n).
+    const ModToggle::Ptr m_pin_card{ModToggle::create("WuWaControls_PinCard", true)};
     const ModSlider::Ptr m_card_width{ModSlider::create("WuWaControls_CardWidth", 0.5f, 1.6f, 0.9f)};
+    // Where the card rises: degrees below the line of sight, and how far away.
+    const ModSlider::Ptr m_card_below{ModSlider::create("WuWaControls_CardBelow", 15.0f, 75.0f, 50.0f)};
+    const ModSlider::Ptr m_card_distance{ModSlider::create("WuWaControls_CardDistance", 0.5f, 1.5f, 0.9f)};
+    // The line after a view switch shows for five switches, then stays off
+    // until turned back on.
+    const ModToggle::Ptr m_view_hints{ModToggle::create("WuWaControls_ViewHints", true)};
+    const ModInt32::Ptr m_view_hints_shown{ModInt32::create("WuWaControls_ViewHintsShown", 0)};
     // A one-line tip shows on the first three launches.
     const ModInt32::Ptr m_tips_shown{ModInt32::create("WuWaControls_TipsShown", 0)};
     // What the camera script reports held: "l3:<buttons>:<lt>:<rt>", "views:..." or nothing.
@@ -303,6 +311,10 @@ private:
     mutable bool m_card_up{};
     mutable uint64_t m_card_since{}, m_card_released{};
     mutable Matrix4x4f m_card_anchor{1.0f};
+    // The level direction from the card back to where the head was (its yaw).
+    mutable glm::vec3 m_card_back{0.0f, 0.0f, 1.0f};
+    // Which of the five view hints is showing.
+    mutable int m_view_hint{};
     mutable int m_view_seen{-1};
     mutable uint64_t m_view_chip_until{};
     wuwa_sheet::CardState m_card_last{};
@@ -311,7 +323,7 @@ private:
     bool m_tip_done{};
     bool held_card(wuwa_sheet::CardState& state) const;
     bool card_visible() const;
-    Matrix4x4f card_anchor() const;
+    Matrix4x4f card_anchor(glm::vec3& back) const;
     // 0 nothing, 1 the first-launch tip, 2 the view-switch chip.
     int tip_kind() const;
     void update_tip();

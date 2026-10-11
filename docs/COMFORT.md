@@ -134,10 +134,11 @@ compensate for a transient rig problem.
 ## Controls cards
 
 Hold L3, or LT + RT, for half a second and a card rises under your view; let go
-and it sinks away. L3 + Menu keeps it open. **Card size** on the WuWa VR menu's
-HUD page sets its width. If you cannot see it, close the WuWa VR menu, recenter
-with L3 + A and look in the headset: the desktop spectator view does not show
-it. The amber mouse-mode and red hidden-UI notices are separate and appear
+and it sinks away. The L3 card starts pinned, low in front of you; L3 + Menu
+hides or pins it. On the WuWa VR menu's HUD page, **Card height** (degrees below
+your line of sight), **Card distance** and **Card size** place it out of the
+HUD's way. If you cannot see it, close the WuWa VR menu, recenter with L3 + A
+and look in the headset: the desktop spectator view does not show it. The amber mouse-mode and red hidden-UI notices are separate and appear
 whether or not a card is open.
 
 ## The window

@@ -27,7 +27,7 @@
     "controls.input": "操作",
     "controls.action": "说明",
     "controls.cards.input": "按住 L3，或同时按住 LT + RT，持续半秒",
-    "controls.cards.action": "视野下方会弹出对应按键的提示卡。松开按键后消失；按住 L3 + Menu 可将其固定显示。",
+    "controls.cards.action": "视野下方会弹出对应按键的提示卡，松开按键后消失。L3 卡片默认固定在你前方低处；L3 + Menu 可隐藏或重新固定。",
     "controls.menu.input": "L3 + R3",
     "controls.menu.action": "打开或关闭 WuWa VR 菜单。可用 VR 控制器激光指向并按下扳机选择，或用 A / B、LB / RB 操作。要进入 UEVR 的完整设置，请在菜单中选择 Menu → All settings（经典 UEVR 菜单）。",
     "controls.next.input": "先同时按住 LT + RT，再单击 R3",

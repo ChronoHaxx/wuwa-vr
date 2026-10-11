@@ -27,7 +27,7 @@
     "controls.input": "入力",
     "controls.action": "操作",
     "controls.cards.input": "L3、または LT + RT を 0.5 秒間押し続ける",
-    "controls.cards.action": "その長押しに対応するボタンを示すカード。離すと消えますが、L3 + Menu で開いたままにできます。",
+    "controls.cards.action": "その長押しに対応するボタンを示すカード。離すと消えます。L3 カードは最初から前方の低い位置に固定されていて、L3 + Menu で隠したり再び固定したりできます。",
     "controls.menu.input": "L3 + R3",
     "controls.menu.action": "WuWa VR メニューを開閉します。VR コントローラーのレーザーで指し示してトリガーを引くか、A / B や LB / RB を使います。UEVR の全設定：Menu → すべての設定（従来の UEVR メニュー）。",
     "controls.next.input": "まず LT + RT を両方押し続け、次に R3 をクリック",

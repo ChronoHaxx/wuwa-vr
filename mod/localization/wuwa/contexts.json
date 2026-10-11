@@ -98,6 +98,9 @@
   "Advanced rendering and script diagnostics": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "After you switch views, a line shows for 3 seconds with how to go on or come back. It switches itself off after 5 switches.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Aiming and right-stick pitch": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -168,6 +171,9 @@
   "Auto uses the eye that has the camera's focus. If both eyes stay sharp or look wrong, try First or Second.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Automatic": [
+    "mods/VR.hpp"
+  ],
   "Automatic cinematic screen": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -181,6 +187,9 @@
     "mods/VR.cpp"
   ],
   "Automatic switching is unverified and off by default. It is intended to use mono for detected videos and the selected view for story scenes. Manual toggles take priority.": [
+    "mods/VR.cpp"
+  ],
+  "Automatic uses the slot that has a controller, such as a treadmill's virtual pad while the real pad is hidden. Choose a fixed slot only if it picks the wrong one: launcher Troubleshooting > Controller check lists them.": [
     "mods/VR.cpp"
   ],
   "Automatically use mouse in game menus (legacy)": [
@@ -232,7 +241,11 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Both together": [
-    "mods/VR.hpp"
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Both together: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps working while you look around with VR. Last used wins: the other waits until you use it. VR only: the Xbox pad is ignored while VR controllers are on.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Both work at once: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps working.": [
     "mods/VR.cpp"
@@ -271,8 +284,19 @@
     "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
+  "Camera up / down: first person, fixed camera": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
   "Camera view": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Card distance": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Card height": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Card size": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -358,7 +382,8 @@
     "mods/VR.cpp"
   ],
   "Controller slot": [
-    "mods/VR.cpp"
+    "mods/VR.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Controls cards": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -416,6 +441,9 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Degrees above straight ahead (below is negative).": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Degrees below your line of sight. More puts the card lower, out of the way of the HUD.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Degrees to the right of straight ahead (left is negative).": [
@@ -646,6 +674,9 @@
   ],
   "For exact edge alignment set WindowMode > Horizontal Curvature to 0. This HUD panel is flat; it does not bend with a curved aperture.": [
     "mods/vr/OverlayComponent.cpp"
+  ],
+  "For the WuWa VR menu, the controls cards and notices. The game's own language is set in the game.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "For troubleshooting and comparisons. Leave these alone for everyday play; opening this section changes nothing.": [
     "mods/VR.cpp"
@@ -923,6 +954,9 @@
   "Higher follows the game camera more closely.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Hint %d of %d. It then switches off; View hints on the WuWa VR menu's HUD page turns it back on.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Hold L3, or LT + RT, for half a second: a card rises under your view and shows what each button does, lighting each one as you press it. Let go and it sinks away.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -982,6 +1016,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "How far away the HUD sits. Its stereo depth follows this distance.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "How far away the card is.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "How far away this menu floats. UEVR's classic window uses the same distance.": [
@@ -1229,11 +1266,15 @@
   "LT/RT      HUD nearer / farther": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Language": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Larger menu following view": [
     "mods/vr/OverlayComponent.cpp"
   ],
   "Last used wins": [
-    "mods/VR.hpp"
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Launch settings include any custom settings saved before starting this game. Supplied profile controls are the build's original choices, not UEVR factory defaults.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1796,7 +1837,8 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Sharing with Xbox / treadmill": [
-    "mods/VR.cpp"
+    "mods/VR.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Shortcut: hold LT + RT, then click L3 to turn the blur on or off.": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1841,11 +1883,8 @@
   "Skip this step": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Slot 0 (usual)": [
+  "Slot 0": [
     "mods/VR.hpp"
-  ],
-  "Slot 0 suits most setups. For a treadmill, choose its slot: launcher Troubleshooting > Controller check.": [
-    "mods/VR.cpp"
   ],
   "Slot 1": [
     "mods/VR.hpp"
@@ -2206,10 +2245,15 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "VR only (Xbox ignored)": [
-    "mods/VR.hpp"
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "View": [
     "mods/VR.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "View hints": [
+    "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "View modes and cutscenes": [
@@ -2261,6 +2305,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Where: ": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Which Xbox controller slot the VR controllers share. Automatic uses the one with a controller, such as a treadmill's virtual pad.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Whichever you used last controls the game; the other waits until you press or push something on it.": [

@@ -383,6 +383,27 @@ Item resolution_choice() {
     return item;
 }
 
+// The WuWa VR menu, cards and notices; each language is listed in its own script.
+Item language_choice() {
+    const auto options = wuwa_l10n::languages();
+    auto item = make(Kind::Choice, "Language",
+        "For the WuWa VR menu, the controls cards and notices. The game's own language is set in the game.");
+    item.get_int = [options] {
+        const auto now = wuwa_l10n::requested_language();
+        for (size_t i = 0; i < options.size(); ++i) {
+            if (options[i].id == now) return static_cast<int>(i);
+        }
+        return 0;
+    };
+    item.set_int = [options](int value) {
+        const auto& id = options[std::clamp(value, 0, static_cast<int>(options.size()) - 1)].id;
+        if (auto* v = typed<std::string>("WuWaLocale")) v->value() = id;
+        wuwa_l10n::request(id, Framework::get_persistent_dir("wuwa-languages"));
+    };
+    for (const auto& option : options) item.choices.push_back(wuwa_l10n::native_name(option.id));
+    return item;
+}
+
 Item view_choice() {
     auto item = make(Kind::Choice, "View",
         "Full VR: the game all around you. Stereo screen: a big 3D screen, for menus and scenes that look wrong in full VR. "
@@ -455,6 +476,24 @@ void save_report(const std::string& problem) {
 
 // ---- Pages ----
 
+// Automatic first in the list; the saved value keeps fixed slots at 0-3 and Automatic at 4.
+Item slot_choice() {
+    auto item = make(Kind::Choice, "Controller slot",
+        "Which Xbox controller slot the VR controllers share. Automatic uses the one with a controller, such as a "
+        "treadmill's virtual pad.");
+    item.enabled = [] { return typed<int32_t>("VR_WuWaVRControllerSlot") != nullptr; };
+    item.get_int = [] {
+        auto* v = typed<int32_t>("VR_WuWaVRControllerSlot");
+        const int saved = v ? static_cast<int>(v->value()) : 4;
+        return saved >= 0 && saved <= 3 ? saved + 1 : 0;
+    };
+    item.set_int = [](int value) {
+        if (auto* v = typed<int32_t>("VR_WuWaVRControllerSlot")) v->value() = value <= 0 ? 4 : value - 1;
+    };
+    item.choices = {"Automatic", "Slot 0", "Slot 1", "Slot 2", "Slot 3"};
+    return item;
+}
+
 Page quick_page() {
     auto* vr = VR::get().get();
     Page page{"Quick"};
@@ -465,6 +504,12 @@ Page quick_page() {
     controllers.get_bool = [vr] { return vr->sightseeing_on(); };
     controllers.set_bool = [vr](bool on) { vr->set_sightseeing_on(on, "VR menu"); };
     page.items.push_back(std::move(controllers));
+    page.items.push_back(setting_choice("Sharing with Xbox / treadmill",
+        "Both together: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps "
+        "working while you look around with VR. Last used wins: the other waits until you use it. VR only: the Xbox pad "
+        "is ignored while VR controllers are on.",
+        "VR_WuWaVRControllerStyle", {"Both together", "Last used wins", "VR only (Xbox ignored)"}));
+    page.items.push_back(slot_choice());
     auto diorama = make(Kind::Toggle, "Diorama (miniature world)",
         "Shows the world as a 10x miniature around you, with the portal on or off. Needs Native Stereo. This launch only.");
     diorama.enabled = [vr] { return !vr->physical_gamepad_passthrough(); };
@@ -638,6 +683,14 @@ Page hud_page() {
         "Shows the L3 card without holding anything. Shortcut: L3 + Menu. A loaded test plan shows its step there instead.",
         "WuWaControls_PinCard"));
     page.items.push_back(setting_slider("Card size", "How wide the controls card is.", "WuWaControls_CardWidth", 0.5f, 1.6f, 0.05f, "%.2f m"));
+    page.items.push_back(setting_slider("Card height",
+        "Degrees below your line of sight. More puts the card lower, out of the way of the HUD.",
+        "WuWaControls_CardBelow", 15.0f, 75.0f, 1.0f, "%.0f\xC2\xB0"));
+    page.items.push_back(setting_slider("Card distance", "How far away the card is.", "WuWaControls_CardDistance",
+        0.5f, 1.5f, 0.05f, "%.2f m"));
+    page.items.push_back(setting_toggle("View hints",
+        "After you switch views, a line shows for 3 seconds with how to go on or come back. It switches itself off after 5 switches.",
+        "WuWaControls_ViewHints"));
     return page;
 }
 
@@ -775,6 +828,7 @@ Page test_page() {
 Page menu_page() {
     auto* vr = VR::get().get();
     Page page{"Menu"};
+    page.items.push_back(language_choice());
     page.items.push_back(setting_slider("Menu size", "How much of its layer this menu fills. Smaller also reads as further away.",
         "VR_WuWaVrMenuSize", 0.4f, 1.0f, 0.05f, "%.2f"));
     page.items.push_back(setting_slider("Menu distance", "How far away this menu floats. UEVR's classic window uses the same distance.",
@@ -805,8 +859,9 @@ Page menu_page() {
 // Pages follow the plan and the camera mode. After a rebuild the same page,
 // and the same row when it still exists, stay selected.
 std::string layout_key() {
+    // The language picker lists names drawn for the current language.
     return (steps.loaded() ? "plan " + std::to_string(steps.revision()) : std::string{"no plan"}) + ", camera " +
-        std::to_string(camera_mode());
+        std::to_string(camera_mode()) + ", language " + wuwa_l10n::language();
 }
 
 void refresh_pages() {

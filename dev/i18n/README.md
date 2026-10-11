@@ -12,6 +12,15 @@ python dev/i18n/check_all.py
 It prints `All translations complete.` or lists what is missing and exits 1.
 A new feature is not done until it passes.
 
+The VR mod's catalogs are keyed by the English itself, so changed English shows
+up as missing. The other sources are keyed by id, so `check_all.py` also keeps a
+fingerprint of their English (`english-snapshot.json`): an edited or new English
+value fails the check until every language has the new wording. Then record it:
+
+```powershell
+python dev/i18n/check_all.py --accept-english
+```
+
 ## Where the text lives
 
 | What players see | Source | Built by | Checked by |

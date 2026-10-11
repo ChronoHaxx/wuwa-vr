@@ -21,8 +21,12 @@ void reserve_fonts(ImFontAtlas* atlas, HMODULE module, float menu_size);
 ImFont* menu_font();
 ImFont* sheet_font();
 std::string language();
+// The language last asked for; it becomes language() once it settles and loads.
+std::string requested_language();
 std::string status();
 std::vector<Language> languages();
+// A language's own name (日本語, Deutsch...), ready to draw in the current menu.
+std::string native_name(std::string_view id);
 std::string translate(std::string_view english);
 std::string visual(std::string_view logical);
 std::string text(std::string_view english);

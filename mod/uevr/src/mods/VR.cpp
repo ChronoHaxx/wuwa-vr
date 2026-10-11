@@ -867,13 +867,23 @@ void VR::update_sightseeing_sample(bool synced) {
     const auto steady = std::chrono::steady_clock::now();
     if (on && !polled && (source == Status::Active || source == Status::WaitingVr)
         && steady - m_sightseeing_last_nudge >= std::chrono::seconds(2)) {
-        m_sightseeing_last_nudge = steady;
-        spdlog::info("[VR] VR controllers: asking the game to read controller slot {}", sightseeing_slot());
-        g_framework->post_message(WM_DEVICECHANGE, 0x0007 /* DBT_DEVNODES_CHANGED */, 0);
+        if (steady - m_sightseeing_nudge_window >= std::chrono::seconds(60)) {
+            m_sightseeing_nudge_window = steady;
+            m_sightseeing_nudges = 0;
+        }
+        if (m_sightseeing_nudges < 3) {
+            ++m_sightseeing_nudges;
+            m_sightseeing_last_nudge = steady;
+            spdlog::info("[VR] VR controllers: asking the game to read controller slot {}", sightseeing_slot());
+            g_framework->post_message(WM_DEVICECHANGE, 0x0007 /* DBT_DEVNODES_CHANGED */, 0);
+        }
     }
 }
 
 bool VR::apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* state) {
+    // The real answer, before any VR input is mixed in: the automatic slot
+    // follows controllers that are really there.
+    if (result && slot < 4 && *result == ERROR_SUCCESS) m_sightseeing_connected_ms[slot].store(GetTickCount64());
     if (!sightseeing_on()) return false;
     // Bypass the legacy motion mapper for all slots; only the chosen slot is
     // mixed. Other connected controllers retain their original state.
@@ -932,7 +942,7 @@ void VR::draw_sightseeing_menu() {
         wuwa_ui::TextWrapped("Only the VR controllers work while on; the Xbox pad on this slot is ignored until you turn them off."); break;
     }
     wuwa_ui::draw(*m_sightseeing_slot, "Controller slot");
-    wuwa_ui::TextWrapped("Slot 0 suits most setups. For a treadmill, choose its slot: launcher Troubleshooting > Controller check.");
+    wuwa_ui::TextWrapped("Automatic uses the slot that has a controller, such as a treadmill's virtual pad while the real pad is hidden. Choose a fixed slot only if it picks the wrong one: launcher Troubleshooting > Controller check lists them.");
 
     wuwa_sightseeing::Snapshot snap{};
     {
@@ -2322,9 +2332,15 @@ void VR::on_frame() {
 
     // Settings are drawn on another thread; the XInput hook reads these copies.
     const auto vr_style = std::clamp(m_sightseeing_style->value(), 0, 2);
-    const auto vr_slot = wuwa_sightseeing::slot_from(m_sightseeing_slot->value());
+    auto vr_slot = wuwa_sightseeing::slot_from(m_sightseeing_slot->value());
+    if (m_sightseeing_slot->value() == wuwa_sightseeing::automatic_slot) {
+        std::uint64_t seen[4]{};
+        for (int i = 0; i < 4; ++i) seen[i] = m_sightseeing_connected_ms[i].load();
+        vr_slot = wuwa_sightseeing::choose_slot(seen, GetTickCount64(), m_sightseeing_target.load());
+    }
     const bool style_changed = m_sightseeing_mix_style.exchange(vr_style) != vr_style;
     const bool slot_changed = m_sightseeing_target.exchange(vr_slot) != vr_slot;
+    if (slot_changed) spdlog::info("[VR] VR controllers: controller slot {}", vr_slot);
     if (style_changed || slot_changed) {
         std::scoped_lock lock{m_sightseeing_mtx};
         m_sightseeing_mixer.reset();

@@ -32,6 +32,14 @@ int main() {
     check(style_from(0) == Style::Both && style_from(1) == Style::LastUsed && style_from(2) == Style::VrOnly,
         "saved style indices changed meaning");
     check(style_from(-1) == Style::Both && style_from(9) == Style::Both, "unknown style was not Both");
+    {
+        // Automatic slot: the lowest slot seen connected in the last 1.5 s.
+        const std::uint64_t none[4]{}, treadmill[4]{0, 9000, 0, 0}, both[4]{9500, 9400, 0, 0}, stale[4]{1000, 0, 0, 0};
+        check(choose_slot(treadmill, 10000, 0) == 1, "automatic slot missed the treadmill's pad");
+        check(choose_slot(both, 10000, 1) == 0, "automatic slot did not prefer the lowest connected slot");
+        check(choose_slot(none, 10000, 2) == 2 && choose_slot(stale, 10000, 3) == 3, "automatic slot moved with no controller");
+        check(choose_slot(none, 10000, 7) == 0, "automatic slot kept an invalid slot");
+    }
     check(slot_from(0) == 0 && slot_from(3) == 3 && slot_from(4) == 0 && slot_from(-1) == 0,
         "slot outside 0-3 was accepted");
 

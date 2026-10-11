@@ -25,7 +25,9 @@ struct CardState {
 void draw_card(ImDrawList* draw, ImVec2 size, ImFont* font, const CardState& state);
 // One line low in view: a highlighted lead ("New:", the view's name), then a
 // line with {L3}-style button chips. Both are English catalog keys.
-void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& lead, const std::string& line, bool vr_controllers);
+// note: an optional smaller line under the tip, already translated.
+void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& lead, const std::string& line, bool vr_controllers,
+    const std::string& note = {});
 
 void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool shortcut_available, bool menu_detected=true);
 void draw_mouse_mode_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool adjustment, bool hidden_menu);

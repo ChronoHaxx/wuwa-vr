@@ -608,7 +608,10 @@ local function process_pad(index,state,result)
         for button,action in pairs({[B.A]="recenter",[B.B]="hud",[B.VIEW]="firstperson",[B.MENU]="sheet",[B.RB]="fixed"}) do
             if has(b,button) then consumed=consumed|B.L3|button; if has(rising,button) then actions[action]=true end end
         end
-        if (mode==1 or mode==3) and not context_mouse then consumed=consumed|(b&(B.L3|B.Y|B.X)) end
+        -- Y / X move the camera up / down in first person and the fixed camera.
+        -- In the game camera they do nothing, but L3 + Y / X still never reach the game.
+        if (mode==1 or mode==3) and not context_mouse then consumed=consumed|(b&(B.L3|B.Y|B.X))
+        elseif not context_mouse and has(b,B.Y|B.X) then consumed=consumed|B.L3|(b&(B.Y|B.X)) end
         if mode==3 and not context_mouse and not adjust and has(b,B.DOWN) then
             consumed=consumed|B.L3|B.DOWN
             if (previous&(B.L3|B.DOWN))~=(B.L3|B.DOWN) then actions.motion=true end

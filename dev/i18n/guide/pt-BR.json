@@ -27,7 +27,7 @@
     "controls.input": "Entrada",
     "controls.action": "Ação",
     "controls.cards.input": "Segure L3, ou LT + RT, por meio segundo",
-    "controls.cards.action": "Um cartão com os botões daquele toque. Solte e ele desce; L3 + Menu o mantém aberto.",
+    "controls.cards.action": "Um cartão com os botões daquele toque. Solte e ele desce. O cartão do L3 começa fixado, baixo à sua frente; L3 + Menu o oculta ou fixa de novo.",
     "controls.menu.input": "L3 + R3",
     "controls.menu.action": "Abrir ou fechar o menu do WuWa VR: aponte com o laser de um controle de VR e aperte o gatilho, ou use A / B e LB / RB. Configurações completas do UEVR: Menu → Todas as configurações (menu clássico do UEVR).",
     "controls.next.input": "Segure LT + RT primeiro e depois clique em R3",

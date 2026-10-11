@@ -754,8 +754,35 @@ bool VR::menu_pointer_active() const {
     if (!wuwa_test::is_wuwa() || !m_wuwa_vr_menu->value() || !g_framework->is_drawing_ui() || !is_hmd_active() || m_controllers.empty()) {
         return false;
     }
+    // A controller laid down or switched off stops turning and pressing, so the
+    // laser sleeps 8 s later; a gamepad or the keyboard ends it at once.
     const auto now = std::chrono::steady_clock::now();
-    return now - m_menu_pointer_motion <= std::chrono::seconds(10) || now - m_last_controller_update <= std::chrono::seconds(30);
+    const auto awake = [&](std::chrono::steady_clock::time_point at) {
+        return at > m_menu_pointer_slept && now - at <= std::chrono::seconds(8);
+    };
+    return awake(m_menu_pointer_motion) || awake(m_last_controller_update);
+}
+
+void VR::menu_pointer_yield() {
+    // Gamepad-looking input while a VR action is active came from the VR
+    // controllers themselves (VR controllers mode): the laser stays.
+    const auto now = std::chrono::steady_clock::now();
+    if (now - m_last_controller_update < std::chrono::milliseconds(300)) return;
+    m_menu_pointer_slept = now;
+}
+
+bool VR::menu_sticks(glm::vec2& left, glm::vec2& right) const {
+    left = right = {};
+    if (!wuwa_test::is_wuwa() || !g_framework->is_drawing_ui() || !is_hmd_active() || m_controllers.empty() ||
+        wuwa_test::motion_input_muted() || !motion_input_has_focus()) {
+        return false;
+    }
+    const auto runtime = get_runtime();
+    if (runtime == nullptr || !runtime->loaded) return false;
+    const auto l = get_joystick_axis(m_left_joystick), r = get_joystick_axis(m_right_joystick);
+    left = {l.x, l.y};
+    right = {r.x, r.y};
+    return true;
 }
 
 std::string VR::menu_pointer_status() const {

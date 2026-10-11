@@ -119,26 +119,45 @@ function M.new(env)
         if not property or not property:is_param() or property:is_out_param() or property:is_return_param() then return nil end
         return fn
     end
-    -- Experiment (test 3i). WuWa's whole UI hangs off one LGUICanvasScaler (3h
-    -- probe: one scaler, reference 2560 x 1440, match mode 2), which has no
-    -- ForceUpdate. LGUI recomputes the layout when a scaler setting changes,
-    -- so change MatchFromWidthToHeight by 0.001 now and restore it next tick.
-    local function nudge(context, objects, scaler_class)
-        local count = 0
+    -- A setter with exactly one plain bool parameter.
+    local function bool_setter(o, name)
+        local fn = o:get_class():find_function(name)
+        if not fn then return nil end
+        local p = fn:get_child_properties()
+        if not p or kind(p) ~= "BoolProperty" or p:get_next() then return nil end
+        local property = fn:find_property(p:get_fname():to_string())
+        if not property or not property:is_param() or property:is_out_param() or property:is_return_param() then return nil end
+        return fn
+    end
+    -- Test 3k. The 3i/3j probe showed the cause: in full VR the root HUD canvas
+    -- draws at the eye size (3292 x 3292) but WuWa's one LGUICanvasScaler keeps
+    -- the scale it worked out for the last size (1.0 for 2560 x 1440, also right
+    -- after loading) until the ESC menu closes, when it becomes 1.286 (3292 /
+    -- 2560). Changing a scaler setting does not rescale (the 3i nudge); the
+    -- scaler re-reads the canvas size when it is enabled, so switch it off and
+    -- on in one call (no frame without it) and report the canvas scale.
+    local function relayout(context, objects, scaler_class, canvas_class)
+        local count, notes = 0, {}
         for _, o in ipairs(objects) do
             if valid(o) and o:is_a(scaler_class) and in_world(o, context.world) then
-                local get = method(o, "GetMatchFromWidthToHeight", RETURNS.float)
-                local set = float_setter(o, "SetMatchFromWidthToHeight")
-                local value = get and get(o)
-                if set and finite(value) and value >= 0 and value <= 1 then
-                    set(o, value < 0.5 and value + 0.001 or value - 0.001)
-                    s.restore = s.restore or {}
-                    s.restore[#s.restore + 1] = {object = o, set = set, value = value}
+                local canvas = prop(o, "Canvas", "ObjectProperty")
+                local scale = valid(canvas) and canvas:is_a(canvas_class) and method(canvas, "GetCanvasScale", RETURNS.float)
+                local active = method(o, "GetIsActiveAndEnable", RETURNS.bool)
+                local enable = bool_setter(o, "SetEnable")
+                if scale and active and enable and active(o) == true then
+                    local before = scale(canvas)
+                    enable(o, false)
+                    enable(o, true)
+                    local after = valid(canvas) and scale(canvas) or nil
                     count = count + 1
+                    notes[#notes + 1] = string.format("%.3f -> %s", finite(before) and before or -1,
+                        finite(after) and string.format("%.3f", after) or "?")
+                elseif not enable then
+                    notes[#notes + 1] = "no SetEnable(bool)"
                 end
             end
         end
-        return count
+        return count, table.concat(notes, ", ")
     end
     local function refresh(context)
         local hook = env.types and env.types.UObjectHook
@@ -167,12 +186,14 @@ function M.new(env)
             local parts = {}
             for _, reason in ipairs(order) do parts[#parts + 1] = reasons[reason] .. "x " .. reason end
             s.last_rejections = #objects .. " scalers: " .. (#parts > 0 and table.concat(parts, ", ") or "none found")
-            local ok, nudged = pcall(nudge, context, objects, scaler_class)
-            if ok and nudged > 0 then
+            local ok, count, notes = pcall(relayout, context, objects, scaler_class, canvas_class)
+            if ok and count > 0 then
                 local size = context.dims and (" at " .. context.dims[1] .. "x" .. context.dims[2]) or ""
-                return true, "HUD scaler nudged (" .. nudged .. ")" .. size .. " (experiment); check the headset / HUD 已刷新（实验），请在头显中确认"
+                return true, "HUD scaler re-enabled (" .. count .. ")" .. size .. ", canvas scale " .. notes ..
+                    "; check the headset / HUD 已刷新，请在头显中确认"
             end
-            if not ok then s.last_rejections = s.last_rejections .. "; nudge error " .. tostring(nudged):sub(1, 80) end
+            if not ok then s.last_rejections = s.last_rejections .. "; relayout error " .. tostring(count):sub(1, 80)
+            elseif notes ~= "" then s.last_rejections = s.last_rejections .. "; " .. notes end
             return false, "No active HUD with the supported LGUI schema"
         end
         local refreshed = 0
@@ -241,7 +262,7 @@ function M.new(env)
             -- use. Refresh again 1 s and 2.5 s after the switch (cheap, same calls).
             local started = env.clock and env.clock() or nil
             self.followups = {1.0, 2.5}
-            self.follow_age, self.follow_start = 0, finite(started) and started or nil
+            self.follow_age, self.follow_start, self.follow_dims = 0, finite(started) and started or nil, nil
         end
         self.last_mode = mode
         if self.followups then
@@ -249,10 +270,16 @@ function M.new(env)
             local now = env.clock and env.clock() or nil
             local elapsed = (self.follow_start and finite(now) and now >= self.follow_start) and now - self.follow_start or self.follow_age
             if not self.pending and elapsed >= self.followups[1] then
-                local at = table.remove(self.followups, 1)
-                if #self.followups == 0 then self.followups = nil end
+                -- Like the queued refresh, never enumerate while the size is still
+                -- changing: the follow-up waits until it reads the same twice.
                 local context = current_context()
-                if context then
+                local dims = context and context.dims
+                local key = dims and (dims[1] .. "x" .. dims[2]) or "none"
+                if key ~= self.follow_dims then
+                    self.follow_dims = key
+                else
+                    local at = table.remove(self.followups, 1)
+                    if #self.followups == 0 then self.followups = nil end
                     local ok, message = refresh(context)
                     self.status = (ok and message or ("HUD refresh unavailable: " .. message)) .. " (follow-up at " .. at .. " s)"
                 end
@@ -311,14 +338,26 @@ function M.new(env)
             end
         end
     end
-    function s:tick(mode, delta)
-        -- Restore nudged scaler values on the tick after the nudge.
-        if self.restore then
-            if self.restore_armed then
-                for _, r in ipairs(self.restore) do pcall(function() if valid(r.object) then r.set(r.object, r.value) end end) end
-                self.restore, self.restore_armed = nil, nil
-            else self.restore_armed = true end
+    -- A world that loads in full VR lays its HUD out squashed as well (3j probe:
+    -- scale 1.0 at 3292 x 3292 until ESC), so a new world gets the same refreshes
+    -- 3 s and 6 s after it appears (its UI is built by then).
+    local function watch_world(self, delta)
+        self.world_age = (self.world_age or 0) + (finite(delta) and math.max(0, math.min(delta, 0.25)) or 0)
+        if self.world_age < 1.0 then return end
+        self.world_age = 0
+        local context = current_context()
+        local world = context and address(context.world)
+        if world and world ~= self.last_world then
+            self.last_world = world
+            if not self.followups then
+                local started = env.clock and env.clock() or nil
+                self.followups = {3.0, 6.0}
+                self.follow_age, self.follow_start, self.follow_dims = 0, finite(started) and started or nil, nil
+            end
         end
+    end
+    function s:tick(mode, delta)
+        pcall(watch_world, self, delta)
         local ok = pcall(tick, self, mode, delta)
         if not ok then self.pending = nil; self.status = "HUD refresh unavailable: reflection changed / 反射接口不可用，未继续刷新" end
     end

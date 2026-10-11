@@ -19,6 +19,9 @@ bool showing();
 // "Move menu" is on: the menu follows a controller's aim (the overlay reads
 // this) or the sticks / arrow keys, until it is put down. Any thread.
 bool moving();
+// The share of the UI image's height the menu fills, for an image of this
+// width / height (draw() sizes it the same way). Any thread.
+float height_share(float aspect);
 
 // The laser beam (OpenXR) is a thin quad textured from a small swatch that the
 // VR menu draws in the top-left corner of the UI image; the menu's own quad

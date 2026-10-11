@@ -1101,7 +1101,7 @@ def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None,
     if expected_pid is not None and expected_pid!=pid: raise ValueError('Game process changed before recording.')
     if not any((config().app/'dev-tools'/name).is_file() for name in
                ('wuwa-recorder.exe','wuwa-simulator-recorder.exe')): raise ValueError('Recorder is not included in this package.')
-    begin_job('recording',f'Recording stereo video at a target of {fps} fps (5 minutes max)',
+    begin_job('recording',f'Recording stereo video at a target of {fps} fps (5-minute parts until you stop it, up to an hour)',
               lambda: record_playtest(video_only,fps,eye_width,source),
               prepare=lambda: RECORDING.update(recording_target(pid)))
 
@@ -1120,17 +1120,37 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto'):
     if type(eye_width) is not int or eye_width not in (720,1024,1280): raise ValueError('Choose 720, 1024 or 1280 pixels per eye.')
     if not RECORDING['running']:
         RECORDING.update(recording_target())
-    folder=Path(RECORDING['folder'])
+    first=Path(RECORDING['folder'])
     stop_file=Path(RECORDING['stopFile'])
+    parts=[]
     try:
         spec=importlib.util.spec_from_file_location('wuwa_recording',config().app/'dev/record-wuwa.py')
         module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
-        args=argparse.Namespace(output=folder,seconds=300,stop_file=stop_file,video_only=video_only,
-            recorder=config().app/'dev-tools/wuwa-recorder.exe',openvr=config().app/'dev-tools/openvr_api.dll',
-            simulator_recorder=config().app/'dev-tools/wuwa-simulator-recorder.exe',source=source,
-            pid=RECORDING.get('pid'),fps=fps,eye_width=eye_width,profile=config().profile)
-        module.record(args)
-        return 'Recording saved. Open recordings, then replay.html for controller/camera annotations or clean-sbs.mp4 for clean footage. '+str(folder)
+        # Each part is a complete recording (video, camera sidecar, replay) of at most 5 minutes, the
+        # recorder's and the camera trace's tested bound. A part that ran its full time starts the next
+        # one at once, with the same id and stop file, so a long session needs no restarts.
+        while True:
+            folder=first if not parts else first.with_name(f'{first.name}-part{len(parts)+1}')
+            with LOCK:
+                RECORDING['folder']=str(folder)
+            args=argparse.Namespace(output=folder,seconds=300,stop_file=stop_file,video_only=video_only,
+                recorder=config().app/'dev-tools/wuwa-recorder.exe',openvr=config().app/'dev-tools/openvr_api.dll',
+                simulator_recorder=config().app/'dev-tools/wuwa-simulator-recorder.exe',source=source,
+                pid=RECORDING.get('pid'),fps=fps,eye_width=eye_width,profile=config().profile)
+            try:
+                module.record(args)
+            except Exception:
+                if not parts: raise
+                break  # The game closed between parts; the parts already saved stand.
+            parts.append(folder)
+            try:
+                ended=json.loads((folder/'recording.json').read_text(encoding='utf-8')).get('end_reason')
+            except (OSError,ValueError):
+                ended=None
+            if ended!='time_limit' or stop_file.exists() or RECORDING.get('stopping') or len(parts)>=12:
+                break
+        where=str(first) if len(parts)==1 else f'{first} (+{len(parts)-1} more parts beside it)'
+        return 'Recording saved. Open recordings, then replay.html for controller/camera annotations or clean-sbs.mp4 for clean footage. '+where
     finally:
         RECORDING.update(running=False,stopFile='')
 

@@ -311249,7 +311249,7 @@ index f7d93967b39ece43a2e556805e46846550cb8c3e..0b0391133ea4ad3876f2054d4a6d1a70
      for (auto&& cb : m_on_custom_event_cbs) {
          try {
 diff --git a/src/mods/VR.cpp b/src/mods/VR.cpp
-index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd9e60c301 100644
+index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..0ba943c2828ac2fd99fff9096af7ab88ef93eeeb 100644
 --- a/src/mods/VR.cpp
 +++ b/src/mods/VR.cpp
 @@ -1,5 +1,7 @@
@@ -311345,7 +311345,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
          return false;
      }
  
-@@ -686,9 +711,281 @@ bool VR::on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param) {
+@@ -686,9 +711,308 @@ bool VR::on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param) {
      return true;
  }
  
@@ -311392,8 +311392,35 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
 +    if (!wuwa_test::is_wuwa() || !m_wuwa_vr_menu->value() || !g_framework->is_drawing_ui() || !is_hmd_active() || m_controllers.empty()) {
 +        return false;
 +    }
++    // A controller laid down or switched off stops turning and pressing, so the
++    // laser sleeps 8 s later; a gamepad or the keyboard ends it at once.
 +    const auto now = std::chrono::steady_clock::now();
-+    return now - m_menu_pointer_motion <= std::chrono::seconds(10) || now - m_last_controller_update <= std::chrono::seconds(30);
++    const auto awake = [&](std::chrono::steady_clock::time_point at) {
++        return at > m_menu_pointer_slept && now - at <= std::chrono::seconds(8);
++    };
++    return awake(m_menu_pointer_motion) || awake(m_last_controller_update);
++}
++
++void VR::menu_pointer_yield() {
++    // Gamepad-looking input while a VR action is active came from the VR
++    // controllers themselves (VR controllers mode): the laser stays.
++    const auto now = std::chrono::steady_clock::now();
++    if (now - m_last_controller_update < std::chrono::milliseconds(300)) return;
++    m_menu_pointer_slept = now;
++}
++
++bool VR::menu_sticks(glm::vec2& left, glm::vec2& right) const {
++    left = right = {};
++    if (!wuwa_test::is_wuwa() || !g_framework->is_drawing_ui() || !is_hmd_active() || m_controllers.empty() ||
++        wuwa_test::motion_input_muted() || !motion_input_has_focus()) {
++        return false;
++    }
++    const auto runtime = get_runtime();
++    if (runtime == nullptr || !runtime->loaded) return false;
++    const auto l = get_joystick_axis(m_left_joystick), r = get_joystick_axis(m_right_joystick);
++    left = {l.x, l.y};
++    right = {r.x, r.y};
++    return true;
 +}
 +
 +std::string VR::menu_pointer_status() const {
@@ -311627,7 +311654,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      if (std::chrono::steady_clock::now() - m_last_engine_tick > std::chrono::seconds(1)) {
          SPDLOG_INFO_EVERY_N_SEC(1, "[VR] XInputGetState called, but engine tick hasn't been called in over a second. Is the game loading?");
          update_action_states();
-@@ -1054,7 +1351,7 @@ void VR::on_xinput_set_state(uint32_t* retval, uint32_t user_index, XINPUT_VIBRA
+@@ -1054,7 +1378,7 @@ void VR::on_xinput_set_state(uint32_t* retval, uint32_t user_index, XINPUT_VIBRA
  }
  
  // Allows imgui navigation to work with the controllers
@@ -311636,7 +311663,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      ZoneScopedN(__FUNCTION__);
  
      bool is_using_this_controller = true;
-@@ -1062,14 +1359,15 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
+@@ -1062,14 +1386,15 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
      const auto is_using_vr_controller_recently = is_using_controllers_within(std::chrono::seconds(1));
      const auto is_gamepad = !is_vr_controller;
  
@@ -311654,7 +311681,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
          if (!FrameworkConfig::get()->is_enable_l3_r3_toggle()) {
              return;
          }
-@@ -1102,7 +1400,8 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
+@@ -1102,7 +1427,8 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
  
      // We need to adjust the stick values based on the selected movement orientation value if the user wants to do this
      // It will either need to be adjusted by the HMD rotation or one of the controllers.
@@ -311664,7 +311691,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
          const auto left_stick_og = glm::vec2((float)state.Gamepad.sThumbLX, (float)state.Gamepad.sThumbLY );
          const auto left_stick_magnitude = glm::clamp(glm::length(left_stick_og), -32767.0f, 32767.0f);
          const auto left_stick = glm::normalize(left_stick_og);
-@@ -1179,7 +1478,9 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
+@@ -1179,7 +1505,9 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
  
          // Now that we're drawing the UI, check for special button combos the user can use as shortcuts
          // like recenter view, set standing origin, camera offset modification, etc.
@@ -311675,7 +311702,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
  
          if (!m_rt_modifier.draw) {
              m_rt_modifier.page = 0;
-@@ -1316,7 +1617,9 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
+@@ -1316,7 +1644,9 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
          MAP_BUTTON(ImGuiKey_GamepadL3,              XINPUT_GAMEPAD_LEFT_THUMB);
          MAP_BUTTON(ImGuiKey_GamepadR3,              XINPUT_GAMEPAD_RIGHT_THUMB);
  
@@ -311686,7 +311713,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
              MAP_ANALOG(ImGuiKey_GamepadLStickLeft,      gamepad.sThumbLX, -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768);
              MAP_ANALOG(ImGuiKey_GamepadLStickRight,     gamepad.sThumbLX, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
              MAP_ANALOG(ImGuiKey_GamepadLStickUp,        gamepad.sThumbLY, +XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767);
-@@ -1367,6 +1670,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
+@@ -1367,6 +1697,7 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
  void VR::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
      ZoneScopedN(__FUNCTION__);
  
@@ -311694,7 +311721,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      m_cvar_manager->on_pre_engine_tick(engine, delta);
      m_last_engine_tick = std::chrono::steady_clock::now();
  
-@@ -1606,6 +1910,7 @@ void VR::update_action_states() {
+@@ -1606,6 +1937,7 @@ void VR::update_action_states() {
      auto runtime = get_runtime();
  
      if (runtime == nullptr || runtime->wants_reinitialize) {
@@ -311702,7 +311729,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
          return;
      }
  
-@@ -1617,6 +1922,7 @@ void VR::update_action_states() {
+@@ -1617,6 +1949,7 @@ void VR::update_action_states() {
      }
  
  
@@ -311710,7 +311737,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      if (runtime->is_openvr()) {
          const auto start_time = std::chrono::high_resolution_clock::now();
  
-@@ -1639,9 +1945,12 @@ void VR::update_action_states() {
+@@ -1639,9 +1972,12 @@ void VR::update_action_states() {
              runtime->wants_reinitialize = true;
          }   
      } else {
@@ -311724,7 +311751,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      bool actively_using_controller = false;
  
      if (is_any_action_down()) {
-@@ -1649,17 +1958,30 @@ void VR::update_action_states() {
+@@ -1649,17 +1985,30 @@ void VR::update_action_states() {
          actively_using_controller = true;
      }
  
@@ -311760,7 +311787,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
  
          m_last_xinput_spoof_sent = std::chrono::steady_clock::now();
      }
-@@ -1679,7 +2001,7 @@ void VR::update_action_states() {
+@@ -1679,7 +2028,7 @@ void VR::update_action_states() {
          once2 = false;
      }
  
@@ -311769,7 +311796,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
  }
  
  void VR::update_dpad_gestures() {
-@@ -1748,6 +2070,10 @@ void VR::update_dpad_gestures() {
+@@ -1748,6 +2097,10 @@ void VR::update_dpad_gestures() {
  void VR::on_config_load(const utility::Config& cfg, bool set_defaults) {
      ZoneScopedN(__FUNCTION__);
  
@@ -311780,7 +311807,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      for (IModValue& option : m_options) {
          option.config_load(cfg, set_defaults);
      }
-@@ -1771,6 +2097,7 @@ void VR::on_config_load(const utility::Config& cfg, bool set_defaults) {
+@@ -1771,6 +2124,7 @@ void VR::on_config_load(const utility::Config& cfg, bool set_defaults) {
      }
  
      m_overlay_component.on_config_load(cfg, set_defaults);
@@ -311788,7 +311815,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
  
      if (m_cvar_manager != nullptr) {
          m_cvar_manager->on_config_load(cfg, set_defaults);   
-@@ -1796,6 +2123,7 @@ void VR::on_config_save(utility::Config& cfg) {
+@@ -1796,6 +2150,7 @@ void VR::on_config_save(utility::Config& cfg) {
      }
  
      m_overlay_component.on_config_save(cfg);
@@ -311796,7 +311823,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
  
      // Save camera offsets
      save_cameras();
-@@ -1965,9 +2293,38 @@ void VR::handle_keybinds() {
+@@ -1965,9 +2320,38 @@ void VR::handle_keybinds() {
  void VR::on_frame() {
      ZoneScopedN(__FUNCTION__);
  
@@ -311835,7 +311862,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      if (!get_runtime()->ready()) {
          return;
      }
-@@ -2250,7 +2607,7 @@ void VR::on_post_present() {
+@@ -2250,7 +2634,7 @@ void VR::on_post_present() {
  }
  
  uint32_t VR::get_hmd_width() const {
@@ -311844,7 +311871,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
          if (get_runtime()->is_openxr()) {
              return g_framework->get_rt_size().x * m_openxr->resolution_scale->value();
          }
-@@ -2266,7 +2623,7 @@ uint32_t VR::get_hmd_width() const {
+@@ -2266,7 +2650,7 @@ uint32_t VR::get_hmd_width() const {
  }
  
  uint32_t VR::get_hmd_height() const {
@@ -311853,7 +311880,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
          if (get_runtime()->is_openxr()) {
              return g_framework->get_rt_size().y * m_openxr->resolution_scale->value();
          }
-@@ -2304,6 +2661,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2304,6 +2688,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
          PAGE_CONSOLE,
          PAGE_COMPATIBILITY,
          PAGE_DEBUG,
@@ -311861,7 +311888,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      };
  
      SelectedPage selected_page = PAGE_RUNTIME;
-@@ -2370,11 +2728,237 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2370,11 +2755,237 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
      case "Debug"_fnv:
          selected_page = PAGE_DEBUG;
          break;
@@ -312099,7 +312126,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      if (selected_page == PAGE_RUNTIME) {
          if (m_has_hw_scheduling) {
              ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-@@ -2393,8 +2977,31 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2393,8 +3004,31 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
          ImGui::Text((std::string{"Runtime Information ("} + get_runtime()->name().data() + ")").c_str());
  
          m_desktop_fix->draw("Desktop Spectator View");
@@ -312133,7 +312160,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
  
          ImGui::TextWrapped("Render Resolution (per-eye): %d x %d", get_runtime()->get_width(), get_runtime()->get_height());
          ImGui::TextWrapped("Total Render Resolution: %d x %d", get_runtime()->get_width() * 2, get_runtime()->get_height());
-@@ -2415,6 +3022,10 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2415,6 +3049,10 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
          m_synced_afr_method->draw("Synced Sequential Method");
  
          m_world_scale->draw("World Scale");
@@ -312144,7 +312171,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
          m_depth_scale->draw("Depth Scale");
  
          m_disable_hzbocclusion->draw("Disable HZBOcclusion");
-@@ -2431,6 +3042,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2431,6 +3069,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
          if (ImGui::TreeNode("Native Stereo Fix")) {
              m_native_stereo_fix->draw("Enabled");
              m_native_stereo_fix_same_pass->draw("Use Same Stereo Pass");
@@ -312152,7 +312179,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
              ImGui::TreePop();
          }
  
-@@ -2456,6 +3068,11 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2456,6 +3095,11 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
              m_joystick_deadzone->draw("VR Joystick Deadzone");
              m_controller_pitch_offset->draw("Controller Pitch Offset");
  
@@ -312164,7 +312191,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
              m_dpad_shifting->draw("DPad Shifting");
              ImGui::SameLine();
              m_swap_controllers->draw("Left-handed Controller Inputs");
-@@ -3221,6 +3838,11 @@ void VR::set_standing_origin(const Vector4f& origin) {
+@@ -3221,6 +3865,11 @@ void VR::set_standing_origin(const Vector4f& origin) {
      m_standing_origin = origin;
  }
  
@@ -312177,7 +312204,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..79f7853d2fdda94df55fca5e352b2ecd
      ZoneScopedN(__FUNCTION__);
  
 diff --git a/src/mods/VR.hpp b/src/mods/VR.hpp
-index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4f509f677 100644
+index 941840c7f61a353fab6a22452267ba259608a81f..f37f3408d3574f417eae126bccf199f493dc1cc5 100644
 --- a/src/mods/VR.hpp
 +++ b/src/mods/VR.hpp
 @@ -13,12 +13,16 @@
@@ -312215,7 +312242,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      }
  
      // texture bounds to tell OpenVR which parts of the submitted texture to render (default - use the whole texture).
-@@ -155,7 +161,27 @@ public:
+@@ -155,7 +161,33 @@ public:
      bool on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_param) override;
      void on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE* state) override;
      void on_xinput_set_state(uint32_t* retval, uint32_t user_index, XINPUT_VIBRATION* vibration) override;
@@ -312225,9 +312252,15 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
 +    void set_sightseeing_on(bool on, const char* why);
 +    // The VR menu's laser: works whether or not motion-controller input or VR
 +    // controllers mode is on, while UEVR's UI is open and the pointing
-+    // controller moved in the last 10 seconds or a VR button was used in the
-+    // last 30.
++    // controller turned or a VR button was used in the last 8 seconds, and not
++    // since a gamepad or the keyboard took over (menu_pointer_yield).
 +    bool menu_pointer_active() const;
++    // A gamepad or the keyboard was used in the menu: the laser sleeps at once,
++    // until the controller is aimed again or a VR button is pressed.
++    void menu_pointer_yield();
++    // Both VR controllers' thumbsticks (-1..1) while UEVR's UI is open, whether
++    // or not something else also turns them into a gamepad.
++    bool menu_sticks(glm::vec2& left, glm::vec2& right) const;
 +    std::string menu_pointer_status() const; // English, for the menu
 +    // The VR controllers as the menu sees them, read straight from the runtime
 +    // while UEVR's UI is open and nothing else (VR controllers mode, UEVR's
@@ -312244,7 +312277,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
  
      void on_pre_engine_tick(sdk::UGameEngine* engine, float delta) override;
      void on_pre_calculate_stereo_view_offset(void* stereo_device, const int32_t view_index, Rotator<float>* view_rotation, 
-@@ -241,6 +267,8 @@ public:
+@@ -241,6 +273,8 @@ public:
      
      float get_standing_height();
      Vector4f get_standing_origin();
@@ -312253,7 +312286,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      void set_standing_origin(const Vector4f& origin);
  
      glm::quat get_rotation_offset();
-@@ -288,6 +316,12 @@ public:
+@@ -288,6 +322,12 @@ public:
          return m_overlay_component;
      }
  
@@ -312266,7 +312299,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      uint32_t get_hmd_width() const;
      uint32_t get_hmd_height() const;
  
-@@ -304,12 +338,56 @@ public:
+@@ -304,12 +344,56 @@ public:
      }
  
      bool is_using_controllers() const {
@@ -312326,7 +312359,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      }
  
      int get_hmd_index() const {
-@@ -373,7 +451,18 @@ public:
+@@ -373,7 +457,18 @@ public:
      }
  
      auto get_world_scale() const {
@@ -312346,7 +312379,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      }
  
      auto is_stereo_emulation_enabled() const {
-@@ -437,7 +526,7 @@ public:
+@@ -437,7 +532,7 @@ public:
      }
  
      float get_world_to_meters() const {
@@ -312355,7 +312388,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      }
  
      float get_depth_scale() const {
-@@ -550,6 +639,10 @@ public:
+@@ -550,6 +645,10 @@ public:
          return m_native_stereo_fix_same_pass->value();
      }
  
@@ -312366,7 +312399,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      bool is_ahud_compatibility_enabled() const {
          return m_compatibility_ahud->value();
      }
-@@ -573,7 +666,42 @@ public:
+@@ -573,7 +672,42 @@ public:
      }
  
      bool is_using_2d_screen() const {
@@ -312410,7 +312443,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      }
  
      bool is_roomscale_enabled() const {
-@@ -723,7 +851,8 @@ private:
+@@ -723,7 +857,8 @@ private:
              m_fake_stereo_hook.get(),
              m_render_target_pool_hook.get(),
              m_cvar_manager.get(),
@@ -312420,7 +312453,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
          };
      }
  
-@@ -752,6 +881,7 @@ private:
+@@ -752,6 +887,7 @@ private:
      vrmod::D3D11Component m_d3d11{};
      vrmod::D3D12Component m_d3d12{};
      vrmod::OverlayComponent m_overlay_component;
@@ -312428,7 +312461,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      bool m_disable_overlay{false};
  
      // Action set handles
-@@ -824,6 +954,7 @@ private:
+@@ -824,6 +960,7 @@ private:
      std::chrono::steady_clock::time_point m_last_controller_update{};
      std::chrono::steady_clock::time_point m_last_xinput_update{};
      std::chrono::steady_clock::time_point m_last_xinput_spoof_sent{};
@@ -312436,7 +312469,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      std::chrono::steady_clock::time_point m_last_xinput_l3_r3_menu_open{};
      std::chrono::steady_clock::time_point m_last_interaction_display{};
      std::chrono::steady_clock::time_point m_last_engine_tick{};
-@@ -895,6 +1026,14 @@ private:
+@@ -895,6 +1032,14 @@ private:
      const ModToggle::Ptr m_decoupled_pitch_ui_adjust{ ModToggle::create(generate_name("DecoupledPitchUIAdjust"), true) };
      const ModToggle::Ptr m_load_blueprint_code{ ModToggle::create(generate_name("LoadBlueprintCode"), false, true) };
      const ModToggle::Ptr m_2d_screen_mode{ ModToggle::create(generate_name("2DScreenMode"), false) };
@@ -312451,7 +312484,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
      const ModToggle::Ptr m_roomscale_movement{ ModToggle::create(generate_name("RoomscaleMovement"), false) };
      const ModToggle::Ptr m_roomscale_sweep{ ModToggle::create(generate_name("RoomscaleMovementSweep"), true) };
      const ModToggle::Ptr m_swap_controllers{ ModToggle::create(generate_name("SwapControllerInputs"), false) };
-@@ -949,11 +1088,19 @@ private:
+@@ -949,11 +1094,19 @@ private:
      const ModSlider::Ptr m_camera_up_offset{ ModSlider::create(generate_name("CameraUpOffset"), -4000.0f, 4000.0f, 0.0f) };
      const ModSlider::Ptr m_camera_fov_distance_multiplier{ ModSlider::create(generate_name("CameraFOVDistanceMultiplier"), 0.00f, 1000.0f, 0.0f) };
      const ModSlider::Ptr m_world_scale{ ModSlider::create(generate_name("WorldScale"), 0.01f, 10.0f, 1.0f) };
@@ -312471,7 +312504,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
  
      const ModSlider::Ptr m_custom_z_near{ ModSlider::create(generate_name("CustomZNear"), 0.001f, 100.0f, 0.01f, true) };
      const ModToggle::Ptr m_custom_z_near_enabled{ ModToggle::create(generate_name("EnableCustomZNear"), false, true) };
-@@ -1035,12 +1182,20 @@ public:
+@@ -1035,12 +1188,20 @@ public:
              *m_disable_hzbocclusion,
              *m_disable_instance_culling,
              *m_desktop_fix,
@@ -312492,7 +312525,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
              *m_roomscale_movement,
              *m_roomscale_sweep,
              *m_swap_controllers,
-@@ -1091,6 +1246,25 @@ public:
+@@ -1091,6 +1252,25 @@ public:
              *m_show_fps,
              *m_show_statistics,
              *m_controllers_allowed,
@@ -312518,7 +312551,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
              *m_lerp_camera_pitch,
              *m_lerp_camera_yaw,
              *m_lerp_camera_roll,
-@@ -1105,6 +1279,55 @@ private:
+@@ -1105,6 +1285,56 @@ private:
      bool m_stereo_emulation_mode{false}; // not a good config option, just for debugging
      bool m_wait_for_present{true};
      const ModToggle::Ptr m_controllers_allowed{ ModToggle::create(generate_name("ControllersAllowed"), true) };
@@ -312535,6 +312568,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..9486960c1e9086442f216ca30c0c47c4
 +    // Turning the pointing controller keeps the menu laser awake, not only buttons.
 +    glm::vec3 m_menu_pointer_aim{};
 +    std::chrono::steady_clock::time_point m_menu_pointer_motion{};
++    std::chrono::steady_clock::time_point m_menu_pointer_slept{};
 +    void update_menu_pointer_motion();
 +    std::atomic<bool> m_sightseeing_on{false};
 +    std::atomic<int32_t> m_sightseeing_target{0};
@@ -314061,7 +314095,7 @@ index 71b0927f732d914b9287a1356e27ad8a59372c3a..4a2a199997f734f7bf7f32b4c87b5900
      imgui.new_enum("ImGuiStyleVar",
          "Alpha", ImGuiStyleVar_Alpha,
 diff --git a/src/mods/vr/CVarManager.cpp b/src/mods/vr/CVarManager.cpp
-index 0c13a86648ccee2502da971039984b807c0be775..5346ba9863ef8f71c3354d2460ad36e5b58ac3b9 100644
+index 0c13a86648ccee2502da971039984b807c0be775..091d6bf78a719bbf04ad90a9f969ec0845125d7b 100644
 --- a/src/mods/vr/CVarManager.cpp
 +++ b/src/mods/vr/CVarManager.cpp
 @@ -2,6 +2,7 @@
@@ -314151,7 +314185,7 @@ index 0c13a86648ccee2502da971039984b807c0be775..5346ba9863ef8f71c3354d2460ad36e5
 +                "WuWaControls_ResetHudAspect", "WuWaControls_HudAspectStatus", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
 +                "UI_Distance", "UI_Size", "UI_WuWaHudShape", "UI_FollowView", "WuWaControls_Enabled",
 +                "WuWaControls_MouseAssist", "WuWaControls_AutoMouseMenus", "WuWaControls_AdjustMode", "WuWaControls_WarnHiddenUI",
-+                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject", "WuWaStereo_DepthOfFieldStrengthFullVR", "WuWaControls_LensFollow", "WuWaSteps_ShowCard", "UI_WuWaMenuYaw", "UI_WuWaMenuPitch", "UI_WuWaMenuYawScreen", "UI_WuWaMenuPitchScreen",
++                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject", "WuWaStereo_DepthOfFieldStrengthFullVR", "WuWaControls_LensFollow", "WuWaSteps_ShowCard", "UI_WuWaMenuYaw", "UI_WuWaMenuPitch", "UI_WuWaMenuYawScreen", "UI_WuWaMenuPitchScreen", "UI_WuWaMenuScreenLow",
 +                "VR_WuWaScreenLens", "VR_WuWaScreenDepth", "WuWaPrivacy_Mode", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
 +                "WuWaControls_FirstRight", "WuWaControls_FirstUp", "WuWaControls_FirstMotion", "WuWaControls_FullFollowLook", "WuWaControls_FollowHeadAnimation", "WuWaControls_LateHeadUpdate",
 +                "VR_AimMethod", "VR_AimModifyPlayerControlRotation", "VR_DecoupledPitch",
@@ -314507,15 +314541,17 @@ index d9d9e052478b77f8cc80d4a7a85a2b69d1abd94d..316c825dc9389a785b19db380af154d6
      struct OpenXR {
          OpenXR(D3D11Component* p) : parent(p) {}
 diff --git a/src/mods/vr/D3D12Component.cpp b/src/mods/vr/D3D12Component.cpp
-index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc445ffaa49a 100644
+index 11fdce508fd8cb553ba58254f3a7188ba69e774c..c893d93c40c29816e852fa1b8c8c117a8a9e5c70 100644
 --- a/src/mods/vr/D3D12Component.cpp
 +++ b/src/mods/vr/D3D12Component.cpp
-@@ -4,9 +4,15 @@
+@@ -4,9 +4,17 @@
  #include <utility/String.hpp>
  #include <utility/ScopeGuard.hpp>
  #include <utility/Logging.hpp>
 +#include <utility/WuWaLguiProbe.hpp>
 +#include <utility/WuWaRunMarker.hpp>
++#include <utility/WuWaDepthProbe.hpp>
++#include <sdk/Globals.hpp>
  
  #include "Framework.hpp"
  #include "../VR.hpp"
@@ -314526,7 +314562,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
  #include <../../directxtk12-src/Inc/ResourceUploadBatch.h>
  #include <../../directxtk12-src/Inc/RenderTargetState.h>
-@@ -25,13 +31,29 @@ constexpr auto ENGINE_SRC_COLOR = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+@@ -25,13 +33,29 @@ constexpr auto ENGINE_SRC_COLOR = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
  
  namespace vrmod {
  vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
@@ -314557,7 +314593,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
          m_last_afr_state = vr->is_using_afr();
      }
  
-@@ -146,10 +168,31 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -146,10 +170,31 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
          }
      }
  
@@ -314589,7 +314625,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
          if (scene_capture_rt != nullptr && m_scene_capture_tex.texture.Get() != scene_capture_rt) {
              spdlog::info("[VR] Setting up scene capture texture as reference to original");
  
-@@ -170,7 +213,19 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -170,7 +215,19 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
  
      // We need to render the scene capture texture to the right side of the double wide texture
      auto pre_render = [&](d3d12::CommandContext& commands, ID3D12Resource* render_target) {
@@ -314610,7 +314646,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              return;
          }
  
-@@ -184,10 +239,18 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -184,10 +241,18 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
              .back = 1
          };
  
@@ -314630,7 +314666,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              D3D12_RESOURCE_STATE_RENDER_TARGET,
              D3D12_RESOURCE_STATE_RENDER_TARGET
          );
-@@ -268,22 +331,52 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -268,22 +333,52 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
      }
  
      const float clear_color[] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -314688,7 +314724,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              d3d12::render_srv_to_rtv(
                  m_game_batch.get(),
                  commands.cmd_list.Get(),
-@@ -294,7 +387,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -294,7 +389,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                  ENGINE_SRC_COLOR
              );
  
@@ -314697,7 +314733,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
                  d3d12::render_srv_to_rtv(
                      m_game_batch.get(),
                      commands.cmd_list.Get(),
-@@ -305,7 +398,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -305,7 +400,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                  );
              }
  
@@ -314706,7 +314742,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
                  // Render right side to right screen tex
                  if (m_scene_capture_tex.texture.Get() != nullptr) {
                      d3d12::render_srv_to_rtv(
-@@ -376,17 +469,54 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -376,17 +471,54 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
  
          clear_rt(m_openvr.ui_tex.commands);
          m_openvr.ui_tex.commands.execute();
@@ -314765,7 +314801,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              }
  
              auto fw_rt = g_framework->get_rendertarget_d3d12();
-@@ -394,13 +524,16 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -394,13 +526,16 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
              if (fw_rt && g_framework->is_drawing_anything()) {
                  m_openxr.copy((uint32_t)runtimes::OpenXR::SwapchainIndex::FRAMEWORK_UI, g_framework->get_rendertarget_d3d12().Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
              }
@@ -314787,7 +314823,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
          }
      }
  
-@@ -412,7 +545,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -412,7 +547,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
  
      ComPtr<ID3D12Resource> scene_depth_tex{};
  
@@ -314796,7 +314832,17 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
          auto& rt_pool = vr->get_render_target_pool_hook();
          scene_depth_tex = rt_pool->get_texture<ID3D12Resource>(L"SceneDepthZ");
  
-@@ -439,7 +572,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -434,12 +569,17 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+     #endif
+     }
+ 
++    // WuWa test 3k: close-up match reads the scene depth (full VR only).
++    if (!is_mono_theatre && !is_2d_screen) {
++        sample_wuwa_depth(vr, device, scene_depth_tex.Get());
++    }
++
+     // If m_frame_count is even, we're rendering the left eye.
+     if (is_left_eye_frame) {
          m_submitted_left_eye = true;
  
          // OpenXR texture
@@ -314805,7 +314851,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              D3D12_BOX src_box{};
              src_box.left = 0;
              src_box.top = 0;
-@@ -463,7 +596,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -463,7 +603,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
          // OpenVR texture
          // Copy the back buffer to the left eye texture
          if (runtime->is_openvr()) {
@@ -314814,7 +314860,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
              auto openvr = vr->get_runtime<runtimes::OpenVR>();
              const auto submit_pose = openvr->get_pose_for_submit();
-@@ -493,7 +626,9 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -493,7 +633,9 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
          }};
  
          // OpenXR texture
@@ -314825,7 +314871,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              if (is_actually_afr && !is_afr && !m_submitted_left_eye) {
                  D3D12_BOX src_box{};
                  src_box.left = 0;
-@@ -569,7 +704,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -569,7 +711,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
              const auto submit_pose = openvr->get_pose_for_submit();
  
              if (!is_afr) {
@@ -314834,7 +314880,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
                  vr::D3D12TextureData_t left {
                      m_openvr.get_left().texture.Get(),
-@@ -593,12 +728,12 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -593,12 +735,12 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
  
              if (!is_afr) {
                  if (m_scene_capture_tex.texture.Get() == nullptr) {
@@ -314850,7 +314896,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              }
  
              vr::D3D12TextureData_t right {
-@@ -648,15 +783,33 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -648,15 +790,33 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
  
              auto& openxr_overlay = vr->get_overlay_component().get_openxr();
  
@@ -314889,7 +314935,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
                      quad_layers.push_back((XrCompositionLayerBaseHeader*)&right_layer->get());
                  }
              } else if (m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::UI)) {
-@@ -672,9 +825,17 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -672,9 +832,17 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                  if (framework_quad) {
                      quad_layers.push_back((XrCompositionLayerBaseHeader*)&framework_quad->get());
                  }
@@ -314908,7 +314954,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
              if (result == XR_ERROR_LAYER_INVALID) {
                  spdlog::info("[VR] Attempting to correct invalid layer");
-@@ -682,7 +843,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
+@@ -682,7 +850,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                  m_openxr.wait_for_all_copies();
  
                  spdlog::info("[VR] Calling xrEndFrame again");
@@ -314917,7 +314963,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              }
  
              vr->m_openxr->needs_pose_update = true;
-@@ -927,11 +1088,45 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
+@@ -927,11 +1095,45 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
      ID3D12DescriptorHeap* game_heaps[] = { m_game_tex.srv_heap->Heap() };
      command_list->SetDescriptorHeaps(1, game_heaps);
  
@@ -314968,7 +315014,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
      //////
      // UI
-@@ -947,6 +1142,14 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
+@@ -947,6 +1149,14 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
  
      batch->End();
  
@@ -314983,15 +315029,66 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
      // Transition backbuffer to D3D12_RESOURCE_STATE_PRESENT
      barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
      barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-@@ -1035,6 +1238,7 @@ void D3D12Component::on_post_present(VR* vr) {
+@@ -1034,7 +1244,52 @@ void D3D12Component::on_post_present(VR* vr) {
+     }
  }
  
++// WuWa test 3k: close-up match (camera script) measures its subject in the
++// rendered depth, around where the 2D frame's centre lands in the eye (both
++// eyes' tangents averaged: the depth may be either eye's). The engine's depth
++// target is named by the render target pool hook, which the request switches
++// on (utility/WuWaDepthProbe.hpp).
++void D3D12Component::sample_wuwa_depth(VR* vr, ID3D12Device* device, ID3D12Resource* scene_depth) {
++    if (!m_depth_sampler) {
++        if (!wuwa_depth_probe::wanted()) return;
++        m_depth_sampler = std::make_unique<wuwa_depth::Sampler>();
++    }
++    ComPtr<ID3D12Resource> depth{scene_depth};
++    wuwa_depth::Sampler::View view{};
++    if (wuwa_depth_probe::wanted()) {
++        if (!depth) depth = vr->get_render_target_pool_hook()->get_texture<ID3D12Resource>(L"SceneDepthZ");
++        if (!m_depth_batch && m_graphics_memory) {
++            D3D12_BLEND_DESC opaque{};
++            opaque.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
++            m_depth_batch = setup_sprite_batch_pso(DXGI_FORMAT_R32_FLOAT, {}, {}, DirectX::SpriteBatchPipelineStateDescription{
++                DirectX::RenderTargetState{DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_UNKNOWN}, &opaque});
++        }
++        const auto runtime = vr->get_runtime();
++        {
++            std::shared_lock _{runtime->projections_mtx};
++            const auto& a = runtime->raw_projections[0];
++            const auto& b = runtime->raw_projections[1];
++            const float half = (std::abs(a[0]) + std::abs(a[1]) + std::abs(b[0]) + std::abs(b[1])) * 0.25f;
++            view.left = -half;
++            view.right = half;
++            view.top = (a[2] + b[2]) * 0.5f;
++            view.bottom = (a[3] + b[3]) * 0.5f;
++        }
++        view.eye_w = (float)m_backbuffer_size[0] / 2.0f;
++        view.eye_h = (float)m_backbuffer_size[1];
++        // The 2D camera looks along the recentred forward; the head turns the eye away from it.
++        const auto head = glm::quat_cast(vr->get_hmd_rotation(static_cast<uint32_t>(vr->m_render_frame_count)));
++        const auto forward = glm::inverse(head) * (glm::inverse(vr->get_rotation_offset()) * glm::vec3{0.0f, 0.0f, -1.0f});
++        view.x = forward.x;
++        view.y = forward.y;
++        view.z = forward.z;
++        view.near_cm = sdk::globals::get_near_clipping_plane();
++    }
++    m_depth_sampler->update(device, depth.Get(), view, m_depth_batch.get());
++}
++
  void D3D12Component::on_reset(VR* vr) {
 +    m_mono_openvr_ready = false;
      m_force_reset = true;
  
      auto runtime = vr->get_runtime();
-@@ -1074,6 +1278,7 @@ void D3D12Component::on_reset(VR* vr) {
+@@ -1070,10 +1325,13 @@ void D3D12Component::on_reset(VR* vr) {
+     m_backbuffer_batch.reset();
+     m_game_batch.reset();
+     m_ui_batch_alpha_invert.reset();
++    m_depth_sampler.reset(); // waits for its last sample
++    m_depth_batch.reset();
+     m_graphics_memory.reset();
  
      if (runtime->is_openxr() && runtime->loaded) {
          m_openxr.wait_for_all_copies();
@@ -314999,7 +315096,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
          auto& rt_pool = vr->get_render_target_pool_hook();
          ComPtr<ID3D12Resource> scene_depth_tex{rt_pool->get_texture<ID3D12Resource>(L"SceneDepthZ")};
-@@ -1210,6 +1415,11 @@ bool D3D12Component::setup() {
+@@ -1210,6 +1468,11 @@ bool D3D12Component::setup() {
                  spdlog::error("[VR] Failed to setup left eye context.");
                  return false;
              }
@@ -315011,7 +315108,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
          }
  
          for (auto& ctx : m_openvr.right_eye_tex) {
-@@ -1224,6 +1434,11 @@ bool D3D12Component::setup() {
+@@ -1224,6 +1487,11 @@ bool D3D12Component::setup() {
                  spdlog::error("[VR] Failed to setup right eye context.");
                  return false;
              }
@@ -315023,7 +315120,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
          }
  
          // Set up the UI texture. it's the desktop resolution.
-@@ -1385,6 +1600,7 @@ std::optional<std::string> D3D12Component::OpenXR::create_swapchains() {
+@@ -1385,6 +1653,7 @@ std::optional<std::string> D3D12Component::OpenXR::create_swapchains() {
          SPDLOG_INFO("[VR] Runtime wants {} images for swapchain {}", image_count, i);
  
          auto& ctx = this->contexts[i];
@@ -315031,7 +315128,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
          ctx.textures.clear();
          ctx.textures.resize(image_count);
-@@ -1411,6 +1627,31 @@ std::optional<std::string> D3D12Component::OpenXR::create_swapchains() {
+@@ -1411,6 +1680,31 @@ std::optional<std::string> D3D12Component::OpenXR::create_swapchains() {
              spdlog::info("[VR] AFTER Swapchain texture {} {} ref count: {}", i, j, ref_count);
          }
  
@@ -315063,7 +315160,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
          if (swapchain_create_info.createFlags & XR_SWAPCHAIN_CREATE_STATIC_IMAGE_BIT) {
              for (uint32_t j = 0; j < image_count; ++j) {
                  XrSwapchainImageAcquireInfo acquire_info{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
-@@ -1626,6 +1867,7 @@ void D3D12Component::OpenXR::destroy_swapchains() {
+@@ -1626,6 +1920,7 @@ void D3D12Component::OpenXR::destroy_swapchains() {
      spdlog::info("[VR] Destroying swapchains.");
  
      this->wait_for_all_copies();
@@ -315071,7 +315168,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
      for (auto& it : this->contexts) {
          auto& ctx = it.second;
-@@ -1716,6 +1958,16 @@ void D3D12Component::OpenXR::copy(
+@@ -1716,6 +2011,16 @@ void D3D12Component::OpenXR::copy(
      const auto& swapchain = vr->m_openxr->swapchains[swapchain_idx];
      auto& ctx = this->contexts[swapchain_idx];
  
@@ -315088,7 +315185,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
      XrSwapchainImageAcquireInfo acquire_info{XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO};
  
      uint32_t texture_index{};
-@@ -1750,6 +2002,16 @@ void D3D12Component::OpenXR::copy(
+@@ -1750,6 +2055,16 @@ void D3D12Component::OpenXR::copy(
              auto& texture_ctx = ctx.texture_contexts[texture_index];
              texture_ctx->commands.wait(INFINITE);
  
@@ -315105,7 +315202,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
              if (pre_commands) {
                  (*pre_commands)(texture_ctx->commands, ctx.textures[texture_index].texture);
              }
-@@ -1781,7 +2043,29 @@ void D3D12Component::OpenXR::copy(
+@@ -1781,7 +2096,29 @@ void D3D12Component::OpenXR::copy(
                  (*additional_commands)(texture_ctx->commands);
              }
  
@@ -315136,7 +315233,7 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
  
              XrSwapchainImageReleaseInfo release_info{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
              auto result = xrReleaseSwapchainImage(swapchain.handle, &release_info);
-@@ -1810,8 +2094,11 @@ void D3D12Component::OpenXR::copy(
+@@ -1810,8 +2147,11 @@ void D3D12Component::OpenXR::copy(
              }
  
              ctx.num_textures_acquired--;
@@ -315152,15 +315249,16 @@ index 11fdce508fd8cb553ba58254f3a7188ba69e774c..fd23710552f02f7b154f012e3421cc44
 \ No newline at end of file
 +} // namespace vrmod
 diff --git a/src/mods/vr/D3D12Component.hpp b/src/mods/vr/D3D12Component.hpp
-index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8fb4c3989 100644
+index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..c4d41db26ad4989ef4dd8ae9866d582268dc21d1 100644
 --- a/src/mods/vr/D3D12Component.hpp
 +++ b/src/mods/vr/D3D12Component.hpp
-@@ -18,13 +18,16 @@
+@@ -18,13 +18,17 @@
  #include <../../directxtk12-src/Inc/DescriptorHeap.h>
  
  #include "d3d12/CommandContext.hpp"
 +#include <utility/WuWaSteadyView.hpp>
  #include "d3d12/TextureContext.hpp"
++#include "d3d12/WuWaDepthSampler.hpp"
 +#include "../WindowMode.hpp"
  
  class VR;
@@ -315172,15 +315270,21 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
      D3D12Component() 
          : m_openvr{this}
      {
-@@ -71,6 +74,7 @@ private:
+@@ -71,8 +75,13 @@ private:
  
      std::unique_ptr<DirectX::DX12::GraphicsMemory> m_graphics_memory{};
      std::unique_ptr<DirectX::DX12::SpriteBatch> m_backbuffer_batch{};
 +    wuwa_steady_view::Smoother m_steady_view{};
      std::unique_ptr<DirectX::DX12::SpriteBatch> m_game_batch{};
      std::unique_ptr<DirectX::DX12::SpriteBatch> m_ui_batch_alpha_invert{};
++    // WuWa test 3k: close-up match measures its subject in the scene depth.
++    std::unique_ptr<wuwa_depth::Sampler> m_depth_sampler{};
++    std::unique_ptr<DirectX::DX12::SpriteBatch> m_depth_batch{};
++    void sample_wuwa_depth(VR* vr, ID3D12Device* device, ID3D12Resource* scene_depth);
  
-@@ -106,8 +110,17 @@ private:
+     ID3D12Resource* m_last_checked_native{nullptr};
+ 
+@@ -106,8 +115,17 @@ private:
              return ctx;
          }
  
@@ -315199,7 +315303,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
              //ctx.commands.copy(src, ctx.texture.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
              // Copy the left half of the backbuffer to the left eye texture.
              D3D12_BOX src_box{};
-@@ -118,11 +131,22 @@ private:
+@@ -118,11 +136,22 @@ private:
              src_box.front = 0;
              src_box.back = 1;
              ctx.commands.copy_region(src, ctx.texture.Get(), &src_box, src_state, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -315223,7 +315327,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
              //ctx.commands.copy(src, ctx.texture.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
              // Copy the right half of the backbuffer to the right eye texture.
              D3D12_BOX src_box{};
-@@ -133,12 +157,23 @@ private:
+@@ -133,12 +162,23 @@ private:
              src_box.front = 0;
              src_box.back = 1;
              ctx.commands.copy_region(src, ctx.texture.Get(), &src_box, src_state, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -315248,7 +315352,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
              //ctx.commands.copy(src, ctx.texture.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
              // Copy the right half of the backbuffer to the right eye texture.
              D3D12_BOX src_box{};
-@@ -149,6 +184,8 @@ private:
+@@ -149,6 +189,8 @@ private:
              src_box.front = 0;
              src_box.back = 1;
              ctx.commands.copy_region(src, ctx.texture.Get(), &src_box, src_state, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -315257,7 +315361,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
              ctx.commands.execute();
          }
  
-@@ -201,6 +238,7 @@ private:
+@@ -201,6 +243,7 @@ private:
          struct SwapchainContext {
              std::vector<XrSwapchainImageD3D12KHR> textures{};
              std::vector<std::unique_ptr<d3d12::TextureContext>> texture_contexts{};
@@ -315265,7 +315369,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
              uint32_t num_textures_acquired{0};
              uint32_t last_acquired_texture{0};
              bool ever_acquired{false};
-@@ -219,6 +257,8 @@ private:
+@@ -219,6 +262,8 @@ private:
      uint32_t m_last_rendered_frame{0};
      bool m_force_reset{true};
      bool m_last_afr_state{false};
@@ -316796,7 +316900,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      g_hook->m_sceneview_data.known_scene_states.clear();
 diff --git a/src/mods/vr/OverlayComponent.cpp b/src/mods/vr/OverlayComponent.cpp
-index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b190ee7a5 100644
+index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..86f3f615800f1ed4e3936e1e10e0bc63cbd7542f 100644
 --- a/src/mods/vr/OverlayComponent.cpp
 +++ b/src/mods/vr/OverlayComponent.cpp
 @@ -1,11 +1,16 @@
@@ -317000,14 +317104,16 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
          vr::VROverlay()->ShowOverlay(m_overlay_handle);
  
          // Show the entire texture
-@@ -708,6 +811,7 @@ void OverlayComponent::update_overlay_openvr() {
+@@ -708,7 +811,8 @@ void OverlayComponent::update_overlay_openvr() {
          glm_matrix[3] += vr->get_standing_origin();
  
          if (g_framework->is_drawing_ui()) {
-+            place_wuwa_menu(glm_matrix);
-             glm_matrix[3] -= glm_matrix[2] * m_framework_distance->value();
+-            glm_matrix[3] -= glm_matrix[2] * m_framework_distance->value();
++            const float menu_distance = place_wuwa_menu(glm_matrix, m_framework_size->value(), 16.0f / 9.0f);
++            glm_matrix[3] -= glm_matrix[2] * menu_distance;
          } else {
              glm_matrix[3] -= glm_matrix[2] * (m_slate_distance->value() - 0.01f);
+ 
 @@ -717,8 +821,16 @@ void OverlayComponent::update_overlay_openvr() {
          }
  
@@ -317140,7 +317246,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
      switch ((OverlayComponent::OverlayType)m_parent->m_slate_overlay_type->value()) {
      default:
      case OverlayComponent::OverlayType::QUAD:
-@@ -1017,7 +1149,43 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
+@@ -1017,7 +1149,63 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
  }
  
  
@@ -317156,15 +317262,34 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
 +}
 +
 +// WuWa: turns the VR menu's frame about the standing origin before it is pushed
-+// out to its distance, so it floats where it was put and still faces you. While
-+// "Move menu" is on and a controller's laser is in use, the menu follows its aim.
-+void OverlayComponent::place_wuwa_menu(glm::mat4& frame) {
-+    if (!wuwa_test::is_wuwa() || !wuwa_menu_host::showing()) return;
++// out to its distance (returned), so it floats where it was put and still faces
++// you. While "Move menu" is on and a controller's laser is in use, the menu
++// follows its aim. On the stereo screen and mono theatre the menu stays in front
++// of the picture (SteamVR hides layers behind it), and "Low" puts its top edge
++// just under the picture, worked out from the screen's size, height and distance.
++float OverlayComponent::place_wuwa_menu(glm::mat4& frame, float quad_height, float quad_aspect) {
++    float distance = m_framework_distance->value();
++    if (!wuwa_test::is_wuwa() || !wuwa_menu_host::showing()) return distance;
 +    auto& vr = VR::get();
 +    const bool screen = vr->is_using_2d_screen() || vr->is_using_mono_theatre();
 +    auto& yaw = screen ? m_wuwa_menu_yaw_screen : m_wuwa_menu_yaw;
 +    auto& pitch = screen ? m_wuwa_menu_pitch_screen : m_wuwa_menu_pitch;
-+    if (wuwa_menu_host::moving() && vr->menu_pointer_active() && !vr->get_controllers().empty()) {
++    const bool aiming = wuwa_menu_host::moving() && vr->menu_pointer_active() && !vr->get_controllers().empty();
++    if (screen) {
++        const float half = 0.5f * quad_height * wuwa_menu_host::height_share(quad_aspect);  // menu, metres
++        const float screen_distance = std::max(m_slate_distance->value(), 0.3f);
++        // Every point of the tilted menu is at most distance / cos(half angle) deep.
++        const float wide = std::atan2(half, std::max(distance, 0.3f));
++        distance = std::min(distance, std::max(0.3f, (screen_distance - 0.15f) * std::cos(wide)));
++        if (aiming) m_wuwa_menu_screen_low->value() = false;
++        if (m_wuwa_menu_screen_low->value()) {
++            const float bottom = std::atan2(m_slate_y_offset->value() - 0.5f * m_slate_size->value() * hud_shape(), screen_distance);
++            const float angle = std::atan2(half, distance);
++            yaw->value() = 0.0f;
++            pitch->value() = std::clamp(glm::degrees(bottom - angle) - 2.0f, -45.0f, 0.0f);
++        }
++    }
++    if (aiming) {
 +        const auto index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
 +        const auto aim = glm::quat{vr->get_rotation(index, false)} * glm::vec3{0.0f, 0.0f, -1.0f};
 +        const auto local = glm::inverse(glm::mat3{frame}) * aim;
@@ -317177,6 +317302,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
 +    const auto turn = glm::angleAxis(glm::radians(-yaw->value()), glm::vec3{0.0f, 1.0f, 0.0f}) *
 +        glm::angleAxis(glm::radians(pitch->value()), glm::vec3{1.0f, 0.0f, 0.0f});
 +    frame = frame * Matrix4x4f{turn};
++    return distance;
 +}
 +
  std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::OpenXR::generate_framework_ui_quad() {
@@ -317184,7 +317310,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
      if (!g_framework->is_drawing_anything()) {
          m_parent->m_framework_intersect_state.intersecting = false;
          return std::nullopt;
-@@ -1037,6 +1205,26 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1037,6 +1225,26 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
      layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
      layer.eyeVisibility = XrEyeVisibility::XR_EYE_VISIBILITY_BOTH;
  
@@ -317211,7 +317337,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
      auto glm_matrix = glm::identity<glm::mat4>();
  
      if (vr->m_overlay_component.m_framework_ui_follows_view->value()) {
-@@ -1065,13 +1253,23 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1065,14 +1273,25 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
      // Adjust size_meters based on scaling factor.
      const float adjusted_size_meters = size_meters * scale_factor;
  
@@ -317232,11 +317358,14 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
      layer.size = {meters_w, meters_h};
  
      if (g_framework->is_drawing_ui()) {
-+        m_parent->place_wuwa_menu(glm_matrix);
-         glm_matrix[3] -= glm_matrix[2] * m_parent->m_framework_distance->value();
+-        glm_matrix[3] -= glm_matrix[2] * m_parent->m_framework_distance->value();
++        const float menu_distance = m_parent->place_wuwa_menu(glm_matrix, adjusted_size_meters,
++            (float)ui_swapchain.width / (float)ui_swapchain.height);
++        glm_matrix[3] -= glm_matrix[2] * menu_distance;
      } else {
          glm_matrix[3] -= glm_matrix[2] * (m_parent->m_slate_distance->value() - 0.01f);
-@@ -1085,8 +1283,9 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+ 
+@@ -1085,8 +1304,9 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
      layer.pose.orientation = runtimes::OpenXR::to_openxr(glm::quat_cast(glm_matrix));
      layer.pose.position = runtimes::OpenXR::to_openxr(glm_matrix[3]);
  
@@ -317248,7 +317377,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
          // Right only for now for testing
          const auto controller_index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
          const auto right_controller_rot = glm::quat{vr->get_rotation(controller_index, false)};
-@@ -1099,6 +1298,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1099,6 +1319,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
          const auto plane_pos = glm::vec3{glm_matrix[3]};
  
          float intersection_distance = 0.0f;
@@ -317256,7 +317385,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
          if (glm::intersectRayPlane<glm::vec3>(start, fwd, plane_pos, glm::normalize(glm::vec3{glm_matrix[2]}), intersection_distance)) {
              const auto intersection_point = start + (fwd * intersection_distance);
  
-@@ -1113,10 +1313,11 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1113,10 +1334,11 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
  
                  m_parent->m_framework_intersect_state.quad_intersection_point = {x, y};
                  m_parent->m_framework_intersect_state.intersecting = true;
@@ -317269,7 +317398,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
  
                      m_parent->m_framework_intersect_state.swapchain_intersection_point = {client_x, client_y};
                  }
-@@ -1124,10 +1325,43 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1124,10 +1346,43 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
                  m_parent->m_framework_intersect_state.intersecting = false;
              }
          }
@@ -317316,7 +317445,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b
 \ No newline at end of file
 +}
 diff --git a/src/mods/vr/OverlayComponent.hpp b/src/mods/vr/OverlayComponent.hpp
-index 1fceacff00a68187f8efb0078f559cc7a8ae10df..3d5ea5a889975b615636efeb0d81ecc71c100fd5 100644
+index 1fceacff00a68187f8efb0078f559cc7a8ae10df..6b0828042b0f53a21bb8837aa864ab19264c84ff 100644
 --- a/src/mods/vr/OverlayComponent.hpp
 +++ b/src/mods/vr/OverlayComponent.hpp
 @@ -23,6 +23,7 @@ public:
@@ -317327,7 +317456,7 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..3d5ea5a889975b615636efeb0d81ecc7
  
      auto& get_openxr() {
          return m_openxr;
-@@ -104,15 +105,34 @@ private:
+@@ -104,15 +105,39 @@ private:
      const ModSlider::Ptr m_slate_x_offset{ ModSlider::create("UI_X_Offset", -10.0f, 10.0f, 0.0f) };
      const ModSlider::Ptr m_slate_y_offset{ ModSlider::create("UI_Y_Offset", -10.0f, 10.0f, 0.0f) };
      const ModSlider::Ptr m_slate_size{ ModSlider::create("UI_Size", 0.5f, 10.0f, 2.0f) };
@@ -317358,11 +317487,16 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..3d5ea5a889975b615636efeb0d81ecc7
 +    const ModSlider::Ptr m_wuwa_menu_pitch{ ModSlider::create("UI_WuWaMenuPitch", -60.0f, 60.0f, 0.0f) };
 +    const ModSlider::Ptr m_wuwa_menu_yaw_screen{ ModSlider::create("UI_WuWaMenuYawScreen", -150.0f, 150.0f, 0.0f) };
 +    const ModSlider::Ptr m_wuwa_menu_pitch_screen{ ModSlider::create("UI_WuWaMenuPitchScreen", -60.0f, 60.0f, -28.0f) };
-+    void place_wuwa_menu(glm::mat4& frame);
++    // On a screen view the menu's "Low" place is worked out from the picture
++    // (just under its bottom edge); moving the menu there turns this off.
++    const ModToggle::Ptr m_wuwa_menu_screen_low{ ModToggle::create("UI_WuWaMenuScreenLow", true) };
++    // Turns the menu's frame to its place; returns the distance to push it out.
++    // quad_height: the UI image's full height in metres; quad_aspect: width / height.
++    float place_wuwa_menu(glm::mat4& frame, float quad_height, float quad_aspect);
  
  public:
      OverlayComponent() 
-@@ -124,14 +144,24 @@ public:
+@@ -124,14 +149,25 @@ public:
              *m_slate_y_offset,
              *m_slate_distance,
              *m_slate_size,
@@ -317384,11 +317518,12 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..3d5ea5a889975b615636efeb0d81ecc7
 +            *m_wuwa_menu_yaw,
 +            *m_wuwa_menu_pitch,
 +            *m_wuwa_menu_yaw_screen,
-+            *m_wuwa_menu_pitch_screen
++            *m_wuwa_menu_pitch_screen,
++            *m_wuwa_menu_screen_low
          };
      }
  
-@@ -158,6 +188,9 @@ private:
+@@ -158,6 +194,9 @@ private:
              XrEyeVisibility eye = XR_EYE_VISIBILITY_BOTH
          );
          std::optional<std::reference_wrapper<XrCompositionLayerQuad>> generate_framework_ui_quad();
@@ -317398,7 +317533,7 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..3d5ea5a889975b615636efeb0d81ecc7
          
      private:
          XrCompositionLayerQuad m_slate_layer{};
-@@ -165,15 +198,18 @@ private:
+@@ -165,15 +204,18 @@ private:
          XrCompositionLayerCylinderKHR m_slate_layer_cylinder{};
          XrCompositionLayerCylinderKHR m_slate_layer_cylinder_right{};
          XrCompositionLayerQuad m_framework_ui_layer{};
@@ -317421,10 +317556,10 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..3d5ea5a889975b615636efeb0d81ecc7
 +};}
 diff --git a/src/mods/vr/WuWaControlsComponent.cpp b/src/mods/vr/WuWaControlsComponent.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..8fb1040076bfed623b49d0f6cd7a987c3311a73e
+index 0000000000000000000000000000000000000000..c10e792f46be60b851f475889bf1602830c98371
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.cpp
-@@ -0,0 +1,1276 @@
+@@ -0,0 +1,1288 @@
 +#define NOMINMAX
 +#include "utility/WuWaLocalizedUI.hpp"
 +#include "utility/WuWaMenuSignals.hpp"
@@ -317439,6 +317574,7 @@ index 0000000000000000000000000000000000000000..8fb1040076bfed623b49d0f6cd7a987c
 +#include "utility/WuWaStereoBasePose.hpp"
 +#include "utility/WuWaPlaytestControl.hpp"
 +#include "utility/WuWaLguiProbe.hpp"
++#include "utility/WuWaDepthProbe.hpp"
 +#include "WuWaVrMenuHost.hpp"
 +#include <nlohmann/json.hpp>
 +#include <glm/gtx/transform.hpp>
@@ -317748,7 +317884,7 @@ index 0000000000000000000000000000000000000000..8fb1040076bfed623b49d0f6cd7a987c
 +        *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
 +        *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
 +        *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
++        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, m_depth_probe, *m_stereo_effects, *m_lens_subject, m_lens_status,
 +        m_playstation_state, m_playstation_status,
 +        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
 +        *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -317759,6 +317895,17 @@ index 0000000000000000000000000000000000000000..8fb1040076bfed623b49d0f6cd7a987c
 +WuWaControlsComponent::~WuWaControlsComponent() {
 +    wuwa_ps_hid::release_on_process_exit(m_playstation,
 +        wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
++}
++
++std::string WuWaControlsComponent::DepthProbe::get() const {
++    return wuwa_depth_probe::report();
++}
++
++void WuWaControlsComponent::DepthProbe::set(const std::string& text) {
++    wuwa_depth_probe::request(text);
++    // The engine's depth target is only named once the render target pool hook
++    // runs; UEVR otherwise switches it on with depth submission alone.
++    if (wuwa_depth_probe::fov.load() > 0.0f) VR::get()->get_render_target_pool_hook()->activate();
 +}
 +
 +void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_defaults) {
@@ -318703,10 +318850,10 @@ index 0000000000000000000000000000000000000000..8fb1040076bfed623b49d0f6cd7a987c
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaControlsComponent.hpp b/src/mods/vr/WuWaControlsComponent.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..738f58462006db259f864cf9ed908d2878b12ea8
+index 0000000000000000000000000000000000000000..aec97cc94ca4972ba262e6eaefe581991a4c79ce
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.hpp
-@@ -0,0 +1,338 @@
+@@ -0,0 +1,348 @@
 +#pragma once
 +
 +#include <chrono>
@@ -318898,8 +319045,8 @@ index 0000000000000000000000000000000000000000..738f58462006db259f864cf9ed908d28
 +    // The second eye is built from a default camera: copy only the blur, or every
 +    // plain post-process value (grading, vignette, exposure...) as well (test 3g).
 +    const ModCombo::Ptr m_stereo_effects{ModCombo::create("WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}, 0)};
-+    // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
-+    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
++    // Close-up subject: measured in the rendered depth (3k) or the game's focus distance (3j).
++    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Rendered depth (3k)", "Game focus only (3j)"}, 0)};
 +    const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
 +    // Full VR has its own strength (test 3h: half looked right in full VR, 1x on screens).
 +    const ModSlider::Ptr m_stereo_dof_strength_vr{ModSlider::create("WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.5f)};
@@ -318918,6 +319065,16 @@ index 0000000000000000000000000000000000000000..738f58462006db259f864cf9ed908d28
 +        void config_load(const utility::Config&, bool) override { set(""); }
 +        void config_save(utility::Config&) override {}
 +    } m_lens_status;
++    // Close-up match measures its subject in the rendered depth (test 3k): the
++    // camera script writes the 2D camera's FOV (0 stops) and reads back
++    // "seq nearest p25 p50 valid state" (utility/WuWaDepthProbe.hpp). Transient.
++    struct DepthProbe : ModString {
++        DepthProbe() : ModString{"WuWaControls_DepthProbe", ""} {}
++        std::string get() const override;
++        void set(const std::string& text) override;
++        void config_load(const utility::Config&, bool) override {}
++        void config_save(utility::Config&) override {}
++    } m_depth_probe;
 +
 +    // Outside control recovery: resetting camera/input does not reset language.
 +    const ModString::Ptr m_language{ModString::create("WuWaLocale", "en")};
@@ -319047,10 +319204,10 @@ index 0000000000000000000000000000000000000000..738f58462006db259f864cf9ed908d28
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaVrMenuHost.cpp b/src/mods/vr/WuWaVrMenuHost.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589401307f6
+index 0000000000000000000000000000000000000000..c649a82fc576b527b9e72c15366d1adb41c27710
 --- /dev/null
 +++ b/src/mods/vr/WuWaVrMenuHost.cpp
-@@ -0,0 +1,1044 @@
+@@ -0,0 +1,1082 @@
 +#include "WuWaVrMenuHost.hpp"
 +
 +// Before windows.h (via Framework.hpp), whose min / max macros break std::min in it.
@@ -319313,8 +319470,19 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +}
 +const char* menu_yaw_key() { return screen_view() ? "UI_WuWaMenuYawScreen" : "UI_WuWaMenuYaw"; }
 +const char* menu_pitch_key() { return screen_view() ? "UI_WuWaMenuPitchScreen" : "UI_WuWaMenuPitch"; }
++// On a screen view "Low" is worked out from the picture each frame (the overlay
++// writes it into the screen keys); moving the menu by hand keeps it where it is.
++bool screen_low() {
++    auto* low = typed<bool>("UI_WuWaMenuScreenLow");
++    return screen_view() && low && low->value();
++}
++void leave_screen_low() {
++    if (!screen_view()) return;
++    if (auto* low = typed<bool>("UI_WuWaMenuScreenLow")) low->value() = false;
++}
 +
 +void start_moving_menu() {
++    leave_screen_low();
 +    move_was = {true, true, true, true};
 +    move_last = 0.0;
 +    moving_menu.store(true, std::memory_order_relaxed);
@@ -319325,7 +319493,7 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +    const auto key = [vertical] { return vertical ? menu_pitch_key() : menu_yaw_key(); };
 +    item.enabled = [key] { return typed<float>(key()) != nullptr; };
 +    item.get_float = [key] { auto* v = typed<float>(key()); return v ? v->value() : 0.0f; };
-+    item.set_float = [key](float value) { if (auto* v = typed<float>(key())) v->value() = value; };
++    item.set_float = [key](float value) { leave_screen_low(); if (auto* v = typed<float>(key())) v->value() = value; };
 +    item.min = vertical ? -60.0f : -150.0f; item.max = vertical ? 60.0f : 150.0f; item.step = 2.0f; item.format = "%.0f deg";
 +    return item;
 +}
@@ -319336,12 +319504,13 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +    static constexpr Spot spots[] = {{0.0f, 0.0f}, {0.0f, -28.0f}, {-40.0f, 0.0f}, {40.0f, 0.0f}};
 +    auto item = make(Kind::Choice, "Menu place",
 +        "Where this menu floats around you. Full VR and the screen views each keep their own place; on a screen view "
-+        "Low keeps it under the picture.");
++        "Low sits just under the picture, whatever its size and distance, and the menu always stays in front of it.");
 +    item.enabled = [] { return typed<float>(menu_yaw_key()) != nullptr; };
 +    item.get_int = [] {
 +        auto* yaw = typed<float>(menu_yaw_key());
 +        auto* pitch = typed<float>(menu_pitch_key());
 +        if (!yaw || !pitch) return 0;
++        if (screen_low()) return 1;
 +        for (int i = 0; i < 4; ++i) {
 +            if (std::abs(yaw->value() - spots[i].yaw) < 1.0f && std::abs(pitch->value() - spots[i].pitch) < 1.0f) return i;
 +        }
@@ -319351,6 +319520,12 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +        auto* yaw = typed<float>(menu_yaw_key());
 +        auto* pitch = typed<float>(menu_pitch_key());
 +        if (!yaw || !pitch || value < 0 || value > 3) return;
++        if (screen_view()) {
++            if (auto* low = typed<bool>("UI_WuWaMenuScreenLow")) {
++                low->value() = value == 1;
++                if (value == 1) return;
++            }
++        }
 +        yaw->value() = spots[value].yaw;
 +        pitch->value() = spots[value].pitch;
 +    };
@@ -319375,9 +319550,10 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +
 +Item lens_subject_choice() {
 +    return setting_choice("Close-up aims at",
-+        "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match "
-+        "stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: the test 3f behaviour.",
-+        "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"});
++        "Rendered depth: how far away the middle of the 2D shot really is, measured in the picture just after each cut, so "
++        "every shot works; Close-up match stops behind anything nearer, such as a shoulder or a prop. Game focus only: the "
++        "test 3j behaviour (shots without a focus stay at the game camera).",
++        "WuWaControls_LensSubject", {"Rendered depth", "Game focus only (3j)"});
 +}
 +
 +Item lens_follow_choice() {
@@ -319927,13 +320103,19 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +    const bool prev_page = once(ImGuiKey_GamepadL1) || (once(ImGuiKey_Tab) && io.KeyShift) || pad_prev;
 +    const bool next_page = once(ImGuiKey_GamepadR1) || (once(ImGuiKey_Tab) && !io.KeyShift) || pad_next;
 +    if (once(ImGuiKey_GamepadFaceUp) || once(ImGuiKey_M)) start_moving_menu();
++    // A gamepad or the keyboard ends the laser at once (otherwise it waits for a
++    // controller that was put down or switched off to go quiet).
++    const bool used = held.up || held.down || held.left || held.right || accept || back || prev_page || next_page;
++    if (used && !pad_accept && !pad_back && !pad_prev && !pad_next && VR::get()->menu_pointer_active()) {
++        VR::get()->menu_pointer_yield();
++    }
 +    return mover.read(held, accept, back, prev_page, next_page, seconds());
 +}
 +
 +// Move menu: sticks, D-pad, arrow keys or WASD turn the menu around you (a
-+// controller's laser aim does it in the overlay instead); the right stick or
-+// Page Up / Down changes the distance. A, B, Y, Enter, Escape, Space, M, a
-+// controller's A / B or a click puts it down.
++// controller's laser aim does it in the overlay instead); the right stick, a VR
++// thumbstick or Page Up / Down changes the distance. A, B, Y, Enter, Escape,
++// Space, M, a controller's A / B or a click puts it down.
 +void move_menu() {
 +    const auto analog = [](ImGuiKey key) { return ImGui::GetKeyData(key)->AnalogValue; };
 +    const auto down = [](ImGuiKey key) { return ImGui::IsKeyDown(key); };
@@ -319950,6 +320132,13 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +    VR::MenuPad pad{};
 +    const bool direct = VR::get()->menu_controller_pad(pad);
 +    if (direct) { x += pad.lx; y += pad.ly; z += pad.ry; }
++    // The VR thumbsticks set the distance even while the game (VR controllers
++    // mode) or UEVR's motion controls own them; the stronger push counts once.
++    glm::vec2 left{}, right{};
++    if (!direct && VR::get()->menu_sticks(left, right)) {
++        const float stick = std::abs(right.y) >= std::abs(left.y) ? right.y : left.y;
++        if (std::abs(stick) > std::abs(z)) z = stick;
++    }
 +    const auto press = [](bool now, bool& was) { const bool pressed = now && !was; was = now; return pressed; };
 +    const bool pad_done = press(direct && pad.accept, move_was.accept) | press(direct && pad.back, move_was.back);
 +    const double now = seconds();
@@ -319990,6 +320179,11 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +    return moving_menu.load(std::memory_order_relaxed) && showing();
 +}
 +
++float height_share(float aspect) {
++    const float fraction = std::clamp(VR::get()->vr_menu_size(), 0.4f, 1.0f);
++    return (std::min)(aspect * 780.0f / 1200.0f, 1.0f) * fraction;
++}
++
 +bool draw(const ImVec2& target_size) {
 +    if (!wuwa_test::is_wuwa()) return false;
 +    tick();
@@ -320024,6 +320218,7 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +    }
 +    // The right mouse button drags the menu around you at any time.
 +    if (!moving_menu.load(std::memory_order_relaxed) && io.MouseDown[1] && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)) {
++        leave_screen_low();
 +        if (auto* yaw = typed<float>(menu_yaw_key())) yaw->value() = std::clamp(yaw->value() + io.MouseDelta.x * 0.1f, -150.0f, 150.0f);
 +        if (auto* pitch = typed<float>(menu_pitch_key())) pitch->value() = std::clamp(pitch->value() - io.MouseDelta.y * 0.1f, -60.0f, 60.0f);
 +    }
@@ -320032,7 +320227,7 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +    wuwa_menu::draw(pages, state, moves, pos, size, look);
 +    if (moving_menu.load(std::memory_order_relaxed)) {
 +        const char* text = VR::get()->menu_pointer_active() ?
-+            "Moving the menu: point where you want it, then pull the trigger." :
++            "Moving the menu: point where you want it, thumbstick up / down for distance, then pull the trigger." :
 +            "Moving the menu: stick, D-pad or arrow keys. Right stick or Page Up / Down: distance. A or Enter: put it down.";
 +        auto* list = ImGui::GetForegroundDrawList();
 +        ImFont* font = wuwa_l10n::sheet_font() ? wuwa_l10n::sheet_font() : ImGui::GetFont();
@@ -320097,10 +320292,10 @@ index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589
 +}
 diff --git a/src/mods/vr/WuWaVrMenuHost.hpp b/src/mods/vr/WuWaVrMenuHost.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..3874d81371c6afb4c66ace52248f341ebcff9f51
+index 0000000000000000000000000000000000000000..7495715231dc3f944382cf6fc3d40a9743f2d9af
 --- /dev/null
 +++ b/src/mods/vr/WuWaVrMenuHost.hpp
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,44 @@
 +#pragma once
 +
 +// Hosts the VR menu (utility/WuWaVrMenu) in UEVR's UI: binds its pages to the
@@ -320122,6 +320317,9 @@ index 0000000000000000000000000000000000000000..3874d81371c6afb4c66ace52248f341e
 +// "Move menu" is on: the menu follows a controller's aim (the overlay reads
 +// this) or the sticks / arrow keys, until it is put down. Any thread.
 +bool moving();
++// The share of the UI image's height the menu fills, for an image of this
++// width / height (draw() sizes it the same way). Any thread.
++float height_share(float aspect);
 +
 +// The laser beam (OpenXR) is a thin quad textured from a small swatch that the
 +// VR menu draws in the top-left corner of the UI image; the menu's own quad
@@ -320462,6 +320660,230 @@ index 49ad06b2c6a1864de0aeeccad078578f06ac7dfd..fad644599ef5aa4a73b7f13dba2cc078
          return rtv_heap->GetCpuHandle(0);
      }
  
+diff --git a/src/mods/vr/d3d12/WuWaDepthSampler.hpp b/src/mods/vr/d3d12/WuWaDepthSampler.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd87a1df9d0693af50aed33f82affebaec535fbf
+--- /dev/null
++++ b/src/mods/vr/d3d12/WuWaDepthSampler.hpp
+@@ -0,0 +1,218 @@
++#pragma once
++
++// WuWa test 3k: reads the scene depth for close-up match (see
++// utility/WuWaDepthProbe.hpp). About 16 times a second, while the camera script
++// asks, a sprite batch shrinks the part of the eye's depth around the 2D
++// frame's centre into a 32 x 32 float target, which is read back once its
++// fence completes (a frame or two later). The depth stays in the engine's own
++// end-of-frame state (readable by pixel shaders); nothing the game draws is
++// touched. Present thread only.
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <vector>
++
++#include <d3d12.h>
++#include <DirectXColors.h>
++#include <wrl/client.h>
++#include <spdlog/spdlog.h>
++#include <utility/Logging.hpp>
++
++#include <../../directxtk12-src/Inc/SpriteBatch.h>
++
++#include "CommandContext.hpp"
++#include "TextureContext.hpp"
++#include "../../../utility/WuWaDepthProbe.hpp"
++
++namespace wuwa_depth {
++class Sampler {
++public:
++    static constexpr UINT side = 32;
++    static constexpr UINT row_pitch = 256; // D3D12_TEXTURE_DATA_PITCH_ALIGNMENT
++    // Where to look. The view sits at the top left of the depth target.
++    struct View {
++        float eye_w{}, eye_h{};                  // one view's size in pixels
++        float left{}, right{}, top{}, bottom{};  // tangents of the eye's edges (left, bottom negative)
++        float x{}, y{}, z{};                     // the 2D camera's forward in the eye (x right, y up, -z ahead)
++        float near_cm{};                         // near plane (reversed, infinite depth: z = near / distance)
++    };
++
++    // The batch draws into DXGI_FORMAT_R32_FLOAT (D3D12Component owns it).
++    void update(ID3D12Device* device, ID3D12Resource* depth, const View& view, DirectX::DX12::SpriteBatch* batch) {
++        using namespace wuwa_depth_probe;
++        const auto now = GetTickCount64();
++        if (m_pending) {
++            if (!m_cmd.fence || m_cmd.fence->GetCompletedValue() < m_cmd.fence_value) return;
++            m_cmd.wait(0);
++            m_pending = false;
++            read(now);
++        }
++        if (!wanted()) {
++            // Never keep the engine's depth target (or a stale one) alive while idle.
++            if (m_source.texture && now - m_last > 3000) m_source.reset();
++            if (state.load() == Sampling) state.store(Idle);
++            return;
++        }
++        // Fast enough that a cut is measured within about 0.1 s.
++        if (now - m_last < 60 || device == nullptr || batch == nullptr) return;
++        m_last = now;
++        if (depth == nullptr) { state.store(NoDepth); return; }
++        if (!ensure(device, depth)) { state.store(Unsupported); return; }
++
++        // Region: the middle 35% of the 2D frame (16:9), around where its
++        // centre lands in this eye; the head may have turned away from it.
++        const float ahead = -view.z;
++        const float across = view.right - view.left, down = view.top - view.bottom;
++        if (ahead < 0.3f || across <= 0.0f || down <= 0.0f || view.near_cm <= 0.0f) { state.store(OutOfView); return; }
++        const float cx = view.x / ahead, cy = view.y / ahead;
++        const float hx = std::tan(fov.load() * 3.14159265f / 360.0f) * 0.35f, hy = hx * 9.0f / 16.0f;
++        const float u0 = (cx - hx - view.left) / across, u1 = (cx + hx - view.left) / across;
++        const float v0 = (view.top - (cy + hy)) / down, v1 = (view.top - (cy - hy)) / down;
++        const float cu0 = std::clamp(u0, 0.0f, 1.0f), cu1 = std::clamp(u1, 0.0f, 1.0f);
++        const float cv0 = std::clamp(v0, 0.0f, 1.0f), cv1 = std::clamp(v1, 0.0f, 1.0f);
++        if ((cu1 - cu0) * (cv1 - cv0) < 0.25f * (u1 - u0) * (v1 - v0)) { state.store(OutOfView); return; }
++        const auto desc = depth->GetDesc();
++        RECT source{LONG(cu0 * view.eye_w), LONG(cv0 * view.eye_h), LONG(cu1 * view.eye_w), LONG(cv1 * view.eye_h)};
++        source.right = std::clamp<LONG>(std::max<LONG>(source.right, source.left + 2), 2, LONG(desc.Width));
++        source.bottom = std::clamp<LONG>(std::max<LONG>(source.bottom, source.top + 2), 2, LONG(desc.Height));
++        m_view = view;
++        m_region = {(cu0 + cu1) * 0.5f, (cv0 + cv1) * 0.5f};
++
++        if (!m_cmd.ready()) {
++            m_cmd.wait(0);
++            if (!m_cmd.ready()) return;
++        }
++        auto* list = m_cmd.cmd_list.Get();
++        ID3D12DescriptorHeap* heaps[] = {m_source.srv_heap->Heap()};
++        list->SetDescriptorHeaps(1, heaps);
++        const auto rtv = m_target.get_rtv();
++        list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
++        const D3D12_VIEWPORT viewport{0.0f, 0.0f, float(side), float(side), 0.0f, 1.0f};
++        const D3D12_RECT scissor{0, 0, LONG(side), LONG(side)};
++        list->RSSetViewports(1, &viewport);
++        list->RSSetScissorRects(1, &scissor);
++        batch->SetViewport(viewport);
++        batch->Begin(list, DirectX::DX12::SpriteSortMode::SpriteSortMode_Immediate);
++        batch->Draw(m_source.get_srv_gpu(), DirectX::XMUINT2{uint32_t(desc.Width), uint32_t(desc.Height)},
++            RECT{0, 0, LONG(side), LONG(side)}, &source, DirectX::Colors::White);
++        batch->End();
++        barrier(list, m_target.texture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
++        D3D12_TEXTURE_COPY_LOCATION from{m_target.texture.Get(), D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX, {}};
++        from.SubresourceIndex = 0;
++        D3D12_TEXTURE_COPY_LOCATION to{m_readback.Get(), D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT, {}};
++        to.PlacedFootprint.Footprint = {DXGI_FORMAT_R32_FLOAT, side, side, 1, row_pitch};
++        list->CopyTextureRegion(&to, 0, 0, 0, &from, nullptr);
++        barrier(list, m_target.texture.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
++        m_cmd.has_commands = true;
++        m_pending = m_cmd.execute();
++        if (m_pending && state.load() != Sampling) state.store(Sampling);
++    }
++
++private:
++    static void barrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, D3D12_RESOURCE_STATES from,
++        D3D12_RESOURCE_STATES to) {
++        D3D12_RESOURCE_BARRIER b{};
++        b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
++        b.Transition.pResource = resource;
++        b.Transition.StateBefore = from;
++        b.Transition.StateAfter = to;
++        b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
++        list->ResourceBarrier(1, &b);
++    }
++
++    // A depth target is read through a typeless format's depth plane only.
++    static DXGI_FORMAT depth_view(DXGI_FORMAT format) {
++        switch (format) {
++        case DXGI_FORMAT_R24G8_TYPELESS: return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
++        case DXGI_FORMAT_R32G8X24_TYPELESS: return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
++        case DXGI_FORMAT_R32_TYPELESS: return DXGI_FORMAT_R32_FLOAT;
++        case DXGI_FORMAT_R16_TYPELESS: return DXGI_FORMAT_R16_UNORM;
++        default: return DXGI_FORMAT_UNKNOWN;
++        }
++    }
++
++    bool ensure(ID3D12Device* device, ID3D12Resource* depth) {
++        if (!m_cmd.cmd_list && !m_cmd.setup(L"WuWa depth probe")) return false;
++        if (!m_target.texture) {
++            D3D12_HEAP_PROPERTIES heap{D3D12_HEAP_TYPE_DEFAULT};
++            D3D12_RESOURCE_DESC desc{};
++            desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
++            desc.Width = side; desc.Height = side; desc.DepthOrArraySize = 1; desc.MipLevels = 1;
++            desc.Format = DXGI_FORMAT_R32_FLOAT; desc.SampleDesc.Count = 1;
++            desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
++            ComPtr<ID3D12Resource> texture;
++            if (FAILED(device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
++                    D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr, IID_PPV_ARGS(&texture)))) return false;
++            D3D12_HEAP_PROPERTIES readback_heap{D3D12_HEAP_TYPE_READBACK};
++            D3D12_RESOURCE_DESC buffer{};
++            buffer.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
++            buffer.Width = row_pitch * side; buffer.Height = 1; buffer.DepthOrArraySize = 1; buffer.MipLevels = 1;
++            buffer.SampleDesc.Count = 1; buffer.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
++            if (FAILED(device->CreateCommittedResource(&readback_heap, D3D12_HEAP_FLAG_NONE, &buffer,
++                    D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_readback)))) return false;
++            if (!m_target.setup(device, texture.Get(), DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32_FLOAT, L"WuWa depth probe target"))
++                return false;
++        }
++        if (m_source.texture.Get() != depth) {
++            m_source.reset();
++            const auto desc = depth->GetDesc();
++            m_format = depth_view(desc.Format);
++            if (m_format == DXGI_FORMAT_UNKNOWN || (desc.Flags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE) ||
++                desc.SampleDesc.Count != 1) {
++                SPDLOG_WARNING_EVERY_N_SEC(10, "[WuWaDepth] scene depth not readable: format={} flags={} samples={}",
++                    (int)desc.Format, (int)desc.Flags, desc.SampleDesc.Count);
++                return false;
++            }
++            // Only a shader view: an RTV on a depth target would be invalid.
++            m_source.texture = depth;
++            if (!m_source.create_srv(device, m_format)) { m_source.reset(); return false; }
++            spdlog::info("[WuWaDepth] reading scene depth {}x{} format {}", desc.Width, desc.Height, (int)desc.Format);
++        }
++        return true;
++    }
++
++    void read(uint64_t now) {
++        using namespace wuwa_depth_probe;
++        void* data{};
++        const D3D12_RANGE range{0, row_pitch * side};
++        if (FAILED(m_readback->Map(0, &range, &data)) || data == nullptr) return;
++        std::vector<float> found;
++        found.reserve(side * side);
++        for (UINT y = 0; y < side; ++y) {
++            const auto* row = reinterpret_cast<const float*>(static_cast<const uint8_t*>(data) + y * row_pitch);
++            for (UINT x = 0; x < side; ++x) {
++                const float z = row[x];
++                // Reversed, infinite depth: 0 is the sky, 1 the near plane.
++                if (z > 1e-7f && z <= 1.0f) found.push_back(m_view.near_cm / z);
++            }
++        }
++        const D3D12_RANGE none{0, 0};
++        m_readback->Unmap(0, &none);
++        const float share = float(found.size()) / float(side * side);
++        if (found.size() >= 16) {
++            std::sort(found.begin(), found.end());
++            const auto at = [&](float q) { return found[(std::min)(found.size() - 1, size_t(q * float(found.size())))]; };
++            nearest.store(at(0.05f)); p25.store(at(0.25f)); p50.store(at(0.5f));
++        } else {
++            nearest.store(0.0f); p25.store(0.0f); p50.store(0.0f);
++        }
++        valid.store(share);
++        seq.fetch_add(1);
++        if (now - m_logged >= 5000) {
++            m_logged = now;
++            spdlog::info("[WuWaDepth] fov={:.1f} region centre=({:.2f},{:.2f}) valid={:.2f} near={:.0f} p25={:.0f} p50={:.0f} cm",
++                fov.load(), m_region[0], m_region[1], share, nearest.load(), p25.load(), p50.load());
++        }
++    }
++
++    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
++    d3d12::CommandContext m_cmd{};
++    d3d12::TextureContext m_source{}, m_target{};
++    ComPtr<ID3D12Resource> m_readback{};
++    DXGI_FORMAT m_format{DXGI_FORMAT_UNKNOWN};
++    View m_view{};
++    std::array<float, 2> m_region{};
++    uint64_t m_last{}, m_logged{};
++    bool m_pending{false};
++};
++}
 diff --git a/src/mods/vr/runtimes/OpenXR.cpp b/src/mods/vr/runtimes/OpenXR.cpp
 index 2f4b3a99713f9c394776798af7e601314d11d76c..e652d9efcf2b18da27230f1ccd8107da5b729543 100644
 --- a/src/mods/vr/runtimes/OpenXR.cpp
@@ -322291,6 +322713,60 @@ index 0000000000000000000000000000000000000000..36971d116798a1a46811513b7e4636c2
 +    if (active == Api::None) return Api::D3D12;
 +    if (initialized || real_present_seen) return active;
 +    return active == Api::D3D12 ? Api::D3D11 : Api::D3D12;
++}
++}
+diff --git a/src/utility/WuWaDepthProbe.hpp b/src/utility/WuWaDepthProbe.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..15055f8c5af5d64ed9060d16f34e5da75023c3f6
+--- /dev/null
++++ b/src/utility/WuWaDepthProbe.hpp
+@@ -0,0 +1,48 @@
++#pragma once
++
++// Close-up match from the rendered scene (test 3k). Story shots often set no
++// focus, or one that does not name the subject (3j: almost every shot stayed
++// wide), so the distance comes from what is actually drawn: the camera script
++// asks with the 2D camera's horizontal FOV, the D3D12 present hook
++// (mods/vr/d3d12/WuWaDepthSampler.hpp) samples the scene depth around where
++// the 2D frame's centre lands in the eye image, and the script reads the
++// distances back. Any thread.
++#include <windows.h>
++
++#include <atomic>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <string>
++
++namespace wuwa_depth_probe {
++// Request: the 2D camera's horizontal FOV in degrees (0: not wanted). A
++// request lapses after 3 s, so samples stop if the script stops asking.
++inline std::atomic<float> fov{0.0f};
++inline std::atomic<uint64_t> asked_at{0};
++// Result, in cm along the view: the nearest thing in the region (5th
++// percentile), its 25th percentile (the subject) and median, and the share of
++// the region with geometry (not sky). seq counts finished samples.
++inline std::atomic<uint32_t> seq{0};
++inline std::atomic<float> nearest{0.0f}, p25{0.0f}, p50{0.0f}, valid{0.0f};
++enum State : int { Idle = 0, Sampling = 1, NoDepth = -1, Unsupported = -2, OutOfView = -3 };
++inline std::atomic<int> state{Idle};
++
++inline void request(const std::string& text) {
++    const float value = std::strtof(text.c_str(), nullptr);
++    fov.store(value > 1.0f && value < 120.0f ? value : 0.0f);
++    asked_at.store(GetTickCount64());
++}
++
++inline bool wanted() {
++    return fov.load() > 0.0f && GetTickCount64() - asked_at.load() < 3000;
++}
++
++// "seq nearest p25 p50 valid state" for the script.
++inline std::string report() {
++    char text[96];
++    std::snprintf(text, sizeof(text), "%u %.0f %.0f %.0f %.2f %d", seq.load(), nearest.load(), p25.load(),
++        p50.load(), valid.load(), state.load());
++    return text;
 +}
 +}
 diff --git a/src/utility/WuWaDepthScale.hpp b/src/utility/WuWaDepthScale.hpp

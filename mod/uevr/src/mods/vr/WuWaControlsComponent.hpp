@@ -189,8 +189,8 @@ private:
     // The second eye is built from a default camera: copy only the blur, or every
     // plain post-process value (grading, vignette, exposure...) as well (test 3g).
     const ModCombo::Ptr m_stereo_effects{ModCombo::create("WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}, 0)};
-    // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
-    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
+    // Close-up subject: measured in the rendered depth (3k) or the game's focus distance (3j).
+    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Rendered depth (3k)", "Game focus only (3j)"}, 0)};
     const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
     // Full VR has its own strength (test 3h: half looked right in full VR, 1x on screens).
     const ModSlider::Ptr m_stereo_dof_strength_vr{ModSlider::create("WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.5f)};
@@ -209,6 +209,16 @@ private:
         void config_load(const utility::Config&, bool) override { set(""); }
         void config_save(utility::Config&) override {}
     } m_lens_status;
+    // Close-up match measures its subject in the rendered depth (test 3k): the
+    // camera script writes the 2D camera's FOV (0 stops) and reads back
+    // "seq nearest p25 p50 valid state" (utility/WuWaDepthProbe.hpp). Transient.
+    struct DepthProbe : ModString {
+        DepthProbe() : ModString{"WuWaControls_DepthProbe", ""} {}
+        std::string get() const override;
+        void set(const std::string& text) override;
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    } m_depth_probe;
 
     // Outside control recovery: resetting camera/input does not reset language.
     const ModString::Ptr m_language{ModString::create("WuWaLocale", "en")};

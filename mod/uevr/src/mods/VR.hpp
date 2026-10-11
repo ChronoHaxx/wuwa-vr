@@ -166,9 +166,15 @@ public:
     void set_sightseeing_on(bool on, const char* why);
     // The VR menu's laser: works whether or not motion-controller input or VR
     // controllers mode is on, while UEVR's UI is open and the pointing
-    // controller moved in the last 10 seconds or a VR button was used in the
-    // last 30.
+    // controller turned or a VR button was used in the last 8 seconds, and not
+    // since a gamepad or the keyboard took over (menu_pointer_yield).
     bool menu_pointer_active() const;
+    // A gamepad or the keyboard was used in the menu: the laser sleeps at once,
+    // until the controller is aimed again or a VR button is pressed.
+    void menu_pointer_yield();
+    // Both VR controllers' thumbsticks (-1..1) while UEVR's UI is open, whether
+    // or not something else also turns them into a gamepad.
+    bool menu_sticks(glm::vec2& left, glm::vec2& right) const;
     std::string menu_pointer_status() const; // English, for the menu
     // The VR controllers as the menu sees them, read straight from the runtime
     // while UEVR's UI is open and nothing else (VR controllers mode, UEVR's
@@ -1292,6 +1298,7 @@ private:
     // Turning the pointing controller keeps the menu laser awake, not only buttons.
     glm::vec3 m_menu_pointer_aim{};
     std::chrono::steady_clock::time_point m_menu_pointer_motion{};
+    std::chrono::steady_clock::time_point m_menu_pointer_slept{};
     void update_menu_pointer_motion();
     std::atomic<bool> m_sightseeing_on{false};
     std::atomic<int32_t> m_sightseeing_target{0};

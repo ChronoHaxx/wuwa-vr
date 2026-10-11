@@ -20,6 +20,7 @@
 #include "d3d12/CommandContext.hpp"
 #include <utility/WuWaSteadyView.hpp>
 #include "d3d12/TextureContext.hpp"
+#include "d3d12/WuWaDepthSampler.hpp"
 #include "../WindowMode.hpp"
 
 class VR;
@@ -77,6 +78,10 @@ private:
     wuwa_steady_view::Smoother m_steady_view{};
     std::unique_ptr<DirectX::DX12::SpriteBatch> m_game_batch{};
     std::unique_ptr<DirectX::DX12::SpriteBatch> m_ui_batch_alpha_invert{};
+    // WuWa test 3k: close-up match measures its subject in the scene depth.
+    std::unique_ptr<wuwa_depth::Sampler> m_depth_sampler{};
+    std::unique_ptr<DirectX::DX12::SpriteBatch> m_depth_batch{};
+    void sample_wuwa_depth(VR* vr, ID3D12Device* device, ID3D12Resource* scene_depth);
 
     ID3D12Resource* m_last_checked_native{nullptr};
 

@@ -260,8 +260,19 @@ bool screen_view() {
 }
 const char* menu_yaw_key() { return screen_view() ? "UI_WuWaMenuYawScreen" : "UI_WuWaMenuYaw"; }
 const char* menu_pitch_key() { return screen_view() ? "UI_WuWaMenuPitchScreen" : "UI_WuWaMenuPitch"; }
+// On a screen view "Low" is worked out from the picture each frame (the overlay
+// writes it into the screen keys); moving the menu by hand keeps it where it is.
+bool screen_low() {
+    auto* low = typed<bool>("UI_WuWaMenuScreenLow");
+    return screen_view() && low && low->value();
+}
+void leave_screen_low() {
+    if (!screen_view()) return;
+    if (auto* low = typed<bool>("UI_WuWaMenuScreenLow")) low->value() = false;
+}
 
 void start_moving_menu() {
+    leave_screen_low();
     move_was = {true, true, true, true};
     move_last = 0.0;
     moving_menu.store(true, std::memory_order_relaxed);
@@ -272,7 +283,7 @@ Item menu_angle_slider(const char* label, const char* help, bool vertical) {
     const auto key = [vertical] { return vertical ? menu_pitch_key() : menu_yaw_key(); };
     item.enabled = [key] { return typed<float>(key()) != nullptr; };
     item.get_float = [key] { auto* v = typed<float>(key()); return v ? v->value() : 0.0f; };
-    item.set_float = [key](float value) { if (auto* v = typed<float>(key())) v->value() = value; };
+    item.set_float = [key](float value) { leave_screen_low(); if (auto* v = typed<float>(key())) v->value() = value; };
     item.min = vertical ? -60.0f : -150.0f; item.max = vertical ? 60.0f : 150.0f; item.step = 2.0f; item.format = "%.0f deg";
     return item;
 }
@@ -283,12 +294,13 @@ Item menu_place_choice() {
     static constexpr Spot spots[] = {{0.0f, 0.0f}, {0.0f, -28.0f}, {-40.0f, 0.0f}, {40.0f, 0.0f}};
     auto item = make(Kind::Choice, "Menu place",
         "Where this menu floats around you. Full VR and the screen views each keep their own place; on a screen view "
-        "Low keeps it under the picture.");
+        "Low sits just under the picture, whatever its size and distance, and the menu always stays in front of it.");
     item.enabled = [] { return typed<float>(menu_yaw_key()) != nullptr; };
     item.get_int = [] {
         auto* yaw = typed<float>(menu_yaw_key());
         auto* pitch = typed<float>(menu_pitch_key());
         if (!yaw || !pitch) return 0;
+        if (screen_low()) return 1;
         for (int i = 0; i < 4; ++i) {
             if (std::abs(yaw->value() - spots[i].yaw) < 1.0f && std::abs(pitch->value() - spots[i].pitch) < 1.0f) return i;
         }
@@ -298,6 +310,12 @@ Item menu_place_choice() {
         auto* yaw = typed<float>(menu_yaw_key());
         auto* pitch = typed<float>(menu_pitch_key());
         if (!yaw || !pitch || value < 0 || value > 3) return;
+        if (screen_view()) {
+            if (auto* low = typed<bool>("UI_WuWaMenuScreenLow")) {
+                low->value() = value == 1;
+                if (value == 1) return;
+            }
+        }
         yaw->value() = spots[value].yaw;
         pitch->value() = spots[value].pitch;
     };
@@ -322,9 +340,10 @@ Item lens_nearest_slider() {
 
 Item lens_subject_choice() {
     return setting_choice("Close-up aims at",
-        "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match "
-        "stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: the test 3f behaviour.",
-        "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"});
+        "Rendered depth: how far away the middle of the 2D shot really is, measured in the picture just after each cut, so "
+        "every shot works; Close-up match stops behind anything nearer, such as a shoulder or a prop. Game focus only: the "
+        "test 3j behaviour (shots without a focus stay at the game camera).",
+        "WuWaControls_LensSubject", {"Rendered depth", "Game focus only (3j)"});
 }
 
 Item lens_follow_choice() {
@@ -874,13 +893,19 @@ Moves read_moves() {
     const bool prev_page = once(ImGuiKey_GamepadL1) || (once(ImGuiKey_Tab) && io.KeyShift) || pad_prev;
     const bool next_page = once(ImGuiKey_GamepadR1) || (once(ImGuiKey_Tab) && !io.KeyShift) || pad_next;
     if (once(ImGuiKey_GamepadFaceUp) || once(ImGuiKey_M)) start_moving_menu();
+    // A gamepad or the keyboard ends the laser at once (otherwise it waits for a
+    // controller that was put down or switched off to go quiet).
+    const bool used = held.up || held.down || held.left || held.right || accept || back || prev_page || next_page;
+    if (used && !pad_accept && !pad_back && !pad_prev && !pad_next && VR::get()->menu_pointer_active()) {
+        VR::get()->menu_pointer_yield();
+    }
     return mover.read(held, accept, back, prev_page, next_page, seconds());
 }
 
 // Move menu: sticks, D-pad, arrow keys or WASD turn the menu around you (a
-// controller's laser aim does it in the overlay instead); the right stick or
-// Page Up / Down changes the distance. A, B, Y, Enter, Escape, Space, M, a
-// controller's A / B or a click puts it down.
+// controller's laser aim does it in the overlay instead); the right stick, a VR
+// thumbstick or Page Up / Down changes the distance. A, B, Y, Enter, Escape,
+// Space, M, a controller's A / B or a click puts it down.
 void move_menu() {
     const auto analog = [](ImGuiKey key) { return ImGui::GetKeyData(key)->AnalogValue; };
     const auto down = [](ImGuiKey key) { return ImGui::IsKeyDown(key); };
@@ -897,6 +922,13 @@ void move_menu() {
     VR::MenuPad pad{};
     const bool direct = VR::get()->menu_controller_pad(pad);
     if (direct) { x += pad.lx; y += pad.ly; z += pad.ry; }
+    // The VR thumbsticks set the distance even while the game (VR controllers
+    // mode) or UEVR's motion controls own them; the stronger push counts once.
+    glm::vec2 left{}, right{};
+    if (!direct && VR::get()->menu_sticks(left, right)) {
+        const float stick = std::abs(right.y) >= std::abs(left.y) ? right.y : left.y;
+        if (std::abs(stick) > std::abs(z)) z = stick;
+    }
     const auto press = [](bool now, bool& was) { const bool pressed = now && !was; was = now; return pressed; };
     const bool pad_done = press(direct && pad.accept, move_was.accept) | press(direct && pad.back, move_was.back);
     const double now = seconds();
@@ -937,6 +969,11 @@ bool moving() {
     return moving_menu.load(std::memory_order_relaxed) && showing();
 }
 
+float height_share(float aspect) {
+    const float fraction = std::clamp(VR::get()->vr_menu_size(), 0.4f, 1.0f);
+    return (std::min)(aspect * 780.0f / 1200.0f, 1.0f) * fraction;
+}
+
 bool draw(const ImVec2& target_size) {
     if (!wuwa_test::is_wuwa()) return false;
     tick();
@@ -971,6 +1008,7 @@ bool draw(const ImVec2& target_size) {
     }
     // The right mouse button drags the menu around you at any time.
     if (!moving_menu.load(std::memory_order_relaxed) && io.MouseDown[1] && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)) {
+        leave_screen_low();
         if (auto* yaw = typed<float>(menu_yaw_key())) yaw->value() = std::clamp(yaw->value() + io.MouseDelta.x * 0.1f, -150.0f, 150.0f);
         if (auto* pitch = typed<float>(menu_pitch_key())) pitch->value() = std::clamp(pitch->value() - io.MouseDelta.y * 0.1f, -60.0f, 60.0f);
     }
@@ -979,7 +1017,7 @@ bool draw(const ImVec2& target_size) {
     wuwa_menu::draw(pages, state, moves, pos, size, look);
     if (moving_menu.load(std::memory_order_relaxed)) {
         const char* text = VR::get()->menu_pointer_active() ?
-            "Moving the menu: point where you want it, then pull the trigger." :
+            "Moving the menu: point where you want it, thumbstick up / down for distance, then pull the trigger." :
             "Moving the menu: stick, D-pad or arrow keys. Right stick or Page Up / Down: distance. A or Enter: put it down.";
         auto* list = ImGui::GetForegroundDrawList();
         ImFont* font = wuwa_l10n::sheet_font() ? wuwa_l10n::sheet_font() : ImGui::GetFont();

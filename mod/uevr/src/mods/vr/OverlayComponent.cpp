@@ -811,8 +811,8 @@ void OverlayComponent::update_overlay_openvr() {
         glm_matrix[3] += vr->get_standing_origin();
 
         if (g_framework->is_drawing_ui()) {
-            place_wuwa_menu(glm_matrix);
-            glm_matrix[3] -= glm_matrix[2] * m_framework_distance->value();
+            const float menu_distance = place_wuwa_menu(glm_matrix, m_framework_size->value(), 16.0f / 9.0f);
+            glm_matrix[3] -= glm_matrix[2] * menu_distance;
         } else {
             glm_matrix[3] -= glm_matrix[2] * (m_slate_distance->value() - 0.01f);
 
@@ -1161,15 +1161,34 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
 }
 
 // WuWa: turns the VR menu's frame about the standing origin before it is pushed
-// out to its distance, so it floats where it was put and still faces you. While
-// "Move menu" is on and a controller's laser is in use, the menu follows its aim.
-void OverlayComponent::place_wuwa_menu(glm::mat4& frame) {
-    if (!wuwa_test::is_wuwa() || !wuwa_menu_host::showing()) return;
+// out to its distance (returned), so it floats where it was put and still faces
+// you. While "Move menu" is on and a controller's laser is in use, the menu
+// follows its aim. On the stereo screen and mono theatre the menu stays in front
+// of the picture (SteamVR hides layers behind it), and "Low" puts its top edge
+// just under the picture, worked out from the screen's size, height and distance.
+float OverlayComponent::place_wuwa_menu(glm::mat4& frame, float quad_height, float quad_aspect) {
+    float distance = m_framework_distance->value();
+    if (!wuwa_test::is_wuwa() || !wuwa_menu_host::showing()) return distance;
     auto& vr = VR::get();
     const bool screen = vr->is_using_2d_screen() || vr->is_using_mono_theatre();
     auto& yaw = screen ? m_wuwa_menu_yaw_screen : m_wuwa_menu_yaw;
     auto& pitch = screen ? m_wuwa_menu_pitch_screen : m_wuwa_menu_pitch;
-    if (wuwa_menu_host::moving() && vr->menu_pointer_active() && !vr->get_controllers().empty()) {
+    const bool aiming = wuwa_menu_host::moving() && vr->menu_pointer_active() && !vr->get_controllers().empty();
+    if (screen) {
+        const float half = 0.5f * quad_height * wuwa_menu_host::height_share(quad_aspect);  // menu, metres
+        const float screen_distance = std::max(m_slate_distance->value(), 0.3f);
+        // Every point of the tilted menu is at most distance / cos(half angle) deep.
+        const float wide = std::atan2(half, std::max(distance, 0.3f));
+        distance = std::min(distance, std::max(0.3f, (screen_distance - 0.15f) * std::cos(wide)));
+        if (aiming) m_wuwa_menu_screen_low->value() = false;
+        if (m_wuwa_menu_screen_low->value()) {
+            const float bottom = std::atan2(m_slate_y_offset->value() - 0.5f * m_slate_size->value() * hud_shape(), screen_distance);
+            const float angle = std::atan2(half, distance);
+            yaw->value() = 0.0f;
+            pitch->value() = std::clamp(glm::degrees(bottom - angle) - 2.0f, -45.0f, 0.0f);
+        }
+    }
+    if (aiming) {
         const auto index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
         const auto aim = glm::quat{vr->get_rotation(index, false)} * glm::vec3{0.0f, 0.0f, -1.0f};
         const auto local = glm::inverse(glm::mat3{frame}) * aim;
@@ -1182,6 +1201,7 @@ void OverlayComponent::place_wuwa_menu(glm::mat4& frame) {
     const auto turn = glm::angleAxis(glm::radians(-yaw->value()), glm::vec3{0.0f, 1.0f, 0.0f}) *
         glm::angleAxis(glm::radians(pitch->value()), glm::vec3{1.0f, 0.0f, 0.0f});
     frame = frame * Matrix4x4f{turn};
+    return distance;
 }
 
 std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::OpenXR::generate_framework_ui_quad() {
@@ -1269,8 +1289,9 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
     layer.size = {meters_w, meters_h};
 
     if (g_framework->is_drawing_ui()) {
-        m_parent->place_wuwa_menu(glm_matrix);
-        glm_matrix[3] -= glm_matrix[2] * m_parent->m_framework_distance->value();
+        const float menu_distance = m_parent->place_wuwa_menu(glm_matrix, adjusted_size_meters,
+            (float)ui_swapchain.width / (float)ui_swapchain.height);
+        glm_matrix[3] -= glm_matrix[2] * menu_distance;
     } else {
         glm_matrix[3] -= glm_matrix[2] * (m_parent->m_slate_distance->value() - 0.01f);
 

@@ -181,6 +181,8 @@ int wmain(int argc,wchar_t** argv) {
         if (argc!=7 && argc!=8) throw std::runtime_error("Expected openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..1920), optional stop file");
         const UINT pid=std::stoul(argv[2]), seconds=std::stoul(argv[4]), fps=std::stoul(argv[5]), ew=std::stoul(argv[6]); out=argv[3];
         if (!pid||seconds<1||seconds>300||fps<10||fps>60||ew<640||ew>1920||ew%2) throw std::runtime_error("Invalid recording bounds");
+        // Ends the recording cleanly when the game exits (a crash included) instead of waiting out the time.
+        const HANDLE game=OpenProcess(SYNCHRONIZE,FALSE,pid);
         if (std::filesystem::exists(out)) throw std::runtime_error("Output exists; refusing to overwrite");
         if (!steamvr_running()) throw std::runtime_error("SteamVR is not running; recorder will not launch it");
         library=LoadLibraryExW(argv[1],nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
@@ -214,15 +216,25 @@ int wmain(int argc,wchar_t** argv) {
             StereoResize resize; resize.open(device.Get(),ew,eh);
             Sleep(250); const auto start=std::chrono::steady_clock::now();
             uint64_t count=0; const auto start_ms=utc();
+            // A hitch, loading stall or hang can hand SteamVR's scene to another process. Nothing is read
+            // then (another application is never captured); the video holds its last frame and resumes
+            // when WuWa has the scene again, so one recording spans scene changes.
+            std::string end_reason="time_limit"; Json pauses=Json::array(); double paused_at=-1, t=0;
             while (true) {
                 const auto current=std::chrono::steady_clock::now();
-                const double t=std::chrono::duration<double>(current-start).count();
-                if (t>=seconds || std::filesystem::exists(out/L"STOP") || (argc==8&&std::filesystem::exists(argv[7]))) break;
-                if (compositor->GetCurrentSceneFocusProcess()!=pid) throw std::runtime_error("Scene changed; recording stopped before capturing another application");
+                t=std::chrono::duration<double>(current-start).count();
+                if (t>=seconds) break;
+                if (std::filesystem::exists(out/L"STOP") || (argc==8&&std::filesystem::exists(argv[7]))) { end_reason="stopped"; break; }
+                if (game && WaitForSingleObject(game,0)==WAIT_OBJECT_0) { end_reason="game_exited"; break; }
+                if (compositor->GetCurrentSceneFocusProcess()!=pid) {
+                    if (paused_at<0) paused_at=t;
+                    Sleep(100); continue;
+                }
                 const auto capture_begin=utc();
                 vr::Compositor_FrameTiming timing{sizeof(timing)}; const bool timed=compositor->GetFrameTiming(&timing);
                 resize.read(context.Get(),eyes[0].view,eyes[1].view,eyes[0].srgb,eyes[1].srgb,pixels);
-                if (compositor->GetCurrentSceneFocusProcess()!=pid) throw std::runtime_error("Scene changed during readback; frame discarded");
+                if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; continue; }  // frame discarded
+                if (paused_at>=0) { pauses.push_back({{"from_s",paused_at},{"to_s",t}}); paused_at=-1; }
                 bool nonblack=false; for (size_t i=0;i<pixels.size();i+=128) if (pixels[i]||pixels[i+1]||pixels[i+2]) { nonblack=true; break; }
                 if (!count&&!nonblack) throw std::runtime_error("Blank initial mirror; no useful video");
                 const auto capture_end=utc();
@@ -235,8 +247,10 @@ int wmain(int argc,wchar_t** argv) {
                 if (remaining>0) Sleep(static_cast<DWORD>(remaining));
             }
             encoder.close();
+            if (paused_at>=0) pauses.push_back({{"from_s",paused_at},{"to_s",t}});
             const double elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
-            result={{"status","recorded"},{"pid",pid},{"started_unix_ms",start_ms},{"frames",count},{"width",ew*2},{"height",eh},
+            result={{"status","recorded"},{"end_reason",end_reason},{"scene_pauses",pauses},
+                {"pid",pid},{"started_unix_ms",start_ms},{"frames",count},{"width",ew*2},{"height",eh},
                 {"fps_target",fps},{"captured_fps",count/elapsed},{"wall_seconds",elapsed},
                 {"timing","wall-clock presentation timestamps; encoder may repeat frames to meet target FPS"},
                 {"source_eye_size",{eyes[0].width,eyes[0].height}},{"method","OpenVR per-eye mirror; GPU SBS resize and one readback"},

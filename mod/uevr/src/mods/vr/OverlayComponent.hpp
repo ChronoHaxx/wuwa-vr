@@ -132,7 +132,12 @@ private:
     const ModSlider::Ptr m_wuwa_menu_pitch{ ModSlider::create("UI_WuWaMenuPitch", -60.0f, 60.0f, 0.0f) };
     const ModSlider::Ptr m_wuwa_menu_yaw_screen{ ModSlider::create("UI_WuWaMenuYawScreen", -150.0f, 150.0f, 0.0f) };
     const ModSlider::Ptr m_wuwa_menu_pitch_screen{ ModSlider::create("UI_WuWaMenuPitchScreen", -60.0f, 60.0f, -28.0f) };
-    void place_wuwa_menu(glm::mat4& frame);
+    // On a screen view the menu's "Low" place is worked out from the picture
+    // (just under its bottom edge); moving the menu there turns this off.
+    const ModToggle::Ptr m_wuwa_menu_screen_low{ ModToggle::create("UI_WuWaMenuScreenLow", true) };
+    // Turns the menu's frame to its place; returns the distance to push it out.
+    // quad_height: the UI image's full height in metres; quad_aspect: width / height.
+    float place_wuwa_menu(glm::mat4& frame, float quad_height, float quad_aspect);
 
 public:
     OverlayComponent() 
@@ -161,7 +166,8 @@ public:
             *m_wuwa_menu_yaw,
             *m_wuwa_menu_pitch,
             *m_wuwa_menu_yaw_screen,
-            *m_wuwa_menu_pitch_screen
+            *m_wuwa_menu_pitch_screen,
+            *m_wuwa_menu_screen_low
         };
     }
 

@@ -71,6 +71,7 @@
 #include "../../utility/WuWaSecondEyeBuild.hpp"
 #include "../../utility/WuWaPerf.hpp"
 #include "../../utility/WuWaMonoNativeProjection.hpp"
+#include "../../utility/WuWaDofSync.hpp"
 #include "../../utility/WuWaCinematicMetadata.hpp"
 
 #include "FFakeStereoRenderingHook.hpp"
@@ -107,6 +108,10 @@ struct ProjectionCall {
     AuthoredCamera camera{};
 };
 thread_local ProjectionCall* current_projection_call{};
+// The primary eye's authored lens, for the stereo screen (test 3f). Captured per
+// draw; the last value covers callers outside the capture's draw scope.
+std::atomic<float> screen_authored_fov{0.0f};
+std::atomic<uint64_t> screen_authored_ms{0};
 struct InitAspectObservation {
     wuwa_cinematic_metadata::Aspect before{}, after{};
     bool read{}, after_read{}, shared{};
@@ -178,8 +183,25 @@ void capture_authored_camera(safetyhook::Context& context) noexcept {
         if (!wuwa_mono_native::map_relative(camera.full, camera.crop, camera.full)) return;
     }
     camera.captured = true;
+    if (call->pass == 2) {
+        screen_authored_fov.store(camera.fov, std::memory_order_relaxed);
+        screen_authored_ms.store(GetTickCount64(), std::memory_order_relaxed);
+    }
     ++wuwa_cinematic_framing::authored_views;
     if (camera.constrained) wuwa_cinematic_framing::constrained_ms.store(GetTickCount64(), std::memory_order_relaxed);
+}
+// Stereo screen lens: the game's authored horizontal FOV, so the screen frames
+// shots exactly like the 2D view (it used a fixed 90 degrees). The second eye's
+// own capture can report the engine's fallback FOV, so the primary eye's is used.
+float stereo_screen_fov() noexcept {
+    if (!VR::get()->is_screen_game_lens()) return 90.0f;
+    float fov{};
+    if (current_mono_draw && current_mono_draw->primary_camera.captured) fov = current_mono_draw->primary_camera.fov;
+    else if (current_projection_call && current_projection_call->pass == 2 && current_projection_call->camera.captured)
+        fov = current_projection_call->camera.fov;
+    else if (const auto at = screen_authored_ms.load(std::memory_order_relaxed); at && GetTickCount64() - at < 1000)
+        fov = screen_authored_fov.load(std::memory_order_relaxed);
+    return std::isfinite(fov) && fov >= 5.0f && fov <= 170.0f ? fov : 90.0f;
 }
 bool native_mono_output(MonoProjection* data, uint32_t pass) noexcept {
     if (!current_mono_draw || !current_mono_draw->enabled) return false;
@@ -4155,6 +4177,9 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     // LOD sync fix candidate: the second view takes the first view's LOD distance
     // factor and FOV, so both eyes choose the same far LODs.
     if (prev_count == 2) wuwa_shadow::lod_sync(vr->get_wuwa_controls().sync_eye_lod(), view_family, views[0], views[1], prev_count);
+    // Depth of field experiment: one eye's settings into the other (test 3d: one eye blurred).
+    if (prev_count == 2 && wuwa_test::is_wuwa())
+        wuwa_dof_sync::sync(vr->get_wuwa_controls().stereo_dof(), vr->get_wuwa_controls().stereo_dof_source(), views[0], views[1]);
     // Far lighting fix: count eye pairs so a CLV refill can follow a start, a loading gap or a teleport.
     if (prev_count == 2) {
         wuwa_clv::on_stereo_frame();
@@ -5996,7 +6021,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
 
         const auto head_offset = quat_converter * (vqi_norm * (pos * world_scale));
         const auto head_offset_flat = quat_converter * (vqi_norm * (pos_flat * world_scale));
-        const auto eye_separation = quat_converter * (glm::normalize(new_rotation) * (eye_offset * world_scale));
+        auto eye_separation = quat_converter * (glm::normalize(new_rotation) * (eye_offset * world_scale));
+        if (is_2d_screen && wuwa_test::is_wuwa()) {
+            // A screen is fixed: separate the eyes along the game camera's right
+            // axis only (head tilt must not skew the 3D). At depth 1 the separation
+            // is the eye distance scaled by the lens, so a close-up's on-screen
+            // depth matches what the same subject has at 90 degrees.
+            const float fov = stereo_screen_fov();
+            const float lens = std::tan(glm::radians(fov) * 0.5f);
+            const auto sideways = glm::vec3{eye_offset.x * lens * std::clamp(vr->screen_depth(), 0.0f, 3.0f), 0.0f, 0.0f};
+            eye_separation = quat_converter * (vqi_norm * (sideways * world_scale));
+        }
 
         if (!has_double_precision) {
             if (!is_2d_screen) {
@@ -6189,7 +6224,7 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
     }
 
     if (VR::get()->is_using_2d_screen()) {
-        float fov = 90.0f; // todo, get from FMinimalViewInfo
+        const float fov = wuwa_test::is_wuwa() ? stereo_screen_fov() : 90.0f;
 
         const float width = VR::get()->get_hmd_width();
         const float height = VR::get()->get_hmd_height();

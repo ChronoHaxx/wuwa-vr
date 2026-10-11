@@ -23,6 +23,8 @@ namespace vrmod {
 class WuWaControlsComponent : public ModComponent {
 public:
     bool sync_eye_lod() const { return m_sync_eye_lod->value(); }
+    bool stereo_dof() const { return m_stereo_dof->value(); }
+    int stereo_dof_source() const { return m_stereo_dof_source->value(); }
     bool refill_far_lighting() const { return m_refill_far_lighting->value(); }
     bool suppress_npc_rim() const { return m_suppress_npc_rim.requested.load(); }
     bool steady_desktop_view() const { return m_steady_desktop->value(); }
@@ -175,11 +177,15 @@ private:
     // Close-up match (02_WuWaVR_PolarControls.lua): how much of a long-lens
     // shot's subject size full VR keeps, in percent; 0 is off. Its live report
     // is transient, like the HUD status above.
-    const ModSlider::Ptr m_lens_match{ModSlider::create("WuWaControls_LensMatch", 0.0f, 100.0f, 75.0f)};
+    const ModSlider::Ptr m_lens_match{ModSlider::create("WuWaControls_LensMatch", 0.0f, 150.0f, 75.0f)};
     // The closest the eye may come to the subject, in cm.
     const ModSlider::Ptr m_lens_nearest{ModSlider::create("WuWaControls_LensNearest", 5.0f, 150.0f, 10.0f)};
     // Experiment: depth of field in stereo views (the camera script sets the show flag).
     const ModToggle::Ptr m_stereo_dof{ModToggle::create("WuWaStereo_DepthOfField", false)};
+    // Which eye's depth of field both eyes use (the second view lacks it), and a
+    // blur multiplier the camera script applies to the f-stop in full VR.
+    const ModCombo::Ptr m_stereo_dof_source{ModCombo::create("WuWaStereo_DepthOfFieldSource", {"First view", "Second view"}, 0)};
+    const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
     struct LensStatus : ModString {
         LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}
         mutable std::mutex mutex;

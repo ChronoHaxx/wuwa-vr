@@ -1237,16 +1237,23 @@ end
 function dof.update(pcm,fov,dolly)
     local on=enabled("WuWaStereo_DepthOfField")
     if on~=dof.want then dof.want=on; dof.flag=dof.set_flag(on); dof.wrote_f=nil; dof.wrote_d=nil end
-    if not on or not pcm or mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre") then return end
+    if not on or not pcm or mode~=0 then return end
+    -- Screens use the game's own lens (test 3f), so only full VR needs the lens
+    -- compensation; the strength multiplier applies everywhere.
+    local screen=enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre")
+    local strength=number("WuWaStereo_DepthOfFieldStrength",1,0.25,4)
     pcall(function()
         local pp=pcm.CameraCachePrivate.POV.PostProcessSettings
         local f,d=pp.DepthOfFieldFstop,pp.DepthOfFieldFocalDistance
         -- A value equal to last frame's write means the game did not refresh it.
         if dof.wrote_f and math.abs(f-dof.wrote_f)<1e-4 then f=dof.base_f else dof.base_f=f end
         if dof.wrote_d and math.abs(d-dof.wrote_d)<1e-3 then d=dof.base_d else dof.base_d=d end
-        if pp.bOverride_DepthOfFieldFstop and type(f)=="number" and f>0 and type(fov)=="number" and fov<60 then
-            local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2)
-            dof.wrote_f=math.max(0.05,f*k*k); pp.DepthOfFieldFstop=dof.wrote_f
+        local kk=1
+        if not screen and type(fov)=="number" and fov<60 then
+            local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2); kk=k*k
+        end
+        if pp.bOverride_DepthOfFieldFstop and type(f)=="number" and f>0 and (kk~=1 or strength~=1) then
+            dof.wrote_f=math.max(0.05,f*kk/strength); pp.DepthOfFieldFstop=dof.wrote_f
         end
         if pp.bOverride_DepthOfFieldFocalDistance and type(d)=="number" and dolly>0 then
             dof.wrote_d=math.max(10,d-dolly); pp.DepthOfFieldFocalDistance=dof.wrote_d
@@ -1262,7 +1269,7 @@ end
 function lens.update()
     local pc=api:get_player_controller(0)
     local pcm=pc and pc.PlayerCameraManager
-    local strength=number("WuWaControls_LensMatch",75,0,100)/100
+    local strength=number("WuWaControls_LensMatch",75,0,150)/100
     -- How close the eye may come to the subject. The old fixed 60 cm capped
     -- the effect at about 40% for the game's usual 1-2 m focus distances; in
     -- the headset 10 cm suited best (test 3d).

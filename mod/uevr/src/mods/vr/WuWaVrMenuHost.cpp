@@ -24,6 +24,7 @@
 #include "Mod.hpp"
 #include "Mods.hpp"
 #include "mods/VR.hpp"
+#include "utility/WuWaDofSync.hpp"
 #include "utility/WuWaLocalization.hpp"
 #include "utility/WuWaStepPlan.hpp"
 #include "utility/WuWaVrMenu.hpp"
@@ -250,9 +251,9 @@ Item live_text(std::function<std::string()> text) {
 Item lens_slider() {
     return setting_slider("Close-up match",
         "Dialogue shots use a zoom lens your headset's wide view can't show, so people look small and far. This moves you nearer, "
-        "per shot, so they keep this share of their 2D size. 0% is the game camera's own spot; 100% matches the 2D shot. "
-        "Game camera in full VR only.",
-        "WuWaControls_LensMatch", 0.0f, 100.0f, 5.0f, "%.0f%%");
+        "per shot, so they keep this share of their 2D size. 0% is the game camera's own spot; 100% matches the 2D shot; "
+        "above 100% comes closer still. Game camera in full VR only.",
+        "WuWaControls_LensMatch", 0.0f, 150.0f, 5.0f, "%.0f%%");
 }
 
 Item lens_nearest_slider() {
@@ -462,16 +463,31 @@ Page camera_page() {
 Page cinema_page() {
     Page page{"Cinema"};
     page.items.push_back(view_choice());
+    page.items.push_back(setting_choice("Screen lens",
+        "Game lens: the stereo screen frames every shot exactly like the 2D view, in 3D. Wide: the fixed 90 degree view used "
+        "before test 3f.", "VR_WuWaScreenLens", {"Game lens", "Wide 90 degrees"}));
+    page.items.push_back(setting_slider("3D depth",
+        "How strong the 3D is on the stereo screen. 1x matches the headset's eye distance to the lens; 0 is flat.",
+        "VR_WuWaScreenDepth", 0.0f, 3.0f, 0.1f, "%.1fx"));
     page.items.push_back(paragraph(
         "Black bars in cutscenes? In WuWa's graphics settings, change Cinematic from Cutscene to Fullscreen. "
         "The bars go and cutscenes fill your view."));
     page.items.push_back(lens_slider());
     page.items.push_back(lens_nearest_slider());
     page.items.push_back(lens_status());
-    page.items.push_back(setting_toggle("Depth of field (experiment)",
-        "Asks the engine for the background blur the 2D view has, in full VR and on the stereo screen. In full VR the blur is "
-        "scaled for the headset's wider view. It may do nothing in this game build: the Now line above says.",
-        "WuWaStereo_DepthOfField"));
+    page.items.push_back(paragraph("Depth of field (experiment)", true));
+    page.items.push_back(setting_toggle("Depth of field",
+        "The 2D view's background blur, in full VR and on the stereo screen. In full VR the blur is scaled for the headset's "
+        "wider lens and the focus follows Close-up match.", "WuWaStereo_DepthOfField"));
+    page.items.push_back(setting_choice("Blur from",
+        "The game gives the blur to one eye's view only; both eyes then use that view's. If both eyes stay sharp or the blur "
+        "looks wrong, try the other.", "WuWaStereo_DepthOfFieldSource", {"First view", "Second view"}));
+    page.items.push_back(setting_slider("Blur strength", "Multiplies the blur. 1x is the 2D view's look.",
+        "WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 0.25f, "%.2fx"));
+    page.items.push_back(live_text([] {
+        auto* on = typed<bool>("WuWaStereo_DepthOfField");
+        return on && on->value() ? std::string{"Both eyes: "} + wuwa_dof_sync::status.load() : std::string{};
+    }));
     page.items.push_back(setting_toggle("Cinematic scene note",
         "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "
         "A fallback for when automatic switching misses a scene.", "VR_CinemaHint"));

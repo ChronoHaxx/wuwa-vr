@@ -677,6 +677,10 @@ public:
 
     bool is_auto_cinema_enabled() const { return m_auto_cinema->value(); }
     bool is_cinema_hint_enabled() const { return m_cinema_hint->value(); }
+    // WuWa stereo screen: the game's own lens (the 2D shot, in 3D) or the old fixed 90 degrees.
+    bool is_screen_game_lens() const { return m_screen_lens->value() == 0; }
+    // Eye separation on the stereo screen; 1 is the headset's eye distance scaled to the lens.
+    float screen_depth() const { return m_screen_depth->value(); }
     // WuWa: buttons still held when UEVR's UI closes (B to close it, A to
     // select) stay hidden from the game until released, so the game never
     // sees them as fresh presses (they advanced dialogue). Triggers too.
@@ -1026,6 +1030,8 @@ private:
     const ModToggle::Ptr m_auto_cinema{ ModToggle::create(generate_name("AutoCinema"), false) };
     // WuWa: a short note in view when a letterboxed cinematic camera starts while in full VR.
     const ModToggle::Ptr m_cinema_hint{ ModToggle::create(generate_name("CinemaHint"), true) };
+    const ModCombo::Ptr m_screen_lens{ ModCombo::create(generate_name("WuWaScreenLens"), {"Game lens (like 2D)", "Wide 90 degrees (before 3f)"}, 0) };
+    const ModSlider::Ptr m_screen_depth{ ModSlider::create(generate_name("WuWaScreenDepth"), 0.0f, 3.0f, 1.0f) };
     const ModCombo::Ptr m_auto_story_presentation{ModCombo::create(generate_name("AutoStoryPresentation"), {"Keep immersive", "Stereo screen", "Mono theatre"}, 1)};
     const ModToggle::Ptr m_cinematic_framing_fix{ ModToggle::create(generate_name("CinematicFramingFix"), true) };
     const ModToggle::Ptr m_roomscale_movement{ ModToggle::create(generate_name("RoomscaleMovement"), false) };
@@ -1186,6 +1192,8 @@ public:
         *m_mono_theatre_mode,
         *m_auto_cinema,
         *m_cinema_hint,
+        *m_screen_lens,
+        *m_screen_depth,
         *m_auto_story_presentation,
         *m_cinematic_framing_fix,
             *m_roomscale_movement,

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-11T11:59:26.646994+00:00",
+  "updatedAt": "2026-10-11T12:02:56.955357+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -136,7 +136,7 @@
     "docs/STEREO-CULLING-PROGRESS.md": "b581a35987b5353fbb07e67efa7205a6733b0326b67f3dbd9813738ee8aa6419",
     "docs/TROUBLESHOOTING.md": "bc3f394ba5b16cdd5289317978056c9fe1d83ea8bc602c6cd314b083a9ed79b6",
     "docs/UNDERSTANDING-WUWA-VR.md": "2cf322c0ec1104e38fdd79405aaccf5ede7411dcf64af7c91935c03f82a39318",
-    "docs/VR-MENU.md": "333685720d851bb5697b8b7ed2028c54ef900e8f8f29107978ffe119fc9a09ac",
+    "docs/VR-MENU.md": "25aa10b04d987af6166504e215f57c5e0917c2f8567d3a5c434f7ce9d6caf8ef",
     "docs/explainer-guide-review.md": "8deb9de097bf3292a46a555e1c48adf9e78706c4576906652e5d59572142e440",
     "docs/launch-kit/CINEMATIC-RELEASE-20261004.md": "6649a5e7452b3d5056312feab6bb90f0c5f45a09755ba3020d760e56d45802e8",
     "docs/launch-kit/DEVICE-DISPATCH-20261006.md": "188469238b9bbd72421d49f5c3641ee0edc566ec9e0bcf21b72b132a8a988178",

@@ -168,13 +168,23 @@ Per shot, `02_WuWaVR_PolarControls.lua` moves the eye along the game camera's
 view so the subject at distance d sits at d * k^s, where k = tan(fov/2) /
 tan(45 degrees) and s is the strength (`WuWaControls_LensMatch`, 0-100 %,
 default 75), stopping no nearer than the closest distance
-(`WuWaControls_LensNearest`, 10-150 cm, default 30).
-- **Subject distance:** the game's own depth-of-field focus distance (the
-  camera's post-process settings) when it sets one; otherwise a 5 cm sphere
-  trace along the view.
-- **Safety:** the trace also stops the eye the closest distance short of
-  anything in between. Without the game's focus the trace is only a guess
-  (often a far wall), so such a shot moves at most 1 m.
+(`WuWaControls_LensNearest`, 5-150 cm, default 10). Strength goes to 150 %
+since test 3f (closer than the 2D shot).
+- **Subject (test 3g, `WuWaControls_LensSubject` = 0):** the characters inside
+  the 2D frame. Every `Engine.Character` (UEVR's class index includes
+  subclasses) is tested as a capsule against the game camera's 16:9 frustum;
+  hidden actors are skipped. The subject is the person at the game's focus
+  distance, else the one nearest the middle of the frame; anyone whose near
+  side is 30 cm or more in front of the subject's is foreground, and the eye
+  stays at least max(closest distance, 30 cm) behind them.
+- **Why:** in test 3f every shot logged `focus=348 trace=none`. The trace
+  (Visibility channel) does not hit characters, so in over-the-shoulder shots
+  the eye moved 2.6-3 m along the view, through the person at the frame's
+  edge. The 3f behaviour stays available as `WuWaControls_LensSubject` = 1.
+- **Fallback:** with no person in frame, the game's own depth-of-field focus
+  distance when it sets one; otherwise a 5 cm sphere trace along the view,
+  which also stops the eye the closest distance short of anything in between.
+  A trace-only shot moves at most 1 m (often a far wall).
 - **Why the closest distance is a setting:** test 3c used a fixed 60 cm. The
   game's focus distances are mostly 0.7-2.2 m, so at 75 % the 60 cm floor
   already applied, and anything above about 40 % changed nothing.
@@ -183,21 +193,68 @@ default 75), stopping no nearer than the closest distance
   unchanged.
 - **Where it applies:** only lenses of 60 degrees or less, in Game camera mode,
   in full VR.
-- **Diagnostics:** every shot is logged as `[WuWaLens] shot=... fov=... focus=...
-  trace=... dolly=...`. The menu shows the live report
-  (`WuWaControls_LensStatus`).
+- **Diagnostics:** every shot is logged as `[WuWaLens] shot=... fov=...
+  subject=... (kind) people=in-frame/all foreground=... focus=... trace=...
+  dolly=...`, plus `people_error`/`trace_error` when a lookup fails. The menu
+  shows the live report (`WuWaControls_LensStatus`), including "held behind the
+  person in front".
+- **Limit:** a long lens cannot be matched in full VR. Moving nearer gives the
+  subject its 2D size, but the perspective is the headset's wide one: the
+  foreground stays big and the background is not compressed. The stereo screen
+  (below) is the exact 2D shot in 3D.
 
-**Depth of field (experiment)** (`WuWaStereo_DepthOfField`, default off). The
-2D view's background blur is missing in full VR and on the stereo screen,
-probably because the engine leaves depth of field out of stereo views (not
-confirmed); mono theatre is a single view, and it keeps the blur. The camera script sets the engine's
+**Stereo screen lens (test 3f).** UEVR's screen projection used a fixed 90
+degrees (`calculate_stereo_projection_matrix`: "todo, get from
+FMinimalViewInfo"). It now uses the primary eye's authored FOV from
+`capture_authored_camera` (`VR_WuWaScreenLens`: 0 game lens, 1 the old 90),
+so the screen frames every shot like mono theatre; tester: "exactly the
+same". The eyes separate along the game camera's right axis, scaled by
+tan(fov/2) and `VR_WuWaScreenDepth` (0-3, default 1), so head tilt does not
+skew the 3D.
+
+**Camera effects in both eyes (tests 3f-3g).** The game builds the second
+stereo view from a default camera: its authored camera reports 90 degrees at
+4:3 where the first has the shot's lens (the same cause as the far-LOD
+mismatch). That view gets none of the camera's post-process settings, so the
+blur showed in one eye only (the right eye, with `swap_eyes`).
+`utility/WuWaDofSync.hpp` runs at BeginRenderViewFamily, after both views'
+final settings exist:
+- **Finding the block:** `FinalPostProcessSettings` is found once by three
+  engine defaults (sensor 24.576 mm, min f-stop 1.2, 5 blades) at a single
+  offset in the first view, confirmed in the second (`view+0x1150` in this
+  build). The search needs a frame without a story camera; it retries every 2 s.
+- **Each copy** checks only that both blocks hold plausible camera values. In
+  3f each copy re-checked the three defaults, and story cameras change them
+  (cine filmback, blade count), so every story shot was skipped silently.
+- **What is copied** (`WuWaStereo_EyeEffects`): the depth-of-field fields, or
+  every field the engine marks plain old data (numbers, colours, override
+  flags, raw texture pointers), merged into byte runs from reflection. Arrays
+  such as post-process materials own memory and are never copied.
+- **From which view** (`WuWaStereo_DepthOfFieldSource`): first, second, or Auto
+  (default; the view with a focus distance when only one has one).
+- **Log:** `[WuWaDoF] copy blur|all 1 -> 2 (auto): focus a / b cm, f-stop,
+  sensor, blades` every 5 s, or `copy skipped: ...` with the values.
+
+**Depth of field** (`WuWaStereo_DepthOfField`, default off). Mono theatre is
+a single view and keeps the blur. The camera script sets the engine's
 `ShowFlag.DepthOfField` console variable to 1 (force on) and back to 2 (the
 game decides), logging `[WuWaDoF]`. If the variable is missing from this build
 the Now line says so. Blur size follows the lens's focal length, so at the
 headset's wide view a close-up's blur would almost vanish: in full VR, for
 lenses of 60 degrees or less, the f-stop is scaled by k squared (the same k as
 close-up match), and the focus distance moves with the close-up dolly. Both
-are rewritten every frame from the game's values. Untested in the headset.
+are rewritten every frame from the game's values. Blur strength
+(`WuWaStereo_DepthOfFieldStrength`, 0.25-4) divides the f-stop everywhere.
+
+**Menu close no longer presses buttons (test 3e).** Buttons and triggers held
+when the menu closes are latched per controller slot and kept from the game
+until released, so the B that closes the menu no longer advances dialogue.
+
+**HUD refresh diagnostics (test 3g).** The automatic refresh after a view
+switch found no HUD in every 3e/3f switch ("No active HUD with the supported
+LGUI schema"), and its schema report was never written. Each refused
+`LGUICanvasScaler` now gets a reason, and the status (logged as `WuWaHud:`)
+ends with a tally such as `[12 scalers: 9x inactive, 3x render mode 1]`.
 
 **Report a problem** appends one line per report to
 `<profile>/wuwa-reports/reports.jsonl`: the kind of problem, the time, the

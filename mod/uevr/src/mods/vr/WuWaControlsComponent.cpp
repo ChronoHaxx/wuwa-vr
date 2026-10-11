@@ -81,7 +81,7 @@ void wuwa_playtest::draw_controls(const std::filesystem::path& profile) {
     const auto item_id=check.at("id").get<std::string>();
     wuwa_ui::TextWrapped("%s",localized(check.at("instructions")).c_str());
     const auto status=check.at("status").get<std::string>();
-    const char* status_label=status=="pass" ? "Pass" : status=="fail" ? "Fail" : status=="blocked" ? "Blocked" : "Not tested";
+    const char* status_label=status=="pass" ? N_("Pass") : status=="fail" ? N_("Fail") : status=="blocked" ? N_("Blocked") : N_("Not tested");
     wuwa_ui::TextWrapped("Current result: %s",wuwa_l10n::text(status_label).c_str());
     for (const auto& choice:std::array<std::array<const char*,2>,4>{{
             {{"Pass","pass"}},{{"Fail","fail"}},{{"Blocked","blocked"}},{{"Not tested","not_tested"}}}}) {
@@ -244,8 +244,8 @@ std::string WuWaControlsComponent::auto_cinema_status() const {
     std::scoped_lock lock{m_cinema_mutex};
     const auto now = GetTickCount64();
     const auto state = m_cinema_presentation.load() != wuwa_auto_cinema::Presentation::none && !m_cinema_lease.active(now) ?
-        "Automatic lease expired; restoration waits for the next game tick" : m_cinema_lease.state(now);
-    return std::string{state} + ". " + m_cinema_signal +
+        N_("Automatic lease expired; restoration waits for the next game tick") : m_cinema_lease.state(now);
+    return wuwa_l10n::translate(state) + ". " + m_cinema_signal +
         " [detection " + std::to_string(static_cast<int>(std::round(m_cinema_detection_ms))) + " ms]";
 }
 void WuWaControlsComponent::reset_auto_cinema() {
@@ -318,13 +318,13 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
-    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, *m_ambient_occlusion, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
+        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -671,22 +671,19 @@ void WuWaControlsComponent::on_draw_recording() {
     ImGui::EndDisabled();
     wuwa_ui::TextWrapped("Smooths head shake out of the game window, so OBS records a calm, full-resolution view with game audio. The headset image is not changed. The window shows a slightly narrower view so the picture can move inside it.");
     ImGui::Separator();
-    const bool run_active = wuwa_run::active.load();
+    const bool run_active = wuwa_run::active();
     if (wuwa_ui::Button(run_active ? "End run" : "Start run")) {
-        if (!wuwa_run::mark(profile, !run_active)) wuwa_ui::TextWrapped("Could not write the run marker file.");
+        if (run_active) wuwa_run::end(profile, "manual");
+        else wuwa_run::start(profile, "manual");
     }
-    const auto since_press = wuwa_run::unix_ms() - wuwa_run::last_ms.load();
-    if (wuwa_run::last_ms.load() != 0 && since_press < 20000) {
-        wuwa_ui::TextWrapped("%s", run_active ? "Run started. Now open the in-game map for 3 seconds."
-                                              : "Run ended. Now open the in-game map, zoomed out, for 3 seconds.");
-    } else if (run_active) {
-        wuwa_ui::TextWrapped("Run in progress: %d min.", static_cast<int>((wuwa_run::unix_ms() - wuwa_run::started_ms.load()) / 60000));
-    }
-    wuwa_ui::TextWrapped("Exercise recordings: start OBS (F9), press Start run, open the in-game map for 3 seconds. At the end: End run, open the map zoomed out, then stop OBS. Each press flashes a magenta square in the desktop view so the video lines up with your route log.");
+    wuwa_ui::TextWrapped("%s", run_status().c_str());
+    wuwa_ui::draw(*m_run_auto, "Start and end treadmill runs automatically");
+    wuwa_ui::TextWrapped("With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. The WuWa VR menu has the same switch on its Controllers page.");
+    wuwa_ui::TextWrapped("Your route in the game is saved once a second (UEVR profile > wuwa-runs), so no map screenshots are needed. Each start and end flashes a magenta square in the desktop view, so an OBS video lines up with the route.");
     ImGui::Separator();
     wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
     if (m_privacy->value()) {
-        if (m_privacy->value()==1) wuwa_ui::TextWrapped("While recording: the boxes appear only while the WuWa VR app records. Recording with other software (OBS) needs Always.");
+        if (m_privacy->value()==1) wuwa_ui::TextWrapped("While recording: the boxes appear while the WuWa VR app records and during treadmill runs. Recording with other software (OBS) at other times needs Always.");
         wuwa_ui::TextWrapped("Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.");
         if (wuwa_ui::TreeNode("Privacy box placement")) {
             wuwa_ui::draw(*m_privacy_profile,"Also cover the ESC profile ID row");
@@ -755,6 +752,8 @@ void WuWaControlsComponent::on_draw_ui() {
         wuwa_ui::TextWrapped("Keeps distant trees and props on the same level of detail in both eyes. This is the normal foliage repair; legacy comparison tests are separate.");
         wuwa_ui::draw(*m_refill_far_lighting,"Refresh far-lighting cache (limited workaround)");
         if (wuwa_ui::Button("Refill far lighting now")) wuwa_clv::request();
+        wuwa_ui::draw(*m_ambient_occlusion,"Ambient occlusion (soft contact shadows)");
+        wuwa_ui::TextWrapped("Off by default: in VR its shading differs between the eyes on rocks, hills and roofs. On gives the game its own setting back.");
         wuwa_ui::TextWrapped("Requests a bounded cascade-lighting-volume refresh after stereo starts or resumes, after detected teleports, or on request. It helped the tested ship/wheel lighting case; it is not a general fix for dark objects or character rims. Each refill can cause a short hitch.");
         wuwa_ui::draw(m_suppress_npc_rim,"Hide character rim lighting (optional workaround)");
         wuwa_ui::TextWrapped("Optional workaround, off by default. Removes toon-depth rim lighting from all characters using it, including nearby characters. This hides the observed extra eye contour; it does not repair the underlying stereo cause. Restores the prior value when disabled, in 2D screen mode, or when native VR is inactive.");
@@ -1189,9 +1188,22 @@ void WuWaControlsComponent::draw_passive_overlay() {
     wuwa_sheet::draw_card(list,size,ImGui::GetFont(),state);
 }
 
+std::string WuWaControlsComponent::run_status() const {
+    const auto totals = wuwa_run::totals();
+    const auto clock = wuwa_run::clock_text(totals.duration_ms), walking = wuwa_run::clock_text(totals.walking_ms);
+    const double km = totals.distance_cm / 100000.0;
+    if (wuwa_run::active())
+        return wuwa_ui::format("Run on: %s, walking %s, %.2f km in the game.", clock.c_str(), walking.c_str(), km);
+    if (wuwa_run::has_finished_run())
+        return wuwa_ui::format("Last run: %s, walking %s, %.2f km in the game.", clock.c_str(), walking.c_str(), km);
+    if (m_run_auto->value() && wuwa_run::treadmill_app.load())
+        return wuwa_l10n::translate(N_("Reality Runner is open: 10 seconds of walking starts a run."));
+    return wuwa_l10n::translate(N_("No run yet. Start one here, or open Reality Runner and walk."));
+}
+
 std::array<wuwa_privacy::Rect, 2> WuWaControlsComponent::privacy_rectangles(int32_t width,int32_t height) const {
     const int mode=m_privacy->value();
-    if (!wuwa_test::is_wuwa() || mode<=0 || (mode==1 && !recording_live())) return {};
+    if (!wuwa_test::is_wuwa() || mode<=0 || (mode==1 && !recording_live() && !wuwa_run::active())) return {};
     return {wuwa_privacy::pixels(m_uid_left->value(),m_uid_top->value(),m_uid_right->value(),m_uid_bottom->value(),width,height),
         m_privacy_profile->value() && wuwa_menu::profile_mask(m_privacy_profile_scope->value(),GetTickCount64(),fresh_menu_cursor()) ?
             wuwa_privacy::pixels(m_id_left->value(),m_id_top->value(),m_id_right->value(),m_id_bottom->value(),width,height) : wuwa_privacy::Rect{}};

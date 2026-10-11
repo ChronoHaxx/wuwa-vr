@@ -26,6 +26,8 @@
 #include "mods/VR.hpp"
 #include "utility/WuWaDofSync.hpp"
 #include "utility/WuWaLocalization.hpp"
+#include "utility/WuWaLocalizedUI.hpp"
+#include "utility/WuWaRunMarker.hpp"
 #include "utility/WuWaStepPlan.hpp"
 #include "utility/WuWaVrMenu.hpp"
 
@@ -182,15 +184,15 @@ nlohmann::json context() {
 }
 
 std::string recorder_line() {
-    if (rec_state == "offline") return "Recorder: open the WuWa VR app (launcher) to record.";
-    if (rec_state == "unavailable") return "Recorder: missing from this launcher package.";
-    if (rec_state == "waiting") return "Recorder: waiting for the launcher...";
-    if (rec_state == "starting") return "Recorder: starting.";
-    if (rec_state == "recording") return "Recorder: recording. Reports and marks note the time in the video.";
-    if (rec_state == "finishing") return "Recorder: saving the video.";
-    if (rec_state == "saved") return "Recorder: saved. Open recordings from the launcher.";
-    if (rec_state == "error") return "Recorder: failed. See WuWa Controls > Recording in the classic menu.";
-    return "Recorder: ready.";
+    if (rec_state == "offline") return N_("Recorder: open the WuWa VR app (launcher) to record.");
+    if (rec_state == "unavailable") return N_("Recorder: missing from this launcher package.");
+    if (rec_state == "waiting") return N_("Recorder: waiting for the launcher...");
+    if (rec_state == "starting") return N_("Recorder: starting.");
+    if (rec_state == "recording") return N_("Recorder: recording. Reports and marks note the time in the video.");
+    if (rec_state == "finishing") return N_("Recorder: saving the video.");
+    if (rec_state == "saved") return N_("Recorder: saved. Open recordings from the launcher.");
+    if (rec_state == "error") return N_("Recorder: failed. See WuWa Controls > Recording in the classic menu.");
+    return N_("Recorder: ready.");
 }
 
 // ---- Rows bound to settings ----
@@ -248,7 +250,8 @@ Item paragraph(std::string text, bool emphasis = false) {
 Item live_text(std::function<std::string()> text) {
     auto item = make(Kind::Text, "");
     item.wrap = true;
-    item.value_text = std::move(text);
+    // Rows return catalog English (N_) or text already filled by wuwa_ui::format.
+    item.value_text = [text = std::move(text)] { return wuwa_l10n::text(text()); };
     return item;
 }
 
@@ -356,7 +359,7 @@ Item lens_status() {
     return live_text([] {
         auto* status = cached("WuWaControls_LensStatus");
         const auto text = status ? status->get() : std::string{};
-        return text.empty() ? std::string{} : "Now: " + text;
+        return text.empty() ? std::string{} : wuwa_ui::format("Now: %s", text.c_str());
     });
 }
 
@@ -447,8 +450,8 @@ Item record_toggle() {
     };
     record.value_text = [] {
         if (rec_state == "recording") return "REC " + rec_clock();
-        if (rec_state == "starting") return std::string{"Starting"};
-        if (rec_state == "finishing") return std::string{"Saving"};
+        if (rec_state == "starting") return wuwa_l10n::text(N_("Starting"));
+        if (rec_state == "finishing") return wuwa_l10n::text(N_("Saving"));
         return std::string{};
     };
     return record;
@@ -470,7 +473,7 @@ void save_report(const std::string& problem) {
         report_status = "Saved at " + local_time() + (rec_since >= 0.0 ? ", " + rec_clock() + " into the video" : std::string{}) +
             ". Folder: UEVR profile > wuwa-reports.";
     } catch (const std::exception& e) {
-        report_status = std::string{"Not saved: "} + e.what();
+        report_status = wuwa_ui::format("Not saved: %s", e.what());
     }
 }
 
@@ -494,22 +497,62 @@ Item slot_choice() {
     return item;
 }
 
-Page quick_page() {
-    auto* vr = VR::get().get();
-    Page page{"Quick"};
-    page.items.push_back(view_choice());
-    page.items.push_back(camera_choice());
+Item controllers_toggle(VR* vr) {
     auto controllers = make(Kind::Toggle, "VR controllers",
         "Use the VR controllers as an Xbox pad for walking and sightseeing. Holding the left Menu button for 1 second also turns them on or off.");
     controllers.get_bool = [vr] { return vr->sightseeing_on(); };
     controllers.set_bool = [vr](bool on) { vr->set_sightseeing_on(on, "VR menu"); };
-    page.items.push_back(std::move(controllers));
+    return controllers;
+}
+
+// A treadmill run: on / off, with the run clock in place of On.
+Item run_toggle() {
+    auto run = make(Kind::Toggle, "Treadmill run",
+        "Times your run and saves your route in the game once a second, with a sync flash for OBS videos. With Reality "
+        "Runner open, walking starts a run by itself (Controllers page).");
+    run.get_bool = [] { return wuwa_run::active(); };
+    run.set_bool = [](bool on) {
+        const auto profile = Framework::get_persistent_dir();
+        if (on) wuwa_run::start(profile, "manual");
+        else wuwa_run::end(profile, "manual");
+    };
+    run.value_text = [] { return wuwa_run::active() ? wuwa_run::clock_text(wuwa_run::totals().duration_ms) : std::string{}; };
+    return run;
+}
+
+// VR controllers, sharing with an Xbox pad or treadmill, and treadmill runs. Motion
+// controls will join this page.
+Page controllers_page() {
+    auto* vr = VR::get().get();
+    Page page{"Controllers"};
+    page.items.push_back(controllers_toggle(vr));
+    page.items.push_back(live_text([vr] { return vr->sightseeing_status(); }));
     page.items.push_back(setting_choice("Sharing with Xbox / treadmill",
         "Both together: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps "
         "working while you look around with VR. Last used wins: the other waits until you use it. VR only: the Xbox pad "
         "is ignored while VR controllers are on.",
         "VR_WuWaVRControllerStyle", {"Both together", "Last used wins", "VR only (Xbox ignored)"}));
     page.items.push_back(slot_choice());
+    page.items.push_back(paragraph("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped."));
+    page.items.push_back(paragraph("Treadmill", true));
+    page.items.push_back(paragraph(
+        "Reality Runner and other treadmills: keep Sharing on Both together and Controller slot on Automatic, so walking "
+        "and the VR controllers work at the same time."));
+    page.items.push_back(run_toggle());
+    page.items.push_back(live_text([] { return VR::get()->get_wuwa_controls().run_status(); }));
+    page.items.push_back(setting_toggle("Start and end runs automatically",
+        "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. Your route "
+        "is saved in the UEVR profile, wuwa-runs folder.", "WuWaRun_Auto"));
+    page.items.push_back(live_text([vr] { return vr->menu_pointer_status(); }));
+    return page;
+}
+
+Page quick_page() {
+    auto* vr = VR::get().get();
+    Page page{"Quick"};
+    page.items.push_back(view_choice());
+    page.items.push_back(camera_choice());
+    page.items.push_back(controllers_toggle(vr));
     auto diorama = make(Kind::Toggle, "Diorama (miniature world)",
         "Shows the world as a 10x miniature around you, with the portal on or off. Needs Native Stereo. This launch only.");
     diorama.enabled = [vr] { return !vr->physical_gamepad_passthrough(); };
@@ -521,6 +564,7 @@ Page quick_page() {
     page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
         "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
     page.items.push_back(record_toggle());
+    page.items.push_back(run_toggle());
     page.items.push_back(action("Recenter view", "Faces the view forward from where you are now.", [vr] { vr->recenter_view(); }));
     return page;
 }
@@ -632,7 +676,8 @@ Page cinema_page() {
     page.items.push_back(live_text([] {
         auto* on = typed<bool>("WuWaStereo_DepthOfField");
         auto* all = typed<int32_t>("WuWaStereo_EyeEffects");
-        return (on && on->value()) || (all && all->value() == 1) ? std::string{"Both eyes: "} + wuwa_dof_sync::status.load() : std::string{};
+        return (on && on->value()) || (all && all->value() == 1) ? wuwa_ui::format("Both eyes: %s", wuwa_l10n::translate(wuwa_dof_sync::status.load()).c_str())
+                                                                : std::string{};
     }));
     page.items.push_back(setting_toggle("Cinematic scene note",
         "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "
@@ -725,6 +770,9 @@ Page fixes_page() {
         "Refreshes the far-lighting cache so distant lighting matches between eyes. A limited workaround.", "WuWaStereo_RefillFarLighting"));
     page.items.push_back(setting_toggle("Match cinematic framing",
         "Gives both eyes the same framing during letterboxed scenes.", "VR_CinematicFramingFix"));
+    page.items.push_back(setting_toggle("Ambient occlusion",
+        "Soft contact shadows in corners and under objects. Off by default: in VR they shade the two eyes differently on "
+        "rocks, hills and roofs. On gives the game its own setting back.", "WuWaStereo_AmbientOcclusion"));
     page.items.push_back(paragraph("Smoothness", true));
     page.items.push_back(paragraph(
         "Full VR draws two large eye images every frame, far more pixels than the stereo screen, so busy scenes such as "
@@ -732,10 +780,8 @@ Page fixes_page() {
     page.items.push_back(resolution_choice());
     page.items.push_back(live_text([] {
         auto* vr = VR::get().get();
-        char text[160];
-        std::snprintf(text, sizeof(text), "Each eye: %u x %u pixels. Now about %.0f fps.", vr->get_hmd_width(),
-            vr->get_hmd_height(), ImGui::GetIO().Framerate);
-        return std::string{text};
+        return wuwa_ui::format("Each eye: %u x %u pixels. Now about %.0f fps.", vr->get_hmd_width(), vr->get_hmd_height(),
+            ImGui::GetIO().Framerate);
     }));
     return page;
 }
@@ -743,10 +789,13 @@ Page fixes_page() {
 Page record_page() {
     Page page{"Record"};
     page.items.push_back(record_toggle());
+    page.items.push_back(run_toggle());
+    page.items.push_back(live_text([] { return VR::get()->get_wuwa_controls().run_status(); }));
     page.items.push_back(setting_choice("Hide player IDs",
-        "Black boxes over your UID in the corner and the profile ID row in menus. While recording: only while the WuWa VR app "
-        "records, so the boxes never cover HUD you need in play. Always: for other recorders such as OBS too. The boxes are "
-        "approximate; check a short video before sharing. Other names and chat are not hidden.",
+        "Black boxes over your UID in the corner and the profile ID row in menus. While recording: while the WuWa VR app "
+        "records or a treadmill run is on, so the boxes never cover HUD you need in play. Always: for OBS and other "
+        "recorders at any time. The boxes are approximate; check a short video before sharing. Other names and chat are "
+        "not hidden.",
         "WuWaPrivacy_Mode", {"Off", "While recording", "Always"}));
     auto profile = setting_toggle("Also hide the profile ID row", "Covers the ID row on the ESC profile screen too.", "WuWaPrivacy_ProfileID");
     profile.enabled = [] {
@@ -880,6 +929,7 @@ void refresh_pages() {
     pages.push_back(camera_page());
     pages.push_back(cinema_page());
     pages.push_back(hud_page());
+    pages.push_back(controllers_page());
     pages.push_back(comfort_page());
     pages.push_back(fixes_page());
     pages.push_back(record_page());
@@ -1074,9 +1124,10 @@ bool draw(const ImVec2& target_size) {
     if (moving_menu.load(std::memory_order_relaxed)) move_menu(); else moves = read_moves();
     wuwa_menu::draw(pages, state, moves, pos, size, look);
     if (moving_menu.load(std::memory_order_relaxed)) {
-        const char* text = VR::get()->menu_pointer_active() ?
-            "Moving the menu: point where you want it, thumbstick up / down for distance, then pull the trigger." :
-            "Moving the menu: stick, D-pad or arrow keys. Right stick or Page Up / Down: distance. A or Enter: put it down.";
+        const auto shown = wuwa_l10n::text(VR::get()->menu_pointer_active() ?
+            N_("Moving the menu: point where you want it, thumbstick up / down for distance, then pull the trigger.") :
+            N_("Moving the menu: stick, D-pad or arrow keys. Right stick or Page Up / Down: distance. A or Enter: put it down."));
+        const char* text = shown.c_str();
         auto* list = ImGui::GetForegroundDrawList();
         ImFont* font = wuwa_l10n::sheet_font() ? wuwa_l10n::sheet_font() : ImGui::GetFont();
         const float font_size = size.y * 0.04f;

@@ -176,6 +176,7 @@ public:
     // or not something else also turns them into a gamepad.
     bool menu_sticks(glm::vec2& left, glm::vec2& right) const;
     std::string menu_pointer_status() const; // English, for the menu
+    std::string sightseeing_status(); // VR controllers status, translated (logical order)
     // The VR controllers as the menu sees them, read straight from the runtime
     // while UEVR's UI is open and nothing else (VR controllers mode, UEVR's
     // motion-controller input) already turns them into a gamepad. Sticks are

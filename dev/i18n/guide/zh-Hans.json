@@ -48,7 +48,7 @@
     "controls.views": "WuWa VR 菜单的<strong>影院</strong>页面包含镜头模式、模糊和特写选项。过场动画的自动切换是实验性功能且默认关闭；请将手动切换视角的快捷键常备手边。",
     "optional.summary": "可选的 VR 手柄行走、微缩景观与手部演示",
     "optional.walk": "<strong>VR 手柄</strong>（快速页面）可让 Quest 手柄充当 Xbox 手柄，用于行走和观光。每次启动时它们默认关闭。按住<strong>左 Menu</strong>键 1 秒即可开启或关闭（会有一次震动确认）；快速按一下仍然是 Start。对于没有 Menu 键的手柄（Index），在它们关闭时同时按住两个摇杆按压并保持 1 秒。使用 VR 手柄时，卡片上会标注握把、扳机和摇杆的名称。",
-    "optional.share": "<strong>与 Xbox / 跑步机共享</strong>会被记住：<strong>两者同时使用</strong>（默认；跑步机行走仍可正常工作）、<strong>以最后使用的为准</strong>，或<strong>仅 VR</strong>。插槽 0 适合大多数配置；使用跑步机时，在<strong>故障排查 → 手柄检查</strong>中选择它的插槽。参见<a href=\"https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md#optional-quest-controllers-for-walking\">行走参考</a>。",
+    "optional.share": "<strong>与 Xbox / 跑步机共用</strong>会被记住：<strong>同时使用</strong>（默认；跑步机行走仍可正常工作）、<strong>以最后使用为准</strong>，或<strong>仅 VR</strong>。<strong>手柄槽位</strong>默认为<strong>自动</strong>：它会使用接有手柄的槽位，例如 Reality Runner 的虚拟手柄。两者都在 WuWa VR 菜单的<strong>手柄</strong>页面，旁边还有<strong>跑步机跑步</strong>：打开 Reality Runner 时，行走会开始一次跑步，为你计时并保存你在游戏中的路线。参见<a href=\"https://github.com/ChronoHaxx/wuwa-vr/blob/main/docs/CONTROLS.md#optional-quest-controllers-for-walking\">行走参考</a>。",
     "optional.diorama": "微缩景观需要原生立体（Native Stereo），会随世界缩放放大头部运动；关闭后即可恢复正常缩放。手部 / 手指演示仅是可视化展示，不包含抓取或手势。",
     "recovery.title": "如果出现问题",
     "recovery.stuck": "<strong>启动卡住：</strong>使用<strong>停止等待</strong>，并给它最多四秒。如果取消未得到确认，打开<strong>故障排查 → 卡住的启动器进程 → 查找卡住的启动器进程</strong>，只选中你想停止的工作进程，然后确认<strong>停止所选进程</strong>。默认不会预先选中任何进程。接着选择<strong>重试连接</strong>。",

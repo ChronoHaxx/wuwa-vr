@@ -65,7 +65,8 @@ struct Sample {
     bool controllers{true}, diorama{false}, recording{true}, profile_row{true}, telemetry{true}, note{true},
         automatic{false}, framing{true}, follow{false}, sheet{true}, collide{false};
     bool dof{false};
-    int view{0}, camera{2}, style{0}, fps{2}, size{1}, kind{1}, step{1}, privacy{1}, resolution{3};
+    int view{0}, camera{2}, style{0}, fps{2}, size{1}, kind{1}, step{1}, privacy{1}, resolution{3}, sharing{0}, slot{0};
+    bool run{true}, auto_run{true}, ambient{false};
     float hud_size{1.1f}, hud_distance{2.0f}, hud_shape{1.33f}, hud_up{-0.15f}, hud_side{0.0f}, speed{600.0f}, turn{90.0f}, scale{0.875f},
         lens{75.0f}, nearest{30.0f};
 };
@@ -125,6 +126,7 @@ std::vector<wuwa_menu::Page> sample_pages() {
         slider("HUD size", "How large the game's HUD and menus appear. More HUD options are on the HUD page.", &sample.hud_size, 0.5f, 5.0f, 0.05f, "%.2f"),
         slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.", &sample.hud_distance, 0.5f, 6.0f, 0.1f, "%.1f m"),
         record(),
+        toggle("Treadmill run", "Times your run and saves your route in the game once a second, with a sync flash for OBS videos. With Reality Runner open, walking starts a run by itself (Controllers page).", &sample.run, "12:34"),
         action("Recenter view", "Faces the view forward from where you are now."),
     }});
     std::vector<std::string> steps{"1 / 7", "2 / 7", "3 / 7", "4 / 7", "5 / 7", "6 / 7", "7 / 7"};
@@ -178,11 +180,25 @@ std::vector<wuwa_menu::Page> sample_pages() {
         action("Refresh HUD layout", "Asks the game to lay out its HUD again."),
         toggle("Controls cards", "Hold L3, or LT + RT, for half a second to see what each button does.", &sample.sheet),
     }});
+    pages.push_back({"Controllers", {
+        toggle("VR controllers", "Use the VR controllers as an Xbox pad for walking and sightseeing. Holding the left Menu button for 1 second also turns them on or off.", &sample.controllers),
+        paragraph("Status: on. VR controllers and Xbox both working."),
+        choice("Sharing with Xbox / treadmill", "Both together: buttons combine and each stick follows whichever is pushed further.", &sample.sharing, {"Both together", "Last used wins", "VR only (Xbox ignored)"}),
+        choice("Controller slot", "Which Xbox controller slot the VR controllers share. Automatic uses the one with a controller, such as a treadmill's virtual pad.", &sample.slot, {"Automatic", "Slot 0", "Slot 1", "Slot 2", "Slot 3"}),
+        paragraph("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped."),
+        paragraph("Treadmill", true),
+        paragraph("Reality Runner and other treadmills: keep Sharing on Both together and Controller slot on Automatic, so walking and the VR controllers work at the same time."),
+        toggle("Treadmill run", "Times your run.", &sample.run, "12:34"),
+        paragraph("Run on: 12:34, walking 10:02, 1.84 km in the game."),
+        toggle("Start and end runs automatically", "With Reality Runner open, 10 seconds of walking starts a run.", &sample.auto_run),
+        paragraph("Laser on: point the right controller and pull its trigger."),
+    }});
     pages.push_back({"Comfort", {}});
     pages.push_back({"Fixes", {
         toggle("Match far detail between eyes", "Far trees and props switch detail together in both eyes. Recommended.", &sample.framing),
         toggle("Refresh far lighting", "Refreshes the far-lighting cache so distant lighting matches between eyes.", &sample.framing),
         toggle("Match cinematic framing", "Gives both eyes the same framing during letterboxed scenes.", &sample.framing),
+        toggle("Ambient occlusion", "Soft contact shadows in corners and under objects.", &sample.ambient),
         paragraph("Smoothness", true),
         paragraph("Full VR draws two large eye images every frame, far more pixels than the stereo screen, so busy scenes such as dialogue run slower there. A lower resolution is smoother and a little softer."),
         choice("Render resolution", "Pixels per eye compared with what your headset asks for. Lower is smoother in full VR.", &sample.resolution, {"60%", "70%", "80%", "90%", "100%", "110%", "120%"}),
@@ -326,8 +342,9 @@ int wmain(int argc, wchar_t** argv) {
     scenes.push_back(menu_scene("menu-3-test-gamepad", 1, 1, Source::Buttons));
     scenes.push_back(menu_scene("menu-4-camera-gamepad", 2, 3, Source::Buttons));
     scenes.push_back(menu_scene("menu-5-hud-gamepad", 4, 2, Source::Buttons));
-    scenes.push_back(menu_scene("menu-6-record-gamepad", 7, 10, Source::Buttons));
-    scenes.push_back(menu_scene("menu-8-fixes-gamepad", 6, 5, Source::Buttons));
+    scenes.push_back(menu_scene("menu-6-record-gamepad", 8, 10, Source::Buttons));
+    scenes.push_back(menu_scene("menu-8-fixes-gamepad", 7, 5, Source::Buttons));
+    scenes.push_back(menu_scene("menu-10-controllers-gamepad", 5, 3, Source::Buttons));
     scenes.push_back(menu_scene("menu-9-cinema-gamepad", 3, 3, Source::Buttons));
     scenes.push_back(menu_scene("menu-7-cinema-pointer", 3, 2, Source::Pointer, ImVec2{100.0f + 500.0f * 1400.0f / 1200.0f, 40.0f + 330.0f * 1400.0f / 1200.0f}));
     // The step card that replaces the controls card while a plan runs.

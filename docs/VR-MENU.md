@@ -110,7 +110,8 @@ Tabs shrink to fit the header; the title hides when they need the room. A red
 REC badge with the elapsed time shows while recording.
 
 1. **Quick:** view (full VR, stereo screen, mono theatre), camera, VR
-   controllers, diorama, HUD size and distance, record video, recenter.
+   controllers, diorama, HUD size and distance, record video, treadmill run
+   (its clock in place of On), recenter.
 2. **Test:** only while a plan is loaded (see below).
 3. **Camera:** the camera mode, then only the options for that mode: fixed
    distance and height; freecam style, speed, turn speed and collision; first
@@ -125,29 +126,40 @@ REC badge with the elapsed time shows while recording.
    default 1.33; see below), up / down, left / right, follow head, refresh
    layout, controls cards (on / off, keep open, size, height, distance) and
    view hints.
-6. **Comfort:** decoupled pitch (and its HUD adjustment), smooth camera turns
+6. **Controllers:** VR controllers on / off with a live status line (which
+   slot Automatic chose), **Sharing with Xbox / treadmill**, **Controller
+   slot** (Automatic first), the button map, then **Treadmill**: the run
+   switch, the run line (time, walking time, distance in the game) and **Start
+   and end runs automatically** (`WuWaRun_Auto`), and the laser status. Motion
+   controls will go here.
+7. **Comfort:** decoupled pitch (and its HUD adjustment), smooth camera turns
    and tilt, walk by default, L3 + A also resets position.
-7. **Fixes:** matched far detail, far lighting, matched framing, and
+8. **Fixes:** matched far detail, far lighting, matched framing, **Ambient
+   occlusion** (`WuWaStereo_AmbientOcclusion`, default off; see
+   REFERENCE.md), and
    **Smoothness**: render resolution (`OpenXR_ResolutionScale` as 60-120 %
    steps, applied live like a view switch) with the live eye size and frame
    rate. Test 3's *Restart VR runtime* is gone: in the headset it made things
    worse, and the 10 Oct recording showed the slowness was not a stuck state
    but full VR's cost (dialogue at 24-30 fps in full VR, about 45 on the
    stereo screen, with 3292 x 3292 px per eye at scale 1.0).
-8. **Record:** record video, then **Hide player IDs** directly below
+9. **Record:** record video, the treadmill run and its line, then **Hide
+   player IDs** directly below
    (`WuWaPrivacy_Mode`: Off, While recording, Always; default While
    recording, because the boxes are approximate and can cover useful HUD), the
    profile-row option, recorder status, frame rate, picture size, telemetry,
    and **Report a problem**. While recording means the launcher's recorder
    reports starting, recording or finishing (polled twice a second, and set at
-   once when this menu or the classic one sends the start request); other
-   recorders such as OBS need Always. A profile that had test 2's
+   once when this menu or the classic one sends the start request) or a
+   treadmill run is on; OBS at other times needs Always. A profile that had test 2's
    `WuWaPrivacy_Enabled=true` and no mode yet starts on Always.
-9. **Menu:** language, menu size and distance, laser status, how each input works,
+10. **Menu:** language, menu size and distance, laser status, how each input works,
    the classic menu, and the switch back to UEVR's window.
 
-Pages rebuild when a plan step or the camera mode changes; the same page and,
-where it still exists, the same row stay selected.
+Pages rebuild when a plan step, the camera mode or the language changes; the
+same page and, where it still exists, the same row stay selected. Live rows
+(status lines, the run line) return catalog English or text filled by
+`wuwa_ui::format`, and are drawn in the current language.
 
 **Why the HUD looks squashed in full VR only.** The log shows the UI pass
 drawn for the square eye (`stage3_fit original=0,0,3292,3292`) and fitted into

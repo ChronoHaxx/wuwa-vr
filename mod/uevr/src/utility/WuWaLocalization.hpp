@@ -10,7 +10,9 @@
 // camera, rendering, game-language or configuration-key semantics.
 // Marks English kept in a table and translated where it is drawn, so
 // dev/i18n/mod_strings.py finds it for the catalogs. Expands to the text itself.
+#ifndef N_
 #define N_(english) english
+#endif
 
 namespace wuwa_l10n {
 struct Language { std::string id, name; };

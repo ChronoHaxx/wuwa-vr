@@ -28,6 +28,10 @@ public:
     int stereo_dof_source() const { return m_stereo_dof_source->value(); }
     bool stereo_all_effects() const { return m_stereo_effects->value() == 1; }
     bool refill_far_lighting() const { return m_refill_far_lighting->value(); }
+    bool ambient_occlusion() const { return m_ambient_occlusion->value(); }
+    bool automatic_runs() const { return m_run_auto->value(); }
+    // One line about the treadmill run: on, last one, or how one starts (translated, logical order).
+    std::string run_status() const;
     bool suppress_npc_rim() const { return m_suppress_npc_rim.requested.load(); }
     bool steady_desktop_view() const { return m_steady_desktop->value(); }
     float steady_desktop_seconds() const { return m_steady_desktop_seconds->value(); }
@@ -227,6 +231,10 @@ private:
     const ModToggle::Ptr m_sync_eye_lod{ModToggle::create("WuWaStereo_SyncEyeLod", true)};
     // Bounded lighting-volume refresh; not a general material or NPC rim repair.
     const ModToggle::Ptr m_refill_far_lighting{ModToggle::create("WuWaStereo_RefillFarLighting", true)};
+    // Screen-space ambient occlusion shades the two eyes differently in native stereo
+    // (rocks, hills, roofs; Lelouche, 9 Oct 2026), so it is off unless chosen
+    // (r.AmbientOcclusionLevels 0, CVarManager.cpp).
+    const ModToggle::Ptr m_ambient_occlusion{ModToggle::create("WuWaStereo_AmbientOcclusion", false)};
     struct RimToggle : ModToggle {
         RimToggle() : ModToggle{"WuWaStereo_SuppressNpcRim", false} {}
         std::atomic<bool> requested{false};
@@ -294,6 +302,8 @@ private:
     // until turned back on.
     const ModToggle::Ptr m_view_hints{ModToggle::create("WuWaControls_ViewHints", true)};
     const ModInt32::Ptr m_view_hints_shown{ModInt32::create("WuWaControls_ViewHintsShown", 0)};
+    // With Reality Runner open, walking starts a run and a long pause ends it (WuWaRunMarker.hpp).
+    const ModToggle::Ptr m_run_auto{ModToggle::create("WuWaRun_Auto", true)};
     // A one-line tip shows on the first three launches.
     const ModInt32::Ptr m_tips_shown{ModInt32::create("WuWaControls_TipsShown", 0)};
     // What the camera script reports held: "l3:<buttons>:<lt>:<rt>", "views:..." or nothing.

@@ -63,7 +63,8 @@
     "mods/VR.cpp"
   ],
   "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped.": [
-    "mods/VR.cpp"
+    "mods/VR.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Acro drone": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -144,6 +145,12 @@
   "Always (manual mask)": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
+  "Ambient occlusion": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Ambient occlusion (soft contact shadows)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "An automated stereo comparison is active. These three settings return to your choices when it ends (at most 60 seconds).": [
     "mods/VR.cpp"
   ],
@@ -159,11 +166,17 @@
   "Animation off: stable height relative to the character root. On: follow the head, or reconstruct it from a visible parent bone when the head is hidden. This follows leaning and sprinting but can add bobbing. Missing rig support falls back to the stable anchor; see the status below.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Another setting changed the rim value; it was left untouched. Toggle off, then on to retry.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
   "Answer in the menu: L3 + R3 (or Insert), Test page.": [
     "utility/WuWaVrMenu.cpp"
   ],
   "Asks the game to lay out its HUD again. Try it if the HUD looks stretched or cut off after switching views.": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Authored framing applied (headset check pending)": [
+    "utility/WuWaMonoNativeProjection.hpp"
   ],
   "Auto": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -182,6 +195,21 @@
   ],
   "Automatic cutscene switching (unverified)": [
     "mods/VR.cpp"
+  ],
+  "Automatic lease expired; restoration waits for the next game tick": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Automatic mono theatre active": [
+    "utility/WuWaAutoCinema.hpp"
+  ],
+  "Automatic presentation lease expired; previous view restored": [
+    "utility/WuWaAutoCinema.hpp"
+  ],
+  "Automatic slot: using slot %d.": [
+    "mods/VR.cpp"
+  ],
+  "Automatic stereo screen active": [
+    "utility/WuWaAutoCinema.hpp"
   ],
   "Automatic story switching did not activate in the latest reported replay. Prerecorded video switching has not been tested. Missing or changed signals leave the normal view unchanged.": [
     "mods/VR.cpp"
@@ -216,8 +244,11 @@
   "Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Black boxes over your UID in the corner and the profile ID row in menus. While recording: only while the WuWa VR app records, so the boxes never cover HUD you need in play. Always: for other recorders such as OBS too. The boxes are approximate; check a short video before sharing. Other names and chat are not hidden.": [
+  "Black boxes over your UID in the corner and the profile ID row in menus. While recording: while the WuWa VR app records or a treadmill run is on, so the boxes never cover HUD you need in play. Always: for OBS and other recorders at any time. The boxes are approximate; check a short video before sharing. Other names and chat are not hidden.": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Blocked": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Blur (depth of field) on / off": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -238,6 +269,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Both eyes get": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Both eyes: %s": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Both together": [
@@ -306,6 +340,12 @@
   ],
   "Change page": [
     "mod/controls.json"
+  ],
+  "Character toon-depth rim is suppressed; the previous value is retained.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
+  "Character toon-depth rim was already zero; no write was needed.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
   ],
   "Character visibility details": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -378,11 +418,17 @@
   "Compare controller fixes in this run": [
     "mods/VR.cpp"
   ],
+  "Confirming cinematic signal": [
+    "utility/WuWaAutoCinema.hpp"
+  ],
   "Controller shortcuts": [
     "mods/VR.cpp"
   ],
   "Controller slot": [
     "mods/VR.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Controllers": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Controls cards": [
@@ -393,9 +439,6 @@
   ],
   "Copy from": [
     "mods/vr/WuWaVrMenuHost.cpp"
-  ],
-  "Could not write the run marker file.": [
-    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Covers the ID row on the ESC profile screen too.": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -513,11 +556,20 @@
   "Drone response (higher = less drift)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "DualSense direct shortcuts (experimental)": [
+    "utility/WuWaPlayStationHid.hpp"
+  ],
+  "DualShock 4 direct shortcuts (experimental)": [
+    "utility/WuWaPlayStationHid.hpp"
+  ],
   "ESC / overlay menus (detected)": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
   "EXPECT": [
     "utility/WuWaVrMenu.cpp"
+  ],
+  "Each eye: %u x %u pixels. Now about %.0f fps.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Early stereo view setup (experimental)": [
     "mods/VR.cpp"
@@ -555,9 +607,6 @@
   "Exact animation (stick does not steer view)": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
-  "Exercise recordings: start OBS (F9), press Start run, open the in-game map for 3 seconds. At the end: End run, open the map zoomed out, then stop OBS. Each press flashes a magenta square in the desktop view so the video lines up with your route log.": [
-    "mods/vr/WuWaControlsComponent.cpp"
-  ],
   "Exit mouse mode now": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -575,6 +624,9 @@
   ],
   "Faces the view forward from where you are now.": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Fail": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Far trees and props switch detail together in both eyes. Recommended.": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -701,6 +753,9 @@
   ],
   "Framing and theatre details": [
     "mods/VR.cpp"
+  ],
+  "Framing candidate refused; see diagnostic log": [
+    "utility/WuWaMonoNativeProjection.hpp"
   ],
   "Framing matched both eyes in the owner's simulator replay. Headset comfort and rare prerecorded movies still need testing.": [
     "mods/VR.cpp"
@@ -1272,6 +1327,24 @@
   "Larger menu following view": [
     "mods/vr/OverlayComponent.cpp"
   ],
+  "Laser asleep: move the left controller or press a VR button.": [
+    "mods/VR.cpp"
+  ],
+  "Laser asleep: move the right controller or press a VR button.": [
+    "mods/VR.cpp"
+  ],
+  "Laser on: point the left controller and pull its trigger.": [
+    "mods/VR.cpp"
+  ],
+  "Laser on: point the right controller and pull its trigger.": [
+    "mods/VR.cpp"
+  ],
+  "Laser: no VR controllers found.": [
+    "mods/VR.cpp"
+  ],
+  "Last run: %s, walking %s, %.2f km in the game.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Last used wins": [
     "mods/VR.hpp",
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1339,6 +1412,9 @@
   ],
   "Lower eye level by 5": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Manual override; waiting for this scene to end": [
+    "utility/WuWaAutoCinema.hpp"
   ],
   "Mark this moment": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1428,6 +1504,12 @@
   "Moves your viewpoint up or down from the game camera.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Moving the menu: point where you want it, thumbstick up / down for distance, then pull the trigger.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Moving the menu: stick, D-pad or arrow keys. Right stick or Page Up / Down: distance. A or Enter: put it down.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Multiplies the blur in full VR. 1x is the 2D view's look.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1436,6 +1518,12 @@
   ],
   "Native Stereo Fix frame timing (experimental)": [
     "mods/VR.cpp"
+  ],
+  "Native game camera active (headset check pending)": [
+    "utility/WuWaMonoNativeProjection.hpp"
+  ],
+  "Native game camera unavailable; compatibility fallback": [
+    "utility/WuWaMonoNativeProjection.hpp"
   ],
   "Navigate / activate / back": [
     "mod/controls.json"
@@ -1449,8 +1537,23 @@
   "No active playtest connection. Keep the launcher running and open Developer playtests to start or resume a session.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "No run yet. Start one here, or open Reality Runner and walk.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "No supported direct PlayStation controller detected": [
+    "utility/WuWaPlayStationHid.hpp"
+  ],
   "Normal scale: %.3fx. Your saved scale and camera presets stay unchanged; intentional scale edits become the new normal value.": [
     "mods/VR.cpp"
+  ],
+  "Not saved: %s": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Not tested": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Now: %s": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Observation": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1458,10 +1561,14 @@
   "Off": [
     "mods/vr/WuWaControlsComponent.hpp",
     "mods/vr/WuWaVrMenuHost.cpp",
+    "utility/WuWaMonoNativeProjection.hpp",
     "utility/WuWaVrMenu.cpp"
   ],
   "Off by default. Detected movies are intended to use mono; story scenes use your choice above. Recognition remains unverified. Manual view changes take priority.": [
     "mods/VR.cpp"
+  ],
+  "Off by default: in VR its shading differs between the eyes on rocks, hills and roofs. On gives the game its own setting back.": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Off: UEVR opens its classic window, as before. You can turn this menu back on under VR > WuWa Controls.": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1516,6 +1623,9 @@
   "Or: UEVR > WuWa Controls > Show game UI now": [
     "utility/WuWaShortcutSheet.cpp"
   ],
+  "Pass": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Physical gamepad passthrough (test)": [
     "mods/VR.cpp"
   ],
@@ -1551,6 +1661,18 @@
   ],
   "Plane: right stick pitches/banks, left stick X steers yaw. RT increases cruise speed, LT decreases it. Hold LB to brake, RB to boost. Double R3 exits. Cruise pauses when focus or controller samples are lost; release controls then move a stick to rearm after Alt-Tab.": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "PlayStation input is unavailable or held exclusively; use Steam Input if available": [
+    "utility/WuWaPlayStationHid.hpp"
+  ],
+  "PlayStation reader unavailable": [
+    "utility/WuWaPlayStationHid.hpp"
+  ],
+  "PlayStation reader unavailable: cannot retain backend module": [
+    "utility/WuWaPlayStationHid.hpp"
+  ],
+  "PlayStation reports stopped; release controls after reconnecting": [
+    "utility/WuWaPlayStationHid.hpp"
   ],
   "PlayStation: L1/R1 = LB/RB, L2/R2 = LT/RT, Cross/Circle/Square/Triangle = A/B/X/Y, Share/Create = View, Options = Menu.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1629,6 +1751,12 @@
   "Readable HUD following view": [
     "mods/vr/OverlayComponent.cpp"
   ],
+  "Reality Runner and other treadmills: keep Sharing on Both together and Controller slot on Automatic, so walking and the VR controllers work at the same time.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Reality Runner is open: 10 seconds of walking starts a run.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Recenter headset / portal": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1650,6 +1778,33 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Record video": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: failed. See WuWa Controls > Recording in the classic menu.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: missing from this launcher package.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: open the WuWa VR app (launcher) to record.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: ready.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: recording. Reports and marks note the time in the video.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: saved. Open recordings from the launcher.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: saving the video.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: starting.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Recorder: waiting for the launcher...": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Recording and privacy": [
@@ -1769,7 +1924,25 @@
   "Right-stick pitch; animated yaw and roll": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
-  "Run in progress: %d min.": [
+  "Rim restoration failed; the original is retained. Toggle off, then on to retry restoration first.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
+  "Rim suppression was not verified. Toggle off, then on to retry safely.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
+  "Rim variable is unavailable. Toggle off, then on to retry.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
+  "Rim workaround is off.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
+  "Rim workaround waits for active native stereo with 2D screen off.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
+  "Rim workaround waits for the current graphics comparison to end.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
+  "Run on: %s, walking %s, %.2f km in the game.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Safe fit inside rounded edges": [
@@ -1798,6 +1971,12 @@
   ],
   "Saves this answer with the settings now in use, then shows the next step.": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Saving": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Scene ending; restoring previous view": [
+    "utility/WuWaAutoCinema.hpp"
   ],
   "Screen lens": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1922,6 +2101,9 @@
   "Smooths the game camera's up / down tilt.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Soft contact shadows in corners and under objects. Off by default: in VR they shade the two eyes differently on rocks, hills and roofs. On gives the game its own setting back.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Speed": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1929,6 +2111,12 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Start a developer playtest in the launcher, then save your observations here. Nothing passes automatically.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Start and end runs automatically": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Start and end treadmill runs automatically": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Start motion sidecar (5 minutes max)": [
@@ -1939,6 +2127,9 @@
   ],
   "Start video recording": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Starting": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Starting the recorder. Close the UEVR menu for a clear view.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1967,7 +2158,7 @@
   "Status: on, waiting for game focus. Click the game window.": [
     "mods/VR.cpp"
   ],
-  "Status: on, waiting for the game to read controller slot %d. It is asked again every 2 seconds; keep the game window focused.": [
+  "Status: on, waiting for the game to read controller slot %d. It is asked again a few times a minute; keep the game window focused.": [
     "mods/VR.cpp"
   ],
   "Status: on. Every controller steers this menu; the game gets no input until it closes.": [
@@ -2094,8 +2285,14 @@
   "The hold gesture is unavailable while Enable motion-controller input is on; use this checkbox.": [
     "mods/VR.cpp"
   ],
+  "The previous character rim value was restored and verified.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
   "The recorder is missing from this launcher package.": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "The rim variable changed; no old pointer was used. Toggle off, then on to retry.": [
+    "utility/WuWaRimSuppressionPolicy.hpp"
   ],
   "The selected package is recorded; this is not proof of the DLL loaded by the game.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2133,6 +2330,9 @@
   "This runtime cannot identify optical hands. Controller-derived joints are not shown.": [
     "mods/vr/runtimes/OpenXR.cpp"
   ],
+  "Times your run and saves your route in the game once a second, with a sync flash for OBS videos. With Reality Runner open, walking starts a run by itself (Controllers page).": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Toggle HUD / mouse adjustment": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -2150,6 +2350,12 @@
   ],
   "Translucency correction stopped or could not verify this game build. See the diagnostic log.": [
     "mods/VR.cpp"
+  ],
+  "Treadmill": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Treadmill run": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Try headset aim": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2268,8 +2474,17 @@
   "Waiting for a valid portal anchor.": [
     "mods/vr/OverlayComponent.cpp"
   ],
+  "Waiting for a verified cinematic signal": [
+    "utility/WuWaAutoCinema.hpp"
+  ],
+  "Waiting for an authored constrained camera": [
+    "utility/WuWaMonoNativeProjection.hpp"
+  ],
   "Waiting for fresh optical hands. Keep hands visible to the headset and enable tracking forwarding in Virtual Desktop when using VDXR.": [
     "mods/vr/runtimes/OpenXR.cpp"
+  ],
+  "Waiting for native game camera": [
+    "utility/WuWaMonoNativeProjection.hpp"
   ],
   "Waiting for the launcher...": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2320,7 +2535,7 @@
     "mods/vr/WuWaControlsComponent.hpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "While recording: the boxes appear only while the WuWa VR app records. Recording with other software (OBS) needs Always.": [
+  "While recording: the boxes appear while the WuWa VR app records and during treadmill runs. Recording with other software (OBS) at other times needs Always.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Wide 90 degrees": [
@@ -2337,6 +2552,12 @@
   ],
   "With Native Stereo Fix and Use Same Stereo Pass on, keeps the source eye's projection for supported custom reflection captures. With Native Stereo Fix off, selects verified two-eye atlas parameters. Visual acceptance is pending.": [
     "mods/VR.cpp"
+  ],
+  "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. The WuWa VR menu has the same switch on its Controllers page.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. Your route is saved in the UEVR profile, wuwa-runs folder.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Within a shot": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -2366,6 +2587,9 @@
   "XInput controller slot (test)": [
     "mods/VR.cpp"
   ],
+  "Xbox / Steam Input has priority; direct PlayStation shortcuts are waiting": [
+    "utility/WuWaPlayStationHid.hpp"
+  ],
   "Yaw rate (degrees / second)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -2380,6 +2604,9 @@
   ],
   "Your body": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Your route in the game is saved once a second (UEVR profile > wuwa-runs), so no map screenshots are needed. Each start and end flashes a magenta square in the desktop view, so an OBS video lines up with the route.": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Your unsent note is retained in this menu until the game closes.": [
     "mods/vr/WuWaControlsComponent.cpp"

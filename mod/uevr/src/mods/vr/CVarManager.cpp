@@ -12,6 +12,9 @@
 #include <sdk/threading/GameThreadWorker.hpp>
 #include <sdk/ConsoleManager.hpp>
 #include <sdk/UGameplayStatics.hpp>
+#include <sdk/UEngine.hpp>
+#include <sdk/APlayerController.hpp>
+#include <sdk/APawn.hpp>
 
 #include "Framework.hpp"
 #include "mods/VR.hpp"
@@ -19,8 +22,39 @@
 #include "CVarManager.hpp"
 #include "utility/WuWaTestControl.hpp"
 #include "utility/WuWaClvRefresh.hpp"
+#include "utility/WuWaRunMarker.hpp"
+#include "utility/WuWaTreadmillApp.hpp"
 
 #include <tracy/Tracy.hpp>
+
+namespace {
+// WuWa: screen-space ambient occlusion shades the two eyes differently in native stereo
+// (rocks, hills, roofs; Lelouche, 9 Oct 2026), so the mod turns it off unless the player
+// chooses it (WuWaStereo_AmbientOcclusion). r.AmbientOcclusionLevels 0 is off; turning it
+// back on restores the value it had. A value frozen in the cvar list wins. Game thread.
+std::optional<int> g_wuwa_ao_before{};
+
+void wuwa_ambient_occlusion(bool on, bool frozen_by_player) {
+    if (frozen_by_player) return;
+    auto data = sdk::find_cvar_data_cached(L"Engine", L"r.AmbientOcclusionLevels");
+    if (!data) return;
+    auto* value = data->get<int>();
+    if (value == nullptr) return;
+    const int current = value->get();
+    if (!on) {
+        if (current == 0) return;
+        if (!g_wuwa_ao_before) {
+            g_wuwa_ao_before = current;
+            SPDLOG_INFO("[WuWa] Ambient occlusion off (r.AmbientOcclusionLevels {} -> 0)", current);
+        }
+        value->set(0);
+    } else if (g_wuwa_ao_before) {
+        if (current == 0) value->set(*g_wuwa_ao_before);
+        SPDLOG_INFO("[WuWa] Ambient occlusion on again (r.AmbientOcclusionLevels {})", *g_wuwa_ao_before);
+        g_wuwa_ao_before.reset();
+    }
+}
+}
 
 constexpr std::string_view cvars_standard_txt_name = "cvars_standard.txt";
 constexpr std::string_view cvars_data_txt_name = "cvars_data.txt";
@@ -98,6 +132,26 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
 
     if (wuwa_test::is_wuwa()) wuwa_clv::tick(VR::get()->get_wuwa_controls().refill_far_lighting());
     if (wuwa_test::is_wuwa()) {
+        auto& controls = VR::get()->get_wuwa_controls();
+        wuwa_treadmill::poll();
+        wuwa_run::tick(Framework::get_persistent_dir(), controls.automatic_runs(), [](double& x, double& y, double& z) {
+            const auto engine = sdk::UEngine::get();
+            const auto world = engine != nullptr ? engine->get_world() : nullptr;
+            const auto statics = world != nullptr ? sdk::UGameplayStatics::get() : nullptr;
+            const auto controller = statics != nullptr ? statics->get_player_controller(world, 0) : nullptr;
+            const auto pawn = controller != nullptr ? controller->get_acknowledged_pawn() : nullptr;
+            if (pawn == nullptr) return false;
+            const auto at = pawn->get_actor_location();
+            x = at.x; y = at.y; z = at.z;
+            return true;
+        });
+        bool ao_frozen = false;
+        for (const auto& cvar : m_all_cvars) {
+            if (cvar->get_name() == L"r.AmbientOcclusionLevels") { ao_frozen = cvar->is_frozen(); break; }
+        }
+        wuwa_ambient_occlusion(controls.ambient_occlusion(), ao_frozen);
+    }
+    if (wuwa_test::is_wuwa()) {
         const auto vr = VR::get();
         const auto runtime = vr->get_runtime();
         const bool eligible = runtime != nullptr && runtime->ready() && vr->is_hmd_active() &&
@@ -168,7 +222,8 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "WuWaControls_AcroThrust", "WuWaControls_AcroDrag", "WuWaControls_AcroTilt", "WuWaControls_AcroInvertPitch",
                 "WuWaControls_FreeCollision", "WuWaControls_CollisionComplex", "WuWaControls_CollisionRadius",
                 "WuWaControls_LevelFirstPerson", "WuWaControls_PinCard", "WuWaControls_CardWidth",
-                "WuWaControls_CardBelow", "WuWaControls_CardDistance", "WuWaControls_ViewHints"}) {
+                "WuWaControls_CardBelow", "WuWaControls_CardDistance", "WuWaControls_ViewHints",
+                "WuWaStereo_AmbientOcclusion", "WuWaRun_Auto", "VR_WuWaVRControllerSlot", "VR_WuWaVRControllerStyle"}) {
             if (const auto value = VR::get()->get_value(name)) options[name] = value->get();
         }
         return options;

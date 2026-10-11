@@ -174,8 +174,12 @@ use the checkbox then.
 - **VR only (Xbox ignored)**: only VR controllers work while on.
 
 **Controller slot** (remembered): the Windows XInput slot that VR shares.
-Slot 0 suits most setups. For a treadmill, choose its slot; **Launcher →
-Troubleshooting → Controller check** reports the slots in use.
+**Automatic** (default) uses the lowest slot that really reports a
+controller, such as Reality Runner's virtual pad while HidHide hides the real
+pad. Choose a fixed slot only if it picks the wrong one; **Launcher →
+Troubleshooting → Controller check** reports the slots in use. Both settings
+are on the WuWa VR menu's **Controllers** page, whose status line shows the
+slot Automatic chose.
 
 | Quest control | Xbox input |
 | --- | --- |
@@ -286,6 +290,26 @@ For vertical aim, **Use right-stick pitch** disables the horizon lock and select
 game aim. **Try headset aim** selects UEVR Head aim with player control rotation.
 These are global UEVR aim settings and change only when selected. Grapple/wing
 behavior still needs comparison in the game.
+
+## Treadmill runs
+
+A run times your session and saves your route in the game once a second to
+`<UEVR profile>/wuwa-runs/run-<date-time>.jsonl` (`t`, `x`, `y`, `z` in game
+units, `walking`; a jump of more than 30 m in a second is marked and not
+counted). Each start and end also adds a line to `wuwa-runs.jsonl` (with the
+time, walking time and distance at the end) and flashes a magenta square in
+the desktop view, so an OBS video lines up with the route. No map
+screenshots are needed.
+
+- **Start or end by hand:** **Treadmill run** on the WuWa VR menu's Quick,
+  Controllers or Record page, or **Start run** in the classic menu (WuWa
+  Controls → Recording and privacy).
+- **Automatic** (`WuWaRun_Auto`, default on): while **RealityRunner.exe** is
+  open, 10 seconds of walking (left stick on any real pad) starts a run, and
+  5 minutes without walking ends a run that started this way; its time stops
+  at the last step. Runs started by hand end by hand.
+- **Player IDs:** with **Hide player IDs** on While recording, the boxes also
+  show during runs, so an OBS recording of a run is covered.
 
 ## Optional temporary menu layout
 

@@ -27,6 +27,7 @@
 #include "utility/WuWaTestControl.hpp"
 #include "utility/WuWaStereoComparison.hpp"
 #include "utility/WuWaMonoNativeProjection.hpp"
+#include "utility/WuWaRunMarker.hpp"
 
 #include "VR.hpp"
 #include "WindowMode.hpp"
@@ -786,10 +787,14 @@ bool VR::menu_sticks(glm::vec2& left, glm::vec2& right) const {
 }
 
 std::string VR::menu_pointer_status() const {
-    if (!is_hmd_active() || m_controllers.empty()) return "Laser: no VR controllers found.";
-    const char* hand = m_swap_controllers->value() ? "left" : "right";
-    if (menu_pointer_active()) return std::string("Laser on: point the ") + hand + " controller and pull its trigger.";
-    return std::string("Laser asleep: move the ") + hand + " controller or press a VR button.";
+    if (!is_hmd_active() || m_controllers.empty()) return N_("Laser: no VR controllers found.");
+    const bool left = m_swap_controllers->value();
+    if (menu_pointer_active()) {
+        return left ? N_("Laser on: point the left controller and pull its trigger.")
+                    : N_("Laser on: point the right controller and pull its trigger.");
+    }
+    return left ? N_("Laser asleep: move the left controller or press a VR button.")
+                : N_("Laser asleep: move the right controller or press a VR button.");
 }
 
 bool VR::menu_controller_pad(MenuPad& pad) const {
@@ -883,7 +888,14 @@ void VR::update_sightseeing_sample(bool synced) {
 bool VR::apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* state) {
     // The real answer, before any VR input is mixed in: the automatic slot
     // follows controllers that are really there.
-    if (result && slot < 4 && *result == ERROR_SUCCESS) m_sightseeing_connected_ms[slot].store(GetTickCount64());
+    if (result && slot < 4 && *result == ERROR_SUCCESS) {
+        m_sightseeing_connected_ms[slot].store(GetTickCount64());
+        // A treadmill's virtual pad walks with the left stick: treadmill runs (WuWaRunMarker.hpp).
+        if (state) {
+            const float lx = state->Gamepad.sThumbLX / 32767.0f, ly = state->Gamepad.sThumbLY / 32767.0f;
+            wuwa_run::stick(std::sqrt(lx * lx + ly * ly));
+        }
+    }
     if (!sightseeing_on()) return false;
     // Bypass the legacy motion mapper for all slots; only the chosen slot is
     // mixed. Other connected controllers retain their original state.
@@ -919,9 +931,51 @@ bool VR::apply_sightseeing_input(uint32_t* result, uint32_t slot, XINPUT_STATE* 
     return true;
 }
 
-void VR::draw_sightseeing_menu() {
+std::string VR::sightseeing_status() {
     using Status = wuwa_sightseeing::Status;
     using Source = wuwa_sightseeing::Source;
+    using Style = wuwa_sightseeing::Style;
+    const bool on = sightseeing_on();
+    const auto style = wuwa_sightseeing::style_from(m_sightseeing_style->value());
+    wuwa_sightseeing::Snapshot snap{};
+    {
+        std::scoped_lock lock{m_sightseeing_mtx};
+        snap = m_sightseeing_readiness.read(on, GetTickCount64(), g_framework->is_drawing_ui());
+    }
+    const auto slot = sightseeing_slot();
+    const bool xbox_fallback = style != Style::VrOnly;
+    const char* line = nullptr;
+    switch (snap.status) {
+    case Status::Off: line = N_("Status: off. Xbox only."); break;
+    case Status::Active:
+        if (snap.source == Source::Both) line = N_("Status: on. VR controllers and Xbox both working.");
+        else if (snap.source == Source::Physical) line = N_("Status: on. Xbox in control; use a VR control to switch.");
+        else if (style == Style::LastUsed) line = N_("Status: on. VR controllers in control; use the Xbox to switch.");
+        else line = N_("Status: on. VR controllers working.");
+        break;
+    case Status::MenuReady: line = N_("Status: on. Every controller steers this menu; the game gets no input until it closes."); break;
+    case Status::WaitingVr:
+        line = xbox_fallback ? N_("Status: on, waiting for VR controllers. Wake both and keep the headset on; the Xbox still works.")
+                             : N_("Status: on, waiting for VR controllers. Wake both and keep the headset on.");
+        break;
+    case Status::WaitingPoll:
+        return wuwa_ui::format("Status: on, waiting for the game to read controller slot %d. It is asked again a few times a minute; keep the game window focused.", slot);
+    case Status::GameUnfocused: line = N_("Status: on, waiting for game focus. Click the game window."); break;
+    case Status::Passthrough: line = N_("Status: blocked by Physical gamepad passthrough. Turn passthrough off to use VR controllers."); break;
+    case Status::SlotFiltered:
+        return wuwa_ui::format("Status: blocked by the XInput controller slot filter. Allow slot %d or choose another slot.", slot);
+    case Status::InputMuted: line = N_("Status: paused by the diagnostic motion-input mute."); break;
+    case Status::OpenXRRequired: line = N_("Status: VR controllers need the OpenXR runtime."); break;
+    }
+    std::string text = line ? wuwa_l10n::translate(line) : std::string{};
+    if (snap.status == Status::Active && snap.held)
+        text += "\n" + wuwa_l10n::translate(N_("A VR button or stick held from before is ignored until you let go of it."));
+    if (on && m_sightseeing_slot->value() == wuwa_sightseeing::automatic_slot)
+        text += "\n" + wuwa_ui::format("Automatic slot: using slot %d.", slot);
+    return text;
+}
+
+void VR::draw_sightseeing_menu() {
     using Style = wuwa_sightseeing::Style;
     bool on = sightseeing_on();
     const auto label = wuwa_l10n::label("VR controllers on (this launch)");
@@ -944,42 +998,7 @@ void VR::draw_sightseeing_menu() {
     wuwa_ui::draw(*m_sightseeing_slot, "Controller slot");
     wuwa_ui::TextWrapped("Automatic uses the slot that has a controller, such as a treadmill's virtual pad while the real pad is hidden. Choose a fixed slot only if it picks the wrong one: launcher Troubleshooting > Controller check lists them.");
 
-    wuwa_sightseeing::Snapshot snap{};
-    {
-        std::scoped_lock lock{m_sightseeing_mtx};
-        snap = m_sightseeing_readiness.read(on, GetTickCount64(), g_framework->is_drawing_ui());
-    }
-    const auto slot = sightseeing_slot();
-    const bool xbox_fallback = style != Style::VrOnly;
-    switch (snap.status) {
-    case Status::Off:
-        wuwa_ui::TextWrapped("Status: off. Xbox only."); break;
-    case Status::Active:
-        if (snap.source == Source::Both) wuwa_ui::TextWrapped("Status: on. VR controllers and Xbox both working.");
-        else if (snap.source == Source::Physical) wuwa_ui::TextWrapped("Status: on. Xbox in control; use a VR control to switch.");
-        else if (style == Style::LastUsed) wuwa_ui::TextWrapped("Status: on. VR controllers in control; use the Xbox to switch.");
-        else wuwa_ui::TextWrapped("Status: on. VR controllers working.");
-        if (snap.held) wuwa_ui::TextWrapped("A VR button or stick held from before is ignored until you let go of it.");
-        break;
-    case Status::MenuReady:
-        wuwa_ui::TextWrapped("Status: on. Every controller steers this menu; the game gets no input until it closes."); break;
-    case Status::WaitingVr:
-        if (xbox_fallback) wuwa_ui::TextWrapped("Status: on, waiting for VR controllers. Wake both and keep the headset on; the Xbox still works.");
-        else wuwa_ui::TextWrapped("Status: on, waiting for VR controllers. Wake both and keep the headset on.");
-        break;
-    case Status::WaitingPoll:
-        wuwa_ui::TextWrapped("Status: on, waiting for the game to read controller slot %d. It is asked again every 2 seconds; keep the game window focused.", slot); break;
-    case Status::GameUnfocused:
-        wuwa_ui::TextWrapped("Status: on, waiting for game focus. Click the game window."); break;
-    case Status::Passthrough:
-        wuwa_ui::TextWrapped("Status: blocked by Physical gamepad passthrough. Turn passthrough off to use VR controllers."); break;
-    case Status::SlotFiltered:
-        wuwa_ui::TextWrapped("Status: blocked by the XInput controller slot filter. Allow slot %d or choose another slot.", slot); break;
-    case Status::InputMuted:
-        wuwa_ui::TextWrapped("Status: paused by the diagnostic motion-input mute."); break;
-    case Status::OpenXRRequired:
-        wuwa_ui::TextWrapped("Status: VR controllers need the OpenXR runtime."); break;
-    }
+    wuwa_ui::TextWrapped("%s", sightseeing_status().c_str());
 
     wuwa_ui::TextWrapped("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped.");
     wuwa_ui::TextWrapped("Choose First person under View modes if wanted; camera and aiming settings stay unchanged.");
@@ -2797,13 +2816,13 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
                 m_wuwa_controls.reset_auto_cinema();
             wuwa_ui::draw(*m_auto_story_presentation, "Story cutscenes and dialogue");
             wuwa_ui::TextWrapped("Off by default. Detected movies are intended to use mono; story scenes use your choice above. Recognition remains unverified. Manual view changes take priority.");
-            if (is_auto_cinema_enabled()) ImGui::TextWrapped("%s", m_wuwa_controls.auto_cinema_status().c_str());
+            if (is_auto_cinema_enabled()) wuwa_ui::TextWrapped("%s", m_wuwa_controls.auto_cinema_status().c_str());
             ImGui::TreePop();
         }
         if (wuwa_ui::TreeNode("Framing and theatre details")) {
             wuwa_ui::TextWrapped("Framing matched both eyes in the owner's simulator replay. Headset comfort and rare prerecorded movies still need testing.");
-            if (is_using_mono_theatre()) ImGui::TextWrapped("%s", wuwa_mono_native::status_text());
-            else if (is_cinematic_framing_fix_enabled()) ImGui::TextWrapped("%s", wuwa_cinematic_framing::status_text());
+            if (is_using_mono_theatre()) wuwa_ui::TextWrapped("%s", wuwa_mono_native::status_text());
+            else if (is_cinematic_framing_fix_enabled()) wuwa_ui::TextWrapped("%s", wuwa_cinematic_framing::status_text());
             ImGui::TreePop();
         }
     };
@@ -3037,11 +3056,11 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         wuwa_ui::draw(*m_cinematic_framing_fix, "Match cinematic framing between eyes (default on)");
         if (ImGui::TreeNode(wuwa_l10n::label("Detection details").c_str())) {
             wuwa_ui::TextWrapped("Automatic story switching did not activate in the latest reported replay. Prerecorded video switching has not been tested. Missing or changed signals leave the normal view unchanged.");
-            if (is_auto_cinema_enabled()) ImGui::TextWrapped("%s", m_wuwa_controls.auto_cinema_status().c_str());
-            if (is_using_mono_theatre()) ImGui::TextWrapped("%s", wuwa_mono_native::status_text());
+            if (is_auto_cinema_enabled()) wuwa_ui::TextWrapped("%s", m_wuwa_controls.auto_cinema_status().c_str());
+            if (is_using_mono_theatre()) wuwa_ui::TextWrapped("%s", wuwa_mono_native::status_text());
             wuwa_ui::TextWrapped("Framing repair matched both eyes in a simulator quest replay. Headset comfort remains untested; mono theatre is still available as a manual fallback.");
             if (is_cinematic_framing_fix_enabled() && !is_using_mono_theatre())
-                ImGui::TextWrapped("%s", wuwa_cinematic_framing::status_text());
+                wuwa_ui::TextWrapped("%s", wuwa_cinematic_framing::status_text());
             ImGui::TreePop();
         }
         }

@@ -1,4 +1,7 @@
 #pragma once
+#ifndef N_
+#define N_(english) english // shown English for the catalog (WuWaLocalization.hpp)
+#endif
 #include <Windows.h>
 #include <Xinput.h>
 #include <hidsdi.h>
@@ -64,14 +67,14 @@ public:
         // under the loader lock. Confirmed process exit releases the owner.
         if (!m_pin || !m_pin()) {
             m_start_failed = true;
-            publish({}, 0, wuwa_ps::Model::unsupported, "PlayStation reader unavailable: cannot retain backend module");
+            publish({}, 0, wuwa_ps::Model::unsupported, N_("PlayStation reader unavailable: cannot retain backend module"));
             return;
         }
         m_stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-        if (!m_stop) { m_start_failed = true; publish({}, 0, wuwa_ps::Model::unsupported, "PlayStation reader unavailable"); return; }
+        if (!m_stop) { m_start_failed = true; publish({}, 0, wuwa_ps::Model::unsupported, N_("PlayStation reader unavailable")); return; }
         { std::scoped_lock lock{m_mutex}; m_snapshot.started = GetTickCount64(); }
         try { m_thread = std::thread{[this] { run(); }}; }
-        catch (...) { m_start_failed = true; publish({}, 0, wuwa_ps::Model::unsupported, "PlayStation reader unavailable"); }
+        catch (...) { m_start_failed = true; publish({}, 0, wuwa_ps::Model::unsupported, N_("PlayStation reader unavailable")); }
     }
     Snapshot snapshot() const { std::scoped_lock lock{m_mutex}; return m_snapshot; }
     bool active(const Snapshot& s, uint64_t now) const {
@@ -79,9 +82,9 @@ public:
     }
     std::string status() const {
         const auto s = snapshot(); const auto now = GetTickCount64();
-        if (wuwa_ps::recent(last_xinput.load(), now, 2000)) return "Xbox / Steam Input has priority; direct PlayStation shortcuts are waiting";
-        if (active(s, now)) return s.model == wuwa_ps::Model::ds4 ? "DualShock 4 direct shortcuts (experimental)" : "DualSense direct shortcuts (experimental)";
-        if (s.stamp && !wuwa_ps::recent(s.stamp, now, 250)) return "PlayStation reports stopped; release controls after reconnecting";
+        if (wuwa_ps::recent(last_xinput.load(), now, 2000)) return N_("Xbox / Steam Input has priority; direct PlayStation shortcuts are waiting");
+        if (active(s, now)) return s.model == wuwa_ps::Model::ds4 ? N_("DualShock 4 direct shortcuts (experimental)") : N_("DualSense direct shortcuts (experimental)");
+        if (s.stamp && !wuwa_ps::recent(s.stamp, now, 250)) return N_("PlayStation reports stopped; release controls after reconnecting");
         return s.status;
     }
 private:
@@ -155,8 +158,8 @@ private:
             return device;
         }
         publish({}, 0, wuwa_ps::Model::unsupported, inaccessible ?
-            "PlayStation input is unavailable or held exclusively; use Steam Input if available" :
-            "No supported direct PlayStation controller detected");
+            N_("PlayStation input is unavailable or held exclusively; use Steam Input if available") :
+            N_("No supported direct PlayStation controller detected"));
         return {};
     }
     void run() noexcept {

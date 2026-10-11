@@ -1,4 +1,7 @@
 #pragma once
+#ifndef N_
+#define N_(english) english // shown English for the catalog (WuWaLocalization.hpp)
+#endif
 #include <cstdint>
 #include <string>
 
@@ -67,12 +70,12 @@ public:
         return true;
     }
     const char* state(uint64_t now) const {
-        if (suppressed_) return "Manual override; waiting for this scene to end";
-        if (active(now)) return clear_pending_ ? "Scene ending; restoring previous view" :
-            (presentation_ == Presentation::mono_theatre ? "Automatic mono theatre active" : "Automatic stereo screen active");
-        if (enter_pending_) return "Confirming cinematic signal";
-        if (until_) return "Automatic presentation lease expired; previous view restored";
-        return "Waiting for a verified cinematic signal";
+        if (suppressed_) return N_("Manual override; waiting for this scene to end");
+        if (active(now)) return clear_pending_ ? N_("Scene ending; restoring previous view") :
+            (presentation_ == Presentation::mono_theatre ? N_("Automatic mono theatre active") : N_("Automatic stereo screen active"));
+        if (enter_pending_) return N_("Confirming cinematic signal");
+        if (until_) return N_("Automatic presentation lease expired; previous view restored");
+        return N_("Waiting for a verified cinematic signal");
     }
 private:
     void clear_lease() { until_ = 0; enter_pending_ = clear_pending_ = false; }

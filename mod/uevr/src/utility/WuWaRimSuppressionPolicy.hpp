@@ -1,4 +1,7 @@
 #pragma once
+#ifndef N_
+#define N_(english) english // shown English for the catalog (WuWaLocalization.hpp)
+#endif
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -17,19 +20,19 @@ struct Status {
 };
 inline const char* message(Code code) {
     switch (code) {
-    case Code::Off: return "Rim workaround is off.";
-    case Code::Waiting: return "Rim workaround waits for active native stereo with 2D screen off.";
-    case Code::TestActive: return "Rim workaround waits for the current graphics comparison to end.";
-    case Code::Suppressed: return "Character toon-depth rim is suppressed; the previous value is retained.";
-    case Code::AlreadyZero: return "Character toon-depth rim was already zero; no write was needed.";
-    case Code::Restored: return "The previous character rim value was restored and verified.";
-    case Code::Unavailable: return "Rim variable is unavailable. Toggle off, then on to retry.";
-    case Code::ApplyFailed: return "Rim suppression was not verified. Toggle off, then on to retry safely.";
-    case Code::RestoreFailed: return "Rim restoration failed; the original is retained. Toggle off, then on to retry restoration first.";
-    case Code::ExternalChange: return "Another setting changed the rim value; it was left untouched. Toggle off, then on to retry.";
-    case Code::PointerChanged: return "The rim variable changed; no old pointer was used. Toggle off, then on to retry.";
+    case Code::Off: return N_("Rim workaround is off.");
+    case Code::Waiting: return N_("Rim workaround waits for active native stereo with 2D screen off.");
+    case Code::TestActive: return N_("Rim workaround waits for the current graphics comparison to end.");
+    case Code::Suppressed: return N_("Character toon-depth rim is suppressed; the previous value is retained.");
+    case Code::AlreadyZero: return N_("Character toon-depth rim was already zero; no write was needed.");
+    case Code::Restored: return N_("The previous character rim value was restored and verified.");
+    case Code::Unavailable: return N_("Rim variable is unavailable. Toggle off, then on to retry.");
+    case Code::ApplyFailed: return N_("Rim suppression was not verified. Toggle off, then on to retry safely.");
+    case Code::RestoreFailed: return N_("Rim restoration failed; the original is retained. Toggle off, then on to retry restoration first.");
+    case Code::ExternalChange: return N_("Another setting changed the rim value; it was left untouched. Toggle off, then on to retry.");
+    case Code::PointerChanged: return N_("The rim variable changed; no old pointer was used. Toggle off, then on to retry.");
     }
-    return "Rim workaround is off.";
+    return N_("Rim workaround is off.");
 }
 
 class Policy {

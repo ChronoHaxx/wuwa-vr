@@ -40,6 +40,11 @@ inline std::string display(std::string_view logical,float width=0) {
     }
     return output+wuwa_l10n::visual(line);
 }
+// An English printf format, translated and filled: for status lines and live menu rows.
+inline std::string format(const char* fmt,...) {
+    va_list args; va_start(args,fmt); auto value=formatted(fmt,args); va_end(args);
+    return value;
+}
 inline void TextWrapped(const char* fmt,...) {
     va_list args; va_start(args,fmt); const auto logical=formatted(fmt,args); va_end(args);
     const auto value=display(logical,ImGui::GetContentRegionAvail().x);

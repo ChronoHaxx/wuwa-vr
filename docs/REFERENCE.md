@@ -248,6 +248,10 @@ cvars: `r.CLV.TriggerRefresh`, `r.CLV.UpdateEveryFrame`.
 - **Workaround:** both times, setting AO from -1 to 0 in UEVR's CVars panel
   removed it. That is `r.AmbientOcclusionLevels` (section 1.8), which turns
   screen-space AO off entirely. It also confirms the fault is in screen-space AO.
+- **Built in (1.2.0):** the mod sets `r.AmbientOcclusionLevels` to 0 unless
+  **Ambient occlusion** (WuWa VR menu → Fixes, `WuWaStereo_AmbientOcclusion`)
+  is on; turning it on restores the value the game had. A value frozen in
+  UEVR's CVars panel wins. The cause (per-eye AO history) is not fixed.
 - **Likely cause:** 3 (AO history kept per eye, or shared between eyes that take
   turns) or 2 (a Kuro AO cache). Because it happens in Synchronized Sequential
   too, the Native Stereo Fix is not the cause.

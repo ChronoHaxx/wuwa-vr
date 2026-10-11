@@ -44,10 +44,10 @@ CALLS = {
     'setting_toggle': [0, 1], 'setting_slider': [0, 1], 'setting_int_slider': [0, 1], 'setting_choice': [0, 1, 3],
     'action': [0, 1], 'paragraph': [0], 'menu_angle_slider': [0, 1], 'make': [1, 2],
     'header': [1, 2], 'rich': [5], 'pieces': [0], 'fit': [1], 'pill': [4], 'pill_width': [1], 'centered': [5],
-    'draw_tip': [3, 4], 'draw_note': [3, 4, 5], 'N_': [0],
+    'draw_tip': [3, 4], 'draw_note': [3, 4, 5], 'N_': [0], 'format': [0],
 }
 # These names are only translating calls when qualified (wuwa_ui::draw, wuwa_l10n::text...).
-QUALIFIED = {'text': 'wuwa_l10n', 'label': 'wuwa_l10n', 'translate': 'wuwa_l10n', 'draw': 'wuwa_ui',
+QUALIFIED = {'text': 'wuwa_l10n', 'label': 'wuwa_l10n', 'translate': 'wuwa_l10n', 'draw': 'wuwa_ui', 'format': 'wuwa_ui',
              'TextWrapped': 'wuwa_ui', 'Text': 'wuwa_ui', 'TextColored': 'wuwa_ui', 'TextUnformatted': 'wuwa_ui',
              'Button': 'wuwa_ui', 'TreeNode': 'wuwa_ui', 'CollapsingHeader': 'wuwa_ui', 'TableSetupColumn': 'wuwa_ui',
              'Combo': 'wuwa_ui'}
@@ -212,11 +212,32 @@ def signature_problems(rel, source):
     return problems
 
 
+SENTENCE = re.compile(r'^[A-Z][a-z]+[ ,:;]')
+THROWN = {('id', 'throw'), ('id', 'runtime_error'), ('id', 'logic_error'), ('id', 'invalid_argument')}
+
+
+def returned_english(rel, toks):
+    """English sentences handed back as values (status lines, live menu rows) are drawn
+    later, by text that only translates what the catalog holds: mark them N_("...").
+    Exception messages are diagnostics and stay English. Returns (file, text) pairs;
+    extract() reports the ones no translating call already collects."""
+    problems = []
+    for i, (kind, value) in enumerate(toks):
+        if kind != 'str' or i < 2 or not SENTENCE.match(value):
+            continue
+        prev, before = toks[i - 1], toks[i - 2]
+        as_value = (prev in (('id', 'return'), ('p', '?')) or (prev == ('p', ':') and before != ('p', ':'))
+                    or (prev in (('p', '{'), ('p', '(')) and before == ('id', 'string')))
+        if as_value and not THROWN.intersection(toks[max(0, i - 10):i]):
+            problems.append((rel, value))
+    return problems
+
+
 def extract():
     """{english: [files]} and raw-ImGui problems."""
     found, problems = {}, []
     files = sorted(p for p in SRC.rglob('*') if p.suffix in ('.cpp', '.hpp'))
-    combos, drawn = {}, set()
+    combos, drawn, returned = {}, set(), []
     for path in files:
         source = path.read_text(encoding='utf-8', errors='replace')
         rel = path.relative_to(SRC).as_posix()
@@ -229,6 +250,8 @@ def extract():
                     problems.append(f'{rel}: untranslated ImGui::{m.group(1)}("{m.group(2)[:50]}"); use wuwa_ui::{m.group(1)}')
             problems += signature_problems(rel, source)
         toks = tokens(source)
+        if owned:
+            returned += returned_english(rel, toks)
         add = lambda text: found.setdefault(text, set()).add(rel) if shown(text) else None
         for i, (kind, value) in enumerate(toks):
             if kind != 'id' or i + 1 >= len(toks):
@@ -262,6 +285,11 @@ def extract():
                     for kind2, text in args[position]:
                         if kind2 == 'str':
                             add(text)
+    for rel, value in returned:
+        if value not in found:
+            line = value.replace('\n', ' ')[:60]
+            problems.append(f'{rel}: "{line}" is returned as text but never reaches the catalog; write N_("...") '
+                            'and draw it through wuwa_ui:: or a live menu row')
     for member in drawn:
         for options, rel in combos.get(member, []):
             for text in options:

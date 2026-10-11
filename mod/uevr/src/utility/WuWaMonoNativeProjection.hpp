@@ -1,4 +1,7 @@
 #pragma once
+#ifndef N_
+#define N_(english) english // shown English for the catalog (WuWaLocalization.hpp)
+#endif
 
 #include <algorithm>
 #include <array>
@@ -16,10 +19,10 @@ inline std::atomic<Status> current_status{Status::not_requested};
 inline Status status() noexcept { return current_status.load(std::memory_order_relaxed); }
 inline const char* status_text() noexcept {
     switch (status()) {
-    case Status::ready: return "Native game camera active (headset check pending)";
-    case Status::refused: return "Native game camera unavailable; compatibility fallback";
-    case Status::pending: return "Waiting for native game camera";
-    default: return "Off";
+    case Status::ready: return N_("Native game camera active (headset check pending)");
+    case Status::refused: return N_("Native game camera unavailable; compatibility fallback");
+    case Status::pending: return N_("Waiting for native game camera");
+    default: return N_("Off");
     }
 }
 
@@ -90,10 +93,10 @@ inline std::atomic<uint64_t> authored_views{}, cropped_views{}, refused_pairs{},
 inline std::atomic<uint64_t> constrained_ms{};
 inline const char* status_text() noexcept {
     switch (current_status.load(std::memory_order_relaxed)) {
-    case Status::ready: return "Authored framing applied (headset check pending)";
-    case Status::refused: return "Framing candidate refused; see diagnostic log";
-    case Status::waiting: return "Waiting for an authored constrained camera";
-    default: return "Off";
+    case Status::ready: return N_("Authored framing applied (headset check pending)");
+    case Status::refused: return N_("Framing candidate refused; see diagnostic log");
+    case Status::waiting: return N_("Waiting for an authored constrained camera");
+    default: return N_("Off");
     }
 }
 } // namespace wuwa_cinematic_framing

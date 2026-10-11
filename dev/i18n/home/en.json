@@ -79,7 +79,7 @@
       ],
       [
         "Controller first",
-        "Xbox and experimental PlayStation shortcuts, with an in-VR shortcut sheet on L3 + Menu."
+        "Xbox and experimental PlayStation shortcuts; in VR, hold L3, or LT + RT, to see what each button does."
       ],
       [
         "First-person body",
@@ -108,14 +108,14 @@
   },
   "pad": {
     "title": "Controller shortcuts",
-    "intro": "Most shortcuts are L3 plus one button: click and hold the left stick, press the button, then let go of everything. In VR, L3 + Menu shows the same list as a sheet.",
+    "intro": "Most shortcuts are L3 plus one button: click and hold the left stick, press the button, then let go of everything. In VR, hold L3, or LT + RT, for half a second and this card rises under your view.",
     "hold": "Hold L3, then press",
     "more": "Gestures",
     "names": "Button names",
     "psNote": "PlayStation support is experimental.",
     "freecam": "While freecam is on",
     "mouse": "While HUD / mouse mode is on",
-    "uevr": "With UEVR settings open",
+    "uevr": "With the WuWa VR menu open",
     "image": "Save as image",
     "all": "Every shortcut"
   },

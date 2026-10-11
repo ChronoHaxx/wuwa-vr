@@ -52,7 +52,7 @@
     "title": "Zum Spielen gemacht, nicht nur zum Anschauen",
     "items": [
       ["Stereo-VR und Headtracking", "Echte Tiefe in OpenXR-Headsets. Menüs und HUD bleiben nutzbar; die Oberfläche lässt sich verschieben, skalieren oder ausblenden."],
-      ["Für den Controller", "Shortcuts für Xbox und experimentell für PlayStation, mit einer Übersicht in VR auf L3 + Menu."],
+      ["Für den Controller", "Shortcuts für Xbox und experimentell für PlayStation; halte in VR L3 oder LT + RT, um zu sehen, was jede Taste tut."],
       ["Körper in der Ego-Perspektive", "Sieh Hände und Outfit deiner Figur bei ausgeblendetem Kopf. Animationsfolgen optional, mit eingebautem Komfortmodus."],
       ["Freie Kameras", "Freecam-, Drohnen-, Flugzeug- und Akro-Ansichten zum Erkunden und für Screenshots. Experimentell."],
       ["6DOF-Fenster", "Ein optionaler Fenstermodus, der das Spiel in deinen Raum stellt. Nach der Arbeit von Elliott Tate."],
@@ -68,14 +68,14 @@
   },
   "pad": {
     "title": "Controller-Kürzel",
-    "intro": "Die meisten Kürzel sind L3 plus eine Taste: linken Stick gedrückt halten, Taste drücken, dann alles loslassen. In VR zeigt L3 + Menu dieselbe Liste als Übersicht.",
+    "intro": "Die meisten Kürzel sind L3 plus eine Taste: linken Stick gedrückt halten, Taste drücken, dann alles loslassen. Halte in VR L3 oder LT + RT eine halbe Sekunde, und diese Karte erscheint unter deinem Blick.",
     "hold": "L3 halten, dann drücken",
     "more": "Gesten",
     "names": "Tastennamen",
     "psNote": "PlayStation-Unterstützung ist experimentell.",
     "freecam": "Bei aktiver freier Kamera",
     "mouse": "Bei aktivem HUD-/Mausmodus",
-    "uevr": "Bei geöffneten UEVR-Einstellungen",
+    "uevr": "Bei geöffnetem WuWa-VR-Menü",
     "image": "Als Bild speichern",
     "all": "Alle Kürzel"
   },

@@ -8,6 +8,10 @@
 
 // Mod-owned presentation only. Does not translate UEVR or change any input,
 // camera, rendering, game-language or configuration-key semantics.
+// Marks English kept in a table and translated where it is drawn, so
+// dev/i18n/mod_strings.py finds it for the catalogs. Expands to the text itself.
+#define N_(english) english
+
 namespace wuwa_l10n {
 struct Language { std::string id, name; };
 void request(std::string_view language, const std::filesystem::path& overrides, bool reload=false);

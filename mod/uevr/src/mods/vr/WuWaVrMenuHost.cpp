@@ -327,14 +327,14 @@ Item menu_place_choice() {
 Item lens_slider() {
     return setting_slider("Close-up match",
         "Dialogue shots use a zoom lens your headset's wide view can't show, so people look small and far. This moves you nearer, "
-        "per shot, so they keep this share of their 2D size. 0% is the game camera's own spot; 100% matches the 2D shot; "
-        "above 100% comes closer still. Game camera in full VR only.",
+        "per shot, so they keep this share of their 2D size. At 0 you stay at the game camera's own spot, 100 matches the "
+        "2D shot and above 100 comes closer still. Game camera in full VR only.",
         "WuWaControls_LensMatch", 0.0f, 150.0f, 5.0f, "%.0f%%");
 }
 
 Item lens_nearest_slider() {
     return setting_slider("Closest distance",
-        "How near Close-up match may bring you to the person in the shot. Lower comes closer. 100% Close-up match "
+        "How near Close-up match may bring you to the person in the shot. Lower comes closer. Close-up match at 100 "
         "already gives the 2D size; this only stops it short when the shot is very tight.", "WuWaControls_LensNearest", 5.0f, 150.0f, 5.0f, "%.0f cm");
 }
 
@@ -579,7 +579,7 @@ Page cinema_page() {
     page.items.push_back(setting_choice("Copy from",
         "Auto uses the eye that has the camera's focus. If both eyes stay sharp or look wrong, try First or Second.",
         "WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}));
-    page.items.push_back(setting_slider("Blur strength, full VR", "Multiplies the blur in full VR. 0.5x suited best in test 3h.",
+    page.items.push_back(setting_slider("Blur strength, full VR", "Multiplies the blur in full VR. 1x is the 2D view's look.",
         "WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.25f, "%.2fx"));
     page.items.push_back(setting_slider("Blur strength, screens", "Multiplies the blur on the stereo screen and mono theatre. 1x is the 2D view's look.",
         "WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 0.25f, "%.2fx"));
@@ -631,9 +631,13 @@ Page hud_page() {
         const auto text = status ? status->get() : std::string{};
         return text.empty() || text == "Ready" ? std::string{} : "HUD refresh: " + text;
     }));
-    page.items.push_back(setting_toggle("Shortcut sheet",
-        "The controller shortcut card below you while playing. A loaded test plan shows its step there instead.",
-        "WuWaControls_ShowShortcutSheet"));
+    page.items.push_back(setting_toggle("Controls cards",
+        "Hold L3, or LT + RT, for half a second: a card rises under your view and shows what each button does, lighting "
+        "each one as you press it. Let go and it sinks away.", "WuWaControls_Cards"));
+    page.items.push_back(setting_toggle("Keep the controls card open",
+        "Shows the L3 card without holding anything. Shortcut: L3 + Menu. A loaded test plan shows its step there instead.",
+        "WuWaControls_PinCard"));
+    page.items.push_back(setting_slider("Card size", "How wide the controls card is.", "WuWaControls_CardWidth", 0.5f, 1.6f, 0.05f, "%.2f m"));
     return page;
 }
 

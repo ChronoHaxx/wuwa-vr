@@ -15,6 +15,7 @@
 #include "utility/WuWaPosePair.hpp"
 #include "utility/WuWaAutoCinema.hpp"
 #include "utility/WuWaPlayStationHid.hpp"
+#include "utility/WuWaShortcutSheet.hpp"
 
 namespace vrmod {
 
@@ -66,7 +67,7 @@ public:
     bool passive_overlay_visible() const { return status_warning_visible() || floor_visible(); }
     void draw_passive_overlay();
     Matrix4x4f floor_transform() const;
-    float floor_width() const { return m_sheet_width->value(); }
+    float floor_width() const;
     static bool game_focused();
     bool auto_cinema_active() const;
     wuwa_auto_cinema::Presentation auto_cinema_presentation() const;
@@ -192,8 +193,9 @@ private:
     // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
     const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
     const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
-    // Full VR has its own strength (test 3h: half looked right in full VR, 1x on screens).
-    const ModSlider::Ptr m_stereo_dof_strength_vr{ModSlider::create("WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.5f)};
+    // Full VR has its own strength (test 3h: half looked right in full VR; since the
+    // close-up camera changes, 3m: 1x looks best there too, as on the screens).
+    const ModSlider::Ptr m_stereo_dof_strength_vr{ModSlider::create("WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 1.0f)};
     // Close-up match within a shot: track the game camera's own moves from the cut (3i),
     // keep the cut's distance (3g), or follow the game's focus distance (3h).
     // The test plan's step card takes the controls card's place below you; off
@@ -277,13 +279,42 @@ private:
     const ModSlider::Ptr m_fp_blend_time{ModSlider::create("WuWaControls_FullFollowBlendTime",0.05f,0.75f,0.2f)};
     const ModToggle::Ptr m_fp_late{ModToggle::create("WuWaControls_LateHeadUpdate", false)};
     const ModToggle::Ptr m_fp_horizon{ModToggle::create("WuWaControls_LevelFirstPerson", true)};
-    const ModToggle::Ptr m_sheet{ModToggle::create("WuWaControls_ShowShortcutSheet", true)};
-    const ModCombo::Ptr m_sheet_page{ModCombo::create("WuWaControls_SheetPage", {"Automatic for current mode", "Everyday shortcuts", "Camera shortcuts", "Menus and HUD", "UEVR settings reference"}, 0)};
-    const ModCombo::Ptr m_sheet_position{ModCombo::create("WuWaControls_SheetPosition", {"Below recentered headset origin", "In front of recentered headset origin"}, 0)};
-    const ModSlider::Ptr m_sheet_width{ModSlider::create("WuWaControls_SheetWidth", 0.5f, 3.0f, 1.5f)};
-    const ModSlider::Ptr m_sheet_drop{ModSlider::create("WuWaControls_SheetDrop", 0.2f, 2.0f, 1.2f)};
-    const ModSlider::Ptr m_sheet_forward{ModSlider::create("WuWaControls_SheetForward", 0.1f, 2.0f, 0.65f)};
-    const ModSlider::Ptr m_sheet_tilt{ModSlider::create("WuWaControls_SheetTilt", 0.0f, 90.0f, 60.0f)};
+    // Controls cards (1.2.0, replacing the four-page sheet): hold L3, or LT + RT,
+    // for half a second and a card rises under your view, lighting each button
+    // as it is used; L3 + Menu keeps it open. New keys, so a saved "sheet
+    // always on" does not pin the new card open.
+    const ModToggle::Ptr m_cards{ModToggle::create("WuWaControls_Cards", true)};
+    const ModToggle::Ptr m_pin_card{ModToggle::create("WuWaControls_PinCard", false)};
+    const ModSlider::Ptr m_card_width{ModSlider::create("WuWaControls_CardWidth", 0.5f, 1.6f, 0.9f)};
+    // A one-line tip shows on the first three launches.
+    const ModInt32::Ptr m_tips_shown{ModInt32::create("WuWaControls_TipsShown", 0)};
+    // What the camera script reports held: "l3:<buttons>:<lt>:<rt>", "views:..." or nothing.
+    struct CardValue : ModString {
+        CardValue() : ModString{"WuWaControls_Card", ""} {}
+        mutable std::mutex mutex;
+        std::string held;
+        std::string get() const override { std::scoped_lock lock{mutex}; return held; }
+        void set(const std::string& text) override { std::scoped_lock lock{mutex}; held = text.substr(0, 64); }
+        void config_load(const utility::Config&, bool) override { set(""); }
+        void config_save(utility::Config&) override {}
+    } m_card;
+    // Asked by the overlay and the UI frame (both on the present thread).
+    mutable std::mutex m_card_mutex;
+    mutable bool m_card_up{};
+    mutable uint64_t m_card_since{}, m_card_released{};
+    mutable Matrix4x4f m_card_anchor{1.0f};
+    mutable int m_view_seen{-1};
+    mutable uint64_t m_view_chip_until{};
+    wuwa_sheet::CardState m_card_last{};
+    std::atomic<uint64_t> m_tip_until{};
+    uint64_t m_tip_eligible_since{};
+    bool m_tip_done{};
+    bool held_card(wuwa_sheet::CardState& state) const;
+    bool card_visible() const;
+    Matrix4x4f card_anchor() const;
+    // 0 nothing, 1 the first-launch tip, 2 the view-switch chip.
+    int tip_kind() const;
+    void update_tip();
     // Privacy is deliberately outside the control-reset allowlist. Resetting
     // camera/input settings must not accidentally reveal a creator's ID.
     // The boxes are approximate and can cover useful HUD, so by default they

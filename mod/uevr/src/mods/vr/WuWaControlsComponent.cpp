@@ -13,10 +13,13 @@
 #include "utility/WuWaPlaytestControl.hpp"
 #include "utility/WuWaLguiProbe.hpp"
 #include "WuWaVrMenuHost.hpp"
+#include "Mods.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <string_view>
 
 void wuwa_playtest::draw_controls(const std::filesystem::path& profile) {
     // This panel is independent of rendering/settings. Opening it only polls
@@ -114,23 +117,23 @@ void wuwa_playtest::draw_controls(const std::filesystem::path& profile) {
 namespace vrmod {
 namespace {
 constexpr const char* sheet[][2] = {
-    {"GENERAL", "CAMERA"},
-    {"L3 + R3    UEVR menu", "L3 + RB    Game / fixed camera"},
-    {"L3 + A     Recenter view / portal", "L3 + Y/X   Fixed / first-person height"},
-    {"L3 + LT / F7   Portal on / off", "L3 + RT    Diorama on / off (10x)"},
-    {"LT + RT, R3: next view (hold: full VR)", "LT + RT, L3: blur (hold: stereo screen)"},
-    {"Double L3  Windows screenshot", "LB + LT/RT Fixed camera farther / closer"},
-    {"Double R3  Freecam on / off", "Freecam: left stick moves, right looks"},
-    {"L3 + B     Show / hide game UI", "Freecam: LT rises, RT boosts speed"},
-    {"L3 + View  First person on / off", "Freecam: LB descends; double RT = turbo"},
-    {"L3 + Menu  Show / hide this sheet", "L3 + D-pad Down: animation follow on / off (first person)"},
-    {"Sheet open: L3 + D-pad Left/Right = pages", "L3 + D-pad Up = automatic page"},
-    {"Hold RB: full speed if Polar walk is on", "LB + R3: V once; hold 0.8 s for Tab wheel"},
-    {"L3 + LB    Toggle HUD / mouse adjustment", "Release all controls after entering/leaving"},
-    {"WHILE ADJUSTMENT IS ON", "HUD POSITION"},
-    {"Left stick Cursor    A Click    B Back", "LT/RT      HUD nearer / farther"},
-    {"X + stick  Scroll    D-pad Move map", "LB/RB      HUD down / up"},
-    {"L3 + LB    Return to normal game controls", "LB + R3 utility shortcut remains available outside adjustment"},
+    {N_("GENERAL"), N_("CAMERA")},
+    {N_("L3 + R3    WuWa VR menu"), N_("L3 + RB    Game / fixed camera")},
+    {N_("L3 + A     Recenter view / portal"), N_("L3 + Y/X   Fixed / first-person height")},
+    {N_("L3 + LT / F7   Portal on / off"), N_("L3 + RT    Diorama on / off (10x)")},
+    {N_("LT + RT, R3: next view (hold: full VR)"), N_("LT + RT, L3: blur (hold: stereo screen)")},
+    {N_("Double L3  Windows screenshot"), N_("LB + LT/RT Fixed camera farther / closer")},
+    {N_("Double R3  Freecam on / off"), N_("Freecam: left stick moves, right looks")},
+    {N_("L3 + B     Show / hide game UI"), N_("Freecam: LT rises, RT boosts speed")},
+    {N_("L3 + View  First person on / off"), N_("Freecam: LB descends; double RT = turbo")},
+    {N_("L3 + Menu  Keep the controls card open"), N_("L3 + D-pad Down: animation follow on / off (first person)")},
+    {N_("Hold L3: controls card"), N_("Hold LT + RT: views card")},
+    {N_("Hold RB: full speed if Polar walk is on"), N_("LB + R3: V once; hold 0.8 s for Tab wheel")},
+    {N_("L3 + LB    Toggle HUD / mouse adjustment"), N_("Release all controls after entering/leaving")},
+    {N_("WHILE ADJUSTMENT IS ON"), N_("HUD POSITION")},
+    {N_("Left stick Cursor    A Click    B Back"), N_("LT/RT      HUD nearer / farther")},
+    {N_("X + stick  Scroll    D-pad Move map"), N_("LB/RB      HUD down / up")},
+    {N_("L3 + LB    Return to normal game controls"), N_("LB + R3 utility shortcut remains available outside adjustment")},
 };
 void key(WORD code, bool down) {
     INPUT input{}; input.type = INPUT_KEYBOARD; input.ki.wVk = code;
@@ -320,8 +323,8 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
-        *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
+        *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
+        *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -472,20 +475,20 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
         wuwa_ui::TableSetupColumn("Action");
         for (const auto& row : std::array<std::array<const char*,2>,14>{{
-            {{"L3 + R3", "Open / close UEVR settings"}},
-            {{"L3 + B", "Show / hide game HUD and menus"}},
-            {{"L3 + A", "Recenter headset / portal"}},
-            {{"L3 + LT / F7", "Portal on / off"}},
-            {{"L3 + RT", "Diorama on / off (10x)"}},
-            {{"LT + RT, then click R3", "Next view: full VR, stereo screen, mono theatre"}},
-            {{"LT + RT, then hold R3", "Back to full VR (hold 0.8 s)"}},
-            {{"LT + RT, then click L3", "Blur (depth of field) on / off"}},
-            {{"LT + RT, then hold L3", "Stereo screen on / off (hold 0.8 s)"}},
-            {{"L3 + Menu", "Show / hide shortcut sheet"}},
-            {{"L3 + LB, release", "Toggle HUD / mouse adjustment"}},
-            {{"L3 + View", "First person on / off"}},
-            {{"Double R3", "Freecam on / off"}},
-            {{"L3 + RB", "Game / fixed camera"}},
+            {{N_("L3 + R3"), N_("Open / close the WuWa VR menu")}},
+            {{N_("L3 + B"), N_("Show / hide game HUD and menus")}},
+            {{N_("L3 + A"), N_("Recenter headset / portal")}},
+            {{N_("L3 + LT / F7"), N_("Portal on / off")}},
+            {{N_("L3 + RT"), N_("Diorama on / off (10x)")}},
+            {{N_("LT + RT, then click R3"), N_("Next view: full VR, stereo screen, mono theatre")}},
+            {{N_("LT + RT, then hold R3"), N_("Back to full VR (hold 0.8 s)")}},
+            {{N_("LT + RT, then click L3"), N_("Blur (depth of field) on / off")}},
+            {{N_("LT + RT, then hold L3"), N_("Stereo screen on / off (hold 0.8 s)")}},
+            {{N_("L3 + Menu"), N_("Keep the controls card open")}},
+            {{N_("L3 + LB, release"), N_("Toggle HUD / mouse adjustment")}},
+            {{N_("L3 + View"), N_("First person on / off")}},
+            {{N_("Double R3"), N_("Freecam on / off")}},
+            {{N_("L3 + RB"), N_("Game / fixed camera")}},
         }}) {
             ImGui::TableNextRow(); ImGui::TableNextColumn(); wuwa_ui::TextUnformatted(row[0]);
             ImGui::TableNextColumn(); wuwa_ui::TextWrapped("%s", row[1]);
@@ -499,28 +502,12 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
         ImGui::TreePop();
     }
-    wuwa_ui::draw(*m_sheet,"Show shortcut sheet");
-    wuwa_ui::draw(*m_sheet_page,"Shortcut sheet page");
-    wuwa_ui::TextWrapped("With the sheet visible, L3 + D-pad left/right changes page; L3 + D-pad up returns to automatic. L3 + Menu hides the sheet.");
-    if (wuwa_ui::Button("Bring sheet in front")) { m_sheet->value() = true; m_sheet_position->value() = 1; }
-    ImGui::SameLine();
-    if (wuwa_ui::Button("Place sheet at feet")) { m_sheet->value() = true; m_sheet_position->value() = 0; }
-    wuwa_ui::TextWrapped("Close UEVR settings to see the sheet in the headset or simulator. It is absent from the game's flat spectator view. At-feet placement uses your recentered headset origin, not the character's feet.");
+    wuwa_ui::draw(*m_cards,"Controls cards (hold L3, or LT + RT)");
+    wuwa_ui::draw(*m_pin_card,"Keep the controls card open");
+    wuwa_ui::draw(*m_card_width,"Card width (meters)");
+    wuwa_ui::TextWrapped("Hold L3, or both triggers, for half a second: a card rises under your view and lights each button as you use it. Let go and it sinks away. L3 + Menu keeps it open. Close UEVR settings to see it; it is absent from the game's flat spectator view.");
     if (FrameworkConfig::get()->is_always_show_cursor())
-        wuwa_ui::TextWrapped("Sheet is blocked by FrameworkConfig > Always Show Cursor. Turn that off to display it.");
-    if (wuwa_ui::TreeNode("Shortcut sheet placement")) {
-        wuwa_ui::draw(*m_sheet_position,"Sheet position");
-        wuwa_ui::draw(*m_sheet_width,"Sheet width (meters)");
-        if (m_sheet_position->value() == 0) {
-            wuwa_ui::draw(*m_sheet_drop,"Below standing origin (meters)");
-            wuwa_ui::draw(*m_sheet_forward,"Forward of standing origin (meters)");
-            wuwa_ui::draw(*m_sheet_tilt,"Tilt toward feet (degrees)");
-        } else {
-            wuwa_ui::TextWrapped("Front placement is two meters ahead of the recentered headset origin. Width still adjusts its size.");
-        }
-        wuwa_ui::TextWrapped("The sheet stays at your recentered origin, including in HUD/mouse mode. UEVR settings and the hidden-UI recovery warning take priority. Only its L3 + D-pad page shortcuts consume input while visible.");
-        ImGui::TreePop();
-    }
+        wuwa_ui::TextWrapped("The card is blocked by FrameworkConfig > Always Show Cursor. Turn that off to display it.");
     if (wuwa_ui::TreeNode("All shortcut contexts")) {
         for (const auto& row : sheet) { wuwa_ui::TextUnformatted(row[0]); wuwa_ui::TextUnformatted(row[1]); }
         ImGui::TreePop();
@@ -886,9 +873,9 @@ nlohmann::json WuWaControlsComponent::diagnostic_status() {
     result["slot_filter"]=VR::get()->gamepad_slot_filter();
     result["playstation_shortcuts"]=m_playstation_status.get();
     // "Eligible" is deliberately not a claim that the user can see/read it.
-    result["sheet_state"] = !m_sheet->value() ? "off"
+    result["sheet_state"] = !m_cards->value() ? "off"
         : g_framework->is_drawing_ui() ? "hidden_by_uevr_menu"
-        : !VR::get()->is_hmd_active() ? "headset_inactive" : "eligible";
+        : !VR::get()->is_hmd_active() ? "headset_inactive" : card_visible() ? "shown" : "eligible";
     result["hidden_ui_warning"] = menu_warning_active();
     result["mouse_mode_warning"] = mode_warning_active();
     result["profile_defaults_available"] = !m_recovery.supplied().empty();
@@ -921,17 +908,133 @@ bool WuWaControlsComponent::mode_warning_active() const {
 }
 
 bool WuWaControlsComponent::status_warning_visible() const {
-    // A visible sheet includes both recovery hints. Keep its controls and
-    // placement available even when mouse mode and hidden UI are combined.
-    // The VR menu's cinematic note shows for a few seconds either way.
+    // A visible card shows both recovery states itself. The VR menu's cinematic
+    // note, the first-launch tip and the view chip show for a few seconds, but
+    // a card you are holding up comes first.
     if (g_framework->is_drawing_ui() || !VR::get()->is_hmd_active()) return false;
-    return wuwa_menu_host::hint_active() || (!floor_visible() && (menu_warning_active() || mode_warning_active()));
+    wuwa_sheet::CardState held;
+    if (m_cards->value() && held_card(held)) return false;
+    return wuwa_menu_host::hint_active() || tip_kind() != 0 ||
+        (!floor_visible() && (menu_warning_active() || mode_warning_active()));
 }
 
 bool WuWaControlsComponent::floor_visible() const {
-    // A guided test plan uses the sheet's place for its current step.
-    return wuwa_test::is_wuwa() && (m_sheet->value() || wuwa_menu_host::overlay_wanted()) &&
-        !g_framework->is_drawing_ui() && VR::get()->is_hmd_active();
+    // A guided test plan uses the card's place for its current step.
+    return wuwa_test::is_wuwa() && !g_framework->is_drawing_ui() && VR::get()->is_hmd_active() &&
+        (card_visible() || wuwa_menu_host::overlay_wanted());
+}
+
+namespace {
+// The card rises into place, and sinks away when let go.
+constexpr uint64_t card_rise_ms = 180, card_sink_ms = 160;
+}
+
+float WuWaControlsComponent::floor_width() const { return card_visible() ? m_card_width->value() : 1.5f; }
+
+bool WuWaControlsComponent::held_card(wuwa_sheet::CardState& state) const {
+    const auto text = m_card.get();
+    char kind[8]{};
+    unsigned buttons{};
+    int lt{}, rt{};
+    if (text.empty() || std::sscanf(text.c_str(), "%7[a-z0-9]:%u:%d:%d", kind, &buttons, &lt, &rt) != 4) return false;
+    state.card = std::string_view{kind} == "views" ? wuwa_sheet::Card::views : wuwa_sheet::Card::l3;
+    state.buttons = buttons;
+    state.lt = lt != 0;
+    state.rt = rt != 0;
+    return true;
+}
+
+bool WuWaControlsComponent::card_visible() const {
+    const bool eligible = wuwa_test::is_wuwa() && m_cards->value() && !g_framework->is_drawing_ui() && VR::get()->is_hmd_active();
+    wuwa_sheet::CardState state;
+    // A loaded test plan's step keeps the card's place unless you hold a card up.
+    const bool wanted = eligible && (held_card(state) || (m_pin_card->value() && !wuwa_menu_host::overlay_wanted()));
+    const auto now = GetTickCount64();
+    std::scoped_lock lock{m_card_mutex};
+    if (!eligible) {
+        m_card_up = false;
+        m_card_released = 0;
+        return false;
+    }
+    if (wanted) {
+        if (!m_card_up) {
+            m_card_up = true;
+            m_card_since = now;
+            m_card_anchor = card_anchor();
+        }
+        m_card_released = 0;
+        return true;
+    }
+    if (m_card_up) {
+        m_card_up = false;
+        m_card_released = now;
+    }
+    return m_card_released != 0 && now - m_card_released < card_sink_ms;
+}
+
+Matrix4x4f WuWaControlsComponent::card_anchor() const {
+    // Where the head faces when the card is called up, level, a little below
+    // the line of sight and tilted to face the eyes. It then stays put, so a
+    // glance down reads it and looking around leaves it behind.
+    auto& vr = VR::get();
+    const auto head = vr->get_transform(vr->get_hmd_index());
+    glm::vec3 back{head[2].x, 0.0f, head[2].z};
+    // Looking straight down: the top of the head points forward.
+    if (glm::length(back) < 0.2f) back = glm::vec3{-head[1].x, 0.0f, -head[1].z};
+    if (glm::length(back) < 0.01f) back = glm::vec3{0.0f, 0.0f, 1.0f};
+    back = glm::normalize(back);
+    const glm::vec3 up{0.0f, 1.0f, 0.0f}, right = glm::cross(up, back);
+    Matrix4x4f basis{1.0f};
+    basis[0] = glm::vec4{right, 0.0f};
+    basis[1] = glm::vec4{up, 0.0f};
+    basis[2] = glm::vec4{back, 0.0f};
+    const float distance = 0.9f, below = glm::radians(24.0f);
+    auto transform = basis * glm::rotate(-below, glm::vec3{1.0f, 0.0f, 0.0f});
+    const glm::vec3 eye{head[3]};
+    transform[3] = glm::vec4{eye - back * (distance * std::cos(below)) - up * (distance * std::sin(below)), 1.0f};
+    return transform;
+}
+
+int WuWaControlsComponent::tip_kind() const {
+    if (!wuwa_test::is_wuwa() || !m_cards->value()) return 0;
+    const auto now = GetTickCount64();
+    auto& vr = VR::get();
+    const int view = vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
+    {
+        // After a view switch: what you are in and how to get back, for 3 seconds.
+        std::scoped_lock lock{m_card_mutex};
+        if (m_view_seen >= 0 && view != m_view_seen) m_view_chip_until = now + 3000;
+        m_view_seen = view;
+        if (now < m_view_chip_until) return 2;
+    }
+    return now < m_tip_until.load() ? 1 : 0;
+}
+
+void WuWaControlsComponent::update_tip() {
+    // On the first three launches, one line under your view once play has
+    // started (script reporting, headset on, no menus), for 12 seconds.
+    if (m_tip_done || !wuwa_test::is_wuwa()) return;
+    if (!m_cards->value() || m_tips_shown->value() >= 3) {
+        m_tip_done = true;
+        return;
+    }
+    bool playing = game_focused() && VR::get()->is_hmd_active() && !menu_warning_active();
+    {
+        std::scoped_lock lock{m_bridge_mutex};
+        playing = playing && !m_game_menu && m_received != std::chrono::steady_clock::time_point{} &&
+            std::chrono::steady_clock::now() - m_received <= std::chrono::milliseconds(1000);
+    }
+    const auto now = GetTickCount64();
+    if (!playing) {
+        m_tip_eligible_since = 0;
+        return;
+    }
+    if (m_tip_eligible_since == 0) m_tip_eligible_since = now;
+    if (now - m_tip_eligible_since < 4000) return;
+    m_tip_until.store(now + 12000);
+    m_tip_done = true;
+    m_tips_shown->value() = m_tips_shown->value() + 1;
+    g_framework->deferred_save_config();
 }
 
 void WuWaControlsComponent::refresh_recording_live() {
@@ -962,44 +1065,94 @@ void WuWaControlsComponent::menu_recording_toggle() {
 }
 
 Matrix4x4f WuWaControlsComponent::floor_transform() const {
-    auto basis = Matrix4x4f{glm::inverse(VR::get()->get_rotation_offset())};
-    if (m_sheet_position->value() == 1) {
-        basis[3] = glm::vec4{Vector3f{VR::get()->get_standing_origin()} - Vector3f{basis[2]} * 2.0f, 1.0f};
-        return basis;
+    if (card_visible()) {
+        Matrix4x4f anchor;
+        uint64_t since{}, released{};
+        {
+            std::scoped_lock lock{m_card_mutex};
+            anchor = m_card_anchor;
+            since = m_card_since;
+            released = m_card_released;
+        }
+        const auto now = GetTickCount64();
+        float lower = released != 0 ? std::clamp((now - released) / float(card_sink_ms), 0.0f, 1.0f)
+            : 1.0f - std::clamp((now - since) / float(card_rise_ms), 0.0f, 1.0f);
+        lower = lower * lower * (3.0f - 2.0f * lower);
+        anchor[3] -= glm::vec4{0.0f, 0.12f * lower, 0.0f, 0.0f};
+        return anchor;
     }
-    const auto center = Vector3f{VR::get()->get_standing_origin()} - Vector3f{basis[2]} * m_sheet_forward->value()
-        - Vector3f{0.0f, m_sheet_drop->value(), 0.0f};
-    auto transform = basis * glm::rotate(glm::radians(-m_sheet_tilt->value()), Vector3f{1.0f, 0.0f, 0.0f});
+    // A test plan's step card: below the recentered headset origin, tilted up.
+    const auto basis = Matrix4x4f{glm::inverse(VR::get()->get_rotation_offset())};
+    const auto center = Vector3f{VR::get()->get_standing_origin()} - Vector3f{basis[2]} * 0.65f - Vector3f{0.0f, 1.2f, 0.0f};
+    auto transform = basis * glm::rotate(glm::radians(-60.0f), Vector3f{1.0f, 0.0f, 0.0f});
     transform[3] = glm::vec4{center, 1.0f};
     return transform;
+}
+
+namespace {
+// Settings that belong to other mods (the portal), by config key.
+bool setting_on(std::string_view key) {
+    for (auto& mod : g_framework->get_mods()->get_mods()) {
+        if (auto* value = mod->get_value(key)) {
+            const auto text = value->get();
+            return text == "true" || text == "1";
+        }
+    }
+    return false;
+}
 }
 
 void WuWaControlsComponent::draw_passive_overlay() {
     // Recordings started from the launcher window are seen here (twice a second).
     if (wuwa_test::is_wuwa()) refresh_recording_live();
+    update_tip();
+    auto* list=ImGui::GetBackgroundDrawList();
+    const auto size=ImGui::GetIO().DisplaySize;
+    auto& vr=VR::get();
+    const bool vr_controllers=vr->is_using_controllers();
+    const int view=vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
     if (status_warning_visible()) {
-        if (floor_visible() || (!menu_warning_active() && !mode_warning_active())) {
-            wuwa_menu_host::draw_hint(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize);
-            return;
+        if (!floor_visible() && (menu_warning_active() || mode_warning_active())) {
+            const bool hidden=menu_warning_active();
+            const bool shortcut=m_enabled->value() && !vr->physical_gamepad_passthrough();
+            if (hidden) wuwa_sheet::draw_hidden_ui_warning(list,size,ImGui::GetFont(),shortcut,true);
+            if (mode_warning_active()) wuwa_sheet::draw_mouse_mode_warning(list,size,ImGui::GetFont(),m_adjust.value(),hidden);
+        } else if (wuwa_menu_host::hint_active()) {
+            wuwa_menu_host::draw_hint(list,size);
+        } else if (tip_kind()==2) {
+            static constexpr const char* names[]{N_("Full VR"),N_("Stereo screen"),N_("Mono theatre")};
+            wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),names[view],
+                view==0 ? "{LT}+{RT}, click {R3} for the next view" : "{LT}+{RT}, hold {R3} for full VR",vr_controllers);
+        } else {
+            wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",
+                "hold {L3} or {LT}+{RT} to see what each button does \xC2\xB7 {L3}+{R3} opens the WuWa VR menu",vr_controllers);
         }
-        const bool hidden=menu_warning_active();
-        const bool shortcut=m_enabled->value() && !VR::get()->physical_gamepad_passthrough();
-        if (hidden) wuwa_sheet::draw_hidden_ui_warning(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize,ImGui::GetFont(),shortcut,true);
-        if (mode_warning_active()) wuwa_sheet::draw_mouse_mode_warning(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize,ImGui::GetFont(),m_adjust.value(),hidden);
         return;
     }
     wuwa_menu_host::tick();
     if (!floor_visible()) return;
-    if (wuwa_menu_host::overlay_wanted()) {
-        wuwa_menu_host::draw_step_overlay(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize);
+    wuwa_sheet::CardState state;
+    const bool held=m_cards->value() && held_card(state);
+    if (held) {
+        m_card_last=state;
+        m_tip_until.store(0);
+    }
+    if (!card_visible()) {
+        wuwa_menu_host::draw_step_overlay(list,size);
         return;
     }
-    int page=m_sheet_page->value()-1;
-    if (page<0) {
-        std::scoped_lock lock{m_bridge_mutex};
-        page=m_adjust.value() || m_mouse_state.active || m_script_status.starts_with("Game menu:") ? 2 : m_camera->value()!=0 ? 1 : 0;
-    }
-    wuwa_sheet::draw(ImGui::GetBackgroundDrawList(),ImGui::GetIO().DisplaySize,page,ImGui::GetFont(),m_free_style->value(),m_adjust.value(),mode_warning_active(),menu_warning_active());
+    if (!held) state=m_pin_card->value() ? wuwa_sheet::CardState{} : m_card_last;
+    state.vr_controllers=vr_controllers;
+    state.view=view;
+    state.blur=m_stereo_dof->value();
+    state.portal=setting_on("WindowMode_Enabled");
+    state.diorama=vr->is_diorama_enabled();
+    state.mouse_mode=m_adjust.value() || mode_warning_active();
+    state.first_person=m_camera->value()==3;
+    state.fixed_camera=m_camera->value()==1;
+    state.ui_hidden=!vr->is_gui_enabled();
+    state.pinned=m_pin_card->value();
+    wuwa_sheet::draw_card(list,size,ImGui::GetFont(),state);
 }
 
 std::array<wuwa_privacy::Rect, 2> WuWaControlsComponent::privacy_rectangles(int32_t width,int32_t height) const {

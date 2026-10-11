@@ -52,7 +52,7 @@
     "title": "Feito para jogar, não só para olhar",
     "items": [
       ["VR estéreo e rastreamento de cabeça", "Profundidade real em headsets OpenXR. Menus e HUD continuam usáveis, e dá para mover, redimensionar ou esconder a interface."],
-      ["Feito para controle", "Atalhos para Xbox e, de forma experimental, PlayStation, com uma folha de atalhos dentro da VR em L3 + Menu."],
+      ["Feito para controle", "Atalhos para Xbox e, de forma experimental, PlayStation; na VR, segure L3 ou LT + RT para ver o que cada botão faz."],
       ["Corpo em primeira pessoa", "Veja as mãos e a roupa do seu personagem com a cabeça oculta. Acompanhamento da animação opcional, com modo de conforto."],
       ["Câmeras livres", "Visões de câmera livre, drone, avião e acrobacias para explorar e tirar capturas. Experimental."],
       ["Janela 6DOF", "Um modo de janela opcional que coloca o jogo no seu quarto. Adaptado do trabalho de Elliott Tate."],
@@ -68,14 +68,14 @@
   },
   "pad": {
     "title": "Atalhos do controle",
-    "intro": "Quase todos os atalhos são L3 mais um botão: mantenha o analógico esquerdo pressionado, aperte o botão e solte tudo. Na VR, L3 + Menu mostra a mesma lista como uma folha.",
+    "intro": "A maioria dos atalhos é L3 mais um botão: segure o analógico esquerdo pressionado, aperte o botão e solte tudo. Na VR, segure L3 ou LT + RT por meio segundo e este cartão aparece abaixo da sua visão.",
     "hold": "Segure L3 e aperte",
     "more": "Gestos",
     "names": "Nomes dos botões",
     "psNote": "O suporte a PlayStation é experimental.",
     "freecam": "Com a câmera livre ativa",
     "mouse": "Com o modo HUD / mouse ativo",
-    "uevr": "Com as configurações do UEVR abertas",
+    "uevr": "Com o menu do WuWa VR aberto",
     "image": "Salvar como imagem",
     "all": "Todos os atalhos"
   },

@@ -275,21 +275,49 @@ int wmain(int argc, wchar_t** argv) {
     wuwa_l10n::apply_pending(module);
     io.Fonts->AddFontFromMemoryCompressedTTF(RobotoMedium_compressed_data, RobotoMedium_compressed_size, 16.0f);
     wuwa_l10n::reserve_fonts(io.Fonts, module, 16.0f);
-    wuwa_sheet::reserve_artwork(io.Fonts, module);
+    wuwa_sheet::reserve_font(io.Fonts);
     io.Fonts->Build();
-    if (!wuwa_sheet::fill_artwork(io.Fonts)) std::fprintf(stderr, "artwork: %s\n", wuwa_sheet::artwork_status());
     ImGui_ImplDX11_Init(device.Get(), context.Get());
     std::printf("language %s (%s)\n", wuwa_l10n::language().c_str(), wuwa_l10n::status().c_str());
 
     std::vector<Scene> scenes;
-    const char* pages[] = {"everyday", "cameras", "menus-hud", "uevr"};
-    for (int page = 0; page < 4; ++page) {
-        scenes.push_back({std::string("sheet-") + std::to_string(page + 1) + "-" + pages[page], [page](ImVec2 size) {
-            wuwa_sheet::draw(ImGui::GetBackgroundDrawList(), size, page, ImGui::GetFont());
+    // The controls cards and the tip line (utility/WuWaShortcutSheet).
+    using wuwa_sheet::Card;
+    using wuwa_sheet::CardState;
+    const auto card = [&](std::string name, CardState state) {
+        scenes.push_back({std::move(name), [state](ImVec2 size) {
+            wuwa_sheet::draw_card(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), state);
         }});
+    };
+    card("card-1-hold-l3", CardState{});
+    {
+        CardState state;
+        state.buttons = 0x2000;  // B held
+        state.ui_hidden = true; state.portal = true; state.pinned = true;
+        card("card-2-hold-l3-pressing-b", state);
     }
-    scenes.push_back({"sheet-3-menus-hud-mode-on", [](ImVec2 size) {
-        wuwa_sheet::draw(ImGui::GetBackgroundDrawList(), size, 2, ImGui::GetFont(), 0, true, true);
+    {
+        CardState state;
+        state.vr_controllers = true; state.rt = true; state.diorama = true;
+        card("card-3-hold-l3-vr-controllers", state);
+    }
+    {
+        CardState state;
+        state.card = Card::views; state.view = 1; state.blur = true; state.lt = state.rt = true;
+        card("card-4-hold-lt-rt", state);
+    }
+    {
+        CardState state;
+        state.card = Card::views; state.view = 0; state.blur = false; state.lt = state.rt = true; state.buttons = 0x0080;
+        card("card-5-hold-lt-rt-pressing-r3", state);
+    }
+    scenes.push_back({"tip-1-first-launches", [](ImVec2 size) {
+        wuwa_sheet::draw_tip(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), "New:",
+            "hold {L3} or {LT}+{RT} to see what each button does \xC2\xB7 {L3}+{R3} opens the WuWa VR menu", false);
+    }});
+    scenes.push_back({"tip-2-view-switch", [](ImVec2 size) {
+        wuwa_sheet::draw_tip(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), "Stereo screen",
+            "{LT}+{RT}, hold {R3} for full VR", false);
     }});
     using wuwa_menu::Source;
     scenes.push_back(menu_scene("menu-1-quick-gamepad", 0, 1, Source::Buttons));

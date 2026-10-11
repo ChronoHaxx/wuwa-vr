@@ -14,9 +14,9 @@ local function fixture()
         get_mod_value=function(_,k) return k=='WuWaControls_Clock' and tostring(f.clock) or f.values[k] or 'false' end,
         set_mod_value=function(k,v) f.values[k]=v; f.writes[k]=(f.writes[k] or 0)+1 end},functions={
         is_drawing_ui=function() return f.ui end,dispatch_custom_event=function() end,
-        log_warn=function(e) f.errors[#f.errors+1]=e end,log_error=function(e) f.errors[#f.errors+1]=e end}},
+        log_info=function() end,log_warn=function(e) f.errors[#f.errors+1]=e end,log_error=function(e) f.errors[#f.errors+1]=e end}},
         sdk={callbacks=setmetatable({},{__index=function(_,k) return function(fn) f.cb[k]=fn end end})}},
-        json={dump_string=function() return '{}' end}},{__index=_G})
+        json={dump_string=function(t) if t.screenshot then f.screenshots=(f.screenshots or 0)+1 end return '{}' end}},{__index=_G})
     assert(loadfile(source,'t',env))()
     function f:tick() self.cb.on_pre_engine_tick(nil,.016); assert(#self.errors==0,self.errors[1]) end
     function f:ps(b,lt,rt,gen)
@@ -42,11 +42,12 @@ test('native report applies existing portal and diorama trigger thresholds once'
         f:count(key,1); f:ps(); chord(255); f:count(key,2)
     end
 end)
-test('native mono preserves triggers-first and fresh edge requirements',function()
-    local f=fixture(); f:ps(); f:ps(R3,255,255); f:count('VR_MonoTheatreMode',0)
-    f:ps(); f:ps(0,255,255); f:ps(R3,255,255); f:count('VR_MonoTheatreMode',1)
+test('native next view (R3 click) preserves triggers-first and fresh edge requirements',function()
+    -- Since test 3i: with both triggers held first, an R3 click is the next view.
+    local f=fixture(); f:ps(); f:ps(R3,255,255); f:ps(0,255,255); f:count('VR_2DScreenMode',0)
+    f:ps(); f:ps(0,255,255); f:ps(R3,255,255); f:ps(0,255,255); f:count('VR_2DScreenMode',1)
     for i=1,60 do f:ps(R3,255,255) end
-    f:count('VR_MonoTheatreMode',1)
+    f:count('VR_2DScreenMode',1)
 end)
 test('native stereo screen requires continuous 0.8 second hold',function()
     local f=fixture(); f:ps(); f:ps(L3,255,255)
@@ -88,6 +89,38 @@ test('native L3+R3 priority cancels other view shortcut',function()
 end)
 test('native PS face and option buttons use common shortcut vocabulary',function()
     local f=fixture(); f:ps(); f:ps(L3+8192); f:count('VR_EnableGUI',1)
-    f:ps(); f:ps(L3+16); f:count('WuWaControls_ShowShortcutSheet',1)
+    f:ps(); f:ps(L3+16); f:count('WuWaControls_PinCard',1)
+end)
+test('holding L3 for half a second calls up the controls card and lights buttons',function()
+    local f=fixture(); f:xp()
+    for i=1,24 do f:xp(L3) end
+    assert(f.values.WuWaControls_Card==nil or f.values.WuWaControls_Card=='','card before half a second')
+    f:xp(L3); f:xp(L3); assert(f.values.WuWaControls_Card=='l3:64:0:0',tostring(f.values.WuWaControls_Card))
+    f:xp(L3+8192); assert(f.values.WuWaControls_Card=='l3:8256:0:0',tostring(f.values.WuWaControls_Card))
+    f:xp(); assert(f.values.WuWaControls_Card=='','card after release')
+end)
+test('a long L3 hold never counts toward double L3',function()
+    local f=fixture(); f:xp()
+    for i=1,30 do f:xp(L3) end
+    -- A click right after the long hold must not complete a double click.
+    f:xp(); f:xp(L3); f:xp()
+    assert((f.screenshots or 0)==0,'long hold counted as a click')
+    -- Two quick clicks still take a screenshot.
+    for i=1,20 do f:xp() end
+    f:xp(L3); f:xp(); f:xp(L3); f:xp()
+    assert((f.screenshots or 0)==1,'double L3 '..tostring(f.screenshots))
+end)
+test('holding both triggers first calls up the views card; L3 then keeps it',function()
+    local f=fixture(); f:xp()
+    for i=1,26 do f:xp(0,255,255) end
+    assert(f.values.WuWaControls_Card=='views:0:1:1',tostring(f.values.WuWaControls_Card))
+    f:xp(L3,255,255); assert(f.values.WuWaControls_Card=='views:64:1:1',tostring(f.values.WuWaControls_Card))
+    f:xp(); assert(f.values.WuWaControls_Card=='','views card after release')
+end)
+test('portal still toggles while the L3 card is up',function()
+    local f=fixture(); f:xp()
+    for i=1,30 do f:xp(L3) end
+    f:xp(L3,255,0); f:count('WindowMode_Enabled',1)
+    assert(f.values.WuWaControls_Card:sub(1,3)=='l3:',tostring(f.values.WuWaControls_Card))
 end)
 print('PASS '..passed..' PlayStation shared-shortcut integration groups; no device/game access')

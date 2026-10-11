@@ -1,6 +1,6 @@
 // Original site tooling, MIT. The controller sections of the home pages and the
 // player guide, built from mod/controls.json and the mod's own catalogs
-// (mod/localization/wuwa), so the website and the in-VR shortcut sheet use the
+// (mod/localization/wuwa), so the website and the in-VR controls cards use the
 // same words in every language. Button names follow Xbox; data-ps carries the
 // PlayStation name for the toggle.
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
@@ -57,7 +57,7 @@ function buttonsOf(keys) {
 }
 
 // Original controller drawing (not an official asset). data-btn ties shapes to
-// callouts and table rows. "lit" outlines the buttons a sheet page uses.
+// callouts and table rows. "lit" outlines the buttons a group uses.
 function pad({lit = [], modifier = true, defs = true, leaders = true} = {}) {
   const on = id => lit.includes(id) ? ' lit' : '';
   const face = (id, x, y) => `<g class="btn face-${id}${on(id)}" data-btn="${id}${id === 'Y' || id === 'X' ? ' YX' : ''}"><circle cx="${x}" cy="${y}" r="17"/><text x="${x}" y="${y + 6}" data-ps="${PS[id]}">${id}</text></g>`;
@@ -119,7 +119,7 @@ function card({dir, copy, t}) {
 <div class="pad-more"><p class="pad-more-title">${esc(copy.more)}</p><ul class="pad-gestures">${gestures}</ul></div>
 <p class="pad-url">chronohaxx.github.io/wuwa-vr</p></figure>`;
 }
-// Table rows for one sheet page, with a heading row whenever the context changes.
+// Table rows for one group, with a heading row whenever the context changes.
 function tableRows(group, t, copy, {hover = false} = {}) {
   const when = {freecam: [copy.freecam, 'Double R3'], mouse: [copy.mouse, 'L3 + LB'], uevr: [copy.uevr, 'L3 + R3']};
   let context = null;
@@ -147,14 +147,15 @@ ${card({dir, copy, t})}
 <p class="section-foot">${guideLink}</p></div></section>`;
 }
 
-// Player guide (English): the card, then one card per in-VR sheet page with that
-// page's buttons outlined; pointing at a row lights its buttons. No nested
-// <section>: the release build replaces this section by pattern.
+// Player guide (English): the card, then one card per group with its buttons
+// outlined; pointing at a row lights its buttons. No nested <section>: the
+// release build replaces this section by pattern.
 const PAGE_NOTES = {
-  everyday: 'Shown on every page of the in-VR sheet: the shortcuts you use all the time.',
-  cameras: 'View modes, first person, the fixed camera, Polar walk and freecam.',
-  menus: 'Sheet pages, the V / Tab utility and HUD / mouse adjustment.',
-  uevr: "Driving UEVR's own settings with a controller. L3 + R3 opens and closes them."
+  l3: 'Hold L3 for half a second in VR and this card rises under your view: the shortcuts you use all the time.',
+  views: 'Hold LT + RT for half a second for the views card: full VR, stereo screen, mono theatre and blur.',
+  cameras: 'The fixed camera, Polar walk and freecam.',
+  menus: 'The V / Tab utility and HUD / mouse adjustment.',
+  menu: 'Driving the WuWa VR menu with a gamepad. VR controllers point and pull the trigger.'
 };
 function renderGuide({copy}) {
   const t = language('en');
@@ -165,7 +166,7 @@ function renderGuide({copy}) {
     return `<article class="pad-page" id="sheet-${g.id}" aria-labelledby="sheet-${g.id}-title"><header class="pad-page-head"><span class="step-num pad-page-num" aria-hidden="true">${number}</span><div><h3 id="sheet-${g.id}-title">${esc(title)}</h3><p>${esc(PAGE_NOTES[g.id])}</p></div></header>
 <div class="pad-page-body">${pad({lit: used, modifier: false, defs: false, leaders: false})}<div class="table-scroll"><table class="shortcut-table"><tbody>${tableRows(g, t, copy, {hover: true})}</tbody></table></div></div></article>`;
   }).join('\n');
-  return `<section id="visual-controls"><h2>Controller guide</h2><p>Every shortcut, laid out like the four pages of the in-VR shortcut sheet (<bdi dir="ltr" class="combo">${chip('L3')}<span class="op">+</span>${chip('Menu')}</bdi> in VR). Point at a row to light its buttons; the searchable text reference follows.</p>
+  return `<section id="visual-controls"><h2>Controller guide</h2><p>Every shortcut, grouped like the in-VR controls cards: in VR, hold <bdi dir="ltr" class="combo">${chip('L3')}</bdi>, or <bdi dir="ltr" class="combo">${chip('LT')}<span class="op">+</span>${chip('RT')}</bdi>, for half a second to see them. Point at a row to light its buttons; the searchable text reference follows.</p>
 ${toolbar(copy, 'media/controls/en.png', 'en')}
 ${card({dir: 'ltr', copy, t})}
 <p class="pad-note small">${esc(copy.psNote)}</p>

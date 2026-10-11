@@ -11,6 +11,8 @@ local selected, selected_at, mode, prior_mode = nil, -100, 0, 0
 local input, frame, base, free, owner, mesh_cache = nil, nil, nil, nil, nil, nil
 local context_mouse, focused, camera_active = false, false, false
 local game_menu = false
+-- The controls card the held buttons call up, as last reported to the overlay.
+local card_sent = ""
 local status, last_error = "Polar controls ready; game camera unchanged.", nil
 local mesh_mode, camera_mode, last_pawn, mesh_revision = -1, -1, nil, -1
 local camera_late=false
@@ -487,6 +489,19 @@ local function process_pad(index,state,result)
     local b,previous=p.wButtons,s.previous
     local rising=b & (~previous)
     local l3,r3,lb=has(b,B.L3),has(b,B.R3),has(b,B.LB)
+    -- Controls cards: L3 held first, or both triggers fully held first, for half
+    -- a second calls up its card, which stays while that hold lasts and lights
+    -- the buttons pressed meanwhile. Only shown; no input is consumed for it.
+    local lt_down,rt_down=p.bLeftTrigger>=30,p.bRightTrigger>=30
+    if not l3 then s.l3_at=nil
+    elseif not s.l3_at and not s.trig_at and not lt_down and not rt_down then s.l3_at=t end
+    if not lt_down or not rt_down then s.trig_at=nil
+    elseif not s.trig_at and not s.l3_at and not l3 and not r3 and p.bLeftTrigger>=180 and p.bRightTrigger>=180 then s.trig_at=t end
+    local card=(s.l3_at and t-s.l3_at>=0.5 and "l3") or (s.trig_at and t-s.trig_at>=0.5 and "views") or nil
+    -- A long hold is not a click: it never counts toward double L3.
+    if card=="l3" then s.lone_l=false end
+    s.card=card and string.format("%s:%d:%d:%d",card,b,lt_down and 1 or 0,rt_down and 1 or 0) or nil
+    s.card_at=t
     if l3 and r3 then
         actions.view=nil
         if s.view_chord then s.view_chord="cancelled" end
@@ -597,16 +612,6 @@ local function process_pad(index,state,result)
         if mode==3 and not context_mouse and not adjust and has(b,B.DOWN) then
             consumed=consumed|B.L3|B.DOWN
             if (previous&(B.L3|B.DOWN))~=(B.L3|B.DOWN) then actions.motion=true end
-        end
-        -- Page browsing is opt-in to a visible sheet and uses the same rising-
-        -- edge/focus rearm rules as other chords. Never steal normal game D-pad.
-        if enabled("WuWaControls_ShowShortcutSheet") then
-            local directions=b&(B.LEFT|B.RIGHT|B.UP)
-            consumed=consumed|directions
-            if directions~=0 then consumed=consumed|B.L3 end
-            if directions==B.UP and has(rising,B.UP) then actions.sheet_auto=true
-            elseif directions==B.LEFT and has(rising,B.LEFT) then actions.sheet_delta=-1
-            elseif directions==B.RIGHT and has(rising,B.RIGHT) then actions.sheet_delta=1 end
         end
     end
     local force=utility_held(p)
@@ -1032,6 +1037,9 @@ local function tick(_,delta)
         -- Discard stale axes/chords and require a neutral sample on return.
         slots={}; actions={}; input=nil; selected=nil; p=nil
     end
+    local held=selected and slots[selected]
+    local card_now=(held and held.card and held.card_at and t-held.card_at<=0.25) and held.card or ""
+    if card_now~=card_sent then set("WuWaControls_Card",card_now); card_sent=card_now end
     if not camera_active then
         frame=nil; free=nil; context_mouse=false
         if mesh_cache then mesh_cache.look_blend=nil end
@@ -1095,14 +1103,7 @@ local function tick(_,delta)
             if adjust then s.mono_ready=nil end
         end
     end
-    if actions.sheet then set("WuWaControls_ShowShortcutSheet",not enabled("WuWaControls_ShowShortcutSheet")) end
-    if actions.sheet_auto then
-        set("WuWaControls_SheetPage",0)
-    elseif actions.sheet_delta then
-        local page=number("WuWaControls_SheetPage",0,0,4)
-        if page==0 then page=(context_mouse or adjust) and 3 or mode~=0 and 2 or 1 end
-        set("WuWaControls_SheetPage",1+(page-1+actions.sheet_delta)%4)
-    end
+    if actions.sheet then set("WuWaControls_PinCard",not enabled("WuWaControls_PinCard")) end
     acro_arm_requested=actions.acro_arm==true
     local recenter,screenshot=actions.recenter,actions.screenshot; actions={}
     mode=number("WuWaControls_CameraMode",0,0,3)
@@ -1405,7 +1406,7 @@ function dof.update(pcm,fov,dolly)
     -- Screens use the game's own lens (test 3f), so only full VR needs the lens
     -- compensation; the strength multiplier applies everywhere.
     local screen=enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre")
-    local strength=screen and number("WuWaStereo_DepthOfFieldStrength",1,0.25,4) or number("WuWaStereo_DepthOfFieldStrengthFullVR",0.5,0.25,4)
+    local strength=screen and number("WuWaStereo_DepthOfFieldStrength",1,0.25,4) or number("WuWaStereo_DepthOfFieldStrengthFullVR",1,0.25,4)
     pcall(function()
         local pp=pcm.CameraCachePrivate.POV.PostProcessSettings
         local f,d=pp.DepthOfFieldFstop,pp.DepthOfFieldFocalDistance

@@ -1197,9 +1197,8 @@ void Framework::update_fonts() {
     }
 
     wuwa_l10n::reserve_fonts(fonts, m_framework_module, (float)m_font_size);
-    wuwa_sheet::reserve_artwork(fonts, m_framework_module);
+    wuwa_sheet::reserve_font(fonts);
     fonts->Build();
-    if (!wuwa_sheet::fill_artwork(fonts)) spdlog::warn("WuWa shortcut artwork unavailable: {}; using text fallback.",wuwa_sheet::artwork_status());
     m_wants_device_object_cleanup = true;
 }
 

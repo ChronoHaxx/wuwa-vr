@@ -52,7 +52,7 @@
     "title": "Fait pour jouer, pas seulement pour regarder",
     "items": [
       ["VR stéréo et suivi de la tête", "Une vraie profondeur dans les casques OpenXR. Menus et HUD restent utilisables, et l'interface peut être déplacée, redimensionnée ou masquée."],
-      ["Pensé pour la manette", "Raccourcis Xbox et, à titre expérimental, PlayStation, avec un aide-mémoire dans la VR sur L3 + Menu."],
+      ["Pensé pour la manette", "Raccourcis Xbox et, à titre expérimental, PlayStation ; dans la VR, maintenez L3 ou LT + RT pour voir le rôle de chaque bouton."],
       ["Corps à la première personne", "Voyez les mains et la tenue de votre personnage, tête masquée. Suivi de l'animation en option, avec un mode confort intégré."],
       ["Caméras libres", "Caméra libre, drone, avion et acrobaties pour explorer et prendre des captures. Expérimental."],
       ["Fenêtre 6DOF", "Un mode fenêtre facultatif qui place le jeu dans votre pièce. Adapté du travail d'Elliott Tate."],
@@ -68,14 +68,14 @@
   },
   "pad": {
     "title": "Raccourcis manette",
-    "intro": "La plupart des raccourcis combinent L3 et un bouton : maintenez le stick gauche enfoncé, appuyez sur le bouton, puis relâchez tout. En VR, L3 + Menu affiche la même liste sous forme de fiche.",
+    "intro": "La plupart des raccourcis sont L3 plus un bouton : maintenez le stick gauche enfoncé, appuyez sur le bouton, puis relâchez tout. Dans la VR, maintenez L3 ou LT + RT une demi-seconde et cette carte apparaît sous votre regard.",
     "hold": "Maintenez L3, puis appuyez",
     "more": "Gestes",
     "names": "Noms des boutons",
     "psNote": "La prise en charge PlayStation est expérimentale.",
     "freecam": "Caméra libre active",
     "mouse": "Mode HUD / souris actif",
-    "uevr": "Réglages UEVR ouverts",
+    "uevr": "Menu WuWa VR ouvert",
     "image": "Enregistrer en image",
     "all": "Tous les raccourcis"
   },

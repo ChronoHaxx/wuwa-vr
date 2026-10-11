@@ -52,7 +52,7 @@
     "title": "Hecho para jugar, no solo para mirar",
     "items": [
       ["VR estereoscópica y seguimiento de cabeza", "Profundidad real en visores OpenXR. Los menús y el HUD siguen siendo usables, y puedes mover, escalar u ocultar la interfaz."],
-      ["Pensado para mando", "Atajos para Xbox y, de forma experimental, PlayStation, con una hoja de atajos dentro de la VR en L3 + Menu."],
+      ["Pensado para mando", "Atajos para Xbox y, de forma experimental, PlayStation; en la VR, mantén L3 o LT + RT para ver qué hace cada botón."],
       ["Cuerpo en primera persona", "Mira las manos y el atuendo de tu personaje con la cabeza oculta. Seguimiento de animación opcional y modo de confort incluido."],
       ["Cámaras libres", "Vistas de cámara libre, dron, avión y acrobacias para explorar y hacer capturas. Experimental."],
       ["Ventana 6DOF", "Un modo de ventana opcional que coloca el juego en tu habitación. Adaptado del trabajo de Elliott Tate."],
@@ -68,14 +68,14 @@
   },
   "pad": {
     "title": "Atajos del mando",
-    "intro": "Casi todos los atajos son L3 más un botón: mantén pulsado el stick izquierdo, pulsa el botón y suelta todo. En VR, L3 + Menu muestra la misma lista como hoja.",
+    "intro": "La mayoría de los atajos son L3 más un botón: mantén pulsado el stick izquierdo, pulsa el botón y suelta todo. En la VR, mantén L3 o LT + RT medio segundo y esta tarjeta aparece bajo tu vista.",
     "hold": "Mantén L3 y pulsa",
     "more": "Gestos",
     "names": "Nombres de botones",
     "psNote": "El soporte de PlayStation es experimental.",
     "freecam": "Con la cámara libre activa",
     "mouse": "Con el modo HUD / ratón activo",
-    "uevr": "Con los ajustes de UEVR abiertos",
+    "uevr": "Con el menú de WuWa VR abierto",
     "image": "Guardar como imagen",
     "all": "Todos los atajos"
   },

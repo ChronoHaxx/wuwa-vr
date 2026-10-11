@@ -16,6 +16,9 @@ void on_closed();
 // The VR menu (not the classic window) was drawn in the last few frames.
 // Any thread.
 bool showing();
+// "Move menu" is on: the menu follows a controller's aim (the overlay reads
+// this) or the sticks / arrow keys, until it is put down. Any thread.
+bool moving();
 
 // The laser beam (OpenXR) is a thin quad textured from a small swatch that the
 // VR menu draws in the top-left corner of the UI image; the menu's own quad

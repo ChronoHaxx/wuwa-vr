@@ -125,6 +125,14 @@ private:
     const ModToggle::Ptr m_framework_ui_follows_view{ ModToggle::create("UI_Framework_FollowView", false) };
     const ModToggle::Ptr m_framework_wrist_ui{ ModToggle::create("UI_Framework_WristUI", false) };
     const ModToggle::Ptr m_framework_mouse_emulation{ ModToggle::create("UI_Framework_MouseEmulation", true) };
+    // WuWa: where the VR menu floats around you, in degrees to the right and up
+    // from straight ahead; one place for full VR and one for the screen views,
+    // where it sits low so it does not cover the picture (test 3j).
+    const ModSlider::Ptr m_wuwa_menu_yaw{ ModSlider::create("UI_WuWaMenuYaw", -150.0f, 150.0f, 0.0f) };
+    const ModSlider::Ptr m_wuwa_menu_pitch{ ModSlider::create("UI_WuWaMenuPitch", -60.0f, 60.0f, 0.0f) };
+    const ModSlider::Ptr m_wuwa_menu_yaw_screen{ ModSlider::create("UI_WuWaMenuYawScreen", -150.0f, 150.0f, 0.0f) };
+    const ModSlider::Ptr m_wuwa_menu_pitch_screen{ ModSlider::create("UI_WuWaMenuPitchScreen", -60.0f, 60.0f, -28.0f) };
+    void place_wuwa_menu(glm::mat4& frame);
 
 public:
     OverlayComponent() 
@@ -149,7 +157,11 @@ public:
             *m_framework_size,
             *m_framework_ui_follows_view,
             *m_framework_wrist_ui,
-            *m_framework_mouse_emulation
+            *m_framework_mouse_emulation,
+            *m_wuwa_menu_yaw,
+            *m_wuwa_menu_pitch,
+            *m_wuwa_menu_yaw_screen,
+            *m_wuwa_menu_pitch_screen
         };
     }
 

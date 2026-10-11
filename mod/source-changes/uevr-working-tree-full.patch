@@ -314061,7 +314061,7 @@ index 71b0927f732d914b9287a1356e27ad8a59372c3a..4a2a199997f734f7bf7f32b4c87b5900
      imgui.new_enum("ImGuiStyleVar",
          "Alpha", ImGuiStyleVar_Alpha,
 diff --git a/src/mods/vr/CVarManager.cpp b/src/mods/vr/CVarManager.cpp
-index 0c13a86648ccee2502da971039984b807c0be775..2789af93415021dc68ea8ac4fb4eccd915800382 100644
+index 0c13a86648ccee2502da971039984b807c0be775..5346ba9863ef8f71c3354d2460ad36e5b58ac3b9 100644
 --- a/src/mods/vr/CVarManager.cpp
 +++ b/src/mods/vr/CVarManager.cpp
 @@ -2,6 +2,7 @@
@@ -314151,7 +314151,7 @@ index 0c13a86648ccee2502da971039984b807c0be775..2789af93415021dc68ea8ac4fb4eccd9
 +                "WuWaControls_ResetHudAspect", "WuWaControls_HudAspectStatus", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
 +                "UI_Distance", "UI_Size", "UI_WuWaHudShape", "UI_FollowView", "WuWaControls_Enabled",
 +                "WuWaControls_MouseAssist", "WuWaControls_AutoMouseMenus", "WuWaControls_AdjustMode", "WuWaControls_WarnHiddenUI",
-+                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject", "WuWaStereo_DepthOfFieldStrengthFullVR", "WuWaControls_LensFollow",
++                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject", "WuWaStereo_DepthOfFieldStrengthFullVR", "WuWaControls_LensFollow", "WuWaSteps_ShowCard", "UI_WuWaMenuYaw", "UI_WuWaMenuPitch", "UI_WuWaMenuYawScreen", "UI_WuWaMenuPitchScreen",
 +                "VR_WuWaScreenLens", "VR_WuWaScreenDepth", "WuWaPrivacy_Mode", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
 +                "WuWaControls_FirstRight", "WuWaControls_FirstUp", "WuWaControls_FirstMotion", "WuWaControls_FullFollowLook", "WuWaControls_FollowHeadAnimation", "WuWaControls_LateHeadUpdate",
 +                "VR_AimMethod", "VR_AimModifyPlayerControlRotation", "VR_DecoupledPitch",
@@ -316796,10 +316796,10 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      g_hook->m_sceneview_data.known_scene_states.clear();
 diff --git a/src/mods/vr/OverlayComponent.cpp b/src/mods/vr/OverlayComponent.cpp
-index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44ef675f785 100644
+index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..9e8cf6c912f98529d451edfe20a2f99b190ee7a5 100644
 --- a/src/mods/vr/OverlayComponent.cpp
 +++ b/src/mods/vr/OverlayComponent.cpp
-@@ -1,11 +1,15 @@
+@@ -1,11 +1,16 @@
 +#include "utility/WuWaLocalizedUI.hpp"
  #include <glm/gtx/intersect.hpp>
  #include <imgui_internal.h>
@@ -316812,10 +316812,11 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
  #include "OverlayComponent.hpp"
 +#include "WuWaVrMenuHost.hpp"
++#include "utility/WuWaInputTrace.hpp"
  
  namespace vrmod {
  void OverlayComponent::on_reset() {
-@@ -71,6 +75,11 @@ std::optional<std::string> OverlayComponent::on_initialize_openvr() {
+@@ -71,6 +76,11 @@ std::optional<std::string> OverlayComponent::on_initialize_openvr() {
  }
  
  void OverlayComponent::on_pre_imgui_frame() {
@@ -316827,7 +316828,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
      this->update_input_openvr();
      this->update_input_mouse_emulation();
  }
-@@ -94,7 +103,7 @@ void OverlayComponent::update_input_mouse_emulation() {
+@@ -94,7 +104,7 @@ void OverlayComponent::update_input_mouse_emulation() {
          return;
      }
  
@@ -316836,7 +316837,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
          auto vr = VR::get();
          auto& io = ImGui::GetIO();
          const auto is_initial_frame = !vr->is_using_afr() || vr->get_frame_count() % 2 == vr->m_left_eye_interval;
-@@ -119,7 +128,12 @@ void OverlayComponent::update_input_mouse_emulation() {
+@@ -119,7 +129,12 @@ void OverlayComponent::update_input_mouse_emulation() {
  
              // Left click.
              const auto& a_button_right = !vr->m_swap_controllers->value() ? VR::s_action_a_button_right : VR::s_action_a_button_left;
@@ -316850,7 +316851,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
                  // Clear any gamepad A events.
                  auto ctx = io.Ctx;
  
-@@ -201,6 +215,78 @@ void OverlayComponent::on_config_load(const utility::Config& cfg, bool set_defau
+@@ -201,6 +216,78 @@ void OverlayComponent::on_config_load(const utility::Config& cfg, bool set_defau
      }
  }
  
@@ -316929,7 +316930,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  void OverlayComponent::on_draw_ui() {
      ImGui::SetNextItemOpen(true, ImGuiCond_Once);
      if (ImGui::TreeNode("Overlay Options")) {
-@@ -322,12 +408,18 @@ void OverlayComponent::update_slate_openvr() {
+@@ -322,12 +409,18 @@ void OverlayComponent::update_slate_openvr() {
          return;
      }
  
@@ -316949,7 +316950,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
      // TODO: do the sizing / scaling calculations below need to take into account non-standard VRTextureBounds_t
      // when we force a symmetrical eye projection matrix?
-@@ -367,14 +459,19 @@ void OverlayComponent::update_slate_openvr() {
+@@ -367,14 +460,19 @@ void OverlayComponent::update_slate_openvr() {
      glm_matrix[3] += m_slate_y_offset->value() * glm_matrix[1];
      glm_matrix[3].w = 1.0f;
      
@@ -316973,7 +316974,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
      if (is_d3d11) {
          if (vr->m_d3d11.get_ui_tex().Get() == nullptr) {
-@@ -624,9 +721,14 @@ void OverlayComponent::update_overlay_openvr() {
+@@ -624,9 +722,14 @@ void OverlayComponent::update_overlay_openvr() {
  
      const auto is_d3d11 = g_framework->get_renderer_type() == Framework::RendererType::D3D11;
  
@@ -316990,7 +316991,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
          vr::VROverlay()->ShowOverlay(m_overlay_handle); // always show overlay idk look at it later
  
          if (should_show_overlay) {
-@@ -669,7 +771,7 @@ void OverlayComponent::update_overlay_openvr() {
+@@ -669,7 +772,7 @@ void OverlayComponent::update_overlay_openvr() {
      }
  
      // Draw the UI as a plane in front of the user instead
@@ -316999,7 +317000,15 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
          vr::VROverlay()->ShowOverlay(m_overlay_handle);
  
          // Show the entire texture
-@@ -717,8 +819,16 @@ void OverlayComponent::update_overlay_openvr() {
+@@ -708,6 +811,7 @@ void OverlayComponent::update_overlay_openvr() {
+         glm_matrix[3] += vr->get_standing_origin();
+ 
+         if (g_framework->is_drawing_ui()) {
++            place_wuwa_menu(glm_matrix);
+             glm_matrix[3] -= glm_matrix[2] * m_framework_distance->value();
+         } else {
+             glm_matrix[3] -= glm_matrix[2] * (m_slate_distance->value() - 0.01f);
+@@ -717,8 +821,16 @@ void OverlayComponent::update_overlay_openvr() {
          }
  
          glm_matrix[3].w = 1.0f;
@@ -317017,7 +317026,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
          const auto is_d3d12 = g_framework->get_renderer_type() == Framework::RendererType::D3D12;
          const auto size = is_d3d12 ? g_framework->get_d3d12_rt_size() : g_framework->get_d3d11_rt_size();
-@@ -728,8 +838,8 @@ void OverlayComponent::update_overlay_openvr() {
+@@ -728,8 +840,8 @@ void OverlayComponent::update_overlay_openvr() {
          const float scale_factor = g_framework->is_drawing_ui() ? (size.x / 1920.0f) : 1.0f;
          const float adjusted_size_meters = size_meters * scale_factor;
  
@@ -317028,7 +317037,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
          vr::VROverlay()->SetOverlayWidthInMeters(m_overlay_handle, width_meters);
  
-@@ -749,8 +859,13 @@ void OverlayComponent::update_overlay_openvr() {
+@@ -749,8 +861,13 @@ void OverlayComponent::update_overlay_openvr() {
              vr::VROverlay()->SetOverlayTexture(m_overlay_handle, &imgui_tex);
          }
  
@@ -317043,7 +317052,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
              // Right only for now for testing
              const auto controller_index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
              const auto right_controller_rot = glm::quat{vr->get_rotation(controller_index, false)};
-@@ -813,7 +928,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -813,7 +930,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
  {
      auto& vr = VR::get();
  
@@ -317052,7 +317061,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
          m_parent->m_intersect_state.intersecting = false;
          return std::nullopt;
      }
-@@ -857,18 +972,27 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -857,18 +974,27 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
      }
  
      const auto size_meters = m_parent->m_slate_size->value();
@@ -317083,7 +317092,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
      // Check if the controller pointer intersects with the quad, and we can use this to emulate the mouse
      if (vr->is_using_controllers()) {
          // Right only for now for testing
-@@ -880,13 +1004,13 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -880,13 +1006,13 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
          auto fwd = (right_controller_rot * glm::vec3{0.0f, 0.0f, -1.0f});
          const auto end = right_controller_pos + (fwd * 1000.0f);
          
@@ -317100,7 +317109,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
              const auto w_half = meters_w / 2.0f;
              const auto h_half = meters_h / 2.0f;
-@@ -921,7 +1045,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerCylinderKHR>> OverlayComp
+@@ -921,7 +1047,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerCylinderKHR>> OverlayComp
  {
      auto& vr = VR::get();
  
@@ -317109,7 +317118,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
          return std::nullopt;
      }
  
-@@ -965,7 +1089,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerCylinderKHR>> OverlayComp
+@@ -965,7 +1091,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerCylinderKHR>> OverlayComp
  
      const auto size_meters = m_parent->m_slate_size->value();
      const auto meters_w = (float)ui_swapchain.width / (float)ui_swapchain.height * size_meters;
@@ -317118,7 +317127,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
      // OpenXR Docs:
      // radius is the non-negative radius of the cylinder. Values of zero or floating point positive infinity are treated as an infinite cylinder.
-@@ -991,6 +1115,12 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
+@@ -991,6 +1117,12 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
      runtimes::OpenXR::SwapchainIndex swapchain, 
      XrEyeVisibility eye)
  {
@@ -317131,7 +317140,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
      switch ((OverlayComponent::OverlayType)m_parent->m_slate_overlay_type->value()) {
      default:
      case OverlayComponent::OverlayType::QUAD:
-@@ -1017,7 +1147,19 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
+@@ -1017,7 +1149,43 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
  }
  
  
@@ -317146,12 +317155,36 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
 +    return m_framework_beam_layer;
 +}
 +
++// WuWa: turns the VR menu's frame about the standing origin before it is pushed
++// out to its distance, so it floats where it was put and still faces you. While
++// "Move menu" is on and a controller's laser is in use, the menu follows its aim.
++void OverlayComponent::place_wuwa_menu(glm::mat4& frame) {
++    if (!wuwa_test::is_wuwa() || !wuwa_menu_host::showing()) return;
++    auto& vr = VR::get();
++    const bool screen = vr->is_using_2d_screen() || vr->is_using_mono_theatre();
++    auto& yaw = screen ? m_wuwa_menu_yaw_screen : m_wuwa_menu_yaw;
++    auto& pitch = screen ? m_wuwa_menu_pitch_screen : m_wuwa_menu_pitch;
++    if (wuwa_menu_host::moving() && vr->menu_pointer_active() && !vr->get_controllers().empty()) {
++        const auto index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
++        const auto aim = glm::quat{vr->get_rotation(index, false)} * glm::vec3{0.0f, 0.0f, -1.0f};
++        const auto local = glm::inverse(glm::mat3{frame}) * aim;
++        if (glm::length(local) > 0.5f) {
++            const auto dir = glm::normalize(local);
++            yaw->value() = std::clamp(glm::degrees(std::atan2(dir.x, -dir.z)), -150.0f, 150.0f);
++            pitch->value() = std::clamp(glm::degrees(std::asin(std::clamp(dir.y, -1.0f, 1.0f))), -60.0f, 60.0f);
++        }
++    }
++    const auto turn = glm::angleAxis(glm::radians(-yaw->value()), glm::vec3{0.0f, 1.0f, 0.0f}) *
++        glm::angleAxis(glm::radians(pitch->value()), glm::vec3{1.0f, 0.0f, 0.0f});
++    frame = frame * Matrix4x4f{turn};
++}
++
  std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::OpenXR::generate_framework_ui_quad() {
 +    m_framework_beam_ready = false;
      if (!g_framework->is_drawing_anything()) {
          m_parent->m_framework_intersect_state.intersecting = false;
          return std::nullopt;
-@@ -1037,6 +1179,26 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1037,6 +1205,26 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
      layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
      layer.eyeVisibility = XrEyeVisibility::XR_EYE_VISIBILITY_BOTH;
  
@@ -317178,7 +317211,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
      auto glm_matrix = glm::identity<glm::mat4>();
  
      if (vr->m_overlay_component.m_framework_ui_follows_view->value()) {
-@@ -1065,9 +1227,18 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1065,13 +1253,23 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
      // Adjust size_meters based on scaling factor.
      const float adjusted_size_meters = size_meters * scale_factor;
  
@@ -317198,7 +317231,12 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
      layer.size = {meters_w, meters_h};
  
-@@ -1085,8 +1256,9 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+     if (g_framework->is_drawing_ui()) {
++        m_parent->place_wuwa_menu(glm_matrix);
+         glm_matrix[3] -= glm_matrix[2] * m_parent->m_framework_distance->value();
+     } else {
+         glm_matrix[3] -= glm_matrix[2] * (m_parent->m_slate_distance->value() - 0.01f);
+@@ -1085,8 +1283,9 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
      layer.pose.orientation = runtimes::OpenXR::to_openxr(glm::quat_cast(glm_matrix));
      layer.pose.position = runtimes::OpenXR::to_openxr(glm_matrix[3]);
  
@@ -317210,7 +317248,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
          // Right only for now for testing
          const auto controller_index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
          const auto right_controller_rot = glm::quat{vr->get_rotation(controller_index, false)};
-@@ -1099,6 +1271,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1099,6 +1298,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
          const auto plane_pos = glm::vec3{glm_matrix[3]};
  
          float intersection_distance = 0.0f;
@@ -317218,7 +317256,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
          if (glm::intersectRayPlane<glm::vec3>(start, fwd, plane_pos, glm::normalize(glm::vec3{glm_matrix[2]}), intersection_distance)) {
              const auto intersection_point = start + (fwd * intersection_distance);
  
-@@ -1113,10 +1286,11 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1113,10 +1313,11 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
  
                  m_parent->m_framework_intersect_state.quad_intersection_point = {x, y};
                  m_parent->m_framework_intersect_state.intersecting = true;
@@ -317231,7 +317269,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
  
                      m_parent->m_framework_intersect_state.swapchain_intersection_point = {client_x, client_y};
                  }
-@@ -1124,10 +1298,43 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
+@@ -1124,10 +1325,43 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
                  m_parent->m_framework_intersect_state.intersecting = false;
              }
          }
@@ -317278,7 +317316,7 @@ index 74b1574ab466473fee1be3e5262d0a7c128fd5c2..328ab52612da7d717c7f99f3d656c44e
 \ No newline at end of file
 +}
 diff --git a/src/mods/vr/OverlayComponent.hpp b/src/mods/vr/OverlayComponent.hpp
-index 1fceacff00a68187f8efb0078f559cc7a8ae10df..48b550f028dc3cbd5f3e670f34b5854e5f4441a8 100644
+index 1fceacff00a68187f8efb0078f559cc7a8ae10df..3d5ea5a889975b615636efeb0d81ecc71c100fd5 100644
 --- a/src/mods/vr/OverlayComponent.hpp
 +++ b/src/mods/vr/OverlayComponent.hpp
 @@ -23,6 +23,7 @@ public:
@@ -317289,7 +317327,7 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..48b550f028dc3cbd5f3e670f34b5854e
  
      auto& get_openxr() {
          return m_openxr;
-@@ -104,9 +105,20 @@ private:
+@@ -104,15 +105,34 @@ private:
      const ModSlider::Ptr m_slate_x_offset{ ModSlider::create("UI_X_Offset", -10.0f, 10.0f, 0.0f) };
      const ModSlider::Ptr m_slate_y_offset{ ModSlider::create("UI_Y_Offset", -10.0f, 10.0f, 0.0f) };
      const ModSlider::Ptr m_slate_size{ ModSlider::create("UI_Size", 0.5f, 10.0f, 2.0f) };
@@ -317310,7 +317348,21 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..48b550f028dc3cbd5f3e670f34b5854e
  
      const ModSlider::Ptr m_framework_distance{ ModSlider::create("UI_Framework_Distance", 0.5f, 10.0f, 1.75f) };
      const ModSlider::Ptr m_framework_size{ ModSlider::create("UI_Framework_Size", 0.5f, 10.0f, 2.0f) };
-@@ -124,9 +136,15 @@ public:
+     const ModToggle::Ptr m_framework_ui_follows_view{ ModToggle::create("UI_Framework_FollowView", false) };
+     const ModToggle::Ptr m_framework_wrist_ui{ ModToggle::create("UI_Framework_WristUI", false) };
+     const ModToggle::Ptr m_framework_mouse_emulation{ ModToggle::create("UI_Framework_MouseEmulation", true) };
++    // WuWa: where the VR menu floats around you, in degrees to the right and up
++    // from straight ahead; one place for full VR and one for the screen views,
++    // where it sits low so it does not cover the picture (test 3j).
++    const ModSlider::Ptr m_wuwa_menu_yaw{ ModSlider::create("UI_WuWaMenuYaw", -150.0f, 150.0f, 0.0f) };
++    const ModSlider::Ptr m_wuwa_menu_pitch{ ModSlider::create("UI_WuWaMenuPitch", -60.0f, 60.0f, 0.0f) };
++    const ModSlider::Ptr m_wuwa_menu_yaw_screen{ ModSlider::create("UI_WuWaMenuYawScreen", -150.0f, 150.0f, 0.0f) };
++    const ModSlider::Ptr m_wuwa_menu_pitch_screen{ ModSlider::create("UI_WuWaMenuPitchScreen", -60.0f, 60.0f, -28.0f) };
++    void place_wuwa_menu(glm::mat4& frame);
+ 
+ public:
+     OverlayComponent() 
+@@ -124,14 +144,24 @@ public:
              *m_slate_y_offset,
              *m_slate_distance,
              *m_slate_size,
@@ -317326,7 +317378,17 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..48b550f028dc3cbd5f3e670f34b5854e
              *m_framework_distance,
              *m_framework_size,
              *m_framework_ui_follows_view,
-@@ -158,6 +176,9 @@ private:
+             *m_framework_wrist_ui,
+-            *m_framework_mouse_emulation
++            *m_framework_mouse_emulation,
++            *m_wuwa_menu_yaw,
++            *m_wuwa_menu_pitch,
++            *m_wuwa_menu_yaw_screen,
++            *m_wuwa_menu_pitch_screen
+         };
+     }
+ 
+@@ -158,6 +188,9 @@ private:
              XrEyeVisibility eye = XR_EYE_VISIBILITY_BOTH
          );
          std::optional<std::reference_wrapper<XrCompositionLayerQuad>> generate_framework_ui_quad();
@@ -317336,7 +317398,7 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..48b550f028dc3cbd5f3e670f34b5854e
          
      private:
          XrCompositionLayerQuad m_slate_layer{};
-@@ -165,15 +186,18 @@ private:
+@@ -165,15 +198,18 @@ private:
          XrCompositionLayerCylinderKHR m_slate_layer_cylinder{};
          XrCompositionLayerCylinderKHR m_slate_layer_cylinder_right{};
          XrCompositionLayerQuad m_framework_ui_layer{};
@@ -317359,7 +317421,7 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..48b550f028dc3cbd5f3e670f34b5854e
 +};}
 diff --git a/src/mods/vr/WuWaControlsComponent.cpp b/src/mods/vr/WuWaControlsComponent.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..eca61116ab96b265320ce6fc1ffd2221ad8acd0b
+index 0000000000000000000000000000000000000000..8fb1040076bfed623b49d0f6cd7a987c3311a73e
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.cpp
 @@ -0,0 +1,1276 @@
@@ -317686,7 +317748,7 @@ index 0000000000000000000000000000000000000000..eca61116ab96b265320ce6fc1ffd2221
 +        *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
 +        *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
 +        *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_stereo_effects, *m_lens_subject, m_lens_status,
++        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
 +        m_playstation_state, m_playstation_status,
 +        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
 +        *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -318641,10 +318703,10 @@ index 0000000000000000000000000000000000000000..eca61116ab96b265320ce6fc1ffd2221
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaControlsComponent.hpp b/src/mods/vr/WuWaControlsComponent.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..79ab4bda157bf0824951353694e4f0181b48d1eb
+index 0000000000000000000000000000000000000000..738f58462006db259f864cf9ed908d2878b12ea8
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.hpp
-@@ -0,0 +1,335 @@
+@@ -0,0 +1,338 @@
 +#pragma once
 +
 +#include <chrono>
@@ -318843,6 +318905,9 @@ index 0000000000000000000000000000000000000000..79ab4bda157bf0824951353694e4f018
 +    const ModSlider::Ptr m_stereo_dof_strength_vr{ModSlider::create("WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.5f)};
 +    // Close-up match within a shot: track the game camera's own moves from the cut (3i),
 +    // keep the cut's distance (3g), or follow the game's focus distance (3h).
++    // The test plan's step card takes the controls card's place below you; off
++    // shows the controls card as a public release does (no plan there).
++    const ModToggle::Ptr m_show_step_card{ModToggle::create("WuWaSteps_ShowCard", true)};
 +    const ModCombo::Ptr m_lens_follow{ModCombo::create("WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"}, 0)};
 +    struct LensStatus : ModString {
 +        LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}
@@ -318982,10 +319047,10 @@ index 0000000000000000000000000000000000000000..79ab4bda157bf0824951353694e4f018
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaVrMenuHost.cpp b/src/mods/vr/WuWaVrMenuHost.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9ad881bd7f
+index 0000000000000000000000000000000000000000..ea99631dbc2677d8c51cb6d80d12a589401307f6
 --- /dev/null
 +++ b/src/mods/vr/WuWaVrMenuHost.cpp
-@@ -0,0 +1,897 @@
+@@ -0,0 +1,1044 @@
 +#include "WuWaVrMenuHost.hpp"
 +
 +// Before windows.h (via Framework.hpp), whose min / max macros break std::min in it.
@@ -319037,6 +319102,11 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +
 +// VR controller buttons read straight from the runtime, as presses.
 +struct PadEdges { bool accept{}, back{}, prev_page{}, next_page{}; } pad_was{};
++// Move menu (test 3j): placing the menu around you with any input.
++std::atomic<bool> moving_menu{false};
++PadEdges move_was{};
++double move_last{};
++bool swallow_click{};
 +
 +// Problem reports from the Record page.
 +int report_kind{};
@@ -319232,6 +319302,59 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +    auto item = make(Kind::Text, "");
 +    item.wrap = true;
 +    item.value_text = std::move(text);
++    return item;
++}
++
++// ---- Where the menu floats (full VR and the screen views each keep their own) ----
++
++bool screen_view() {
++    auto* vr = VR::get().get();
++    return vr->is_using_2d_screen() || vr->is_using_mono_theatre();
++}
++const char* menu_yaw_key() { return screen_view() ? "UI_WuWaMenuYawScreen" : "UI_WuWaMenuYaw"; }
++const char* menu_pitch_key() { return screen_view() ? "UI_WuWaMenuPitchScreen" : "UI_WuWaMenuPitch"; }
++
++void start_moving_menu() {
++    move_was = {true, true, true, true};
++    move_last = 0.0;
++    moving_menu.store(true, std::memory_order_relaxed);
++}
++
++Item menu_angle_slider(const char* label, const char* help, bool vertical) {
++    auto item = make(Kind::Slider, label, help);
++    const auto key = [vertical] { return vertical ? menu_pitch_key() : menu_yaw_key(); };
++    item.enabled = [key] { return typed<float>(key()) != nullptr; };
++    item.get_float = [key] { auto* v = typed<float>(key()); return v ? v->value() : 0.0f; };
++    item.set_float = [key](float value) { if (auto* v = typed<float>(key())) v->value() = value; };
++    item.min = vertical ? -60.0f : -150.0f; item.max = vertical ? 60.0f : 150.0f; item.step = 2.0f; item.format = "%.0f deg";
++    return item;
++}
++
++// Front, low, left or right of you; "Custom" after moving it anywhere else.
++Item menu_place_choice() {
++    struct Spot { float yaw, pitch; };
++    static constexpr Spot spots[] = {{0.0f, 0.0f}, {0.0f, -28.0f}, {-40.0f, 0.0f}, {40.0f, 0.0f}};
++    auto item = make(Kind::Choice, "Menu place",
++        "Where this menu floats around you. Full VR and the screen views each keep their own place; on a screen view "
++        "Low keeps it under the picture.");
++    item.enabled = [] { return typed<float>(menu_yaw_key()) != nullptr; };
++    item.get_int = [] {
++        auto* yaw = typed<float>(menu_yaw_key());
++        auto* pitch = typed<float>(menu_pitch_key());
++        if (!yaw || !pitch) return 0;
++        for (int i = 0; i < 4; ++i) {
++            if (std::abs(yaw->value() - spots[i].yaw) < 1.0f && std::abs(pitch->value() - spots[i].pitch) < 1.0f) return i;
++        }
++        return 4;
++    };
++    item.set_int = [](int value) {
++        auto* yaw = typed<float>(menu_yaw_key());
++        auto* pitch = typed<float>(menu_pitch_key());
++        if (!yaw || !pitch || value < 0 || value > 3) return;
++        yaw->value() = spots[value].yaw;
++        pitch->value() = spots[value].pitch;
++    };
++    item.choices = {"Front", "Low", "Left", "Right", "Custom"};
 +    return item;
 +}
 +
@@ -319671,6 +319794,9 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +    }
 +    page.items.push_back(action("Mark this moment", "Saves the time and current settings, so the moment is easy to find later.",
 +        [] { steps.mark(context(), unix_ms()); }));
++    page.items.push_back(setting_toggle("Step card below you",
++        "Shows the current step where the controls card usually is. Off shows the controls card, as a public release "
++        "does; the plan stays loaded here.", "WuWaSteps_ShowCard"));
 +    page.items.push_back(record_toggle());
 +    page.items.push_back(live_text([] { return recorder_line(); }));
 +    page.items.push_back(live_text([] { return steps.error().empty() ? std::string{} : "plan.json was not read: " + steps.error(); }));
@@ -319684,6 +319810,13 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +        "VR_WuWaVrMenuSize", 0.4f, 1.0f, 0.05f, "%.2f"));
 +    page.items.push_back(setting_slider("Menu distance", "How far away this menu floats. UEVR's classic window uses the same distance.",
 +        "UI_Framework_Distance", 0.8f, 4.0f, 0.1f, "%.1f m"));
++    page.items.push_back(action("Move menu",
++        "Point with a controller and pull the trigger to put it down. Or use a stick, the D-pad, the arrow keys or WASD, and "
++        "the right stick or Page Up / Down for distance; A, Enter or B puts it down. Gamepad shortcut: Y. Keyboard: M. "
++        "Mouse: drag with the right button at any time.", [] { start_moving_menu(); }));
++    page.items.push_back(menu_place_choice());
++    page.items.push_back(menu_angle_slider("Menu left / right", "Degrees to the right of straight ahead (left is negative).", false));
++    page.items.push_back(menu_angle_slider("Menu up / down", "Degrees above straight ahead (below is negative).", true));
 +    page.items.push_back(live_text([vr] { return vr->menu_pointer_status(); }));
 +    page.items.push_back(paragraph(
 +        "VR controllers: point and pull the trigger, or use either stick and A. B closes, the grips change page. "
@@ -319793,7 +319926,46 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +    const bool back = once(ImGuiKey_GamepadFaceRight) || once(ImGuiKey_Escape) || pad_back;
 +    const bool prev_page = once(ImGuiKey_GamepadL1) || (once(ImGuiKey_Tab) && io.KeyShift) || pad_prev;
 +    const bool next_page = once(ImGuiKey_GamepadR1) || (once(ImGuiKey_Tab) && !io.KeyShift) || pad_next;
++    if (once(ImGuiKey_GamepadFaceUp) || once(ImGuiKey_M)) start_moving_menu();
 +    return mover.read(held, accept, back, prev_page, next_page, seconds());
++}
++
++// Move menu: sticks, D-pad, arrow keys or WASD turn the menu around you (a
++// controller's laser aim does it in the overlay instead); the right stick or
++// Page Up / Down changes the distance. A, B, Y, Enter, Escape, Space, M, a
++// controller's A / B or a click puts it down.
++void move_menu() {
++    const auto analog = [](ImGuiKey key) { return ImGui::GetKeyData(key)->AnalogValue; };
++    const auto down = [](ImGuiKey key) { return ImGui::IsKeyDown(key); };
++    const auto once = [](ImGuiKey key) { return ImGui::IsKeyPressed(key, false); };
++    float x = analog(ImGuiKey_GamepadLStickRight) - analog(ImGuiKey_GamepadLStickLeft);
++    float y = analog(ImGuiKey_GamepadLStickUp) - analog(ImGuiKey_GamepadLStickDown);
++    float z = analog(ImGuiKey_GamepadRStickUp) - analog(ImGuiKey_GamepadRStickDown);
++    if (down(ImGuiKey_GamepadDpadRight) || down(ImGuiKey_RightArrow) || down(ImGuiKey_D)) x += 1.0f;
++    if (down(ImGuiKey_GamepadDpadLeft) || down(ImGuiKey_LeftArrow) || down(ImGuiKey_A)) x -= 1.0f;
++    if (down(ImGuiKey_GamepadDpadUp) || down(ImGuiKey_UpArrow) || down(ImGuiKey_W)) y += 1.0f;
++    if (down(ImGuiKey_GamepadDpadDown) || down(ImGuiKey_DownArrow) || down(ImGuiKey_S)) y -= 1.0f;
++    if (down(ImGuiKey_PageUp)) z += 1.0f;
++    if (down(ImGuiKey_PageDown)) z -= 1.0f;
++    VR::MenuPad pad{};
++    const bool direct = VR::get()->menu_controller_pad(pad);
++    if (direct) { x += pad.lx; y += pad.ly; z += pad.ry; }
++    const auto press = [](bool now, bool& was) { const bool pressed = now && !was; was = now; return pressed; };
++    const bool pad_done = press(direct && pad.accept, move_was.accept) | press(direct && pad.back, move_was.back);
++    const double now = seconds();
++    const float dt = move_last > 0.0 ? static_cast<float>(std::clamp(now - move_last, 0.0, 0.1)) : 0.0f;
++    move_last = now;
++    const auto dead = [](float v) { return std::abs(v) < 0.2f ? 0.0f : std::clamp(v, -1.0f, 1.0f); };
++    if (!VR::get()->menu_pointer_active()) {
++        if (auto* yaw = typed<float>(menu_yaw_key())) yaw->value() = std::clamp(yaw->value() + dead(x) * 60.0f * dt, -150.0f, 150.0f);
++        if (auto* pitch = typed<float>(menu_pitch_key())) pitch->value() = std::clamp(pitch->value() + dead(y) * 40.0f * dt, -60.0f, 60.0f);
++    }
++    if (auto* distance = typed<float>("UI_Framework_Distance")) distance->value() = std::clamp(distance->value() + dead(z) * 0.8f * dt, 0.8f, 4.0f);
++    if (once(ImGuiKey_GamepadFaceDown) || once(ImGuiKey_GamepadFaceRight) || once(ImGuiKey_GamepadFaceUp) ||
++        once(ImGuiKey_Enter) || once(ImGuiKey_KeypadEnter) || once(ImGuiKey_Escape) || once(ImGuiKey_Space) ||
++        once(ImGuiKey_M) || pad_done) {
++        moving_menu.store(false, std::memory_order_relaxed);
++    }
 +}
 +}
 +
@@ -319803,12 +319975,19 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +    update_recording();
 +}
 +
++// A finished plan, or the card switched off, gives the place back to the controls card.
 +bool overlay_wanted() {
-+    return wuwa_test::is_wuwa() && steps.loaded();
++    if (!wuwa_test::is_wuwa() || !steps.loaded() || steps.finished()) return false;
++    auto* card = typed<bool>("WuWaSteps_ShowCard");
++    return !card || card->value();
 +}
 +
 +bool showing() {
 +    return GetTickCount64() < showing_until.load(std::memory_order_relaxed);
++}
++
++bool moving() {
++    return moving_menu.load(std::memory_order_relaxed) && showing();
 +}
 +
 +bool draw(const ImVec2& target_size) {
@@ -319832,7 +320011,38 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +        ImGuiWindowFlags_NoBringToFrontOnFocus);
 +    Look look{1.0f, wuwa_l10n::sheet_font()};
 +    if (rec_since >= 0.0) look.badge = "REC " + rec_clock();
-+    wuwa_menu::draw(pages, state, read_moves(), pos, size, look);
++    // Move menu: a click (the laser's trigger or the mouse) puts the menu down
++    // and is kept from the rows under it until the button is released.
++    auto& io = ImGui::GetIO();
++    if (moving_menu.load(std::memory_order_relaxed) && io.MouseClicked[0]) {
++        moving_menu.store(false, std::memory_order_relaxed);
++        swallow_click = true;
++    }
++    if (swallow_click) {
++        if (!io.MouseDown[0]) swallow_click = false;
++        io.MouseDown[0] = false; io.MouseClicked[0] = false; io.MouseReleased[0] = false;
++    }
++    // The right mouse button drags the menu around you at any time.
++    if (!moving_menu.load(std::memory_order_relaxed) && io.MouseDown[1] && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)) {
++        if (auto* yaw = typed<float>(menu_yaw_key())) yaw->value() = std::clamp(yaw->value() + io.MouseDelta.x * 0.1f, -150.0f, 150.0f);
++        if (auto* pitch = typed<float>(menu_pitch_key())) pitch->value() = std::clamp(pitch->value() - io.MouseDelta.y * 0.1f, -60.0f, 60.0f);
++    }
++    Moves moves{};
++    if (moving_menu.load(std::memory_order_relaxed)) move_menu(); else moves = read_moves();
++    wuwa_menu::draw(pages, state, moves, pos, size, look);
++    if (moving_menu.load(std::memory_order_relaxed)) {
++        const char* text = VR::get()->menu_pointer_active() ?
++            "Moving the menu: point where you want it, then pull the trigger." :
++            "Moving the menu: stick, D-pad or arrow keys. Right stick or Page Up / Down: distance. A or Enter: put it down.";
++        auto* list = ImGui::GetForegroundDrawList();
++        ImFont* font = wuwa_l10n::sheet_font() ? wuwa_l10n::sheet_font() : ImGui::GetFont();
++        const float font_size = size.y * 0.04f;
++        const ImVec2 text_size = font->CalcTextSizeA(font_size, size.x, 0.0f, text);
++        const ImVec2 at{pos.x + (size.x - text_size.x) * 0.5f, pos.y - text_size.y - font_size * 0.6f};
++        list->AddRectFilled(ImVec2{at.x - font_size * 0.5f, at.y - font_size * 0.3f},
++            ImVec2{at.x + text_size.x + font_size * 0.5f, at.y + text_size.y + font_size * 0.3f}, IM_COL32(20, 18, 14, 230), font_size * 0.4f);
++        list->AddText(font, font_size, at, IM_COL32(255, 236, 190, 255), text);
++    }
 +    ImGui::End();
 +    draw_beam_swatch(ImGui::GetForegroundDrawList());
 +    if (state.close_requested) {
@@ -319854,6 +320064,8 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +    state.close_requested = false;
 +    pad_was = {};
 +    stick.held = Dir::None;
++    moving_menu.store(false, std::memory_order_relaxed);
++    swallow_click = false;
 +    showing_until.store(0, std::memory_order_relaxed);
 +}
 +
@@ -319885,10 +320097,10 @@ index 0000000000000000000000000000000000000000..bdada0eaaf45c025de989486d6970c9a
 +}
 diff --git a/src/mods/vr/WuWaVrMenuHost.hpp b/src/mods/vr/WuWaVrMenuHost.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..985e615a9641f842884bed41a9031139b39402a0
+index 0000000000000000000000000000000000000000..3874d81371c6afb4c66ace52248f341ebcff9f51
 --- /dev/null
 +++ b/src/mods/vr/WuWaVrMenuHost.hpp
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,41 @@
 +#pragma once
 +
 +// Hosts the VR menu (utility/WuWaVrMenu) in UEVR's UI: binds its pages to the
@@ -319907,6 +320119,9 @@ index 0000000000000000000000000000000000000000..985e615a9641f842884bed41a9031139
 +// The VR menu (not the classic window) was drawn in the last few frames.
 +// Any thread.
 +bool showing();
++// "Move menu" is on: the menu follows a controller's aim (the overlay reads
++// this) or the sticks / arrow keys, until it is put down. Any thread.
++bool moving();
 +
 +// The laser beam (OpenXR) is a thin quad textured from a small swatch that the
 +// VR menu draws in the top-left corner of the UI image; the menu's own quad

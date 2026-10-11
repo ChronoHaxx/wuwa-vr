@@ -10,6 +10,7 @@
 
 #include "OverlayComponent.hpp"
 #include "WuWaVrMenuHost.hpp"
+#include "utility/WuWaInputTrace.hpp"
 
 namespace vrmod {
 void OverlayComponent::on_reset() {
@@ -810,6 +811,7 @@ void OverlayComponent::update_overlay_openvr() {
         glm_matrix[3] += vr->get_standing_origin();
 
         if (g_framework->is_drawing_ui()) {
+            place_wuwa_menu(glm_matrix);
             glm_matrix[3] -= glm_matrix[2] * m_framework_distance->value();
         } else {
             glm_matrix[3] -= glm_matrix[2] * (m_slate_distance->value() - 0.01f);
@@ -1158,6 +1160,30 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
     return m_framework_beam_layer;
 }
 
+// WuWa: turns the VR menu's frame about the standing origin before it is pushed
+// out to its distance, so it floats where it was put and still faces you. While
+// "Move menu" is on and a controller's laser is in use, the menu follows its aim.
+void OverlayComponent::place_wuwa_menu(glm::mat4& frame) {
+    if (!wuwa_test::is_wuwa() || !wuwa_menu_host::showing()) return;
+    auto& vr = VR::get();
+    const bool screen = vr->is_using_2d_screen() || vr->is_using_mono_theatre();
+    auto& yaw = screen ? m_wuwa_menu_yaw_screen : m_wuwa_menu_yaw;
+    auto& pitch = screen ? m_wuwa_menu_pitch_screen : m_wuwa_menu_pitch;
+    if (wuwa_menu_host::moving() && vr->menu_pointer_active() && !vr->get_controllers().empty()) {
+        const auto index = !vr->m_swap_controllers->value() ? vr->get_right_controller_index() : vr->get_left_controller_index();
+        const auto aim = glm::quat{vr->get_rotation(index, false)} * glm::vec3{0.0f, 0.0f, -1.0f};
+        const auto local = glm::inverse(glm::mat3{frame}) * aim;
+        if (glm::length(local) > 0.5f) {
+            const auto dir = glm::normalize(local);
+            yaw->value() = std::clamp(glm::degrees(std::atan2(dir.x, -dir.z)), -150.0f, 150.0f);
+            pitch->value() = std::clamp(glm::degrees(std::asin(std::clamp(dir.y, -1.0f, 1.0f))), -60.0f, 60.0f);
+        }
+    }
+    const auto turn = glm::angleAxis(glm::radians(-yaw->value()), glm::vec3{0.0f, 1.0f, 0.0f}) *
+        glm::angleAxis(glm::radians(pitch->value()), glm::vec3{1.0f, 0.0f, 0.0f});
+    frame = frame * Matrix4x4f{turn};
+}
+
 std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::OpenXR::generate_framework_ui_quad() {
     m_framework_beam_ready = false;
     if (!g_framework->is_drawing_anything()) {
@@ -1243,6 +1269,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
     layer.size = {meters_w, meters_h};
 
     if (g_framework->is_drawing_ui()) {
+        m_parent->place_wuwa_menu(glm_matrix);
         glm_matrix[3] -= glm_matrix[2] * m_parent->m_framework_distance->value();
     } else {
         glm_matrix[3] -= glm_matrix[2] * (m_parent->m_slate_distance->value() - 0.01f);

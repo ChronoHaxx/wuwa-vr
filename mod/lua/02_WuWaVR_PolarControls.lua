@@ -1430,78 +1430,69 @@ function dof.text()
     if dof.flag:sub(1,5)=="error" then return "; depth of field: "..dof.flag end
     return "; depth of field forced on"
 end
--- At a cut: who the shot is about, and who stands in front of them.
+-- The game's focus, when it really focuses (test 3j). Full VR rewrites the
+-- camera's focus and f-stop every frame (dof.update), so a value equal to the
+-- last write means the game did not refresh it: use the game's own value. At
+-- f/10 and above nothing in the shot is blurred, so the focus names no subject
+-- (3i: 348 cm at f/14 put the eye against Rover's legs; 116 cm at f/35).
+function lens.real_focus(pcm)
+    local ok,d,f=pcall(function()
+        local pp=pcm.CameraCachePrivate.POV.PostProcessSettings
+        if not pp.bOverride_DepthOfFieldFocalDistance then return nil end
+        local d,f=pp.DepthOfFieldFocalDistance,pp.DepthOfFieldFstop
+        if dof.wrote_d and type(d)=="number" and math.abs(d-dof.wrote_d)<1e-3 then d=dof.base_d end
+        if dof.wrote_f and type(f)=="number" and math.abs(f-dof.wrote_f)<1e-4 then f=dof.base_f end
+        return d,f
+    end)
+    if not ok or type(d)~="number" or d~=d or d<=30 or d>=5000 then return nil end
+    if type(f)=="number" and f>=10 then return nil end
+    return d
+end
+-- At a cut: the subject is the game's real focus, or nothing (the eye stays at
+-- the game camera). No guesses: the centre trace passes through characters and
+-- a far wall moved the eye through Shorekeeper in 3i; the people search picked
+-- someone 18 m away. People are only used to stay behind anyone in front.
 function lens.pick(pcm,pos,rot,fov)
     local pawn=api:get_local_pawn(0); local pc=api:get_player_controller(0)
-    lens.subject_focus=lens.focus(pcm)
+    lens.subject_focus=lens.real_focus(pcm)
+    lens.live_focus=lens.subject_focus
     lens.subject_trace,lens.trace_error=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
     lens.subject_entry,lens.foreground_entry,lens.foreground,lens.people_stats,lens.people_seen=nil,nil,nil,nil,nil
-    local found
-    if number("WuWaControls_LensSubject",0,0,1)==0 then
-        local ok,list,stats=pcall(people.scan,pos,rot,fov)
-        if ok then found,lens.people_stats=list,stats else lens.people_stats="error "..tostring(list):sub(1,80) end
-    end
-    lens.people_seen=found and #found or nil
-    if found and #found>0 then
-        -- The subject is the person at the game's focus distance, else the one
-        -- nearest the middle of the frame; anyone clearly in front of them is
-        -- foreground the eye must stay behind.
-        local subject,kind
-        if lens.subject_focus then
-            for _,c in ipairs(found) do
-                local miss=math.abs(c.t-lens.subject_focus)
-                if miss<=math.max(80,c.r*2) and (not subject or miss<math.abs(subject.t-lens.subject_focus)) then subject=c end
-            end
-            kind="focused person"
+    lens.subject=lens.subject_focus
+    lens.subject_kind=lens.subject and "game focus" or nil
+    if lens.subject and number("WuWaControls_LensSubject",0,0,1)==0 then
+        local ok,found,stats=pcall(people.scan,pos,rot,fov)
+        if ok then lens.people_stats=stats else lens.people_stats="error "..tostring(found):sub(1,80); found=nil end
+        lens.people_seen=found and #found or nil
+        for _,c in ipairs(found or {}) do
+            if c.t<lens.subject-40 and c.near<lens.subject-30 and (not lens.foreground or c.near<lens.foreground) then lens.foreground=c.near end
         end
-        if not subject then
-            kind="person in the middle"
-            for _,c in ipairs(found) do if not subject or c.angle<subject.angle then subject=c end end
-        end
-        local front
-        for _,c in ipairs(found) do
-            if c~=subject and c.near<subject.near-30 and (not front or c.near<front.near) then front=c end
-        end
-        lens.subject_entry,lens.foreground_entry,lens.subject_kind=subject,front,kind
-        lens.subject=math.max(10,subject.t-subject.r*0.5)
-        lens.foreground=front and front.near or nil
-    else
-        lens.subject=lens.subject_focus or lens.subject_trace
-        lens.subject_kind=lens.subject_focus and "game focus" or "trace"
     end
 end
--- Within a shot: dialogue cameras glide and settle (test 3g: full VR kept the
--- distance from the cut until a view switch re-measured it, then jumped).
--- Follow the same people, or the game's focus, four times a second.
+-- Within a shot. Track the camera (default): during the shot's first second a
+-- focus that arrives or changes is adopted (the game often sets it a few frames
+-- after the cut); after that only the game camera's own move along the cut's
+-- view changes the distance, so focus pulls cannot move you. The live focus
+-- is still read: the eye never goes past what the game focuses on.
 function lens.follow(pcm,pos,rot,fov,how)
     local pawn=api:get_local_pawn(0); local pc=api:get_player_controller(0)
     lens.subject_trace=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
-    -- Test 3i default: the subject stays where it was at the cut; only the
-    -- camera's own move along the cut's view changes the distance. The game's
-    -- focus also changes when focus moves to another person (34 -> 105 -> 34
-    -- cm within one shot in 3h), which slid the eye while the 2D camera stood still.
-    if how==0 and lens.cut_pos and lens.cut_subject and not lens.subject_entry then
-        local moved=(pos.x-lens.cut_pos.x)*lens.cut_f.x+(pos.y-lens.cut_pos.y)*lens.cut_f.y+(pos.z-lens.cut_pos.z)*lens.cut_f.z
-        lens.subject=math.max(10,lens.cut_subject-moved)
+    lens.live_focus=lens.real_focus(pcm)
+    if how==0 then
+        local settling=lens.cut_time and now()-lens.cut_time<1.0
+        if settling and lens.live_focus and math.abs(lens.live_focus-(lens.cut_subject or 0))>1 then
+            lens.subject,lens.cut_subject,lens.subject_kind=lens.live_focus,lens.live_focus,"game focus"
+            lens.cut_pos,lens.cut_f=pos,lens.forward(rot)
+            return
+        end
+        if lens.cut_pos and lens.cut_subject then
+            local moved=(pos.x-lens.cut_pos.x)*lens.cut_f.x+(pos.y-lens.cut_pos.y)*lens.cut_f.y+(pos.z-lens.cut_pos.z)*lens.cut_f.z
+            lens.subject=math.max(10,lens.cut_subject-moved)
+        end
         return
     end
-    local fr=people.frame(pos,rot,fov)
-    local function where(entry)
-        if not entry then return nil end
-        local ok,c,r,h=pcall(people.body,entry)
-        if not ok or not c then return nil end
-        return people.place(fr,c,r or entry.r,h or entry.h)
-    end
-    if lens.subject_entry then
-        local p=where(lens.subject_entry)
-        if p then lens.subject=math.max(10,p.t-p.r*0.5) end
-        local q=where(lens.foreground_entry)
-        lens.foreground=q and q.near or nil
-    elseif lens.subject_kind=="game focus" then
-        lens.subject=lens.focus(pcm) or lens.subject
-    elseif lens.subject_kind=="trace" then
-        lens.subject=lens.subject_trace or lens.subject
-    end
+    -- Follow the focus (3h behaviour): the subject is the live focus.
+    if lens.live_focus then lens.subject=lens.live_focus end
 end
 function lens.update()
     local pc=api:get_player_controller(0)
@@ -1540,7 +1531,7 @@ function lens.update()
     if cut then
         lens.shot=lens.shot+1
         lens.pick(pcm,pos,rot,fov)
-        lens.cut_pos,lens.cut_f,lens.cut_subject=pos,lens.forward(rot),lens.subject
+        lens.cut_pos,lens.cut_f,lens.cut_subject,lens.cut_time=pos,lens.forward(rot),lens.subject,now()
         lens.next_follow=lens.frames+8
     elseif how~=1 and lens.frames>=(lens.next_follow or 0) then
         lens.next_follow=lens.frames+8
@@ -1548,14 +1539,17 @@ function lens.update()
         if not ok then lens.subject_entry,lens.foreground_entry=nil,nil end
     end
     if not lens.subject then
-        lens.dolly=0; dof.update(pcm,fov,0)
-        lens.publish(string.format("Close-up at %.0f degrees: subject distance unknown, view unchanged",fov)..dof.text()); return
+        lens.dolly=0; lens.eased_at=nil; dof.update(pcm,fov,0)
+        lens.publish(string.format("Close-up at %.0f degrees: the game sets no focus in this shot, view at the game camera",fov)..dof.text()); return
     end
     -- The subject keeps strength^1 of its 2D size: distance d becomes d*k^strength.
     local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2)
     local d=lens.subject
     local target=math.max(0,d-math.max(nearest,d*k^strength))
     if lens.subject_trace then target=math.min(target,math.max(0,lens.subject_trace-nearest)) end
+    -- Never past what the game focuses on (3i: pushed past the focused person,
+    -- the blur's focus ended 10 cm away and smeared everything).
+    if lens.live_focus then target=math.min(target,math.max(0,lens.live_focus-nearest)) end
     -- Someone in front of the subject (over-the-shoulder): stay at least 30 cm behind them.
     local held=false
     if lens.foreground then

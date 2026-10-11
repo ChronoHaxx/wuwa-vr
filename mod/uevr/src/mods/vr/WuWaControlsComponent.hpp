@@ -196,6 +196,9 @@ private:
     const ModSlider::Ptr m_stereo_dof_strength_vr{ModSlider::create("WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.5f)};
     // Close-up match within a shot: track the game camera's own moves from the cut (3i),
     // keep the cut's distance (3g), or follow the game's focus distance (3h).
+    // The test plan's step card takes the controls card's place below you; off
+    // shows the controls card as a public release does (no plan there).
+    const ModToggle::Ptr m_show_step_card{ModToggle::create("WuWaSteps_ShowCard", true)};
     const ModCombo::Ptr m_lens_follow{ModCombo::create("WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"}, 0)};
     struct LensStatus : ModString {
         LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}

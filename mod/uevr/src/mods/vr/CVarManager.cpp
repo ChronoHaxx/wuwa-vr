@@ -158,7 +158,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "WuWaControls_ResetHudAspect", "WuWaControls_HudAspectStatus", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
                 "UI_Distance", "UI_Size", "UI_WuWaHudShape", "UI_FollowView", "WuWaControls_Enabled",
                 "WuWaControls_MouseAssist", "WuWaControls_AutoMouseMenus", "WuWaControls_AdjustMode", "WuWaControls_WarnHiddenUI",
-                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject", "WuWaStereo_DepthOfFieldStrengthFullVR", "WuWaControls_LensFollow",
+                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject", "WuWaStereo_DepthOfFieldStrengthFullVR", "WuWaControls_LensFollow", "WuWaSteps_ShowCard", "UI_WuWaMenuYaw", "UI_WuWaMenuPitch", "UI_WuWaMenuYawScreen", "UI_WuWaMenuPitchScreen",
                 "VR_WuWaScreenLens", "VR_WuWaScreenDepth", "WuWaPrivacy_Mode", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
                 "WuWaControls_FirstRight", "WuWaControls_FirstUp", "WuWaControls_FirstMotion", "WuWaControls_FullFollowLook", "WuWaControls_FollowHeadAnimation", "WuWaControls_LateHeadUpdate",
                 "VR_AimMethod", "VR_AimModifyPlayerControlRotation", "VR_DecoupledPitch",

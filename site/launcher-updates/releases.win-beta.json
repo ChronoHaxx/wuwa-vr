@@ -2,12 +2,12 @@
   "Assets": [
     {
       "PackageId": "ChronoHaxx.WuWaVR",
-      "Version": "1.1.2",
+      "Version": "1.2.0",
       "Type": "Full",
-      "FileName": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-1-2/ChronoHaxx.WuWaVR-1.1.2-win-beta-full.nupkg",
-      "SHA1": "31B4523020585B44100A104C0A38C7DF1FF05906",
-      "SHA256": "F83DCF4BAECE75C8337932CCA2D9399F0DBE6FD1170D0ADC21BA88B5A2824A6D",
-      "Size": 2999338
+      "FileName": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-0/ChronoHaxx.WuWaVR-1.2.0-win-beta-full.nupkg",
+      "SHA1": "42EF7E2DFE4B12602EED0CD19630C13BD8F8866A",
+      "SHA256": "4118C7AE55FBCFA2EFB28FCEEDFB5821C04CD2D3C55B4C9CE129AF669293C0FF",
+      "Size": 3032986
     }
   ]
 }

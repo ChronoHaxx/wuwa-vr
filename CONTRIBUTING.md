@@ -27,7 +27,7 @@ Portuguese, French, German, Russian and Arabic. Most translations started as
 machine drafts, so review by speakers of each language is very welcome: a
 correction to a single phrase helps.
 
-[dev/i18n/README.md](dev/i18n/README.md) shows where each piece of text lives
+[dev/i18n/README.md](https://github.com/ChronoHaxx/wuwa-vr/blob/main/dev/i18n/README.md) shows where each piece of text lives
 and how to change it. Keep exact in-game option names and Xbox button names
 unchanged so players can find them. Do not add a remote translation service.
 Right-to-left languages use `dir="rtl"`; controller chords remain left-to-right.

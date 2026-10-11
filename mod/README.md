@@ -1,13 +1,13 @@
-# Mod source — 1.1.2 beta
+# Mod source — 1.2.0 beta
 
 The release target is
-[beta-1-1-2](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-1-2),
-launcher **1.1.2**, backend/package build **steam-guard-1-1-2**, for game
-**3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. The owner confirmed this build's Steam startup on the PC where 1.1.1 crashed; the Windows 11 PC retest, controller and headset acceptance remain pending.
+[beta-1-2-0](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-0),
+launcher **1.2.0**, backend/package build **vr-menu-1-2-0**, for game
+**3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. Headset results and open checks are below.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The owner confirmed this release's VR build on the Windows 10 PC where 1.1.1 crashed through Steam: the game reaches VR through Steam and stays open. On that PC the Steam overlay sent the game's first frames back into our DirectX hook in a loop; 1.1.2 breaks the loop and presents the frame. The Windows 11 Steam PC retest and the new launcher window on a real launch are still pending. See [the resize startup report](../docs/launch-kit/STEAM-GUARD-1.1.2.md).
+The owner played this release in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill) through private tests: the new VR menu with the laser and a gamepad, the view shortcuts, full-VR close-ups that follow the camera without getting stuck, blur in both eyes, from the start of a story scene, the menu in front of the stereo screen, a gamepad taking over at once from a put-down controller, the controls cards and the translated menu and VR controllers and a Reality Runner treadmill working together. The last test's additions (treadmill runs in the VR menu, the Controllers page, ambient occlusion off, the L3 card pinned low) and recording in 5-minute parts still need a headset check. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot, and in full VR the HUD can stay squashed until ESC. See [the 1.2.0 release notes](../docs/launch-kit/VR-MENU-1.2.0.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

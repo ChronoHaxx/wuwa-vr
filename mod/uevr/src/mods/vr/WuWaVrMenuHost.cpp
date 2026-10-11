@@ -262,6 +262,13 @@ Item lens_nearest_slider() {
         "already gives the 2D size; this only stops it short when the shot is very tight.", "WuWaControls_LensNearest", 5.0f, 150.0f, 5.0f, "%.0f cm");
 }
 
+Item lens_subject_choice() {
+    return setting_choice("Close-up aims at",
+        "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match "
+        "stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: the test 3f behaviour.",
+        "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"});
+}
+
 Item lens_status() {
     return live_text([] {
         auto* status = cached("WuWaControls_LensStatus");
@@ -474,19 +481,25 @@ Page cinema_page() {
         "The bars go and cutscenes fill your view."));
     page.items.push_back(lens_slider());
     page.items.push_back(lens_nearest_slider());
+    page.items.push_back(lens_subject_choice());
     page.items.push_back(lens_status());
-    page.items.push_back(paragraph("Depth of field (experiment)", true));
+    page.items.push_back(paragraph("Depth of field and camera effects", true));
     page.items.push_back(setting_toggle("Depth of field",
         "The 2D view's background blur, in full VR and on the stereo screen. In full VR the blur is scaled for the headset's "
         "wider lens and the focus follows Close-up match.", "WuWaStereo_DepthOfField"));
-    page.items.push_back(setting_choice("Blur from",
-        "The game gives the blur to one eye's view only; both eyes then use that view's. If both eyes stay sharp or the blur "
-        "looks wrong, try the other.", "WuWaStereo_DepthOfFieldSource", {"First view", "Second view"}));
+    page.items.push_back(setting_choice("Both eyes get",
+        "The game builds one eye from a plain default camera, so that eye misses the shot's camera settings. Blur only copies "
+        "the depth of field across; All camera effects also copies grading, vignette, exposure and the rest.",
+        "WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}));
+    page.items.push_back(setting_choice("Copy from",
+        "Auto uses the eye that has the camera's focus. If both eyes stay sharp or look wrong, try First or Second.",
+        "WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}));
     page.items.push_back(setting_slider("Blur strength", "Multiplies the blur. 1x is the 2D view's look.",
         "WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 0.25f, "%.2fx"));
     page.items.push_back(live_text([] {
         auto* on = typed<bool>("WuWaStereo_DepthOfField");
-        return on && on->value() ? std::string{"Both eyes: "} + wuwa_dof_sync::status.load() : std::string{};
+        auto* all = typed<int32_t>("WuWaStereo_EyeEffects");
+        return (on && on->value()) || (all && all->value() == 1) ? std::string{"Both eyes: "} + wuwa_dof_sync::status.load() : std::string{};
     }));
     page.items.push_back(setting_toggle("Cinematic scene note",
         "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "

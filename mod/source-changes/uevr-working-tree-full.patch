@@ -314061,7 +314061,7 @@ index 71b0927f732d914b9287a1356e27ad8a59372c3a..4a2a199997f734f7bf7f32b4c87b5900
      imgui.new_enum("ImGuiStyleVar",
          "Alpha", ImGuiStyleVar_Alpha,
 diff --git a/src/mods/vr/CVarManager.cpp b/src/mods/vr/CVarManager.cpp
-index 0c13a86648ccee2502da971039984b807c0be775..acde2896c4dc9bd2ccda2d45b76a1cf954232c42 100644
+index 0c13a86648ccee2502da971039984b807c0be775..9fe2f09088b60682530fb215e02b28e28286e269 100644
 --- a/src/mods/vr/CVarManager.cpp
 +++ b/src/mods/vr/CVarManager.cpp
 @@ -2,6 +2,7 @@
@@ -314151,7 +314151,7 @@ index 0c13a86648ccee2502da971039984b807c0be775..acde2896c4dc9bd2ccda2d45b76a1cf9
 +                "WuWaControls_ResetHudAspect", "WuWaControls_HudAspectStatus", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
 +                "UI_Distance", "UI_Size", "UI_WuWaHudShape", "UI_FollowView", "WuWaControls_Enabled",
 +                "WuWaControls_MouseAssist", "WuWaControls_AutoMouseMenus", "WuWaControls_AdjustMode", "WuWaControls_WarnHiddenUI",
-+                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength",
++                "WuWaControls_CameraMode", "WuWaControls_LensMatch", "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaStereo_DepthOfFieldSource", "WuWaStereo_DepthOfFieldStrength", "WuWaStereo_EyeEffects", "WuWaControls_LensSubject",
 +                "VR_WuWaScreenLens", "VR_WuWaScreenDepth", "WuWaPrivacy_Mode", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
 +                "WuWaControls_FirstRight", "WuWaControls_FirstUp", "WuWaControls_FirstMotion", "WuWaControls_FullFollowLook", "WuWaControls_FollowHeadAnimation", "WuWaControls_LateHeadUpdate",
 +                "VR_AimMethod", "VR_AimModifyPlayerControlRotation", "VR_DecoupledPitch",
@@ -315277,7 +315277,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
 \ No newline at end of file
 +} // namespace vrmod
 diff --git a/src/mods/vr/FFakeStereoRenderingHook.cpp b/src/mods/vr/FFakeStereoRenderingHook.cpp
-index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b194e118083 100644
+index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9db100b3c1 100644
 --- a/src/mods/vr/FFakeStereoRenderingHook.cpp
 +++ b/src/mods/vr/FFakeStereoRenderingHook.cpp
 @@ -4,7 +4,9 @@
@@ -316229,7 +316229,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
      if (rtfrt == nullptr) {
          // This is fine to call constantly because we use an in-flight render target
          // that gets unset after the texture is fully created. This function exits early otherwise.
-@@ -3359,6 +4170,34 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3359,6 +4170,35 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          return;
      }
  
@@ -316242,7 +316242,8 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
 +    if (prev_count == 2) wuwa_shadow::lod_sync(vr->get_wuwa_controls().sync_eye_lod(), view_family, views[0], views[1], prev_count);
 +    // Depth of field experiment: one eye's settings into the other (test 3d: one eye blurred).
 +    if (prev_count == 2 && wuwa_test::is_wuwa())
-+        wuwa_dof_sync::sync(vr->get_wuwa_controls().stereo_dof(), vr->get_wuwa_controls().stereo_dof_source(), views[0], views[1]);
++        wuwa_dof_sync::sync(vr->get_wuwa_controls().stereo_dof(), vr->get_wuwa_controls().stereo_all_effects(),
++            vr->get_wuwa_controls().stereo_dof_source(), views[0], views[1]);
 +    // Far lighting fix: count eye pairs so a CLV refill can follow a start, a loading gap or a teleport.
 +    if (prev_count == 2) {
 +        wuwa_clv::on_stereo_frame();
@@ -316264,7 +316265,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
      bool wants_swap = false;
      if (views.count > 1) {
          views.count = 1;
-@@ -3374,8 +4213,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3374,8 +4214,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
              const auto last_frame = (frame_count) % runtimes::OpenXR::QUEUE_SIZE;
              const auto now_frame = (frame_count + 1) % runtimes::OpenXR::QUEUE_SIZE;
@@ -316285,7 +316286,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
          } else {
              auto openvr = (runtimes::OpenVR*)runtime;
              std::unique_lock __{ openvr->pose_mtx };
-@@ -3401,7 +4251,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3401,7 +4252,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          view_family.views.data[1]->constructor((sdk::FSceneViewInitOptions*)init_options_copy2.data());*/
      }
  
@@ -316365,7 +316366,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
      if (wants_swap) {
          // Swap out the existing render target for our custom one
-@@ -3410,11 +4331,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3410,11 +4332,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          // because the engine is still working on the old render target
          const auto original_target = view_family_target;
  
@@ -316394,7 +316395,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
              // We decrement the frame count because it fixes motion vectors in the right eye.
              scene->decrement_frame_count();
          }
-@@ -3422,7 +4357,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3422,7 +4358,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          std::swap(views[0], views[1]);
  
          // Call it again
@@ -316414,7 +316415,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
          std::swap(views[0], views[1]);
  
-@@ -3430,6 +4376,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3430,6 +4377,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      }
  
      views.count = prev_count;
@@ -316423,7 +316424,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  }
  
  void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* extension, sdk::FSceneViewFamily& view_family) {
-@@ -3444,7 +4392,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
+@@ -3444,7 +4393,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
      sdk::FSceneViewFamily::update_offsets(&view_family, g_hook->get_render_target_manager()->get_viewport());
      auto si = view_family.get_scene_interface();
  
@@ -316432,7 +316433,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
          sdk::FScene::update_offsets((sdk::FScene*)si);
      }
  
-@@ -4092,6 +5040,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
+@@ -4092,6 +5041,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
      SPDLOG_INFO("Current ext count: {}", view_extensions.extensions.count);
      SPDLOG_INFO("Current ext capacity: {}", view_extensions.extensions.capacity);
  
@@ -316502,7 +316503,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
      // Verifications on the current memory of the FSceneViewExtensions, because pre-4.10 (?) the view extensions array did not actually exist
      if (m_rendertarget_manager_embedded_in_stereo_device) {
          SPDLOG_INFO("Performing verifications on the current memory of the FSceneViewExtensions...");
-@@ -4621,6 +5632,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
+@@ -4621,6 +5633,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
          g_hook->set_should_recreate_textures(true);
          return true;
      }
@@ -316512,7 +316513,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
      
      /*if (g_hook->m_analyzing_view_extensions) {
          const auto now = std::chrono::high_resolution_clock::now();
-@@ -4696,13 +5710,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4696,13 +5711,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -316531,7 +316532,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
      // The purpose of this is to prevent the game from crashing in IDirect3D12CommandList::Close
      // Because the game will try to copy a texture region that is out of bounds.
-@@ -4725,6 +5738,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4725,6 +5739,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -316544,7 +316545,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
      if (VR::get()->is_stereo_emulation_enabled()) {
          *w *= 2;
      } else {
-@@ -4735,7 +5754,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4735,7 +5755,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
  
      *w = *w / 2;
  
@@ -316553,7 +316554,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
      if (!VR::get()->is_native_stereo_fix_enabled()) {
          *x += *w * true_index;
-@@ -4756,6 +5775,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4756,6 +5776,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          return;
      }
  
@@ -316565,7 +316566,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
      auto vr = VR::get();
      //std::scoped_lock _{vr->get_vr_mutex()};
  
-@@ -4787,8 +5811,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4787,8 +5812,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto is_full_pass = view_index == 0 && !index_was_ever_two && !index_was_ever_negative && !g_hook->m_has_double_precision;
  
      auto true_index = index_starts_from_one ? ((view_index + 1) % 2) : (view_index % 2);
@@ -316623,7 +316624,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
      if (vr->is_using_afr() && !is_full_pass) {
          true_index = g_frame_count % 2;
-@@ -4852,6 +5925,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4852,6 +5926,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -316632,7 +316633,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
      const auto view_d = (Vector3d*)view_location;
  
      const auto view_mat = !has_double_precision ? 
-@@ -4905,6 +5980,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4905,6 +5981,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto camera_up = quat_converter * (vqi_norm * glm::vec3{0, -camera_up_offset, 0});
  
      const auto world_scale = world_to_meters * vr->get_world_scale();
@@ -316640,7 +316641,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
      if (has_double_precision) {
          *view_d += camera_forward;
-@@ -4924,6 +6000,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4924,6 +6001,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto rotation_offset = vr->get_rotation_offset();
          const auto current_hmd_rotation = glm::normalize(rotation_offset * glm::quat{vr->get_rotation(0)});
@@ -316654,7 +316655,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
          const auto current_eye_rotation_offset = glm::normalize(glm::quat{vr->get_eye_transform(true_index)});
  
          const auto new_rotation = glm::normalize(vqi_norm * current_hmd_rotation * current_eye_rotation_offset);
-@@ -4938,7 +6021,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4938,7 +6022,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto head_offset = quat_converter * (vqi_norm * (pos * world_scale));
          const auto head_offset_flat = quat_converter * (vqi_norm * (pos_flat * world_scale));
@@ -316673,7 +316674,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
          if (!has_double_precision) {
              if (!is_2d_screen) {
-@@ -5047,6 +6140,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -5047,6 +6141,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -316683,7 +316684,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  #ifdef FFAKE_STEREO_RENDERING_LOG_ALL_CALLS
      SPDLOG_INFO("Finished calculating stereo view offset!");
  #else
-@@ -5103,22 +6199,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5103,22 +6200,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          return out;
      }
  
@@ -316710,7 +316711,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
      // Can happen if we hooked this differently.
      if (g_hook->m_calculate_stereo_projection_matrix_hook) {
-@@ -5131,8 +6215,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5131,8 +6216,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          }
      }
  
@@ -316728,7 +316729,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
          const float width = VR::get()->get_hmd_width();
          const float height = VR::get()->get_hmd_height();
-@@ -5163,11 +6255,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5163,11 +6256,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
      // SPDLOG_INFO("NearZ: {}", old_znear);
  
      if (out != nullptr) {
@@ -316747,7 +316748,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
          auto& double_matrix = *(Matrix4x4d*)out;
  
-@@ -5500,6 +6598,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
+@@ -5500,6 +6599,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
  
              if (get_projection_data) {
                  SPDLOG_INFO("Successfully found GetProjectionData at {:x}", *get_projection_data);
@@ -316755,7 +316756,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
                  g_hook->m_hooked_alternative_localplayer_scan = true;
  
-@@ -5682,11 +6781,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5682,11 +6782,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
      if (idx) {
          SPDLOG_INFO("Calling PostInitProperties on local player!");
  
@@ -316783,7 +316784,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..b4b8e72da154083d6e5b458ca6382b19
  
          // If the exception count exceeds a certain amount, we need to un-nop the function call because it was supposed to return a pointer.
          static auto exception_count = 0;
-@@ -5804,7 +6914,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5804,7 +6915,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
  
          // remove the handler
          RemoveVectoredExceptionHandler(exception_handler);
@@ -317358,7 +317359,7 @@ index 1fceacff00a68187f8efb0078f559cc7a8ae10df..48b550f028dc3cbd5f3e670f34b5854e
 +};}
 diff --git a/src/mods/vr/WuWaControlsComponent.cpp b/src/mods/vr/WuWaControlsComponent.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..b9e7d03cedf099fe27005503e2724e79aa68e354
+index 0000000000000000000000000000000000000000..13a6572dfcb9333e4d5c401aee525fffc2e16297
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.cpp
 @@ -0,0 +1,1271 @@
@@ -317682,7 +317683,7 @@ index 0000000000000000000000000000000000000000..b9e7d03cedf099fe27005503e2724e79
 +        *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
 +        *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
 +        *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_sheet, *m_sheet_page, *m_sheet_position, *m_sheet_width, *m_sheet_drop,
-+        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, m_lens_status,
++        *m_sheet_forward, *m_sheet_tilt, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_effects, *m_lens_subject, m_lens_status,
 +        m_playstation_state, m_playstation_status,
 +        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
 +        *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -318635,10 +318636,10 @@ index 0000000000000000000000000000000000000000..b9e7d03cedf099fe27005503e2724e79
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaControlsComponent.hpp b/src/mods/vr/WuWaControlsComponent.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..904b318eabf2618baadfe24c1c03df66442c385e
+index 0000000000000000000000000000000000000000..6483e62e31624b629a2bd5f3692f58e03b050ddc
 --- /dev/null
 +++ b/src/mods/vr/WuWaControlsComponent.hpp
-@@ -0,0 +1,324 @@
+@@ -0,0 +1,330 @@
 +#pragma once
 +
 +#include <chrono>
@@ -318666,6 +318667,7 @@ index 0000000000000000000000000000000000000000..904b318eabf2618baadfe24c1c03df66
 +    bool sync_eye_lod() const { return m_sync_eye_lod->value(); }
 +    bool stereo_dof() const { return m_stereo_dof->value(); }
 +    int stereo_dof_source() const { return m_stereo_dof_source->value(); }
++    bool stereo_all_effects() const { return m_stereo_effects->value() == 1; }
 +    bool refill_far_lighting() const { return m_refill_far_lighting->value(); }
 +    bool suppress_npc_rim() const { return m_suppress_npc_rim.requested.load(); }
 +    bool steady_desktop_view() const { return m_steady_desktop->value(); }
@@ -318825,7 +318827,12 @@ index 0000000000000000000000000000000000000000..904b318eabf2618baadfe24c1c03df66
 +    const ModToggle::Ptr m_stereo_dof{ModToggle::create("WuWaStereo_DepthOfField", false)};
 +    // Which eye's depth of field both eyes use (the second view lacks it), and a
 +    // blur multiplier the camera script applies to the f-stop in full VR.
-+    const ModCombo::Ptr m_stereo_dof_source{ModCombo::create("WuWaStereo_DepthOfFieldSource", {"First view", "Second view"}, 0)};
++    const ModCombo::Ptr m_stereo_dof_source{ModCombo::create("WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}, 2)};
++    // The second eye is built from a default camera: copy only the blur, or every
++    // plain post-process value (grading, vignette, exposure...) as well (test 3g).
++    const ModCombo::Ptr m_stereo_effects{ModCombo::create("WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}, 0)};
++    // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
++    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
 +    const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
 +    struct LensStatus : ModString {
 +        LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}
@@ -318965,10 +318972,10 @@ index 0000000000000000000000000000000000000000..904b318eabf2618baadfe24c1c03df66
 +} // namespace vrmod
 diff --git a/src/mods/vr/WuWaVrMenuHost.cpp b/src/mods/vr/WuWaVrMenuHost.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..fac2fe81e177e01af779054351f0d76f661a0d7a
+index 0000000000000000000000000000000000000000..626d39ff506c188bef8e28296e054ceda5660642
 --- /dev/null
 +++ b/src/mods/vr/WuWaVrMenuHost.cpp
-@@ -0,0 +1,872 @@
+@@ -0,0 +1,885 @@
 +#include "WuWaVrMenuHost.hpp"
 +
 +// Before windows.h (via Framework.hpp), whose min / max macros break std::min in it.
@@ -319233,6 +319240,13 @@ index 0000000000000000000000000000000000000000..fac2fe81e177e01af779054351f0d76f
 +        "already gives the 2D size; this only stops it short when the shot is very tight.", "WuWaControls_LensNearest", 5.0f, 150.0f, 5.0f, "%.0f cm");
 +}
 +
++Item lens_subject_choice() {
++    return setting_choice("Close-up aims at",
++        "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match "
++        "stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: the test 3f behaviour.",
++        "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"});
++}
++
 +Item lens_status() {
 +    return live_text([] {
 +        auto* status = cached("WuWaControls_LensStatus");
@@ -319445,19 +319459,25 @@ index 0000000000000000000000000000000000000000..fac2fe81e177e01af779054351f0d76f
 +        "The bars go and cutscenes fill your view."));
 +    page.items.push_back(lens_slider());
 +    page.items.push_back(lens_nearest_slider());
++    page.items.push_back(lens_subject_choice());
 +    page.items.push_back(lens_status());
-+    page.items.push_back(paragraph("Depth of field (experiment)", true));
++    page.items.push_back(paragraph("Depth of field and camera effects", true));
 +    page.items.push_back(setting_toggle("Depth of field",
 +        "The 2D view's background blur, in full VR and on the stereo screen. In full VR the blur is scaled for the headset's "
 +        "wider lens and the focus follows Close-up match.", "WuWaStereo_DepthOfField"));
-+    page.items.push_back(setting_choice("Blur from",
-+        "The game gives the blur to one eye's view only; both eyes then use that view's. If both eyes stay sharp or the blur "
-+        "looks wrong, try the other.", "WuWaStereo_DepthOfFieldSource", {"First view", "Second view"}));
++    page.items.push_back(setting_choice("Both eyes get",
++        "The game builds one eye from a plain default camera, so that eye misses the shot's camera settings. Blur only copies "
++        "the depth of field across; All camera effects also copies grading, vignette, exposure and the rest.",
++        "WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}));
++    page.items.push_back(setting_choice("Copy from",
++        "Auto uses the eye that has the camera's focus. If both eyes stay sharp or look wrong, try First or Second.",
++        "WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}));
 +    page.items.push_back(setting_slider("Blur strength", "Multiplies the blur. 1x is the 2D view's look.",
 +        "WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 0.25f, "%.2fx"));
 +    page.items.push_back(live_text([] {
 +        auto* on = typed<bool>("WuWaStereo_DepthOfField");
-+        return on && on->value() ? std::string{"Both eyes: "} + wuwa_dof_sync::status.load() : std::string{};
++        auto* all = typed<int32_t>("WuWaStereo_EyeEffects");
++        return (on && on->value()) || (all && all->value() == 1) ? std::string{"Both eyes: "} + wuwa_dof_sync::status.load() : std::string{};
 +    }));
 +    page.items.push_back(setting_toggle("Cinematic scene note",
 +        "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "
@@ -322169,31 +322189,36 @@ index 0000000000000000000000000000000000000000..cd83c1519393030b6d5e27b2bbb9afca
 +} // namespace wuwa_diorama
 diff --git a/src/utility/WuWaDofSync.hpp b/src/utility/WuWaDofSync.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..d188ba987ec402409415eff2affe1082e0d4f69d
+index 0000000000000000000000000000000000000000..e82b7e569ba41d024af7538a613b5575ac0dfb65
 --- /dev/null
 +++ b/src/utility/WuWaDofSync.hpp
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,227 @@
 +#pragma once
 +
-+// Depth of field for both eyes (experiment, test 3f). With the show flag
-+// forced on, test 3d blurred one eye only: the second stereo view does not
-+// get the camera's depth-of-field settings. Before the view family renders,
-+// copy the depth-of-field values of one view's final post-process settings
-+// into the other's.
++// Camera effects for both eyes (test 3f/3g). The game builds the second stereo
++// view from a default camera (90 degree FOV, 4:3; see WuWaShadowPass.hpp), so
++// that eye gets none of the camera's post-process settings: no depth of field
++// (test 3d/3f: blur in one eye only), and possibly none of its grading. Before
++// the view family renders, copy the source view's final post-process settings
++// into the other: the depth-of-field fields only, or every plain-data field.
 +//
 +// Field offsets inside FPostProcessSettings come from the engine's own
 +// reflection. Where that block sits inside an FSceneView is not known for this
-+// build, so it is found once by matching three engine defaults that the game
-+// does not change (sensor width 24.576 mm, minimum f-stop 1.2, 5 blades) at a
-+// single offset in the first view, and confirmed in the second. Any mismatch
-+// later stops the copy. Game thread (BeginRenderViewFamily).
++// build, so it is found once by matching three engine defaults (sensor width
++// 24.576 mm, minimum f-stop 1.2, 5 blades) at a single offset in the first
++// view, and confirmed in the second. Story cameras change exactly those values
++// (cine cameras set their own filmback and blades; test 3f skipped every story
++// shot), so after the search each copy only checks that both blocks hold
++// plausible camera values. Game thread (BeginRenderViewFamily).
 +#include <Windows.h>
 +
-+#include <array>
++#include <algorithm>
 +#include <atomic>
++#include <cmath>
 +#include <cstdint>
 +#include <cstring>
 +#include <string>
++#include <utility>
 +#include <vector>
 +
 +#include <spdlog/spdlog.h>
@@ -322201,17 +322226,22 @@ index 0000000000000000000000000000000000000000..d188ba987ec402409415eff2affe1082
 +#include <sdk/UClass.hpp>
 +#include <sdk/FProperty.hpp>
 +
++#include "Logging.hpp"
 +#include "WuWaShadowPass.hpp"
 +
 +namespace wuwa_dof_sync {
 +struct Layout {
 +    bool attempted{}, ready{};
 +    uint32_t base{};                 // FinalPostProcessSettings inside FSceneView
-+    uint32_t sensor{}, min_fstop{}, blades{}, focal{}, fstop{}, scale{};
++    uint32_t size{};                 // sizeof(FPostProcessSettings)
++    uint32_t sensor{}, min_fstop{}, blades{}, focal{}, fstop{};
 +    std::vector<uint32_t> fields;    // 4-byte depth-of-field fields, relative to the block
++    std::vector<std::pair<uint32_t, uint32_t>> plain; // plain-data runs (offset, bytes): numbers, colours, flags
++    uint32_t plain_bytes{};
 +};
 +inline Layout layout{};
 +inline std::atomic<uint64_t> copies{}, refused{};
++inline int last_auto_source{0};
 +// Static strings only: the menu reads this from the UI thread.
 +inline std::atomic<const char*> status{"Off"};
 +
@@ -322221,6 +322251,43 @@ index 0000000000000000000000000000000000000000..d188ba987ec402409415eff2affe1082
 +    if (!read_u32(address, bits)) return false;
 +    std::memcpy(&value, &bits, sizeof(value));
 +    return true;
++}
++
++// Every property the engine marks plain old data (CPF_IsPlainOldData): floats,
++// ints, enums, bitfield flags, colour/vector structs, raw object pointers.
++// Arrays (post-process materials) own memory and are never copied.
++inline void resolve_plain(sdk::UScriptStruct* settings) {
++    const auto struct_size = settings->get_struct_size();
++    if (struct_size <= 0 || struct_size > 0x4000) return;
++    std::vector<std::pair<int32_t, bool>> all;
++    int count{};
++    for (auto field = settings->get_child_properties(); field && count < 1024; field = field->get_next(), ++count) {
++        const auto property = static_cast<sdk::FProperty*>(field);
++        const auto offset = property->get_offset();
++        if (offset < 0 || offset >= struct_size) { all.clear(); return; }
++        all.emplace_back(offset, property->is_pod());
++    }
++    if (all.size() < 16) return;
++    std::sort(all.begin(), all.end());
++    // A byte range belongs to the properties starting there, up to the next
++    // distinct offset; it is plain only if every property starting there is.
++    for (size_t i = 0; i < all.size();) {
++        const auto offset = all[i].first;
++        bool pod = true;
++        size_t j = i;
++        for (; j < all.size() && all[j].first == offset; ++j) pod = pod && all[j].second;
++        const auto end = j < all.size() ? all[j].first : struct_size;
++        if (pod && end > offset) {
++            if (!layout.plain.empty() && layout.plain.back().first + layout.plain.back().second == uint32_t(offset)) {
++                layout.plain.back().second += uint32_t(end - offset);
++            } else {
++                layout.plain.emplace_back(uint32_t(offset), uint32_t(end - offset));
++            }
++            layout.plain_bytes += uint32_t(end - offset);
++        }
++        i = j;
++    }
++    layout.size = uint32_t(struct_size);
 +}
 +
 +inline bool resolve_fields() {
@@ -322233,10 +322300,10 @@ index 0000000000000000000000000000000000000000..d188ba987ec402409415eff2affe1082
 +    };
 +    const auto sensor = offset_of(L"DepthOfFieldSensorWidth"), min_fstop = offset_of(L"DepthOfFieldMinFstop"),
 +        blades = offset_of(L"DepthOfFieldBladeCount"), focal = offset_of(L"DepthOfFieldFocalDistance"),
-+        fstop = offset_of(L"DepthOfFieldFstop"), scale = offset_of(L"DepthOfFieldScale");
++        fstop = offset_of(L"DepthOfFieldFstop");
 +    if (sensor < 0 || min_fstop < 0 || blades < 0 || focal < 0 || fstop < 0) { status = "Depth-of-field fields not found"; return false; }
 +    layout.sensor = uint32_t(sensor); layout.min_fstop = uint32_t(min_fstop); layout.blades = uint32_t(blades);
-+    layout.focal = uint32_t(focal); layout.fstop = uint32_t(fstop); layout.scale = scale >= 0 ? uint32_t(scale) : uint32_t(focal);
++    layout.focal = uint32_t(focal); layout.fstop = uint32_t(fstop);
 +    for (const auto* name : {L"DepthOfFieldFocalDistance", L"DepthOfFieldFstop", L"DepthOfFieldMinFstop", L"DepthOfFieldBladeCount",
 +             L"DepthOfFieldSensorWidth", L"DepthOfFieldDepthBlurAmount", L"DepthOfFieldDepthBlurRadius", L"DepthOfFieldFocalRegion",
 +             L"DepthOfFieldNearTransitionRegion", L"DepthOfFieldFarTransitionRegion", L"DepthOfFieldScale", L"DepthOfFieldNearBlurSize",
@@ -322244,6 +322311,9 @@ index 0000000000000000000000000000000000000000..d188ba987ec402409415eff2affe1082
 +             L"DepthOfFieldColorThreshold", L"DepthOfFieldSizeThreshold"}) {
 +        if (const auto at = offset_of(name); at >= 0) layout.fields.push_back(uint32_t(at));
 +    }
++    resolve_plain(settings);
++    spdlog::info("[WuWaDoF] PostProcessSettings: {} bytes, {} depth-of-field fields, {} plain-data runs ({} bytes)",
++        layout.size, layout.fields.size(), layout.plain.size(), layout.plain_bytes);
 +    return true;
 +}
 +
@@ -322254,6 +322324,21 @@ index 0000000000000000000000000000000000000000..d188ba987ec402409415eff2affe1082
 +        read_u32(block + layout.blades, blades) && sensor == 24.576f && min_fstop == 1.2f && blades == 5;
 +}
 +
++struct Camera { float focal{}, fstop{}, sensor{}, min_fstop{}; uint32_t blades{}; bool read{}; };
++inline Camera camera_at(uintptr_t block) {
++    Camera c{};
++    c.read = read_f32(block + layout.focal, c.focal) && read_f32(block + layout.fstop, c.fstop) &&
++        read_f32(block + layout.sensor, c.sensor) && read_f32(block + layout.min_fstop, c.min_fstop) &&
++        read_u32(block + layout.blades, c.blades);
++    return c;
++}
++// Any real camera: a filmback between 1 and 200 mm, f-stops above zero, at most 32 blades.
++inline bool plausible(const Camera& c) {
++    return c.read && std::isfinite(c.sensor) && c.sensor >= 1.0f && c.sensor <= 200.0f &&
++        std::isfinite(c.min_fstop) && c.min_fstop > 0.0f && c.min_fstop <= 64.0f && c.blades <= 32 &&
++        std::isfinite(c.fstop) && c.fstop > 0.0f && c.fstop < 1000.0f && std::isfinite(c.focal) && c.focal >= 0.0f && c.focal < 1.0e7f;
++}
++
 +inline bool find_block(uintptr_t first, uintptr_t second) {
 +    constexpr uint32_t search = 0x6000;
 +    uint32_t found{}, matches{};
@@ -322261,40 +322346,78 @@ index 0000000000000000000000000000000000000000..d188ba987ec402409415eff2affe1082
 +        if (anchors_match(first + base)) { found = base; ++matches; }
 +    }
 +    if (matches != 1 || !anchors_match(second + found)) {
-+        status = matches == 0 ? "Post-process block not found in the view" :
++        status = matches == 0 ? "Post-process block not found in the view (try again outside a story scene)" :
 +            matches > 1 ? "Post-process block ambiguous" : "Second view does not match the first";
 +        spdlog::warn("[WuWaDoF] block search failed: {} matches, {}", matches, status.load());
 +        return false;
 +    }
 +    layout.base = found;
 +    layout.ready = true;
-+    spdlog::info("[WuWaDoF] FinalPostProcessSettings at view+0x{:x}; {} depth-of-field fields", found, layout.fields.size());
++    spdlog::info("[WuWaDoF] FinalPostProcessSettings at view+0x{:x}", found);
 +    return true;
 +}
 +
-+// source: 0 copies the first view into the second, 1 the second into the first.
-+inline void sync(bool enabled, int source, const void* first_view, const void* second_view) {
-+    if (!enabled || !first_view || !second_view) { status = enabled ? "Waiting for a stereo frame" : "Off"; return; }
++// source: 0 copies the first view into the second, 1 the second into the first,
++// 2 picks the view carrying the camera's focus (the other has none).
++// everything: copy every plain-data field, not only depth of field.
++inline void sync(bool depth_of_field, bool everything, int source, const void* first_view, const void* second_view) {
++    if ((!depth_of_field && !everything) || !first_view || !second_view) {
++        status = depth_of_field || everything ? "Waiting for a stereo frame" : "Off";
++        return;
++    }
 +    const auto a = reinterpret_cast<uintptr_t>(first_view), b = reinterpret_cast<uintptr_t>(second_view);
 +    if (!layout.attempted && !resolve_fields()) return;
 +    if (layout.fields.empty()) return;
-+    if (!layout.ready && !find_block(a, b)) { layout.fields.clear(); return; } // one search per session
-+    const auto from = (source == 1 ? b : a) + layout.base, to = (source == 1 ? a : b) + layout.base;
-+    if (!anchors_match(from) || !anchors_match(to)) { ++refused; status = "Views changed shape; copy skipped"; return; }
-+    // Before the copy: shows which view carried the camera's depth of field.
-+    float fa{}, fb{}, sa{}, sb{};
-+    read_f32(a + layout.base + layout.focal, fa); read_f32(b + layout.base + layout.focal, fb);
-+    read_f32(a + layout.base + layout.fstop, sa); read_f32(b + layout.base + layout.fstop, sb);
-+    for (const auto offset : layout.fields) {
-+        uint32_t value{};
-+        if (!read_u32(from + offset, value) || !wuwa_shadow::write_field(to + offset, value)) {
-+            ++refused; status = "Copy failed"; return;
-+        }
++    // The search needs the engine defaults, so it waits for a frame without a
++    // story camera; a failed search is retried at most every 2 seconds.
++    if (!layout.ready) {
++        static uint64_t last_search{};
++        const auto now = GetTickCount64();
++        if (now - last_search < 2000) return;
++        last_search = now;
++        if (!find_block(a, b)) return;
 +    }
++    const auto ca = camera_at(a + layout.base), cb = camera_at(b + layout.base);
++    if (!plausible(ca) || !plausible(cb)) {
++        ++refused;
++        status = "Views hold unexpected values; copy skipped";
++        SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaDoF] copy skipped: focus {:.0f} / {:.0f}, f-stop {:.2f} / {:.2f}, sensor {:.3f} / {:.3f}, "
++            "min f-stop {:.2f} / {:.2f}, blades {} / {}", ca.focal, cb.focal, ca.fstop, cb.fstop, ca.sensor, cb.sensor,
++            ca.min_fstop, cb.min_fstop, ca.blades, cb.blades);
++        return;
++    }
++    int from_index = source;
++    if (source != 0 && source != 1) {
++        // Auto: the view with a focus distance is the one built from the camera.
++        if ((ca.focal > 0.0f) != (cb.focal > 0.0f)) last_auto_source = ca.focal > 0.0f ? 0 : 1;
++        from_index = last_auto_source;
++    }
++    const auto from = (from_index == 1 ? b : a) + layout.base, to = (from_index == 1 ? a : b) + layout.base;
++    bool copied = false;
++    if (everything && !layout.plain.empty()) {
++        if (!wuwa_shadow::writable_span(to, layout.size)) { ++refused; status = "Second view not writable; copy skipped"; return; }
++        copied = true;
++        for (const auto& [offset, bytes] : layout.plain) {
++            if (!wuwa_shadow::checked::guarded_copy(reinterpret_cast<void*>(to + offset), reinterpret_cast<const void*>(from + offset), bytes)) {
++                ++refused; status = "Copy failed"; return;
++            }
++        }
++    } else {
++        for (const auto offset : layout.fields) {
++            uint32_t value{};
++            if (!read_u32(from + offset, value) || !wuwa_shadow::write_field(to + offset, value)) {
++                ++refused; status = "Copy failed"; return;
++            }
++        }
++        copied = true;
++    }
++    if (!copied) return;
 +    ++copies;
-+    status = source == 1 ? "Copied into the first view" : "Copied into the second view";
-+    SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaDoF] copy {} -> {}: focus {:.0f} / {:.0f} cm, f-stop {:.2f} / {:.2f}",
-+        source == 1 ? 2 : 1, source == 1 ? 1 : 2, fa, fb, sa, sb);
++    status = everything ? (from_index == 1 ? "All camera effects copied into the first view" : "All camera effects copied into the second view")
++                        : (from_index == 1 ? "Blur copied into the first view" : "Blur copied into the second view");
++    SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaDoF] copy {} {} -> {}{}: focus {:.0f} / {:.0f} cm, f-stop {:.2f} / {:.2f}, sensor {:.2f} / {:.2f}, "
++        "blades {} / {}", everything ? "all" : "blur", from_index + 1, 2 - from_index, source == 2 ? " (auto)" : "",
++        ca.focal, cb.focal, ca.fstop, cb.fstop, ca.sensor, cb.sensor, ca.blades, cb.blades);
 +}
 +}
 diff --git a/src/utility/WuWaEarlyStereo.hpp b/src/utility/WuWaEarlyStereo.hpp

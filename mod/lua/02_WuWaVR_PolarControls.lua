@@ -1203,6 +1203,51 @@ function lens.focus(pcm)
     end)
     if ok and type(value)=="number" and value>30 and value<5000 then return value end
 end
+-- Characters inside the game camera's 2D frame (test 3g). Over-the-shoulder
+-- shots put one person at the frame's edge in front of the speaker; the
+-- centre trace misses them (and does not hit characters at all), so in test
+-- 3f the eye passed straight through her. Capsules are tested against the 2D
+-- frustum (16:9 at the game's FOV); hidden actors are skipped.
+local character_class
+function lens.characters(pos,rot,fov)
+    local hook=uevr.types and uevr.types.UObjectHook
+    if not hook or not hook.get_objects_by_class then return nil,"object index unavailable" end
+    if not character_class then character_class=api:find_uobject("Class /Script/Engine.Character") end
+    if not character_class then return nil,"Character class not found" end
+    local list=hook.get_objects_by_class(character_class,false)
+    if type(list)~="table" then return nil,"no character list" end
+    local f=lens.forward(rot)
+    local yaw,pitch=math.rad(rot.y),math.rad(rot.x)
+    local right={x=-math.sin(yaw),y=math.cos(yaw)}
+    local up={x=-math.sin(pitch)*math.cos(yaw),y=-math.sin(pitch)*math.sin(yaw),z=math.cos(pitch)}
+    local th=math.tan(math.rad(fov)/2); local tv=th/(16/9)
+    local out={}
+    for i,c in ipairs(list) do
+        if i>400 then break end
+        local ok,info=pcall(function()
+            if c.bHidden==true then return nil end
+            local loc=point(c:K2_GetActorLocation())
+            if not valid(loc) then return nil end
+            local v={x=loc.x-pos.x,y=loc.y-pos.y,z=loc.z-pos.z}
+            local t=v.x*f.x+v.y*f.y+v.z*f.z
+            if t<=0 or t>3000 then return nil end
+            local x=v.x*right.x+v.y*right.y
+            local z=v.x*up.x+v.y*up.y+v.z*up.z
+            local r,h=34,88
+            local cap=c.CapsuleComponent
+            if cap then
+                local okr,rr=pcall(function() return cap:GetScaledCapsuleRadius() end)
+                if okr and type(rr)=="number" and rr>5 and rr<200 then r=rr end
+                local okh,hh=pcall(function() return cap:GetScaledCapsuleHalfHeight() end)
+                if okh and type(hh)=="number" and hh>10 and hh<400 then h=hh end
+            end
+            if math.abs(x)-r>t*th or z-h>t*tv or z+h<-t*tv then return nil end
+            return {t=t,near=t-r,r=r,angle=math.abs(x)/t+math.abs(z)/(t*3)}
+        end)
+        if ok and info then out[#out+1]=info end
+    end
+    return out,#list
+end
 function lens.blocked(context,pawn,from,dir)
     local ok,value=pcall(function()
         local lib=trace_library(); local out={}; local reach=5000
@@ -1214,6 +1259,7 @@ function lens.blocked(context,pawn,from,dir)
         if type(t)=="number" and t==t and t>=0 and t<=1 then return t*reach end
     end)
     if ok then return value end
+    return nil,tostring(value):sub(1,80)
 end
 -- Depth of field in VR (experiment). The engine leaves depth of field out of
 -- stereo views; ShowFlag.DepthOfField=1 asks for it anyway and 2 gives the
@@ -1302,8 +1348,39 @@ function lens.update()
         local pawn=api:get_local_pawn(0)
         lens.shot=lens.shot+1
         lens.subject_focus=lens.focus(pcm)
-        lens.subject_trace=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
-        lens.subject=lens.subject_focus or lens.subject_trace
+        lens.subject_trace,lens.trace_error=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
+        lens.foreground=nil; lens.chars_seen=nil; lens.chars_total=nil; lens.chars_error=nil
+        local chars
+        if number("WuWaControls_LensSubject",0,0,1)==0 then
+            chars,lens.chars_total=lens.characters(pos,rot,fov)
+            if not chars then lens.chars_error=lens.chars_total; lens.chars_total=nil end
+        end
+        lens.chars_seen=chars and #chars or nil
+        if chars and #chars>0 then
+            -- The subject is the person at the game's focus distance, else the
+            -- one nearest the middle of the frame; anyone clearly in front of
+            -- them is foreground the eye must stay behind.
+            local subject,kind
+            if lens.subject_focus then
+                for _,c in ipairs(chars) do
+                    local miss=math.abs(c.t-lens.subject_focus)
+                    if miss<=math.max(80,c.r*2) and (not subject or miss<math.abs(subject.t-lens.subject_focus)) then subject=c end
+                end
+                kind="focused person"
+            end
+            if not subject then
+                kind="person in the middle"
+                for _,c in ipairs(chars) do if not subject or c.angle<subject.angle then subject=c end end
+            end
+            for _,c in ipairs(chars) do
+                if c~=subject and c.near<subject.near-30 and (not lens.foreground or c.near<lens.foreground) then lens.foreground=c.near end
+            end
+            lens.subject=math.max(10,subject.t-subject.r*0.5)
+            lens.subject_kind=kind
+        else
+            lens.subject=lens.subject_focus or lens.subject_trace
+            lens.subject_kind=lens.subject_focus and "game focus" or "trace"
+        end
     end
     if not lens.subject then
         lens.dolly=0; dof.update(pcm,fov,0)
@@ -1314,17 +1391,27 @@ function lens.update()
     local d=lens.subject
     local dolly=math.max(0,d-math.max(nearest,d*k^strength))
     if lens.subject_trace then dolly=math.min(dolly,math.max(0,lens.subject_trace-nearest)) end
-    -- Without the game's focus the trace is only a guess (often a far wall): at most 1 m.
-    if not lens.subject_focus then dolly=math.min(dolly,100) end
+    -- Someone in front of the subject (over-the-shoulder): stay at least 30 cm behind them.
+    local held=false
+    if lens.foreground then
+        local limit=math.max(0,lens.foreground-math.max(nearest,30))
+        if limit<dolly then dolly=limit; held=true end
+    end
+    -- Without the game's focus or a person the trace is only a guess (often a far wall): at most 1 m.
+    if lens.subject_kind=="trace" then dolly=math.min(dolly,100) end
     lens.dolly=dolly
     dof.update(pcm,fov,dolly)
-    local text=string.format("Close-up at %.0f degrees: subject %.1f m (%s), moved %.1f m nearer",
-        fov,d/100,lens.subject_focus and "game focus" or "trace",dolly/100)
-    if dolly>0 and d-dolly<=nearest+1 then text=text..string.format(", stopped at the closest %.0f cm",nearest) end
+    local text=string.format("Close-up at %.0f degrees: %s %.1f m away, moved %.1f m nearer",
+        fov,lens.subject_kind or "subject",d/100,dolly/100)
+    if held then text=text..string.format(", held behind the person in front (%.1f m)",lens.foreground/100)
+    elseif dolly>0 and d-dolly<=nearest+1 then text=text..string.format(", stopped at the closest %.0f cm",nearest) end
     if cut then
-        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f focus=%s trace=%s dolly=%.0f strength=%.2f nearest=%.0f",
-            lens.shot,fov,tostring(lens.subject_focus and math.floor(lens.subject_focus) or "none"),
-            tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength,nearest))
+        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f subject=%.0f (%s) people=%s/%s foreground=%s focus=%s trace=%s dolly=%.0f strength=%.2f nearest=%.0f%s",
+            lens.shot,fov,d,tostring(lens.subject_kind),tostring(lens.chars_seen or "-"),tostring(lens.chars_total or "-"),
+            tostring(lens.foreground and math.floor(lens.foreground) or "none"),
+            tostring(lens.subject_focus and math.floor(lens.subject_focus) or "none"),
+            tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength,nearest,
+            (lens.chars_error and (" people_error="..tostring(lens.chars_error)) or "")..(lens.trace_error and (" trace_error="..lens.trace_error) or "")))
     end
     lens.publish(text..dof.text())
 end

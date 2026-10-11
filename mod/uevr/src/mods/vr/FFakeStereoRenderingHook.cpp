@@ -4179,7 +4179,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     if (prev_count == 2) wuwa_shadow::lod_sync(vr->get_wuwa_controls().sync_eye_lod(), view_family, views[0], views[1], prev_count);
     // Depth of field experiment: one eye's settings into the other (test 3d: one eye blurred).
     if (prev_count == 2 && wuwa_test::is_wuwa())
-        wuwa_dof_sync::sync(vr->get_wuwa_controls().stereo_dof(), vr->get_wuwa_controls().stereo_dof_source(), views[0], views[1]);
+        wuwa_dof_sync::sync(vr->get_wuwa_controls().stereo_dof(), vr->get_wuwa_controls().stereo_all_effects(),
+            vr->get_wuwa_controls().stereo_dof_source(), views[0], views[1]);
     // Far lighting fix: count eye pairs so a CLV refill can follow a start, a loading gap or a teleport.
     if (prev_count == 2) {
         wuwa_clv::on_stereo_frame();

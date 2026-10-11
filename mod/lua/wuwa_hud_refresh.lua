@@ -72,27 +72,41 @@ function M.new(env)
         end
         return {world = world, dims = dims, dimensions_available = dimensions_available}
     end
+    -- Each refusal names its reason (test 3g): the refresh found no HUD in
+    -- every 3e/3f view switch, and the saved schema report never appeared.
     local function candidate(o, world, canvas_class)
-        if not valid(o) or not in_world(o, world) then return nil end
+        if not valid(o) then return nil, "invalid" end
+        if not in_world(o, world) then return nil, "scaler outside viewport world" end
         local active = method(o, "GetIsActiveAndEnable", RETURNS.bool)
-        if not active or active(o) ~= true then return nil end
+        if not active then return nil, "no GetIsActiveAndEnable" end
+        if active(o) ~= true then return nil, "inactive" end
         -- Reference ForceUpdate dereferences Canvas before CheckCanvas: never
         -- invoke it on an uninitialized scaler, even when reflection resolves.
         local canvas = prop(o, "Canvas", "ObjectProperty")
-        if not valid(canvas) or not canvas:is_a(canvas_class) or not in_world(canvas, world) then return nil end
+        if not valid(canvas) then return nil, "no canvas" end
+        if not canvas:is_a(canvas_class) then return nil, "canvas not LGUICanvas" end
+        if not in_world(canvas, world) then return nil, "canvas outside viewport world" end
         local root = method(canvas, "GetRootCanvas", RETURNS.object)
         local mode = method(canvas, "GetRenderMode", RETURNS.enum)
-        if not root or not mode or address(root(canvas)) ~= address(canvas) or mode(canvas) ~= 0 then return nil end
+        if not root then return nil, "no GetRootCanvas" end
+        if not mode then return nil, "no GetRenderMode(enum)" end
+        if address(root(canvas)) ~= address(canvas) then return nil, "not a root canvas" end
+        local render_mode = mode(canvas)
+        if render_mode ~= 0 then return nil, "render mode " .. tostring(render_mode) end
         local force = method(o, "ForceUpdate", {})
         local set = method(canvas, "SetProjectionParameters", SET_PROJECTION)
         local projection = method(o, "GetProjectionType", RETURNS.byte)
         local fov = method(o, "GetFovAngle", RETURNS.float)
         local near = method(o, "GetNearClipPlane", RETURNS.float)
         local far = method(o, "GetFarClipPlane", RETURNS.float)
-        if not force or not set or not projection or not fov or not near or not far then return nil end
+        if not force then return nil, "no ForceUpdate()" end
+        if not set then return nil, "SetProjectionParameters signature differs" end
+        if not projection or not fov or not near or not far then return nil, "projection getters differ" end
         local values = {projection(o), fov(o), near(o), far(o)}
         if (values[1] ~= 0 and values[1] ~= 1) or not finite(values[2]) or values[2] <= 0 or values[2] >= 360
-            or not finite(values[3]) or values[3] <= 0 or not finite(values[4]) or values[4] <= values[3] then return nil end
+            or not finite(values[3]) or values[3] <= 0 or not finite(values[4]) or values[4] <= values[3] then
+            return nil, string.format("projection values %s/%s/%s/%s", tostring(values[1]), tostring(values[2]), tostring(values[3]), tostring(values[4]))
+        end
         return {object = o, canvas = canvas, force = force, set = set, values = values}
     end
     local function refresh(context)
@@ -105,14 +119,25 @@ function M.new(env)
         -- No UObject survives this request, and oversized sets are refused.
         local objects = hook.get_objects_by_class(scaler_class, false)
         if type(objects) ~= "table" or #objects > 64 then return false, "LGUI object set unavailable or too large" end
-        local plans = {}
+        local plans, reasons, order = {}, {}, {}
         for _, o in ipairs(objects) do
             if valid(o) and o:is_a(scaler_class) then
-                local plan = candidate(o, context.world, canvas_class)
-                if plan then plans[#plans + 1] = plan end
+                local ok, plan, reason = pcall(candidate, o, context.world, canvas_class)
+                if not ok then plan, reason = nil, "error " .. tostring(plan):sub(1, 60) end
+                if plan then plans[#plans + 1] = plan
+                else
+                    reason = reason or "unknown"
+                    if not reasons[reason] then reasons[reason] = 0; order[#order + 1] = reason end
+                    reasons[reason] = reasons[reason] + 1
+                end
             end
         end
-        if #plans == 0 then return false, "No active HUD with the supported LGUI schema" end
+        if #plans == 0 then
+            local parts = {}
+            for _, reason in ipairs(order) do parts[#parts + 1] = reasons[reason] .. "x " .. reason end
+            s.last_rejections = #objects .. " scalers: " .. (#parts > 0 and table.concat(parts, ", ") or "none found")
+            return false, "No active HUD with the supported LGUI schema"
+        end
         local refreshed = 0
         for _, plan in ipairs(plans) do
             -- A getter or preceding canvas update could have changed the world.
@@ -243,7 +268,10 @@ function M.new(env)
             self.pending = nil
             local ok, message = refresh(context)
             self.status = ok and message or ("HUD refresh unavailable: " .. message .. " / HUD 刷新未完成")
-            if not ok and message == "No active HUD with the supported LGUI schema" then save_schema_once(self) end
+            if not ok and message == "No active HUD with the supported LGUI schema" then
+                if self.last_rejections then self.status = self.status .. " [" .. self.last_rejections .. "]" end
+                save_schema_once(self)
+            end
         end
     end
     function s:tick(mode, delta)

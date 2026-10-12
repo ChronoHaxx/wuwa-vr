@@ -231,9 +231,10 @@ private:
     const ModToggle::Ptr m_sync_eye_lod{ModToggle::create("WuWaStereo_SyncEyeLod", true)};
     // Bounded lighting-volume refresh; not a general material or NPC rim repair.
     const ModToggle::Ptr m_refill_far_lighting{ModToggle::create("WuWaStereo_RefillFarLighting", true)};
-    // Screen-space ambient occlusion shades the two eyes differently in native stereo
-    // (rocks, hills, roofs; Lelouche, 9 Oct 2026), so it is off unless chosen
-    // (r.AmbientOcclusionLevels 0, CVarManager.cpp).
+    // Screen-space ambient occlusion shades the two eyes differently with off-centre eye
+    // frustums (rocks, hills, roofs; Lelouche, 9 Oct 2026). Off unless chosen
+    // (r.AmbientOcclusionLevels 0, CVarManager.cpp); on also makes OpenXR render
+    // symmetric frustums (VR::get_effective_horizontal_projection_override).
     const ModToggle::Ptr m_ambient_occlusion{ModToggle::create("WuWaStereo_AmbientOcclusion", false)};
     struct RimToggle : ModToggle {
         RimToggle() : ModToggle{"WuWaStereo_SuppressNpcRim", false} {}

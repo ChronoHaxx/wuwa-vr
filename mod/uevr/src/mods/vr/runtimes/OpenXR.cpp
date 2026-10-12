@@ -625,7 +625,7 @@ VRRuntime::Error OpenXR::update_matrices(float nearz, float farz) {
     // through the compatibility UI that sets should_recalculate_eye_projections.
     const auto& vr = VR::get();
     const wuwa_projection_test::Base projection_base{
-        vr->get_horizontal_projection_override(), vr->get_vertical_projection_override(),
+        vr->get_effective_horizontal_projection_override(), vr->get_vertical_projection_override(),
         vr->should_grow_rectangle_for_projection_cropping(), vr->is_using_2d_screen(),
         vr->get_runtime() == this, !vr->is_using_afr() && !vr->is_stereo_emulation_enabled(),
         this->ready(), vr->is_native_stereo_fix_enabled(), reinterpret_cast<uintptr_t>(this)};

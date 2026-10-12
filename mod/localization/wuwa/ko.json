@@ -727,7 +727,7 @@
     "Smooths head shake out of the game window, so OBS records a calm, full-resolution view with game audio. The headset image is not changed. The window shows a slightly narrower view so the picture can move inside it.": "게임 창에서 머리 흔들림을 부드럽게 처리하여 OBS가 게임 오디오와 함께 안정적인 전체 해상도 화면을 녹화하도록 합니다. 헤드셋 화면은 변경되지 않습니다. 창은 화면이 내부에서 움직일 수 있도록 약간 좁은 시야를 표시합니다.",
     "Smooths the game camera's left / right turns, so quick camera swings feel gentler.": "게임 카메라의 좌우 회전을 부드럽게 처리하여 빠른 카메라 전환이 더 완만하게 느껴지도록 합니다.",
     "Smooths the game camera's up / down tilt.": "게임 카메라의 상하 기울기를 부드럽게 처리합니다.",
-    "Soft contact shadows in corners and under objects. Off by default: in VR they shade the two eyes differently on rocks, hills and roofs. On gives the game its own setting back.": "구석과 물체 아래의 부드러운 접촉 그림자. 기본값은 끔: VR에서는 바위, 언덕, 지붕에서 양쪽 눈의 음영이 달라집니다. 켜면 게임 자체 설정으로 돌아갑니다.",
+    "Soft contact shadows in corners and under objects. Off by default. On gives the game its own setting back and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer.": "구석과 물체 아래의 부드러운 접촉 그림자. 기본값은 끔. 켜면 게임 자체 설정으로 돌아가고 양쪽 눈을 대칭 시야로 렌더링하여 바위, 언덕, 지붕의 음영이 양쪽 눈에서 같아집니다. 화면은 약간 부드러워집니다.",
     "Speed": "속도",
     "Stand where the far tree freezes, start a window, close the menu and look, then press what you saw. Each start or stop may cause a one-frame blur.": "먼 나무가 멈추는 곳에 서서 창을 시작하고, 메뉴를 닫고 바라본 뒤, 본 것을 누르세요. 시작하거나 중지할 때마다 한 프레임 흐려질 수 있습니다.",
     "Start a developer playtest in the launcher, then save your observations here. Nothing passes automatically.": "런처에서 개발자 플레이테스트를 시작한 다음, 관찰 내용을 여기에 저장하세요. 자동으로 통과되는 것은 없습니다.",

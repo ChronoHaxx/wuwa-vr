@@ -2101,7 +2101,7 @@
   "Smooths the game camera's up / down tilt.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Soft contact shadows in corners and under objects. Off by default: in VR they shade the two eyes differently on rocks, hills and roofs. On gives the game its own setting back.": [
+  "Soft contact shadows in corners and under objects. Off by default. On gives the game its own setting back and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Speed": [

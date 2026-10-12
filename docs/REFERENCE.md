@@ -82,10 +82,10 @@ you what to measure.
 | --- | --- | --- | --- |
 | 1 | A per-view input left at its default for the second view | 1 Oct: the second eye was built with the default 90° FOV, not 75°, so its LOD factor was 1.0, not 0.836 | Diff every field of both views ([EYE-DIFF-HANDOFF.md](EYE-DIFF-HANDOFF.md)) |
 | 2 | A per-view-state cache filled for only one eye | 1 Oct: Kuro's Cascade Lighting Volume (far indirect light) | Swap the eyes' view states; force the cache to refresh |
-| 3 | Temporal history kept per view state | Suspected for AO (open). It was also seen in Synchronized Sequential in Oct 2025, so it is not caused by the Native Stereo Fix. | Turn off only the temporal part and see whether the eyes agree |
+| 3 | Temporal history kept per view state | Suspected for AO until 12 Oct 2026, then ruled out: with both eyes at one position and a symmetric FOV the AO matched exactly (see cause 6) | Turn off only the temporal part and see whether the eyes agree |
 | 4 | Work done once per frame, or only for the first view | 4 Oct: cinematic letterbox framing; suspected for the dialogue bars (open) | Does the problem move when you swap eye order? |
 | 5 | Game-thread data read at different moments for each eye | 28 Sep: camera base during ultimate returns (`WuWaStereoBasePose`) | Log the camera inputs for both eyes in one frame |
-| 6 | Screen-space effects with asymmetric eye projections | Community: Symmetric horizontal projection fixed UI parts drawn in one eye (polar, Nov 2024), and fixed many one-eye post-process artifacts in native stereo (SannpoKun, Dec 2025) | Projection overrides (section 1.5) |
+| 6 | Screen-space effects with asymmetric eye projections | 12 Oct 2026: ambient occlusion (SSAO) shades rocks and roofs differently per eye; measured and fixed with a symmetric horizontal projection. Community: Symmetric horizontal projection fixed UI parts drawn in one eye (polar, Nov 2024), and fixed many one-eye post-process artifacts in native stereo (SannpoKun, Dec 2025) | Projection overrides (section 1.5); the simulator at IPD 0 with an asymmetric headset profile isolates it |
 
 **First test for any one-eye problem: toggle `NativeStereoFixSwapEyes`.** If the
 problem moves to the other physical eye, it follows render order: causes 1 to 4.
@@ -241,7 +241,8 @@ teleports. Manual control: WuWa Controls → Refill far lighting now. Related
 cvars: `r.CLV.TriggerRefresh`, `r.CLV.UpdateEveryFrame`.
 
 **Shading on rocks and hills differs per eye (ambient occlusion).**
-**Open**, and older than this project.
+**Fixed in code** on branch `claude/ao-symmetric-projection` (12 Oct 2026); headset
+check pending. Older than this project.
 - **Reports:** Lelouche first reported it on 12 Oct 2025, in Septimont, using
   Synchronized Sequential. They reported it again on 9 Oct 2026 in our build, in
   Rinascita.
@@ -251,22 +252,32 @@ cvars: `r.CLV.TriggerRefresh`, `r.CLV.UpdateEveryFrame`.
 - **Built in (1.2.0):** the mod sets `r.AmbientOcclusionLevels` to 0 unless
   **Ambient occlusion** (WuWa VR menu → Fixes, `WuWaStereo_AmbientOcclusion`)
   is on; turning it on restores the value the game had. A value frozen in
-  UEVR's CVars panel wins. The cause (per-eye AO history) is not fixed.
-- **Likely cause:** 3 (AO history kept per eye, or shared between eyes that take
-  turns) or 2 (a Kuro AO cache). Because it happens in Synchronized Sequential
-  too, the Native Stereo Fix is not the cause.
-- **Which AO runs:** `r.AmbientOcclusion.Method` selects SSAO (0), GTAO (1) or
-  XeGTAO (2). Read its value first; only that method's settings matter.
-- **What to test:** `launcher/dev/wuwa_ao_batch.py` (branch `claude/ao-eye-mismatch`)
-  flips 21 AO cvars one at a time while you stand at the rocks, and scores how
-  different the eyes are:
-  - Kuro: `r.AOKuroGhostFix`, `r.AOKuroDownsampleMethod`;
-  - Unreal: `r.GTAO.TemporalFilter`, `r.GTAO.SpatialFilter`,
-    `r.AmbientOcclusion.Denoiser.TemporalAccumulation`, `r.XeGTAO.Denoise`, and
-    others.
-  - The list also includes `r.UsingDynamicCacheForKuroGTAOSpatialX`; its help
-    text says it is a MediaTek phone hint, so expect no effect on PC.
-- **The fix we want:** the one setting that makes the eyes agree with AO still on.
+  UEVR's CVars panel wins.
+- **Cause (cause 6, measured 12 Oct 2026):** WuWa runs classic SSAO
+  (`r.AmbientOcclusion.Method` 0, pixel shader, half resolution; DFAO off). It
+  builds view-space positions from a centred projection, but each headset eye
+  has an off-centre frustum (wider towards the outside), so each eye's AO is
+  skewed the opposite way. That is also why it happened in Synchronized
+  Sequential: each eye still gets its own frustum.
+- **Evidence** (OpenXR Simulator, Quest Pro profile, rooftop in Rinascita,
+  left/right AO difference relative to the AO itself; 0 = identical):
+  - both eyes at one position with a symmetric FOV: 0.07 (noise). So no eye
+    keeps its own AO history (cause 3 ruled out);
+  - one position, Quest Pro's asymmetric FOV: 0.38, and 0.50 away from the frame
+    edges, largest where the roof ridge has the most depth;
+  - the same with `HorizontalProjectionOverride` Symmetric: 0.10;
+  - AO's addition to the left/right image difference: +0.68 raw, +0.01
+    symmetric.
+  - GTAO (`Method` 1) also differs per eye (0.28); XeGTAO (2) draws almost no AO
+    in this build.
+- **Fix:** while **Ambient occlusion** is on, the OpenXR runtime renders a
+  symmetric horizontal frustum for both eyes and crops each to its own field of
+  view (`VR::get_effective_horizontal_projection_override`). The saved
+  `HorizontalProjectionOverride` is not changed. Cost: with **Scale Render
+  Target** off (default) the eye image is slightly softer (Quest Pro: about 20%
+  fewer horizontal pixels in view); with it on, about 24% more pixels are
+  rendered instead. The wider frustum also makes WuWa's FOV-based LOD switch a
+  little sooner, the same in both eyes.
 
 **Distant NPC rim light or specular differs.**
 **Open**. NPC rim suppression is an optional workaround that also removes

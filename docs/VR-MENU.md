@@ -135,8 +135,8 @@ REC badge with the elapsed time shows while recording.
 7. **Comfort:** decoupled pitch (and its HUD adjustment), smooth camera turns
    and tilt, walk by default, L3 + A also resets position.
 8. **Fixes:** matched far detail, far lighting, matched framing, **Ambient
-   occlusion** (`WuWaStereo_AmbientOcclusion`, default off; see
-   REFERENCE.md), and
+   occlusion** (`WuWaStereo_AmbientOcclusion`, default off; on also renders
+   symmetric eye frustums so both eyes shade alike; see REFERENCE.md), and
    **Smoothness**: render resolution (`OpenXR_ResolutionScale` as 60-120 %
    steps, applied live like a view switch) with the live eye size and frame
    rate. Test 3's *Restart VR runtime* is gone: in the headset it made things

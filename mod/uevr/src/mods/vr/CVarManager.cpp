@@ -28,10 +28,12 @@
 #include <tracy/Tracy.hpp>
 
 namespace {
-// WuWa: screen-space ambient occlusion shades the two eyes differently in native stereo
-// (rocks, hills, roofs; Lelouche, 9 Oct 2026), so the mod turns it off unless the player
-// chooses it (WuWaStereo_AmbientOcclusion). r.AmbientOcclusionLevels 0 is off; turning it
-// back on restores the value it had. A value frozen in the cvar list wins. Game thread.
+// WuWa: screen-space ambient occlusion shades the two eyes differently with the headset's
+// off-centre eye frustums (rocks, hills, roofs; Lelouche, 9 Oct 2026). It stays off unless
+// the player chooses it (WuWaStereo_AmbientOcclusion); while it is on, OpenXR renders
+// symmetric frustums (VR::get_effective_horizontal_projection_override), which makes the
+// eyes agree. r.AmbientOcclusionLevels 0 is off; turning it back on restores the value it
+// had. A value frozen in the cvar list wins. Game thread.
 std::optional<int> g_wuwa_ao_before{};
 
 void wuwa_ambient_occlusion(bool on, bool frozen_by_player) {
@@ -50,7 +52,8 @@ void wuwa_ambient_occlusion(bool on, bool frozen_by_player) {
         value->set(0);
     } else if (g_wuwa_ao_before) {
         if (current == 0) value->set(*g_wuwa_ao_before);
-        SPDLOG_INFO("[WuWa] Ambient occlusion on again (r.AmbientOcclusionLevels {})", *g_wuwa_ao_before);
+        SPDLOG_INFO("[WuWa] Ambient occlusion on again (r.AmbientOcclusionLevels {}); symmetric eye projection while on",
+            *g_wuwa_ao_before);
         g_wuwa_ao_before.reset();
     }
 }
@@ -231,7 +234,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
         const auto vr = VR::get();
         const auto runtime = vr->get_runtime();
         return wuwa_projection_test::Base{
-            vr->get_horizontal_projection_override(), vr->get_vertical_projection_override(),
+            vr->get_effective_horizontal_projection_override(), vr->get_vertical_projection_override(),
             vr->should_grow_rectangle_for_projection_cropping(), vr->is_using_2d_screen(),
             runtime != nullptr && runtime->is_openxr(),
             !vr->is_using_afr() && !vr->is_stereo_emulation_enabled(),

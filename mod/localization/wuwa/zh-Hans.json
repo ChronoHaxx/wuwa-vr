@@ -727,7 +727,7 @@
     "Smooths head shake out of the game window, so OBS records a calm, full-resolution view with game audio. The headset image is not changed. The window shows a slightly narrower view so the picture can move inside it.": "消除游戏窗口中的头部晃动，让 OBS 能录制到带游戏音频的平稳全分辨率画面。头显中的画面不受影响。窗口显示的画面略窄，以便画面在其中移动。",
     "Smooths the game camera's left / right turns, so quick camera swings feel gentler.": "平滑游戏镜头的左右转向，让快速转动的镜头更柔和。",
     "Smooths the game camera's up / down tilt.": "平滑游戏镜头的上下俯仰。",
-    "Soft contact shadows in corners and under objects. Off by default: in VR they shade the two eyes differently on rocks, hills and roofs. On gives the game its own setting back.": "角落和物体下方柔和的接触阴影。默认关闭：在 VR 中，它在岩石、山丘和屋顶上给两只眼睛的阴影不一致。打开后恢复游戏自己的设置。",
+    "Soft contact shadows in corners and under objects. Off by default. On gives the game its own setting back and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer.": "角落和物体下方柔和的接触阴影。默认关闭。打开后恢复游戏自己的设置，并以对称视野渲染两只眼睛，使岩石、山丘和屋顶在两只眼睛中的阴影一致；画面会略微变软。",
     "Speed": "速度",
     "Stand where the far tree freezes, start a window, close the menu and look, then press what you saw. Each start or stop may cause a one-frame blur.": "站在远处树木静止的位置，开启一个窗口，关闭菜单后观察，然后按下你看到的结果。每次开始或停止都可能造成一帧模糊。",
     "Start a developer playtest in the launcher, then save your observations here. Nothing passes automatically.": "先在启动器中开始开发者测试，再在此保存观察结果。不会自动判定通过。",

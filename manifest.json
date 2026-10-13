@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-13T14:08:06.208076+00:00",
+  "updatedAt": "2026-10-13T15:09:37.654160+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -99,7 +99,7 @@
     "dev/test_graphics_policy.ps1": "4a88130c5da65ca86a7112f6b9fbdee2779bf1bc3fc5d9a6979a02315c8c94f7",
     "dev/test_hand_demo.cpp": "cdff02bf2a4ee7324b33901a19cec9fa2660fe41851a3603c78f8abf66ada392",
     "dev/test_hud_recovery.cpp": "30f6d0618ea4e61db0dac34d42f0cdb17555813c7869abf96ff27ede2689d46f",
-    "dev/test_hud_refresh.lua": "c966b7f1c74616e3e69b8f4947c8a61bf362e6ed7f5301b0a33690bf7ccc3bf4",
+    "dev/test_hud_refresh.lua": "c66ecbed253ff370f8ad3042ebf7b440c32f65e4fb79db2891c12bbd66ae17de",
     "dev/test_injector_graphics.ps1": "3e44b827fb74b207eb1ade652e97ca4cadeebb8f021dcdf920b4508024a34be4",
     "dev/test_injector_target_path.ps1": "d41aa044ae69215b15950a9f1e0b9fa1dd25ad633cc2855b5419b8cce14cc5af",
     "dev/test_launch_attempt.ps1": "d2b4ea6df859bcaa7518ff4bb00050cc3edd0733074c6e2fda2fe337ac4dceab",
@@ -366,7 +366,7 @@
     "mod/lua/02_WuWaVR_PolarControls.lua": "ba3a2f8456326fd9ab603b25a8e33d695f0bfddca9f5329ffbd6b12a012ff0c6",
     "mod/lua/inventory-nearby-static-meshes-request.lua": "3d89c426b358733d12c0a3b8cb631e0820940d79dfaf80a19579ee3ea91f8524",
     "mod/lua/wuwa_auto_cinema.lua": "6d9138ec47d60ab6fd470d2fbb857086e6a98ef700ef214e180a8fbf955059d1",
-    "mod/lua/wuwa_hud_refresh.lua": "7bb4dafeb475f915d5a1157139ffcd9d7080bab45006d5ec32c6bf4770e8e0dc",
+    "mod/lua/wuwa_hud_refresh.lua": "9b90c352077afeb5e90a38f1780e794fc1778cab35f120ed823d61608bc7d325",
     "mod/lua/wuwa_hud_schema.lua": "12abaa36a7d4dec2fcd0449dc5301f0f7334ff8f9ca2884f6ee524659d6a5f8b",
     "mod/lua/wuwa_nearby_inventory.lua": "bd40be5e841d88b8057334453aebdd41028602b7736fccee4ca35ecc57f6f06f",
     "mod/lua/zz_WuWaHudProbe.lua": "04e4d21e410a085002a8da18d0b178508d5097f0ab8c78cb583b956df1718d03",

@@ -23,7 +23,7 @@ local function callable(parameters, run)
         find_property = function(_, name) return properties[name] end,
         get_properties_size = function() return #parameters * 4 end}, {__call = function(_, ...) return run(...) end})
 end
-local function fixture()
+local function fixture(options)
     local f = {objects = {}, count = 0, queries = 0, writes = {}, width = 1920, height = 1080}
     local function class(name)
         local c = {name = name, functions = {}, props = {}}
@@ -77,6 +77,35 @@ local function fixture()
     pc_class.functions.GetViewportSize = callable({{"SizeX", "IntProperty", "out"}, {"SizeY", "IntProperty", "out"}},
         function(_, x, y) x.result, y.result = f.width, f.height end)
     f.classes = {scaler = scaler_class, canvas = canvas_class, pc = pc_class}
+    if options and options.wuwa then
+        -- WuWa's schema (13 Oct): no ForceUpdate or GetIsActiveAndEnable; the
+        -- scaler sizes the root UI item of its canvas (reference 2560 x 1440,
+        -- shrink), and after stereo screen the item kept 2560 x 1440 in full VR.
+        scaler_class.functions.ForceUpdate, scaler_class.functions.GetIsActiveAndEnable = nil, nil
+        local actor_class, item_class = class("UIContainerActor"), class("UIItem")
+        item_class.id, item_class.get_address = 1002, function(self) return self.id end
+        f.objects[1002], f.classes.item, f.classes.actor = item_class, item_class, actor_class
+        f.actor = object(actor_class, f.world)
+        f.item = object(item_class, f.actor)
+        f.viewport_size, f.item_size, f.scale = {X = 2560, Y = 2560}, {2560, 1440}, 1
+        getter(canvas_class, "GetViewportSize", "StructProperty", function() return f.viewport_size end)
+        getter(canvas_class, "GetCanvasScale", "FloatProperty", function() return f.scale end)
+        getter(canvas_class, "GetOwner", "ObjectProperty", function() return f.actor end)
+        getter(actor_class, "K2_GetRootComponent", "ObjectProperty", function() return f.item end)
+        getter(item_class, "GetRootCanvas", "ObjectProperty", function() return f.item_canvas or f.canvas end)
+        getter(item_class, "GetWidth", "FloatProperty", function() return f.item_size[1] end)
+        getter(item_class, "GetHeight", "FloatProperty", function() return f.item_size[2] end)
+        item_class.functions.SetWidth = callable({{"NewWidth", "FloatProperty"}}, function(_, value)
+            f.item_size[1] = value; f.writes[#f.writes + 1] = "width" end)
+        item_class.functions.SetHeight = callable({{"NewHeight", "FloatProperty"}}, function(_, value)
+            f.item_size[2] = value; f.writes[#f.writes + 1] = "height" end)
+        scaler_class.functions.CalculateAdaptedSizeAndScale = callable({{"Width", "FloatProperty"},
+            {"Height", "FloatProperty"}, {"OutWidth", "FloatProperty", "out"}, {"OutHeight", "FloatProperty", "out"},
+            {"OutScale", "FloatProperty", "out"}}, function(_, width, height, out_width, out_height, out_scale)
+                local scale = f.adapted_scale or math.min(width / 2560, height / 1440)
+                out_width.result, out_height.result, out_scale.result = width / scale, height / scale, scale
+            end)
+    end
     f.list = {f.scaler}
     f.env = {api = {
         to_uobject = function(_, id) return f.objects[id] end,
@@ -85,6 +114,7 @@ local function fixture()
             if f.missing_class then return nil end
             if name == "Class /Script/LGUI.LGUICanvasScaler" then return scaler_class end
             if name == "Class /Script/LGUI.LGUICanvas" then return canvas_class end
+            if name == "Class /Script/LGUI.UIItem" then return f.classes.item end
             error("Unexpected lookup")
         end,
     }, types = {UObjectHook = {get_objects_by_class = function(c, defaults)
@@ -305,5 +335,49 @@ test("audit failure cannot turn a rejected HUD request into success or repeated 
     assert(audits == 1 and #f.writes == 0 and not f.state.schema_report)
     assert(f.state.status:find("HUD refresh unavailable", 1, true))
     package.loaded.wuwa_hud_schema, json = old_module, old_json
+end)
+test("WuWa: a 16:9 root item left from stereo screen is fitted to the eye view", function()
+    local f = fixture({wuwa = true}); f:manual()
+    assert(table.concat(f.writes, ",") == "height" and f.item_size[1] == 2560 and f.item_size[2] == 2560)
+    assert(f.state.status:find("HUD root fitted (1) 2560x1440 -> 2560x2560", 1, true), f.state.status)
+end)
+test("WuWa: a matching root item is left alone without the unsupported-HUD audit", function()
+    local old_module = package.loaded.wuwa_hud_schema
+    package.loaded.wuwa_hud_schema = function() error("audit must not run") end
+    for _, case in ipairs({{{X = 2560, Y = 2560}, {2560, 2560}}, {{X = 2560, Y = 1440}, {2560, 1440}}}) do
+        local f = fixture({wuwa = true}); f.viewport_size, f.item_size = case[1], case[2]; f:manual()
+        assert(#f.writes == 0 and f.state.status:find("already matches", 1, true), f.state.status)
+    end
+    package.loaded.wuwa_hud_schema = old_module
+end)
+test("WuWa: returning to full VR fits once; the follow-ups find it fitted", function()
+    local f = fixture({wuwa = true}); f:tick(true); f:tick(false); f:tick(false)
+    assert(table.concat(f.writes, ",") == "height")
+    for _ = 1, 40 do f:tick(false) end
+    assert(table.concat(f.writes, ",") == "height" and f.state.followups == nil)
+    assert(f.state.status:find("already matches", 1, true), f.state.status)
+end)
+test("WuWa: scale change, foreign item, world-space canvas and bad sizes are not written", function()
+    for _, change in ipairs({
+        {"canvas scale differs", function(f) f.adapted_scale = 2 end},
+        {"root item of another canvas", function(f) f.item_canvas = f.world end},
+        {"not a screen-space canvas", function(f) f.mode = 1 end},
+        {"not a root canvas", function(f) f.root = f.world end},
+        {"viewport size unavailable", function(f) f.viewport_size = {X = 0 / 0, Y = 2560} end},
+        {"viewport size unavailable", function(f) f.viewport_size = {X = 2560} end},
+        {"viewport size unavailable", function(f) f.viewport_size = nil end},
+        {"no root UI item", function(f) f.actor = nil end},
+        {"no root UI item", function(f) f.item = f.world end},
+        {"no root UI item", function(f) f.objects[f.item.id] = nil end},
+        {"UIItem class unavailable", function(f) f.classes.item = nil end},
+        {"UI item schema differs", function(f)
+            f.classes.item.functions.SetHeight = callable({{"NewHeight", "FloatProperty", "out"}}, function() error("unsafe") end) end},
+        {"scaler schema differs", function(f) f.classes.scaler.functions.CalculateAdaptedSizeAndScale = nil end},
+    }) do
+        local f = fixture({wuwa = true}); change[2](f); f:manual()
+        assert(#f.writes == 0 and f.state.status:find("No active HUD", 1, true), f.state.status)
+        assert(f.state.last_rejections:find("fit: " .. change[1], 1, true) or
+            f.state.last_rejections:find(change[1], 1, true), change[1] .. " / " .. f.state.last_rejections)
+    end
 end)
 print("HUD refresh tests passed: " .. count)

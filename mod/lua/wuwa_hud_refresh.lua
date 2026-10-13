@@ -119,26 +119,77 @@ function M.new(env)
         if not property or not property:is_param() or property:is_out_param() or property:is_return_param() then return nil end
         return fn
     end
-    -- Experiment (test 3i). WuWa's whole UI hangs off one LGUICanvasScaler (3h
-    -- probe: one scaler, reference 2560 x 1440, match mode 2), which has no
-    -- ForceUpdate. LGUI recomputes the layout when a scaler setting changes,
-    -- so change MatchFromWidthToHeight by 0.001 now and restore it next tick.
-    local function nudge(context, objects, scaler_class)
-        local count = 0
+    local function size(v)
+        if v == nil then return nil end
+        local ok, x, y = pcall(function() return v.X, v.Y end)
+        if ok and finite(x) and finite(y) and x >= 64 and y >= 64 and x <= 32768 and y <= 32768 then return x, y end
+        return nil
+    end
+    -- WuWa's whole UI hangs off one LGUICanvasScaler (3h probe: reference
+    -- 2560 x 1440, match mode 2) without ForceUpdate. Test 13 Oct: after stereo
+    -- screen or mono theatre, the root UI item kept the 16:9 size (2560 x 1440)
+    -- in full VR until the Esc menu, while its canvas already reported the eye
+    -- size (2560 x 2560): the scaler is not told the eye images changed size.
+    -- The 3i MatchFromWidthToHeight nudge did not resize the root. Ask the
+    -- scaler what it would give this canvas and set the root item to that;
+    -- only when the scale already matches, since the scale has no setter.
+    local function fit_root(context, objects, scaler_class, canvas_class)
+        local item_class = api:find_uobject("Class /Script/LGUI.UIItem")
+        if not valid(item_class) then return 0, 0, "UIItem class unavailable" end
+        local fitted, matching, reason = 0, 0, nil
         for _, o in ipairs(objects) do
             if valid(o) and o:is_a(scaler_class) and in_world(o, context.world) then
-                local get = method(o, "GetMatchFromWidthToHeight", RETURNS.float)
-                local set = float_setter(o, "SetMatchFromWidthToHeight")
-                local value = get and get(o)
-                if set and finite(value) and value >= 0 and value <= 1 then
-                    set(o, value < 0.5 and value + 0.001 or value - 0.001)
-                    s.restore = s.restore or {}
-                    s.restore[#s.restore + 1] = {object = o, set = set, value = value}
-                    count = count + 1
+                local canvas = prop(o, "Canvas", "ObjectProperty")
+                if not valid(canvas) or not canvas:is_a(canvas_class) or not in_world(canvas, context.world) then
+                    reason = "no canvas"
+                else
+                    local root_canvas = method(canvas, "GetRootCanvas", RETURNS.object)
+                    local render_mode = method(canvas, "GetRenderMode", RETURNS.enum)
+                    local viewport = method(canvas, "GetViewportSize", {{"ReturnValue", "StructProperty"}})
+                    local scale = method(canvas, "GetCanvasScale", RETURNS.float)
+                    local owner = method(canvas, "GetOwner", RETURNS.object)
+                    local adapt = method(o, "CalculateAdaptedSizeAndScale", {{"Width", "FloatProperty"},
+                        {"Height", "FloatProperty"}, {"OutWidth", "FloatProperty", "out"},
+                        {"OutHeight", "FloatProperty", "out"}, {"OutScale", "FloatProperty", "out"}})
+                    local actor = owner and owner(canvas) or nil
+                    local get_root = valid(actor) and method(actor, "K2_GetRootComponent", RETURNS.object) or nil
+                    local item = get_root and get_root(actor) or nil
+                    if not root_canvas or not render_mode or not viewport or not scale or not adapt then
+                        reason = "canvas or scaler schema differs"
+                    elseif address(root_canvas(canvas)) ~= address(canvas) then reason = "not a root canvas"
+                    elseif render_mode(canvas) ~= 0 then reason = "not a screen-space canvas"
+                    elseif not valid(item) or not item:is_a(item_class) then reason = "no root UI item"
+                    else
+                        local item_canvas = method(item, "GetRootCanvas", RETURNS.object)
+                        local get_w, get_h = method(item, "GetWidth", RETURNS.float), method(item, "GetHeight", RETURNS.float)
+                        local set_w, set_h = float_setter(item, "SetWidth"), float_setter(item, "SetHeight")
+                        local vx, vy = size(viewport(canvas))
+                        if not item_canvas or not get_w or not get_h or not set_w or not set_h then reason = "UI item schema differs"
+                        elseif address(item_canvas(item)) ~= address(canvas) then reason = "root item of another canvas"
+                        elseif not vx then reason = "canvas viewport size unavailable"
+                        else
+                            local w, h, k = {}, {}, {}
+                            adapt(o, vx, vy, w, h, k)
+                            local width, height, current = w.result, h.result, scale(canvas)
+                            local item_w, item_h = get_w(item), get_h(item)
+                            if not size({X = width, Y = height}) or not finite(k.result) or not finite(current)
+                                or not finite(item_w) or not finite(item_h) then reason = "adapted size unavailable"
+                            elseif math.abs(k.result - current) > 1e-3 then reason = "canvas scale differs"
+                            elseif math.abs(item_w - width) <= 0.5 and math.abs(item_h - height) <= 0.5 then
+                                matching = matching + 1
+                            else
+                                if math.abs(item_w - width) > 0.5 then set_w(item, width) end
+                                if math.abs(item_h - height) > 0.5 then set_h(item, height) end
+                                fitted = fitted + 1
+                                s.last_fit = string.format("%dx%d -> %dx%d", math.floor(item_w + 0.5), math.floor(item_h + 0.5),
+                                    math.floor(width + 0.5), math.floor(height + 0.5))
+                            end
+                        end
+                    end
                 end
             end
         end
-        return count
+        return fitted, matching, reason
     end
     local function refresh(context)
         local hook = env.types and env.types.UObjectHook
@@ -167,12 +218,13 @@ function M.new(env)
             local parts = {}
             for _, reason in ipairs(order) do parts[#parts + 1] = reasons[reason] .. "x " .. reason end
             s.last_rejections = #objects .. " scalers: " .. (#parts > 0 and table.concat(parts, ", ") or "none found")
-            local ok, nudged = pcall(nudge, context, objects, scaler_class)
-            if ok and nudged > 0 then
-                local size = context.dims and (" at " .. context.dims[1] .. "x" .. context.dims[2]) or ""
-                return true, "HUD scaler nudged (" .. nudged .. ")" .. size .. " (experiment); check the headset / HUD 已刷新（实验），请在头显中确认"
+            local ok, fitted, matching, reason = pcall(fit_root, context, objects, scaler_class, canvas_class)
+            if ok and fitted > 0 then
+                return true, "HUD root fitted (" .. fitted .. ") " .. s.last_fit .. "; check the headset / HUD 已适配，请在头显中确认"
             end
-            if not ok then s.last_rejections = s.last_rejections .. "; nudge error " .. tostring(nudged):sub(1, 80) end
+            if ok and matching > 0 then return true, "HUD size already matches the view / HUD 尺寸已匹配" end
+            if not ok then s.last_rejections = s.last_rejections .. "; fit error " .. tostring(fitted):sub(1, 80)
+            elseif reason then s.last_rejections = s.last_rejections .. "; fit: " .. reason end
             return false, "No active HUD with the supported LGUI schema"
         end
         local refreshed = 0
@@ -318,13 +370,6 @@ function M.new(env)
         end
     end
     function s:tick(mode, delta)
-        -- Restore nudged scaler values on the tick after the nudge.
-        if self.restore then
-            if self.restore_armed then
-                for _, r in ipairs(self.restore) do pcall(function() if valid(r.object) then r.set(r.object, r.value) end end) end
-                self.restore, self.restore_armed = nil, nil
-            else self.restore_armed = true end
-        end
         local ok = pcall(tick, self, mode, delta)
         if not ok then self.pending = nil; self.status = "HUD refresh unavailable: reflection changed / 反射接口不可用，未继续刷新" end
     end

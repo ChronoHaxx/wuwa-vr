@@ -138,25 +138,33 @@ function M.new(env)
     -- nudge alone did nothing because the cache was stale). Verified against
     -- the scaler's own adapted scale; the old cache is restored if it differs.
     local SCALER_BYTES, CANVAS_AT, CACHE_AT = 336, 0x130, {0x138, 0x148}
-    local function cache_state(o, canvas, scaler_class)
+    -- Memory reads only, no game calls.
+    local function cache_of(o, canvas, scaler_class)
         if not valid(scaler_class) or address(o:get_class()) ~= address(scaler_class) then return nil, "scaler class differs" end
         local canvas_property = scaler_class:find_property("Canvas")
         if scaler_class:get_properties_size() ~= SCALER_BYTES or not canvas_property
             or canvas_property:get_offset() ~= CANVAS_AT or o:read_qword(CANVAS_AT) ~= address(canvas) then
             return nil, "scaler layout differs"
         end
-        local viewport = method(canvas, "GetViewportSize", {{"ReturnValue", "StructProperty"}})
-        local vx, vy = size(viewport and viewport(canvas))
-        if not vx or vx ~= math.floor(vx) or vy ~= math.floor(vy) then return nil, "canvas viewport size unavailable" end
         local w, h = o:read_dword(CACHE_AT[1]), o:read_dword(CACHE_AT[1] + 4)
         if w ~= o:read_dword(CACHE_AT[2]) or h ~= o:read_dword(CACHE_AT[2] + 4) or not size({X = w, Y = h}) then
             return nil, "viewport cache differs"
         end
-        return {w = w, h = h, vx = vx, vy = vy}
+        return {w = w, h = h}
     end
-    local function sync_cache(o, canvas, scaler_class)
-        local cache, reason = cache_state(o, canvas, scaler_class)
+    -- The canvas viewport is a game call that computes a view: it re-enters
+    -- UEVR's stereo callbacks while this Lua state is locked, which UEVR logs
+    -- as a plugin exception (harmless; one per HUD refresh since 1.2.1, test 10).
+    -- Ask it only when needed.
+    local function canvas_viewport(canvas)
+        local viewport = method(canvas, "GetViewportSize", {{"ReturnValue", "StructProperty"}})
+        return size(viewport and viewport(canvas))
+    end
+    local function sync_cache(o, canvas, scaler_class, vx, vy)
+        local cache, reason = cache_of(o, canvas, scaler_class)
         if not cache then return nil, reason end
+        if not vx or vx ~= math.floor(vx) or vy ~= math.floor(vy) then return nil, "canvas viewport size unavailable" end
+        cache.vx, cache.vy = vx, vy
         if cache.w == cache.vx and cache.h == cache.vy then return "current" end
         local set_match = float_setter(o, "SetMatchFromWidthToHeight")
         local scale = method(canvas, "GetCanvasScale", RETURNS.float)
@@ -224,11 +232,14 @@ function M.new(env)
                         elseif not vx then reason = "canvas viewport size unavailable"
                         else
                             if context.full_vr then
-                                local synced, why = sync_cache(o, canvas, scaler_class)
+                                local synced, why = sync_cache(o, canvas, scaler_class, vx, vy)
                                 s.last_cache = synced or why
                                 if synced then
-                                    s.watch = s.watch or {syncs = {}, time = 0}
-                                    s.watch.world, s.watch.scaler = address(context.world), address(o)
+                                    local w = s.watch or {syncs = {}, time = 0}
+                                    s.watch = w
+                                    w.world, w.scaler, w.retry = address(context.world), address(o), nil
+                                    w.view = {dims = context.dims and (context.dims[1] .. "x" .. context.dims[2]) or "none",
+                                        canvas = address(canvas), vx = vx, vy = vy}
                                 end
                             end
                             local w, h, k = {}, {}, {}
@@ -343,8 +354,10 @@ function M.new(env)
     end
     -- Full VR watchdog. Dialogue has no ESC to make the game resend its
     -- viewport, so a cache left stale there stayed stale. Once a second it reads
-    -- the remembered scaler (found once per world with a single class index
-    -- lookup, never a scan) and compares its cache with the canvas viewport.
+    -- the remembered scaler's cache (memory only) and compares it with the
+    -- canvas viewport, asked again only when the player viewport changes. The
+    -- scaler is found with a single class index lookup, never a scan: in a new
+    -- world, or at most every 10 s after the game rebuilds its UI.
     -- The same mismatch on two checks in a row runs the refresh. Three resyncs
     -- within a minute mean something keeps undoing it: pause until a view switch.
     local function watch(self, delta)
@@ -361,21 +374,29 @@ function M.new(env)
         local scaler_class = api:find_uobject("Class /Script/LGUI.LGUICanvasScaler")
         if not context or not valid(scaler_class) then w.key = nil; return end
         local o = w.scaler and api:to_uobject(w.scaler)
-        if w.world ~= address(context.world) then
-            w.world, w.scaler, w.key, o = address(context.world), nil, nil, nil
+        if not valid(o) or not in_world(o, context.world) then
+            o, w.scaler, w.key, w.view = nil, nil, nil, nil
+            if w.world == address(context.world) and w.retry and now < w.retry and now >= w.retry - 10 then return end
+            w.world, w.retry = address(context.world), now + 10
             local hook = env.types and env.types.UObjectHook
             local objects = hook and hook.get_objects_by_class and hook.get_objects_by_class(scaler_class, false)
             for i = 1, (type(objects) == "table" and #objects <= 64) and #objects or 0 do
                 local found = objects[i]
                 local canvas = valid(found) and in_world(found, context.world) and prop(found, "Canvas", "ObjectProperty")
-                if valid(canvas) and cache_state(found, canvas, scaler_class) then w.scaler, o = address(found), found; break end
+                if valid(canvas) and cache_of(found, canvas, scaler_class) then w.scaler, o = address(found), found; break end
             end
+            if not o then return end
         end
-        if not valid(o) or not in_world(o, context.world) then w.key = nil; return end
         local canvas = prop(o, "Canvas", "ObjectProperty")
-        local cache = valid(canvas) and cache_state(o, canvas, scaler_class)
-        local key = cache and (cache.w ~= cache.vx or cache.h ~= cache.vy)
-            and string.format("%dx%d/%dx%d", cache.w, cache.h, cache.vx, cache.vy) or nil
+        if not valid(canvas) then w.key = nil; return end
+        local dims = context.dims and (context.dims[1] .. "x" .. context.dims[2]) or "none"
+        if not w.view or w.view.dims ~= dims or w.view.canvas ~= address(canvas) then
+            local vx, vy = canvas_viewport(canvas)
+            w.view = vx and {dims = dims, canvas = address(canvas), vx = vx, vy = vy} or nil
+        end
+        local cache = w.view and cache_of(o, canvas, scaler_class)
+        local key = cache and (cache.w ~= w.view.vx or cache.h ~= w.view.vy)
+            and string.format("%dx%d/%dx%d", cache.w, cache.h, w.view.vx, w.view.vy) or nil
         if not key or key ~= w.key then w.key = key; return end
         w.key = nil
         local recent = {}
@@ -412,7 +433,7 @@ function M.new(env)
             -- menu, so the first refresh may run before the new eye images are in
             -- use. Refresh again 1 s and 2.5 s after the switch (cheap, same calls).
             local started = env.clock and env.clock() or nil
-            if self.watch then self.watch.paused, self.watch.syncs, self.watch.key = nil, {}, nil end
+            if self.watch then self.watch.paused, self.watch.syncs, self.watch.key, self.watch.view = nil, {}, nil, nil end
             self.followups = {1.0, 2.5}
             self.follow_age, self.follow_start, self.follow_dims = 0, finite(started) and started or nil, nil
         end

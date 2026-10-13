@@ -125,7 +125,9 @@ local function fixture(options)
                 if not f.ignore_match then relayout() end
             end
         end)
-        getter(canvas_class, "GetViewportSize", "StructProperty", function() return f.viewport_size end)
+        -- Counted: in the game this call computes a view and re-enters UEVR's stereo callbacks.
+        f.viewport_calls = 0
+        getter(canvas_class, "GetViewportSize", "StructProperty", function() f.viewport_calls = f.viewport_calls + 1; return f.viewport_size end)
         getter(canvas_class, "GetCanvasScale", "FloatProperty", function() return f.scale end)
         getter(canvas_class, "GetOwner", "ObjectProperty", function() return f.actor end)
         getter(actor_class, "K2_GetRootComponent", "ObjectProperty", function() return f.item end)
@@ -497,5 +499,23 @@ test("WuWa: an unexpected scaler layout is never written; an ignored sync is res
     local f = fixture({wuwa = true}); stale(f); f.ignore_match = true; f:manual()
     assert(f.cache_writes == 8 and f.scaler.mem[0x138] == 2560 and f.scaler.mem[0x14C] == 1440)
     assert(f.state.last_rejections:find("cache: cache sync did not take", 1, true), f.state.last_rejections)
+end)
+test("WuWa: idle full VR reads memory each second and asks the canvas only when the viewport changes", function()
+    local f = fixture({wuwa = true}); f.viewport_size = {X = 3292, Y = 3292}; f:game_viewport(3292, 3292)
+    for _ = 1, 60 do f:tick() end
+    assert(f.viewport_calls == 1 and f.queries == 1 and #f.writes == 0, "canvas asked " .. f.viewport_calls .. " times")
+    f.width = 1800
+    for _ = 1, 30 do f:tick() end
+    assert(f.viewport_calls == 2 and f.queries == 1 and #f.writes == 0, "viewport change not rechecked once")
+end)
+test("WuWa: after the game rebuilds its UI the check finds the new scaler within 10 s", function()
+    local f = fixture({wuwa = true}); f.viewport_size = {X = 3292, Y = 3292}; f:game_viewport(3292, 3292)
+    for _ = 1, 30 do f:tick() end
+    assert(f.queries == 1)
+    -- Same scaler class and layout at a new address, the old one gone.
+    f.objects[f.scaler.id] = nil; f.scaler.id = 5000; f.objects[5000] = f.scaler
+    stale(f)
+    for _ = 1, 140 do f:tick() end
+    assert(synced(f) and f.queries <= 3, "rebuilt UI not found or searched too often: " .. f.queries)
 end)
 print("HUD refresh tests passed: " .. count)

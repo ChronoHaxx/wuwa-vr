@@ -274158,7 +274158,7 @@ index 71b0927f732d914b9287a1356e27ad8a59372c3a..4a2a199997f734f7bf7f32b4c87b5900
      imgui.new_enum("ImGuiStyleVar",
          "Alpha", ImGuiStyleVar_Alpha,
 diff --git a/src/mods/vr/CVarManager.cpp b/src/mods/vr/CVarManager.cpp
-index 0c13a86648ccee2502da971039984b807c0be775..c914c0e8b641cb109e5d5967f9c50720deaf6f7b 100644
+index 0c13a86648ccee2502da971039984b807c0be775..6b0e43cc26596898b9420e1ce78520c4379507f6 100644
 --- a/src/mods/vr/CVarManager.cpp
 +++ b/src/mods/vr/CVarManager.cpp
 @@ -2,6 +2,7 @@
@@ -274169,7 +274169,7 @@ index 0c13a86648ccee2502da971039984b807c0be775..c914c0e8b641cb109e5d5967f9c50720
  #include <nlohmann/json.hpp>
  
  #include <utility/Config.hpp>
-@@ -11,13 +12,53 @@
+@@ -11,13 +12,54 @@
  #include <sdk/threading/GameThreadWorker.hpp>
  #include <sdk/ConsoleManager.hpp>
  #include <sdk/UGameplayStatics.hpp>
@@ -274183,6 +274183,7 @@ index 0c13a86648ccee2502da971039984b807c0be775..c914c0e8b641cb109e5d5967f9c50720
  #include "CVarManager.hpp"
 +#include "utility/WuWaTestControl.hpp"
 +#include "utility/WuWaClvRefresh.hpp"
++#include "utility/WuWaSceneCache.hpp"
 +#include "utility/WuWaRunMarker.hpp"
 +#include "utility/WuWaTreadmillApp.hpp"
  
@@ -274223,12 +274224,13 @@ index 0c13a86648ccee2502da971039984b807c0be775..c914c0e8b641cb109e5d5967f9c50720
  constexpr std::string_view cvars_standard_txt_name = "cvars_standard.txt";
  constexpr std::string_view cvars_data_txt_name = "cvars_data.txt";
  constexpr std::string_view user_script_txt_name = "user_script.txt";
-@@ -91,6 +132,115 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
+@@ -91,6 +133,116 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
          execute_console_script(engine, user_script_txt_name.data());
          m_should_execute_console_script = false;
      }
 +
 +    if (wuwa_test::is_wuwa()) wuwa_clv::tick(VR::get()->get_wuwa_controls().refill_far_lighting());
++    if (wuwa_test::is_wuwa()) wuwa_scene_cache::tick();
 +    if (wuwa_test::is_wuwa()) {
 +        auto& controls = VR::get()->get_wuwa_controls();
 +        wuwa_treadmill::poll();
@@ -274339,7 +274341,7 @@ index 0c13a86648ccee2502da971039984b807c0be775..c914c0e8b641cb109e5d5967f9c50720
  }
  
  void CVarManager::on_draw_ui() {
-@@ -168,6 +318,7 @@ void CVarManager::on_frame() {
+@@ -168,6 +320,7 @@ void CVarManager::on_frame() {
  
  void CVarManager::on_config_load(const utility::Config& cfg, bool set_defaults) {
      ZoneScopedN(__FUNCTION__);
@@ -292437,6 +292439,66 @@ index 0000000000000000000000000000000000000000..d3c81b79f5ea535e9bd913559c9dd367
 +    return left > 0;
 +}
 +}
+diff --git a/src/utility/WuWaSceneCache.hpp b/src/utility/WuWaSceneCache.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..96c99c52eaa45c230d064d5e8621cf4abd648032
+--- /dev/null
++++ b/src/utility/WuWaSceneCache.hpp
+@@ -0,0 +1,54 @@
++#pragma once
++// Live world behind menus (13 Oct 2026, game 3.7). With a full-screen menu open
++// (quest log, Esc terminal, journey), Kuro's scene-colour cache keeps the scene
++// colour from the moment the menu opened ("Scene texture preserved, using copy")
++// and stops redrawing the world; later passes such as god rays still follow the
++// head. In 2D that is a free GPU saving; in VR the world becomes a picture locked
++// to the eyes. Simulator, quest menu: with the cache on, +-12 degrees of head yaw
++// moved no geometry in either eye; with r.CacheSceneColor.Enable 0 and the menu
++// reopened, both eyes shifted -50/+54 px with the head. The switch gates the next
++// start of the cache, so it is set to 0 from the first engine ticks and set again
++// if the game restores its default (1).
++#include <cstdint>
++#include <string>
++#include <windows.h>
++#include <sdk/CVar.hpp>
++#include <sdk/ConsoleManager.hpp>
++#include <spdlog/spdlog.h>
++#include "WuWaClvRefresh.hpp"
++
++namespace wuwa_scene_cache {
++inline sdk::IConsoleVariable* enable_var{}; // game thread only
++inline uint64_t next_check_ms{}, writes{}, failures{};
++inline bool missing_logged{};
++
++// Game thread, every engine tick; reads at most once a second.
++inline void tick() {
++    const auto now = GetTickCount64();
++    if (now < next_check_ms) return;
++    next_check_ms = now + 1000;
++    try {
++        if (enable_var == nullptr) {
++            const auto manager = sdk::FConsoleManager::get();
++            if (manager == nullptr) return;
++            auto* object = manager->find(L"r.CacheSceneColor.Enable");
++            if (object == nullptr || object->AsCommand() != nullptr) {
++                if (!missing_logged) spdlog::info("[WuWaSceneCache] r.CacheSceneColor.Enable not found; menus keep the game's cache");
++                missing_logged = true;
++                return;
++            }
++            enable_var = static_cast<sdk::IConsoleVariable*>(object);
++        }
++        const auto before = wuwa_clv::CheckedCVarAccess::read(enable_var);
++        if (!before || *before == 0) return;
++        enable_var->Set(L"0");
++        const auto after = wuwa_clv::CheckedCVarAccess::read(enable_var);
++        if (after && *after == 0) {
++            ++writes;
++            spdlog::info("[WuWaSceneCache] r.CacheSceneColor.Enable {} -> 0: live world behind menus (#{})", *before, writes);
++        } else if (++failures <= 3) {
++            spdlog::warn("[WuWaSceneCache] r.CacheSceneColor.Enable stayed {}", after ? std::to_string(*after) : "unreadable");
++        }
++    } catch (...) { ++failures; }
++}
++} // namespace wuwa_scene_cache
 diff --git a/src/utility/WuWaSceneFrame.hpp b/src/utility/WuWaSceneFrame.hpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..a4304cf8237a7a3942a41ba73939a58c9e6cc8a0

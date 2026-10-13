@@ -22,6 +22,7 @@
 #include "CVarManager.hpp"
 #include "utility/WuWaTestControl.hpp"
 #include "utility/WuWaClvRefresh.hpp"
+#include "utility/WuWaSceneCache.hpp"
 #include "utility/WuWaRunMarker.hpp"
 #include "utility/WuWaTreadmillApp.hpp"
 
@@ -134,6 +135,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
     }
 
     if (wuwa_test::is_wuwa()) wuwa_clv::tick(VR::get()->get_wuwa_controls().refill_far_lighting());
+    if (wuwa_test::is_wuwa()) wuwa_scene_cache::tick();
     if (wuwa_test::is_wuwa()) {
         auto& controls = VR::get()->get_wuwa_controls();
         wuwa_treadmill::poll();

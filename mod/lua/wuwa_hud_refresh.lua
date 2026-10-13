@@ -1,5 +1,6 @@
 -- Explicit HUD refresh and bounded 2D-transition observer. Loading is inert.
--- Calls reflected LGUI APIs on the game thread only; no offsets or setting writes.
+-- Calls reflected LGUI APIs on the game thread only; no setting writes. The one
+-- offset write is the guarded scaler viewport cache below (full VR only).
 local M = {}
 local function finite(v) return type(v) == "number" and v == v and math.abs(v) < math.huge end
 local function address(o) return o and o:get_address() end
@@ -125,14 +126,68 @@ function M.new(env)
         if ok and finite(x) and finite(y) and x >= 64 and y >= 64 and x <= 32768 and y <= 32768 then return x, y end
         return nil
     end
+    -- The scaler recomputes only from the viewport size it last heard about,
+    -- kept as two FIntPoint copies after its Canvas pointer (+0x138, +0x148 of
+    -- the 336-byte LGUICanvasScaler; read live 13 Oct 2026). The game refreshes
+    -- them on its own viewport events: entering stereo screen gives one
+    -- (2560 x 1440, the monitor), leaving it gives none. With a 3292-pixel eye
+    -- full VR then kept scale 1.0 and a 2560 x 1440 root until ESC, and
+    -- dialogue never recovered; at 2560 per eye the scale happened to match.
+    -- Copy the canvas viewport into the cache and let the scaler recompute
+    -- through a MatchFromWidthToHeight nudge, its setter's re-layout (the 3i
+    -- nudge alone did nothing because the cache was stale). Verified against
+    -- the scaler's own adapted scale; the old cache is restored if it differs.
+    local SCALER_BYTES, CANVAS_AT, CACHE_AT = 336, 0x130, {0x138, 0x148}
+    local function cache_state(o, canvas, scaler_class)
+        if not valid(scaler_class) or address(o:get_class()) ~= address(scaler_class) then return nil, "scaler class differs" end
+        local canvas_property = scaler_class:find_property("Canvas")
+        if scaler_class:get_properties_size() ~= SCALER_BYTES or not canvas_property
+            or canvas_property:get_offset() ~= CANVAS_AT or o:read_qword(CANVAS_AT) ~= address(canvas) then
+            return nil, "scaler layout differs"
+        end
+        local viewport = method(canvas, "GetViewportSize", {{"ReturnValue", "StructProperty"}})
+        local vx, vy = size(viewport and viewport(canvas))
+        if not vx or vx ~= math.floor(vx) or vy ~= math.floor(vy) then return nil, "canvas viewport size unavailable" end
+        local w, h = o:read_dword(CACHE_AT[1]), o:read_dword(CACHE_AT[1] + 4)
+        if w ~= o:read_dword(CACHE_AT[2]) or h ~= o:read_dword(CACHE_AT[2] + 4) or not size({X = w, Y = h}) then
+            return nil, "viewport cache differs"
+        end
+        return {w = w, h = h, vx = vx, vy = vy}
+    end
+    local function sync_cache(o, canvas, scaler_class)
+        local cache, reason = cache_state(o, canvas, scaler_class)
+        if not cache then return nil, reason end
+        if cache.w == cache.vx and cache.h == cache.vy then return "current" end
+        local set_match = float_setter(o, "SetMatchFromWidthToHeight")
+        local scale = method(canvas, "GetCanvasScale", RETURNS.float)
+        local adapt = method(o, "CalculateAdaptedSizeAndScale", {{"Width", "FloatProperty"}, {"Height", "FloatProperty"},
+            {"OutWidth", "FloatProperty", "out"}, {"OutHeight", "FloatProperty", "out"}, {"OutScale", "FloatProperty", "out"}})
+        if not set_match or not scale or not adapt then return nil, "scaler schema differs" end
+        local match = prop(o, "MatchFromWidthToHeight", "FloatProperty")
+        if not finite(match) or match < 0 or match > 1 then return nil, "match value differs" end
+        local nudge = match <= 0.5 and match + 0.001 or match - 0.001
+        local function apply(w, h)
+            for _, at in ipairs(CACHE_AT) do o:write_dword(at, w); o:write_dword(at + 4, h) end
+            set_match(o, nudge); set_match(o, match)
+        end
+        apply(cache.vx, cache.vy)
+        local w, h, k = {}, {}, {}
+        adapt(o, cache.vx, cache.vy, w, h, k)
+        local now = scale(canvas)
+        if not finite(k.result) or not finite(now) or math.abs(k.result - now) > 1e-3 then
+            apply(cache.w, cache.h)
+            return nil, "cache sync did not take"
+        end
+        s.last_sync = string.format("%dx%d -> %dx%d", cache.w, cache.h, cache.vx, cache.vy)
+        return "synced"
+    end
     -- WuWa's whole UI hangs off one LGUICanvasScaler (3h probe: reference
     -- 2560 x 1440, match mode 2) without ForceUpdate. Test 13 Oct: after stereo
     -- screen or mono theatre, the root UI item kept the 16:9 size (2560 x 1440)
     -- in full VR until the Esc menu, while its canvas already reported the eye
-    -- size (2560 x 2560): the scaler is not told the eye images changed size.
-    -- The 3i MatchFromWidthToHeight nudge did not resize the root. Ask the
-    -- scaler what it would give this canvas and set the root item to that;
-    -- only when the scale already matches, since the scale has no setter.
+    -- size (2560 x 2560). In full VR the viewport cache is synced first (above);
+    -- then ask the scaler what it would give this canvas and set the root item
+    -- to that, only when the scale matches.
     local function fit_root(context, objects, scaler_class, canvas_class)
         local item_class = api:find_uobject("Class /Script/LGUI.UIItem")
         if not valid(item_class) then return 0, 0, "UIItem class unavailable" end
@@ -168,6 +223,14 @@ function M.new(env)
                         elseif address(item_canvas(item)) ~= address(canvas) then reason = "root item of another canvas"
                         elseif not vx then reason = "canvas viewport size unavailable"
                         else
+                            if context.full_vr then
+                                local synced, why = sync_cache(o, canvas, scaler_class)
+                                s.last_cache = synced or why
+                                if synced then
+                                    s.watch = s.watch or {syncs = {}, time = 0}
+                                    s.watch.world, s.watch.scaler = address(context.world), address(o)
+                                end
+                            end
                             local w, h, k = {}, {}, {}
                             adapt(o, vx, vy, w, h, k)
                             local width, height, current = w.result, h.result, scale(canvas)
@@ -201,6 +264,7 @@ function M.new(env)
         -- No UObject survives this request, and oversized sets are refused.
         local objects = hook.get_objects_by_class(scaler_class, false)
         if type(objects) ~= "table" or #objects > 64 then return false, "LGUI object set unavailable or too large" end
+        s.last_cache = nil
         local plans, reasons, order = {}, {}, {}
         for _, o in ipairs(objects) do
             if valid(o) and o:is_a(scaler_class) then
@@ -222,9 +286,15 @@ function M.new(env)
             if ok and fitted > 0 then
                 return true, "HUD root fitted (" .. fitted .. ") " .. s.last_fit .. "; check the headset / HUD 已适配，请在头显中确认"
             end
+            if ok and matching > 0 and s.last_cache == "synced" then
+                return true, "HUD viewport resynced " .. s.last_sync .. "; check the headset / HUD 视口已同步，请在头显中确认"
+            end
             if ok and matching > 0 then return true, "HUD size already matches the view / HUD 尺寸已匹配" end
             if not ok then s.last_rejections = s.last_rejections .. "; fit error " .. tostring(fitted):sub(1, 80)
             elseif reason then s.last_rejections = s.last_rejections .. "; fit: " .. reason end
+            if ok and s.last_cache and s.last_cache ~= "synced" and s.last_cache ~= "current" then
+                s.last_rejections = s.last_rejections .. "; cache: " .. s.last_cache
+            end
             return false, "No active HUD with the supported LGUI schema"
         end
         local refreshed = 0
@@ -271,12 +341,62 @@ function M.new(env)
             self.status = self.status .. "; diagnostic saved / 已保存诊断"
         end
     end
+    -- Full VR watchdog. Dialogue has no ESC to make the game resend its
+    -- viewport, so a cache left stale there stayed stale. Once a second it reads
+    -- the remembered scaler (found once per world with a single class index
+    -- lookup, never a scan) and compares its cache with the canvas viewport.
+    -- The same mismatch on two checks in a row runs the refresh. Three resyncs
+    -- within a minute mean something keeps undoing it: pause until a view switch.
+    local function watch(self, delta)
+        local w = self.watch
+        if not w then w = {syncs = {}, time = 0}; self.watch = w end
+        w.time = w.time + (finite(delta) and math.max(0, math.min(delta, 0.25)) or 0)
+        local clock = env.clock and env.clock() or nil
+        local now = finite(clock) and clock or w.time
+        -- First check a second into full VR, after any view-switch follow-ups.
+        if not w.next then w.next = now + 1 end
+        if w.paused or (now < w.next and w.next - now <= 1) then return end
+        w.next = now + 1
+        local context = current_context()
+        local scaler_class = api:find_uobject("Class /Script/LGUI.LGUICanvasScaler")
+        if not context or not valid(scaler_class) then w.key = nil; return end
+        local o = w.scaler and api:to_uobject(w.scaler)
+        if w.world ~= address(context.world) then
+            w.world, w.scaler, w.key, o = address(context.world), nil, nil, nil
+            local hook = env.types and env.types.UObjectHook
+            local objects = hook and hook.get_objects_by_class and hook.get_objects_by_class(scaler_class, false)
+            for i = 1, (type(objects) == "table" and #objects <= 64) and #objects or 0 do
+                local found = objects[i]
+                local canvas = valid(found) and in_world(found, context.world) and prop(found, "Canvas", "ObjectProperty")
+                if valid(canvas) and cache_state(found, canvas, scaler_class) then w.scaler, o = address(found), found; break end
+            end
+        end
+        if not valid(o) or not in_world(o, context.world) then w.key = nil; return end
+        local canvas = prop(o, "Canvas", "ObjectProperty")
+        local cache = valid(canvas) and cache_state(o, canvas, scaler_class)
+        local key = cache and (cache.w ~= cache.vx or cache.h ~= cache.vy)
+            and string.format("%dx%d/%dx%d", cache.w, cache.h, cache.vx, cache.vy) or nil
+        if not key or key ~= w.key then w.key = key; return end
+        w.key = nil
+        local recent = {}
+        for _, at in ipairs(w.syncs) do if now >= at and now - at < 60 then recent[#recent + 1] = at end end
+        w.syncs = recent
+        if #recent >= 3 then
+            w.paused = true
+            self.status = "HUD viewport keeps changing; open ESC or switch view to retry / HUD 视口反复变化，请打开 ESC 或切换视图重试"
+            return
+        end
+        recent[#recent + 1] = now
+        context.full_vr = true
+        local ok, message = refresh(context)
+        self.status = (ok and message or ("HUD refresh unavailable: " .. message)) .. " (full VR check)"
+    end
     function s:request()
         self.pending = {manual = true, age = 0, ticks = 0, stable = 0}
         self.status = "HUD refresh queued / HUD 刷新已排队"
     end
     function s:reset()
-        self.pending, self.last_mode, self.followups = nil, nil, nil
+        self.pending, self.last_mode, self.followups, self.watch = nil, nil, nil, nil
     end
     local function tick(self, mode, delta)
         if type(mode) ~= "boolean" then
@@ -292,6 +412,7 @@ function M.new(env)
             -- menu, so the first refresh may run before the new eye images are in
             -- use. Refresh again 1 s and 2.5 s after the switch (cheap, same calls).
             local started = env.clock and env.clock() or nil
+            if self.watch then self.watch.paused, self.watch.syncs, self.watch.key = nil, {}, nil end
             self.followups = {1.0, 2.5}
             self.follow_age, self.follow_start, self.follow_dims = 0, finite(started) and started or nil, nil
         end
@@ -311,13 +432,20 @@ function M.new(env)
                 else
                     local at = table.remove(self.followups, 1)
                     if #self.followups == 0 then self.followups = nil end
+                    if context then context.full_vr = mode == false end
                     local ok, message = refresh(context)
                     self.status = (ok and message or ("HUD refresh unavailable: " .. message)) .. " (follow-up at " .. at .. " s)"
                 end
             end
         end
         local p = self.pending
-        if not p then return end
+        if not p then
+            if mode == false and not self.followups and not pcall(watch, self, delta) and self.watch then
+                self.watch.paused = true
+                self.status = "HUD full VR check stopped: reflection changed / HUD 全 VR 检查已停止：反射接口已改变"
+            end
+            return
+        end
         p.age = p.age + (finite(delta) and math.max(0, math.min(delta, 0.25)) or 0)
         p.ticks = p.ticks + 1
         local now = env.clock and env.clock() or nil
@@ -361,6 +489,7 @@ function M.new(env)
         if not p.clock_used then settled = p.age >= 0.2 or p.stable >= 12 or (not context.dimensions_available and p.manual and p.ticks >= 12) end
         if settled and ((dims and p.stable >= 2) or (not context.dimensions_available and p.manual)) then
             self.pending = nil
+            context.full_vr = mode == false
             local ok, message = refresh(context)
             self.status = ok and message or ("HUD refresh unavailable: " .. message .. " / HUD 刷新未完成")
             if not ok and message == "No active HUD with the supported LGUI schema" then

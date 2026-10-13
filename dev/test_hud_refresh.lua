@@ -24,7 +24,7 @@ local function callable(parameters, run)
         get_properties_size = function() return #parameters * 4 end}, {__call = function(_, ...) return run(...) end})
 end
 local function fixture(options)
-    local f = {objects = {}, count = 0, queries = 0, writes = {}, width = 1920, height = 1080}
+    local f = {objects = {}, count = 0, queries = 0, writes = {}, cache_writes = 0, width = 1920, height = 1080}
     local function class(name)
         local c = {name = name, functions = {}, props = {}}
         function c:find_function(key) return self.functions[key] end
@@ -38,6 +38,14 @@ local function fixture(options)
         function o:get_class() return self.class end
         function o:get_outer() return self.outer end
         function o:is_a(klass) return self.class == klass end
+        o.mem = {}
+        local function bounds(self, offset, bytes)
+            local size = self.class.get_properties_size and self.class:get_properties_size()
+            if not size or offset + bytes > size then error("Offset out of bounds") end
+        end
+        function o:read_dword(offset) bounds(self, offset, 4); return self.mem[offset] or 0 end
+        function o:read_qword(offset) bounds(self, offset, 8); return self.mem[offset] or 0 end
+        function o:write_dword(offset, value) bounds(self, offset, 4); self.mem[offset] = value; f.cache_writes = f.cache_writes + 1 end
         f.objects[o.id] = o
         return o
     end
@@ -55,6 +63,16 @@ local function fixture(options)
     f.scaler, f.canvas = object(scaler_class, f.world), object(canvas_class, f.world)
     f.scaler.Canvas = f.canvas
     scaler_class.props.Canvas = field("Canvas", "ObjectProperty")
+    -- LGUICanvasScaler layout read live 13 Oct: 336 bytes, Canvas at 0x130, then
+    -- two FIntPoint copies of the viewport size it last heard about.
+    f.scaler_bytes, f.canvas_offset = 336, 0x130
+    function scaler_class:get_properties_size() return f.scaler_bytes end
+    scaler_class.props.Canvas.get_offset = function() return f.canvas_offset end
+    f.scaler.mem[0x130] = f.canvas.id
+    function f:set_cache(w, h, w2, h2)
+        local m = self.scaler.mem
+        m[0x138], m[0x13C], m[0x148], m[0x14C] = w, h, w2 or w, h2 or h
+    end
     f.active, f.mode, f.projection, f.fov, f.near, f.far = true, 0, 0, 90, 1, 10000
     local function getter(c, name, kind, run) c.functions[name] = callable({{"ReturnValue", kind}}, run) end
     getter(scaler_class, "GetIsActiveAndEnable", "BoolProperty", function() return f.active end)
@@ -88,6 +106,25 @@ local function fixture(options)
         f.actor = object(actor_class, f.world)
         f.item = object(item_class, f.actor)
         f.viewport_size, f.item_size, f.scale = {X = 2560, Y = 2560}, {2560, 1440}, 1
+        f:set_cache(2560, 2560)
+        local function adapted(w, h) return f.adapted_scale or math.min(w / 2560, h / 1440) end
+        -- The scaler lays out from its cached viewport whenever a setting changes;
+        -- a same-value setter returns early (both seen live).
+        local function relayout()
+            local w, h = f.scaler.mem[0x138], f.scaler.mem[0x13C]
+            f.scale = adapted(w, h); f.item_size = {w / f.scale, h / f.scale}
+        end
+        -- The game's own viewport event (ESC, entering stereo screen).
+        function f:game_viewport(w, h) self:set_cache(w, h); relayout() end
+        f.scaler.MatchFromWidthToHeight = 0
+        scaler_class.props.MatchFromWidthToHeight = field("MatchFromWidthToHeight", "FloatProperty")
+        scaler_class.functions.SetMatchFromWidthToHeight = callable({{"Value", "FloatProperty"}}, function(o, value)
+            f.writes[#f.writes + 1] = "match"
+            if o.MatchFromWidthToHeight ~= value then
+                o.MatchFromWidthToHeight = value
+                if not f.ignore_match then relayout() end
+            end
+        end)
         getter(canvas_class, "GetViewportSize", "StructProperty", function() return f.viewport_size end)
         getter(canvas_class, "GetCanvasScale", "FloatProperty", function() return f.scale end)
         getter(canvas_class, "GetOwner", "ObjectProperty", function() return f.actor end)
@@ -102,7 +139,7 @@ local function fixture(options)
         scaler_class.functions.CalculateAdaptedSizeAndScale = callable({{"Width", "FloatProperty"},
             {"Height", "FloatProperty"}, {"OutWidth", "FloatProperty", "out"}, {"OutHeight", "FloatProperty", "out"},
             {"OutScale", "FloatProperty", "out"}}, function(_, width, height, out_width, out_height, out_scale)
-                local scale = f.adapted_scale or math.min(width / 2560, height / 1440)
+                local scale = adapted(width, height)
                 out_width.result, out_height.result, out_scale.result = width / scale, height / scale, scale
             end)
     end
@@ -130,8 +167,12 @@ local function fixture(options)
 end
 local count = 0
 local function test(name, run) run(); count = count + 1; print("PASS: " .. name) end
-test("loading and idle ticks never query or mutate objects", function()
-    local f = fixture(); for _ = 1, 20 do f:tick() end
+test("loading and idle ticks never mutate; idle full VR looks the scaler up once per world", function()
+    local f = fixture(); for _ = 1, 9 do f:tick() end
+    assert(f.queries == 0 and #f.writes == 0)
+    for _ = 1, 40 do f:tick() end
+    assert(f.queries == 1 and #f.writes == 0 and f.cache_writes == 0)
+    f = fixture(); for _ = 1, 40 do f:tick(true) end
     assert(f.queries == 0 and #f.writes == 0)
 end)
 test("manual request is deferred and preserves exact projection values", function()
@@ -345,7 +386,8 @@ test("WuWa: a matching root item is left alone without the unsupported-HUD audit
     local old_module = package.loaded.wuwa_hud_schema
     package.loaded.wuwa_hud_schema = function() error("audit must not run") end
     for _, case in ipairs({{{X = 2560, Y = 2560}, {2560, 2560}}, {{X = 2560, Y = 1440}, {2560, 1440}}}) do
-        local f = fixture({wuwa = true}); f.viewport_size, f.item_size = case[1], case[2]; f:manual()
+        local f = fixture({wuwa = true}); f.viewport_size, f.item_size = case[1], case[2]
+        f:set_cache(case[1].X, case[1].Y); f:manual()
         assert(#f.writes == 0 and f.state.status:find("already matches", 1, true), f.state.status)
     end
     package.loaded.wuwa_hud_schema = old_module
@@ -379,5 +421,81 @@ test("WuWa: scale change, foreign item, world-space canvas and bad sizes are not
         assert(f.state.last_rejections:find("fit: " .. change[1], 1, true) or
             f.state.last_rejections:find(change[1], 1, true), change[1] .. " / " .. f.state.last_rejections)
     end
+end)
+local function stale(f)
+    -- 3292-pixel eyes after stereo screen: the cache kept the monitor size.
+    f.viewport_size = {X = 3292, Y = 3292}; f:game_viewport(2560, 1440)
+    assert(f.scale == 1 and f.item_size[1] == 2560 and f.item_size[2] == 1440)
+end
+local function synced(f)
+    local m = f.scaler.mem
+    return m[0x138] == 3292 and m[0x13C] == 3292 and m[0x148] == 3292 and m[0x14C] == 3292
+        and math.abs(f.scale - 3292 / 2560) < 1e-6 and f.item_size[1] == 2560 and f.item_size[2] == 2560
+        and f.scaler.MatchFromWidthToHeight == 0
+end
+test("WuWa: in full VR a stale viewport cache is synced and the scaler re-lays out the HUD", function()
+    local f = fixture({wuwa = true}); stale(f); f:manual()
+    assert(synced(f) and table.concat(f.writes, ",") == "match,match" and f.cache_writes == 4, table.concat(f.writes, ","))
+    assert(f.state.status:find("HUD viewport resynced 2560x1440 -> 3292x3292", 1, true), f.state.status)
+end)
+test("WuWa: returning to full VR syncs the cache; stereo screen and mono never touch it", function()
+    local f = fixture({wuwa = true}); f:tick(false); f:tick(true)
+    f.viewport_size = {X = 2560, Y = 1440}; f:game_viewport(3292, 3292)
+    for _ = 1, 60 do f:tick(true) end
+    assert(f.cache_writes == 0 and f.scaler.mem[0x138] == 3292, "cache written outside full VR")
+    stale(f); f:tick(false); f:tick(false)
+    assert(synced(f) and f.cache_writes == 4)
+end)
+test("WuWa: in dialogue (no view switch) the full VR check resyncs a cache the game left stale", function()
+    local f = fixture({wuwa = true}); f.viewport_size = {X = 3292, Y = 3292}; f:game_viewport(3292, 3292)
+    for _ = 1, 40 do f:tick() end
+    assert(#f.writes == 0 and f.cache_writes == 0 and f.queries == 1)
+    stale(f)
+    for _ = 1, 9 do f:tick() end
+    assert(f.cache_writes == 0, "one mismatch is not enough")
+    for _ = 1, 12 do f:tick() end
+    assert(synced(f) and f.state.status:find("(full VR check)", 1, true), f.state.status)
+    for _ = 1, 40 do f:tick() end
+    assert(f.cache_writes == 4)
+end)
+test("WuWa: a cache the game keeps undoing is retried three times, then waits for a view switch", function()
+    local f = fixture({wuwa = true}); f.viewport_size = {X = 3292, Y = 3292}; f:game_viewport(3292, 3292)
+    for _ = 1, 400 do
+        if f.scaler.mem[0x138] == 3292 then f:game_viewport(2560, 1440) end
+        f:tick()
+    end
+    assert(f.cache_writes == 12 and f.state.status:find("keeps changing", 1, true), f.state.status)
+    f:tick(true); f:tick(false); f:tick(false)
+    assert(f.cache_writes == 16)
+end)
+test("WuWa: an unexpected scaler layout is never written; an ignored sync is restored", function()
+    for _, case in ipairs({
+        {"scaler layout differs", function(f) f.scaler_bytes = 344 end},
+        {"scaler layout differs", function(f) f.canvas_offset = 0x128 end},
+        {"scaler layout differs", function(f) f.scaler.mem[0x130] = f.world.id end},
+        {"scaler class differs", function(f)
+            local sub = setmetatable({id = 1003, get_address = function(self) return self.id end}, {__index = f.classes.scaler})
+            f.objects[1003], f.scaler.class = sub, sub
+            f.scaler.is_a = function(_, klass) return klass == f.classes.scaler end
+        end},
+        {"viewport cache differs", function(f) f:set_cache(2560, 1440, 3292, 3292) end},
+        {"viewport cache differs", function(f) f:set_cache(0, 0) end},
+        {"canvas viewport size unavailable", function(f) f.viewport_size = {X = 3292.5, Y = 3292} end},
+        {"match value differs", function(f) f.scaler.MatchFromWidthToHeight = 2 end},
+        {"scaler schema differs", function(f) f.classes.scaler.functions.SetMatchFromWidthToHeight = nil end},
+    }) do
+        local f = fixture({wuwa = true}); stale(f); case[2](f)
+        local before = {}
+        for at, v in pairs(f.scaler.mem) do before[at] = v end
+        f:manual()
+        assert(f.cache_writes == 0, case[1])
+        for at, v in pairs(before) do assert(f.scaler.mem[at] == v, case[1]) end
+        assert(not f.state.status:find("resynced", 1, true), case[1] .. " / " .. f.state.status)
+        assert(f.state.last_cache == case[1] or (f.state.last_rejections or ""):find(case[1], 1, true),
+            case[1] .. " / " .. tostring(f.state.last_cache))
+    end
+    local f = fixture({wuwa = true}); stale(f); f.ignore_match = true; f:manual()
+    assert(f.cache_writes == 8 and f.scaler.mem[0x138] == 2560 and f.scaler.mem[0x14C] == 1440)
+    assert(f.state.last_rejections:find("cache: cache sync did not take", 1, true), f.state.last_rejections)
 end)
 print("HUD refresh tests passed: " .. count)

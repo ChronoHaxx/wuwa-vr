@@ -69,7 +69,7 @@ struct State {
         registered{}, redirected{}, fitted{}, capture_suppressed{}, capture_pending{}, invalid{}, callback_errors{};
     std::atomic<uint64_t> menu_candidates{}, menu_redirected{}, menu_fitted{};
     std::atomic<uint64_t> menu_capture_suppressed{}, menu_capture_pending{}, menu_eye_unknown{};
-    std::atomic<int32_t> main_pass{-1}, capture_pass{-1}; // stereo pass of each NSF eye
+    std::atomic<uintptr_t> main_family_target{}, capture_family_target{}; // NSF eyes' FRenderTarget
     std::atomic<uint64_t> stage3_calls{}, stage3_redirected{}, stage3_fitted{}, stage3_empty{}, stage3_samples{};
     std::atomic<uint64_t> stage3_capture_suppressed{}, stage3_capture_pending{};
     struct MenuObservation {
@@ -310,18 +310,24 @@ struct SetupContext { uintptr_t graph{}; bool menu{}, stage3{}; MenuTargets targ
 inline thread_local SetupContext active_setup{};
 inline thread_local MenuFitReceipt menu_fit_receipt{};
 inline thread_local MenuFitReceipt transient_fit_receipt{}; // stage-2 Tonemap copy, NSF
-inline constexpr uint32_t view_stereo_pass_offset = 0xc90;
+// FSceneView +0 is its family; the family's FRenderTarget is at +0x18 (as read by
+// WuWaLguiProbe), then the scene at +0x20.
+inline uintptr_t family_render_target(uintptr_t view) noexcept {
+    uintptr_t family{}, render_target{};
+    if (!checked::read_field(view, 0, family) || !family || !checked::read_field(family, 0x18, render_target)) return 0;
+    return render_target;
+}
 
-// Native stereo fix: remember which stereo pass renders into the main target and
-// which into the second eye's capture, from setups whose target is known.
+// Native stereo fix: remember which family render target draws into the main
+// target and which into the second eye's capture, from setups whose target is known.
 inline void learn_eye(State& s, uintptr_t view, uintptr_t source, const wuwa_lgui_route::Target& target) noexcept {
     if (!target.native_stereo_fix || !source || !target.game) return;
     const bool main = source == target.game;
     const bool capture = target.capture && target.capture != target.game && source == target.capture;
     if (!main && !capture) return;
-    int32_t pass{};
-    if (!checked::read_field(view, view_stereo_pass_offset, pass) || pass < 0 || pass > 8) return;
-    (main ? s.main_pass : s.capture_pass).store(pass, std::memory_order_relaxed);
+    const auto render_target = family_render_target(view);
+    if (!render_target) return;
+    (main ? s.main_family_target : s.capture_family_target).store(render_target, std::memory_order_relaxed);
 }
 struct ScopedSetupContext {
     SetupContext previous{active_setup};
@@ -384,10 +390,8 @@ inline SetupRoute route_setup(uintptr_t renderer, uintptr_t builder, uintptr_t c
             if (known_menu_target) sample_menu_stages(s, renderer, view, ViewContext::tonemap, target);
             auto eye = TransientEye::main;
             if (known_menu_target && target.native_stereo_fix) {
-                int32_t pass{-1};
-                if (!checked::read_field(view, view_stereo_pass_offset, pass)) pass = -1;
-                eye = transient_eye(pass, s.main_pass.load(std::memory_order_relaxed),
-                    s.capture_pass.load(std::memory_order_relaxed));
+                eye = transient_eye(family_render_target(view), s.main_family_target.load(std::memory_order_relaxed),
+                    s.capture_family_target.load(std::memory_order_relaxed));
                 if (eye == TransientEye::unknown) ++s.menu_eye_unknown;
             }
             if (target.menu_redirect_enabled && known_menu_target && eye == TransientEye::capture) {
@@ -927,9 +931,9 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                 s.world_layout_skips.load(), s.world_guard_skips.load(), s.world_caller_skips.load(),
                 s.world_disabled_skips.load(), s.world_mode_skips.load());
             spdlog::info("[WuWaLguiRedirect] menu_test enabled={} native_fix={} candidates={} redirected={} fitted={} "
-                "eye_passes={}/{} capture_suppressed={} capture_pending={} eye_unknown={}",
+                "eye_targets={:x}/{:x} capture_suppressed={} capture_pending={} eye_unknown={}",
                 target.menu_redirect_enabled, target.native_stereo_fix, s.menu_candidates.load(), s.menu_redirected.load(),
-                s.menu_fitted.load(), s.main_pass.load(), s.capture_pass.load(), s.menu_capture_suppressed.load(),
+                s.menu_fitted.load(), s.main_family_target.load(), s.capture_family_target.load(), s.menu_capture_suppressed.load(),
                 s.menu_capture_pending.load(), s.menu_eye_unknown.load());
             spdlog::info("[WuWaLguiRedirect] stage3 ready={} calls={} empty={} redirected={} fitted={} capture_suppressed={} capture_pending={}",
                 s.menu_ready.load(), s.stage3_calls.load(), s.stage3_empty.load(), s.stage3_redirected.load(), s.stage3_fitted.load(),

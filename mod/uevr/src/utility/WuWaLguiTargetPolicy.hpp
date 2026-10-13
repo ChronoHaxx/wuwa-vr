@@ -36,17 +36,19 @@ inline constexpr bool is_transient_menu_candidate(const RejectedDescription& val
     return true;
 }
 
-// Native stereo fix, 13 Oct 2026 (journey menu, simulator): while some full-screen
+// Native stereo fix, 13 Oct 2026 (journey, quest and Esc menus, simulator): while full-screen
 // menus are open the stage-2 canvases, including the menu's background picture,
 // draw into each eye's transient Tonemap, so the picture stayed fixed in front of
-// the eyes. Its texture has no RHI at setup, so the eye comes from the view's
-// stereo pass, learned from setups whose target is known: the main target's pass
-// and the second eye's capture pass. Unknown or equal passes leave the draw alone.
+// the eyes. Its texture has no RHI at setup, and both eyes' views carry the same
+// stereo pass, so the eye comes from the view family's render target, learned from
+// setups whose target is known: the game viewport for the main copy, the capture
+// target for the second eye. Unknown or equal targets leave the draw alone.
 enum class TransientEye { unknown, main, capture };
-inline constexpr TransientEye transient_eye(int32_t pass, int32_t main_pass, int32_t capture_pass) noexcept {
-    if (pass < 0 || main_pass < 0 || capture_pass < 0 || main_pass == capture_pass) return TransientEye::unknown;
-    if (pass == main_pass) return TransientEye::main;
-    if (pass == capture_pass) return TransientEye::capture;
+inline constexpr TransientEye transient_eye(uintptr_t family_target, uintptr_t main_target,
+        uintptr_t capture_target) noexcept {
+    if (!family_target || !main_target || !capture_target || main_target == capture_target) return TransientEye::unknown;
+    if (family_target == main_target) return TransientEye::main;
+    if (family_target == capture_target) return TransientEye::capture;
     return TransientEye::unknown;
 }
 

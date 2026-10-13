@@ -285911,10 +285911,10 @@ index 0000000000000000000000000000000000000000..5455c019a6f31bfdc1273e72f35c0223
 +} // namespace wuwa_lgui_probe
 diff --git a/src/utility/WuWaLguiRedirect.hpp b/src/utility/WuWaLguiRedirect.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..a3a6bd855ab1cd4b44209e36b353cb0aa1b6c434
+index 0000000000000000000000000000000000000000..7f324543978830442c2b3274c3fbf70420d03e31
 --- /dev/null
 +++ b/src/utility/WuWaLguiRedirect.hpp
-@@ -0,0 +1,962 @@
+@@ -0,0 +1,966 @@
 +#pragma once
 +
 +// Opt-in experiment pinned to the inspected September 8 WuWa code. See
@@ -285986,7 +285986,7 @@ index 0000000000000000000000000000000000000000..a3a6bd855ab1cd4b44209e36b353cb0a
 +        registered{}, redirected{}, fitted{}, capture_suppressed{}, capture_pending{}, invalid{}, callback_errors{};
 +    std::atomic<uint64_t> menu_candidates{}, menu_redirected{}, menu_fitted{};
 +    std::atomic<uint64_t> menu_capture_suppressed{}, menu_capture_pending{}, menu_eye_unknown{};
-+    std::atomic<int32_t> main_pass{-1}, capture_pass{-1}; // stereo pass of each NSF eye
++    std::atomic<uintptr_t> main_family_target{}, capture_family_target{}; // NSF eyes' FRenderTarget
 +    std::atomic<uint64_t> stage3_calls{}, stage3_redirected{}, stage3_fitted{}, stage3_empty{}, stage3_samples{};
 +    std::atomic<uint64_t> stage3_capture_suppressed{}, stage3_capture_pending{};
 +    struct MenuObservation {
@@ -286227,18 +286227,24 @@ index 0000000000000000000000000000000000000000..a3a6bd855ab1cd4b44209e36b353cb0a
 +inline thread_local SetupContext active_setup{};
 +inline thread_local MenuFitReceipt menu_fit_receipt{};
 +inline thread_local MenuFitReceipt transient_fit_receipt{}; // stage-2 Tonemap copy, NSF
-+inline constexpr uint32_t view_stereo_pass_offset = 0xc90;
++// FSceneView +0 is its family; the family's FRenderTarget is at +0x18 (as read by
++// WuWaLguiProbe), then the scene at +0x20.
++inline uintptr_t family_render_target(uintptr_t view) noexcept {
++    uintptr_t family{}, render_target{};
++    if (!checked::read_field(view, 0, family) || !family || !checked::read_field(family, 0x18, render_target)) return 0;
++    return render_target;
++}
 +
-+// Native stereo fix: remember which stereo pass renders into the main target and
-+// which into the second eye's capture, from setups whose target is known.
++// Native stereo fix: remember which family render target draws into the main
++// target and which into the second eye's capture, from setups whose target is known.
 +inline void learn_eye(State& s, uintptr_t view, uintptr_t source, const wuwa_lgui_route::Target& target) noexcept {
 +    if (!target.native_stereo_fix || !source || !target.game) return;
 +    const bool main = source == target.game;
 +    const bool capture = target.capture && target.capture != target.game && source == target.capture;
 +    if (!main && !capture) return;
-+    int32_t pass{};
-+    if (!checked::read_field(view, view_stereo_pass_offset, pass) || pass < 0 || pass > 8) return;
-+    (main ? s.main_pass : s.capture_pass).store(pass, std::memory_order_relaxed);
++    const auto render_target = family_render_target(view);
++    if (!render_target) return;
++    (main ? s.main_family_target : s.capture_family_target).store(render_target, std::memory_order_relaxed);
 +}
 +struct ScopedSetupContext {
 +    SetupContext previous{active_setup};
@@ -286301,10 +286307,8 @@ index 0000000000000000000000000000000000000000..a3a6bd855ab1cd4b44209e36b353cb0a
 +            if (known_menu_target) sample_menu_stages(s, renderer, view, ViewContext::tonemap, target);
 +            auto eye = TransientEye::main;
 +            if (known_menu_target && target.native_stereo_fix) {
-+                int32_t pass{-1};
-+                if (!checked::read_field(view, view_stereo_pass_offset, pass)) pass = -1;
-+                eye = transient_eye(pass, s.main_pass.load(std::memory_order_relaxed),
-+                    s.capture_pass.load(std::memory_order_relaxed));
++                eye = transient_eye(family_render_target(view), s.main_family_target.load(std::memory_order_relaxed),
++                    s.capture_family_target.load(std::memory_order_relaxed));
 +                if (eye == TransientEye::unknown) ++s.menu_eye_unknown;
 +            }
 +            if (target.menu_redirect_enabled && known_menu_target && eye == TransientEye::capture) {
@@ -286844,9 +286848,9 @@ index 0000000000000000000000000000000000000000..a3a6bd855ab1cd4b44209e36b353cb0a
 +                s.world_layout_skips.load(), s.world_guard_skips.load(), s.world_caller_skips.load(),
 +                s.world_disabled_skips.load(), s.world_mode_skips.load());
 +            spdlog::info("[WuWaLguiRedirect] menu_test enabled={} native_fix={} candidates={} redirected={} fitted={} "
-+                "eye_passes={}/{} capture_suppressed={} capture_pending={} eye_unknown={}",
++                "eye_targets={:x}/{:x} capture_suppressed={} capture_pending={} eye_unknown={}",
 +                target.menu_redirect_enabled, target.native_stereo_fix, s.menu_candidates.load(), s.menu_redirected.load(),
-+                s.menu_fitted.load(), s.main_pass.load(), s.capture_pass.load(), s.menu_capture_suppressed.load(),
++                s.menu_fitted.load(), s.main_family_target.load(), s.capture_family_target.load(), s.menu_capture_suppressed.load(),
 +                s.menu_capture_pending.load(), s.menu_eye_unknown.load());
 +            spdlog::info("[WuWaLguiRedirect] stage3 ready={} calls={} empty={} redirected={} fitted={} capture_suppressed={} capture_pending={}",
 +                s.menu_ready.load(), s.stage3_calls.load(), s.stage3_empty.load(), s.stage3_redirected.load(), s.stage3_fitted.load(),
@@ -287116,10 +287120,10 @@ index 0000000000000000000000000000000000000000..8ed04f0c3873e0de36cdcd875e54b1b4
 +} // namespace wuwa_lgui_route
 diff --git a/src/utility/WuWaLguiTargetPolicy.hpp b/src/utility/WuWaLguiTargetPolicy.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..44b4a1fcb7e490236bdf18df953c12aceac7a08f
+index 0000000000000000000000000000000000000000..114cd315c3078f9ddcc05efdb05f2d793a0492a0
 --- /dev/null
 +++ b/src/utility/WuWaLguiTargetPolicy.hpp
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,106 @@
 +#pragma once
 +
 +#include <array>
@@ -287158,17 +287162,19 @@ index 0000000000000000000000000000000000000000..44b4a1fcb7e490236bdf18df953c12ac
 +    return true;
 +}
 +
-+// Native stereo fix, 13 Oct 2026 (journey menu, simulator): while some full-screen
++// Native stereo fix, 13 Oct 2026 (journey, quest and Esc menus, simulator): while full-screen
 +// menus are open the stage-2 canvases, including the menu's background picture,
 +// draw into each eye's transient Tonemap, so the picture stayed fixed in front of
-+// the eyes. Its texture has no RHI at setup, so the eye comes from the view's
-+// stereo pass, learned from setups whose target is known: the main target's pass
-+// and the second eye's capture pass. Unknown or equal passes leave the draw alone.
++// the eyes. Its texture has no RHI at setup, and both eyes' views carry the same
++// stereo pass, so the eye comes from the view family's render target, learned from
++// setups whose target is known: the game viewport for the main copy, the capture
++// target for the second eye. Unknown or equal targets leave the draw alone.
 +enum class TransientEye { unknown, main, capture };
-+inline constexpr TransientEye transient_eye(int32_t pass, int32_t main_pass, int32_t capture_pass) noexcept {
-+    if (pass < 0 || main_pass < 0 || capture_pass < 0 || main_pass == capture_pass) return TransientEye::unknown;
-+    if (pass == main_pass) return TransientEye::main;
-+    if (pass == capture_pass) return TransientEye::capture;
++inline constexpr TransientEye transient_eye(uintptr_t family_target, uintptr_t main_target,
++        uintptr_t capture_target) noexcept {
++    if (!family_target || !main_target || !capture_target || main_target == capture_target) return TransientEye::unknown;
++    if (family_target == main_target) return TransientEye::main;
++    if (family_target == capture_target) return TransientEye::capture;
 +    return TransientEye::unknown;
 +}
 +

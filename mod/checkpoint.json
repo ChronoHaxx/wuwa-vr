@@ -1,37 +1,37 @@
 {
   "schema": 3,
-  "build": "vr-menu-1-2-0",
+  "build": "godray-menu-1-2-1",
   "privateCandidate": false,
-  "launcherVersion": "1.2.0",
+  "launcherVersion": "1.2.1",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "917388ee149812183f60d9dabf8717790cb6d83dbbb8b38c95063bc177de09e5",
-  "frozenPatchSha256": "c2c25ea3c35eaa75262cef5743c20ad0ac84bc8bde6e5b4daede5bbf42ca328d",
-  "sourceReconstructedTree": "e3c6bcebcf3394409ef7dbbd08a60d01eab8ad73",
-  "buildCompleted": "2026-10-11T22:26:02+0100",
+  "backendSha256": "e41bfe2f01c8f6c69cac479578cff3b140f2ffcc7a2c78631ebe24ea71e86ae4",
+  "frozenPatchSha256": "8710053a890c9abc30c4a5a1ea3bede6e94801243c6e74edce36f77b72afb431",
+  "sourceReconstructedTree": "d9cda3c5f76b1062e886e0d29a6a8f16b742ab08",
+  "buildCompleted": "2026-10-13T16:10:35+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 52788243,
-    "sha256": "114d64c074004947161f8bf8e416c26d1c74bfe2fb15c192644bd971286dc804",
+    "bytes": 52814324,
+    "sha256": "8d7287830d8a3abf505d2c9cce1de82436ea6c911a997158be953241debec8fb",
     "public": true
   },
-  "liveAcceptance": "Owner headset tests through private test 3o (Valve Index controllers, Bigscreen Beyond; Meta Quest Pro with a Reality Runner treadmill). Pending: the 3p additions (treadmill runs in the VR menu, Controllers page, ambient occlusion off), Windows 11 Steam PC retest, PlayStation hardware and broad headset compatibility.",
+  "liveAcceptance": "1.2.0 played in the headset by the owner. The 1.2.1 fixes (AO in both eyes, storm-sky god rays, live world behind full-screen menus, journey picture on the panel, HUD after a view switch) measured on the OpenXR simulator and played there by the owner (test 6). Pending: headset check of the 1.2.1 fixes, Windows 11 Steam PC retest, PlayStation hardware and broad headset compatibility.",
   "previousPublicRelease": {
-    "tag": "beta-1-1-2",
-    "backendSha256": "dfa8b4af8c38233c8c635ce24bc610fa91ab3f2884d26a5d5d1248e231b08a06"
+    "tag": "beta-1-2-0",
+    "backendSha256": "917388ee149812183f60d9dabf8717790cb6d83dbbb8b38c95063bc177de09e5"
   },
-  "sourceIdentity": "The WuWa VR menu (utility/WuWaVrMenu, mods/vr/WuWaVrMenuHost) replaces UEVR's window on L3 + R3; controls cards (utility/WuWaShortcutSheet) replace the shortcut sheet; VR controllers for walking (#15); close-ups as in test 3j. See docs/VR-MENU.md and VR-MENU-1.2.0.md. Steam guard, resize guard, DX12 handoff and graphics policy retained.",
+  "sourceIdentity": "1.2.0 plus: AO with a symmetric eye projection while on; Kuro god-ray pass in the eye frustum (utility/WuWaGodRay); full-screen menu backgrounds on the UI panel (utility/WuWaLguiRedirect); r.CacheSceneColor.Enable kept at 0 (utility/WuWaSceneCache); HUD root fitted after a view switch (lua/wuwa_hud_refresh). See docs/launch-kit/GODRAY-MENU-1.2.1.md and PR #17. VR menu, Steam guard, resize guard, DX12 handoff and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "vr-menu-1-2-0",
+  "rendererBuild": "godray-menu-1-2-1",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-1-2-0",
+  "releaseTag": "beta-1-2-1",
   "sdkPatchSha256": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
   "sdkReconstructedTree": "0ad1702a10fec58469ec88265fa7297365fffab6",
-  "launcherSha256": "a14458b43023411f2c7fa25a33908883c7488d0c70947a8b87acb56e9a5959ef",
-  "setupSha256": "1415e224a7c244c7a528f183b04006a57047a379e0e7c82cf1d01219ab71566f"
+  "launcherSha256": "5abef21af25440b96e37493c3a3928615270c8565c0739739862e6b87768c24f",
+  "setupSha256": "0b44973f82a3ccc2deb4b4951ea59796cf5662f57477285ad6be3bbc179059e7"
 }

@@ -1,17 +1,16 @@
-WUWA VR — 1.2.0 BETA / FOCUSED USER CHECKS
-App 1.2.0 | Package beta-1-2-0 | Build vr-menu-1-2-0 | Game 3.7 | 11 Oct 22:49 BST
+WUWA VR — 1.2.1 BETA / FOCUSED USER CHECKS
+App 1.2.1 | Package beta-1-2-1 | Build godray-menu-1-2-1 | Game 3.7 | 13 Oct 16:51 BST
 
 Record Pass / Fail / Blocked / Not tested. Automated checks are not user results.
 Close game and injector before updating package or changing runtime.
 
-[ ] Update app to 1.2.0, then choose/install VR package 1.2.0 beta in step 02.
+[ ] Update app to 1.2.1, then choose/install VR package 1.2.1 beta in step 02.
     If using simulator, explicitly choose Use bundled simulator. Confirm ready.
-[ ] Launch once with the usual setup. Press L3 + R3: the WuWa VR menu opens.
-    Change a page with LB / RB, then close it with B.
-[ ] With VR controllers: point at the menu and pull the trigger on an item.
-[ ] Hold L3 for half a second: the controls card rises under your view.
-[ ] LT + RT, then click R3 three times: stereo screen, mono theatre, full VR.
-[ ] Record page: record 30 seconds, stop, and check the clip hides your UID.
+[ ] Open the quest log, then the Esc menu: turn your head. The world behind stays put.
+[ ] Open the journey menu: its picture sits on the menu panel, not in your view.
+[ ] Switch to the stereo screen (LT + RT, then click R3), then back to full VR
+    (LT + RT, then hold R3): the HUD and an opened menu are full size.
+[ ] At a storm sky (Fogveil Pagoda): the light shafts stay with the clouds as you turn.
 
 PS4/PS5 hardware and physical-headset comfort remain separate pending checks.
 See PlayerGuide.html for controls, recovery and remaining rendering limitations.

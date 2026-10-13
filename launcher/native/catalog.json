@@ -2,6 +2,18 @@
   "schema": 1,
   "releases": [
     {
+      "id": "beta-1-2-1",
+      "displayName": "1.2.1 beta · 13 Oct 16:51 BST",
+      "gameVersion": "3.7",
+      "buildId": "godray-menu-1-2-1",
+      "channel": "beta",
+      "published": "2026-10-13T15:52:58.105340+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-1/WuWa-VR-Launcher.zip",
+      "sha256": "8d7287830d8a3abf505d2c9cce1de82436ea6c911a997158be953241debec8fb",
+      "size": 52814324,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-1"
+    },
+    {
       "id": "beta-1-2-0",
       "displayName": "1.2.0 beta · 11 Oct 22:49 BST",
       "gameVersion": "3.7",

@@ -1,13 +1,13 @@
-# Mod source — 1.2.0 beta
+# Mod source — 1.2.1 beta
 
 The release target is
-[beta-1-2-0](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-0),
-launcher **1.2.0**, backend/package build **vr-menu-1-2-0**, for game
+[beta-1-2-1](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-1),
+launcher **1.2.1**, backend/package build **godray-menu-1-2-1**, for game
 **3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. Headset results and open checks are below.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The owner played this release in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill) through private tests: the new VR menu with the laser and a gamepad, the view shortcuts, full-VR close-ups that follow the camera without getting stuck, blur in both eyes, from the start of a story scene, the menu in front of the stereo screen, a gamepad taking over at once from a put-down controller, the controls cards and the translated menu and VR controllers and a Reality Runner treadmill working together. The last test's additions (treadmill runs in the VR menu, the Controllers page, ambient occlusion off, the L3 card pinned low) and recording in 5-minute parts still need a headset check. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot, and in full VR the HUD can stay squashed until ESC. See [the 1.2.0 release notes](../docs/launch-kit/VR-MENU-1.2.0.md).
+The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill). The 1.2.1 fixes (ambient occlusion in both eyes, the storm-sky god rays, the live world behind full-screen menus, the journey picture on the menu panel and the HUD after a view switch) were measured on the OpenXR simulator and played there by the owner; a headset check is still pending. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot. See [the 1.2.1 release notes](../docs/launch-kit/GODRAY-MENU-1.2.1.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

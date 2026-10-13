@@ -1,8 +1,8 @@
 {
-  "tag": "beta-1-2-0",
-  "previousTag": "beta-1-1-2",
+  "tag": "beta-1-2-1",
+  "previousTag": "beta-1-2-0",
   "game": "3.7",
-  "appVersion": "1.2.0",
-  "buildId": "vr-menu-1-2-0",
+  "appVersion": "1.2.1",
+  "buildId": "godray-menu-1-2-1",
   "installer": "WuWa-VR-Setup.exe"
 }

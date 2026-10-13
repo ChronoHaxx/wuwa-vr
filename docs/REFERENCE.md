@@ -253,6 +253,12 @@ check pending. Older than this project.
   **Ambient occlusion** (WuWa VR menu → Fixes, `WuWaStereo_AmbientOcclusion`)
   is on; turning it on restores the value the game had. A value frozen in
   UEVR's CVars panel wins.
+- **On by default (1.2.2):** with the symmetric projection below both eyes
+  shade alike, so the toggle defaults to on. Configs saved before 1.2.2 hold
+  the old default; they are switched on once (`WuWaStereo_AmbientOcclusionDefault`
+  records it) and a later choice to turn it off stays. Cost measured 13 Oct
+  2026 on the OpenXR Simulator at 3292 px per eye, AO off/on alternated three
+  times for 20 s each: 31.0 -> 33.2 ms a frame (about 2.2 ms, 7 %).
 - **Cause (cause 6, measured 12 Oct 2026):** WuWa runs classic SSAO
   (`r.AmbientOcclusion.Method` 0, pixel shader, half resolution; DFAO off). It
   builds view-space positions from a centred projection, but each headset eye

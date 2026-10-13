@@ -236,10 +236,13 @@ private:
     // Bounded lighting-volume refresh; not a general material or NPC rim repair.
     const ModToggle::Ptr m_refill_far_lighting{ModToggle::create("WuWaStereo_RefillFarLighting", true)};
     // Screen-space ambient occlusion shades the two eyes differently with off-centre eye
-    // frustums (rocks, hills, roofs; Lelouche, 9 Oct 2026). Off unless chosen
-    // (r.AmbientOcclusionLevels 0, CVarManager.cpp); on also makes OpenXR render
-    // symmetric frustums (VR::get_effective_horizontal_projection_override).
-    const ModToggle::Ptr m_ambient_occlusion{ModToggle::create("WuWaStereo_AmbientOcclusion", false)};
+    // frustums (rocks, hills, roofs; Lelouche, 9 Oct 2026). While it renders, OpenXR
+    // renders symmetric frustums (VR::get_effective_horizontal_projection_override), so
+    // it is on by default from 1.2.2; off sets r.AmbientOcclusionLevels 0 (CVarManager.cpp).
+    // Cost measured 13 Oct 2026: about 2.2 ms a frame (7%), simulator, 3292 px per eye.
+    const ModToggle::Ptr m_ambient_occlusion{ModToggle::create("WuWaStereo_AmbientOcclusion", true)};
+    // Configs saved before 1.2.2 hold the old default (off). 1 = moved to the new default.
+    const ModInt32::Ptr m_ambient_occlusion_default{ModInt32::create("WuWaStereo_AmbientOcclusionDefault", 0)};
     std::atomic<bool> m_ao_rendering{false};
     struct RimToggle : ModToggle {
         RimToggle() : ModToggle{"WuWaStereo_SuppressNpcRim", false} {}

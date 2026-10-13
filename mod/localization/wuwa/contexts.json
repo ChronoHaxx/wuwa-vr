@@ -1567,15 +1567,15 @@
   "Off by default. Detected movies are intended to use mono; story scenes use your choice above. Recognition remains unverified. Manual view changes take priority.": [
     "mods/VR.cpp"
   ],
-  "Off by default: in VR its shading differs between the eyes on rocks, hills and roofs. On gives the game its own setting back.": [
-    "mods/vr/WuWaControlsComponent.cpp"
-  ],
   "Off: UEVR opens its classic window, as before. You can turn this menu back on under VR > WuWa Controls.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "On": [
     "utility/WuWaShortcutSheet.cpp",
     "utility/WuWaVrMenu.cpp"
+  ],
+  "On by default: both eyes render with a symmetric view, so its shading matches on rocks, hills and roofs. Off is a little faster.": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "On uses our LGUI capture. Off shows the game's original HUD in the eye images. This does not hide the UEVR settings panel.": [
     "mods/VR.cpp"
@@ -2101,7 +2101,7 @@
   "Smooths the game camera's up / down tilt.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Soft contact shadows in corners and under objects. Off by default. On gives the game its own setting back and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer.": [
+  "Soft contact shadows in corners and under objects. On by default. It keeps the game's own setting and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer. Off is a little faster.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Speed": [

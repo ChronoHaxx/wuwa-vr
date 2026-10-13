@@ -318,7 +318,7 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
-    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, *m_ambient_occlusion, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, *m_ambient_occlusion, *m_ambient_occlusion_default, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
@@ -344,6 +344,14 @@ void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_
     // the boxes on always rather than only while the launcher records.
     if (!set_defaults && !cfg.get("WuWaPrivacy_Mode") && cfg.get<bool>("WuWaPrivacy_Enabled").value_or(false))
         m_privacy->value()=2;
+    // 1.2.2 turns ambient occlusion on by default. A config saved before then
+    // says off only because that was the default, so switch it on once; the
+    // marker is saved with the config, and a later choice to turn it off stays.
+    if (!set_defaults && m_ambient_occlusion_default->value() < 1) {
+        if (!m_ambient_occlusion->value()) spdlog::info("[WuWa] Ambient occlusion: on, the new default (once, for configs from before 1.2.2)");
+        m_ambient_occlusion->value() = true;
+        m_ambient_occlusion_default->value() = 1;
+    }
     if (wuwa_test::is_wuwa())
         wuwa_l10n::request(m_language->value(), Framework::get_persistent_dir("wuwa-languages"));
     if (!wuwa_test::is_wuwa() || set_defaults || !m_recovery.launch().empty()) return;
@@ -753,7 +761,7 @@ void WuWaControlsComponent::on_draw_ui() {
         wuwa_ui::draw(*m_refill_far_lighting,"Refresh far-lighting cache (limited workaround)");
         if (wuwa_ui::Button("Refill far lighting now")) wuwa_clv::request();
         wuwa_ui::draw(*m_ambient_occlusion,"Ambient occlusion (soft contact shadows)");
-        wuwa_ui::TextWrapped("Off by default: in VR its shading differs between the eyes on rocks, hills and roofs. On gives the game its own setting back.");
+        wuwa_ui::TextWrapped("On by default: both eyes render with a symmetric view, so its shading matches on rocks, hills and roofs. Off is a little faster.");
         wuwa_ui::TextWrapped("Requests a bounded cascade-lighting-volume refresh after stereo starts or resumes, after detected teleports, or on request. It helped the tested ship/wheel lighting case; it is not a general fix for dark objects or character rims. Each refill can cause a short hitch.");
         wuwa_ui::draw(m_suppress_npc_rim,"Hide character rim lighting (optional workaround)");
         wuwa_ui::TextWrapped("Optional workaround, off by default. Removes toon-depth rim lighting from all characters using it, including nearby characters. This hides the observed extra eye contour; it does not repair the underlying stereo cause. Restores the prior value when disabled, in 2D screen mode, or when native VR is inactive.");

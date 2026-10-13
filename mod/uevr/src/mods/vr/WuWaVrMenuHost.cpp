@@ -771,9 +771,9 @@ Page fixes_page() {
     page.items.push_back(setting_toggle("Match cinematic framing",
         "Gives both eyes the same framing during letterboxed scenes.", "VR_CinematicFramingFix"));
     page.items.push_back(setting_toggle("Ambient occlusion",
-        "Soft contact shadows in corners and under objects. Off by default. On gives the game its own setting back and "
+        "Soft contact shadows in corners and under objects. On by default. It keeps the game's own setting and "
         "renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is "
-        "slightly softer.", "WuWaStereo_AmbientOcclusion"));
+        "slightly softer. Off is a little faster.", "WuWaStereo_AmbientOcclusion"));
     page.items.push_back(paragraph("Smoothness", true));
     page.items.push_back(paragraph(
         "Full VR draws two large eye images every frame, far more pixels than the stereo screen, so busy scenes such as "

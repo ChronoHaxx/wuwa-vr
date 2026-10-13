@@ -766,9 +766,11 @@ public:
     // WuWa: screen-space AO builds view positions from a centred projection, so each
     // eye's off-centre frustum skews its AO the opposite way and the shading differs
     // between eyes (12 Oct 2026: L/R AO gap 0.38 raw, 0.10 symmetric, 0.07 floor).
-    // While AO is on, both eyes render a symmetric frustum cropped to their own FOV.
+    // While AO renders, both eyes render a symmetric frustum cropped to their own FOV. This
+    // follows the cvar, not only the toggle: AO set on in UEVR's cvar list skipped the fix
+    // (Lelouche, 13 Oct 2026).
     int32_t get_effective_horizontal_projection_override() const {
-        return m_wuwa_controls.ambient_occlusion() ? HORIZONTAL_SYMMETRIC : m_horizontal_projection_override->value();
+        return m_wuwa_controls.ambient_occlusion_rendering() ? HORIZONTAL_SYMMETRIC : m_horizontal_projection_override->value();
     }
 
     auto get_vertical_projection_override() const {

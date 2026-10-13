@@ -34,18 +34,19 @@ namespace {
 // the player chooses it (WuWaStereo_AmbientOcclusion); while it is on, OpenXR renders
 // symmetric frustums (VR::get_effective_horizontal_projection_override), which makes the
 // eyes agree. r.AmbientOcclusionLevels 0 is off; turning it back on restores the value it
-// had. A value frozen in the cvar list wins. Game thread.
+// had. A value frozen in the cvar list wins. Returns whether AO renders after this tick (the
+// cvar is non-zero), or nothing while the cvar is unavailable. Game thread.
 std::optional<int> g_wuwa_ao_before{};
 
-void wuwa_ambient_occlusion(bool on, bool frozen_by_player) {
-    if (frozen_by_player) return;
+std::optional<bool> wuwa_ambient_occlusion(bool on, bool frozen_by_player) {
     auto data = sdk::find_cvar_data_cached(L"Engine", L"r.AmbientOcclusionLevels");
-    if (!data) return;
+    if (!data) return std::nullopt;
     auto* value = data->get<int>();
-    if (value == nullptr) return;
+    if (value == nullptr) return std::nullopt;
+    if (frozen_by_player) return value->get() != 0;
     const int current = value->get();
     if (!on) {
-        if (current == 0) return;
+        if (current == 0) return false;
         if (!g_wuwa_ao_before) {
             g_wuwa_ao_before = current;
             SPDLOG_INFO("[WuWa] Ambient occlusion off (r.AmbientOcclusionLevels {} -> 0)", current);
@@ -57,6 +58,7 @@ void wuwa_ambient_occlusion(bool on, bool frozen_by_player) {
             *g_wuwa_ao_before);
         g_wuwa_ao_before.reset();
     }
+    return value->get() != 0;
 }
 }
 
@@ -154,7 +156,12 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
         for (const auto& cvar : m_all_cvars) {
             if (cvar->get_name() == L"r.AmbientOcclusionLevels") { ao_frozen = cvar->is_frozen(); break; }
         }
-        wuwa_ambient_occlusion(controls.ambient_occlusion(), ao_frozen);
+        const bool ao = wuwa_ambient_occlusion(controls.ambient_occlusion(), ao_frozen).value_or(controls.ambient_occlusion());
+        if (ao != controls.ambient_occlusion_rendering()) {
+            controls.set_ambient_occlusion_rendering(ao);
+            SPDLOG_INFO("[WuWa] Ambient occlusion {}: eye projection {}{}", ao ? "renders" : "off",
+                ao ? "symmetric" : "as configured", ao_frozen ? " (r.AmbientOcclusionLevels frozen in the cvar list)" : "");
+        }
     }
     if (wuwa_test::is_wuwa()) {
         const auto vr = VR::get();

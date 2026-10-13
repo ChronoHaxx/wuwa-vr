@@ -29,6 +29,10 @@ public:
     bool stereo_all_effects() const { return m_stereo_effects->value() == 1; }
     bool refill_far_lighting() const { return m_refill_far_lighting->value(); }
     bool ambient_occlusion() const { return m_ambient_occlusion->value(); }
+    // Whether AO actually renders (r.AmbientOcclusionLevels non-zero), however it was turned on:
+    // the toggle, or a value set in UEVR's cvar list. Written by CVarManager on the game thread.
+    bool ambient_occlusion_rendering() const { return m_ao_rendering.load(std::memory_order_relaxed); }
+    void set_ambient_occlusion_rendering(bool on) { m_ao_rendering.store(on, std::memory_order_relaxed); }
     bool automatic_runs() const { return m_run_auto->value(); }
     // One line about the treadmill run: on, last one, or how one starts (translated, logical order).
     std::string run_status() const;
@@ -236,6 +240,7 @@ private:
     // (r.AmbientOcclusionLevels 0, CVarManager.cpp); on also makes OpenXR render
     // symmetric frustums (VR::get_effective_horizontal_projection_override).
     const ModToggle::Ptr m_ambient_occlusion{ModToggle::create("WuWaStereo_AmbientOcclusion", false)};
+    std::atomic<bool> m_ao_rendering{false};
     struct RimToggle : ModToggle {
         RimToggle() : ModToggle{"WuWaStereo_SuppressNpcRim", false} {}
         std::atomic<bool> requested{false};

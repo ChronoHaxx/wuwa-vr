@@ -272233,7 +272233,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..3099069db389851c3cfa7c109f81f34d
      ZoneScopedN(__FUNCTION__);
  
 diff --git a/src/mods/VR.hpp b/src/mods/VR.hpp
-index 941840c7f61a353fab6a22452267ba259608a81f..42af46b511194c88784d84fbbf9ec5ab6efdf9fd 100644
+index 941840c7f61a353fab6a22452267ba259608a81f..06056548310f1fea217f4f50e83ba7298369c5df 100644
 --- a/src/mods/VR.hpp
 +++ b/src/mods/VR.hpp
 @@ -13,12 +13,16 @@
@@ -272599,7 +272599,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..42af46b511194c88784d84fbbf9ec5ab
              *m_lerp_camera_pitch,
              *m_lerp_camera_yaw,
              *m_lerp_camera_roll,
-@@ -1105,6 +1297,70 @@ private:
+@@ -1105,6 +1297,71 @@ private:
      bool m_stereo_emulation_mode{false}; // not a good config option, just for debugging
      bool m_wait_for_present{true};
      const ModToggle::Ptr m_controllers_allowed{ ModToggle::create(generate_name("ControllersAllowed"), true) };
@@ -272658,10 +272658,11 @@ index 941840c7f61a353fab6a22452267ba259608a81f..42af46b511194c88784d84fbbf9ec5ab
 +    const ModToggle::Ptr m_wuwa_stereo_translucency{ ModToggle::create(generate_name("WuWaStereoTranslucency"), false) };
 +    const ModToggle::Ptr m_wuwa_kuro_water_stereo{ ModToggle::create(generate_name("WuWaKuroWaterStereo"), false) };
 +    const ModToggle::Ptr m_wuwa_hide_kuro_reflections{ ModToggle::create(generate_name("WuWaHideKuroReflections"), false) };
-+    // Camera the storm-sky god-ray pass renders from (WuWaGodRay.hpp): 0 game, 1 eye, 2 game without head,
-+    // 3 eye frustum, 4 eye FOV. Scale and shear multiply the mode 3/4 terms; hidden, for live tuning.
-+    const ModCombo::Ptr m_wuwa_god_ray_camera{ ModCombo::create(generate_name("WuWaGodRayCamera"),
-+        {"Game", "Eye", "Game without head", "Eye frustum", "Eye FOV"}, 0) };
++    // View the storm-sky god-ray pass renders with in VR (WuWaGodRay.hpp): 0 game, 1 eye, 2 game without head,
++    // 3 eye frustum (default, the fix), 4 eye FOV. Scale and shear multiply the mode 3/4 terms. Hidden, for
++    // diagnostics; the key replaces WuWaGodRayCamera, which test profiles saved as 0.
++    const ModCombo::Ptr m_wuwa_god_ray_camera{ ModCombo::create(generate_name("WuWaGodRayView"),
++        {"Game", "Eye", "Game without head", "Eye frustum", "Eye FOV"}, 3) };
 +    const ModSlider::Ptr m_wuwa_god_ray_scale{ ModSlider::create(generate_name("WuWaGodRayScale"), 0.25f, 4.0f, 1.0f) };
 +    const ModSlider::Ptr m_wuwa_god_ray_shear{ ModSlider::create(generate_name("WuWaGodRayShear"), -4.0f, 4.0f, 1.0f) };
 +    const ModToggle::Ptr m_wuwa_native_frame_timing{ ModToggle::create(generate_name("WuWaNativeFrameTiming"), false) };
@@ -283574,10 +283575,10 @@ index 0000000000000000000000000000000000000000..8c81eb42fa75ab03b670eaac2b42a30f
 +} // namespace wuwa_eye_diff
 diff --git a/src/utility/WuWaGodRay.hpp b/src/utility/WuWaGodRay.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..57570e583afdbc5715894fe0d74e83eb8126b967
+index 0000000000000000000000000000000000000000..a05971aea82e7025ef72292076d2fa40dc8ab228
 --- /dev/null
 +++ b/src/utility/WuWaGodRay.hpp
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,258 @@
 +#pragma once
 +// Kuro's screen-space god ray (storm sky at the Mengzhou Fogveil Pagoda, 13 Oct 2026).
 +// KuroGlobalGI::ApplyGodRay hands the scene a 256x256 GodRayRT and ExtraFOV; each
@@ -283588,9 +283589,13 @@ index 0000000000000000000000000000000000000000..57570e583afdbc5715894fe0d74e83eb
 +// FOV (+0xca4) stays the game's 75 degrees in VR, while the material maps each eye
 +// pixel into the target from the eye's own, wider and off-centre, projection. With the
 +// god-ray layer isolated (volume on minus off) it moved about 1.5 times as far as the
-+// world for a head turn, so the rays slid across the clouds (13 Oct, simulator).
++// world for a head turn, so the rays slid across the clouds, and with the headset's
++// off-centre eyes (AO off) each eye drew them in a different place (13 Oct, simulator).
++// Mode 3, the default in VR, keeps them on the clouds within the scene's own error for
++// yaw +-12 and pitch +-8 degrees and makes the eyes agree, with AO on or off; mode 4
++// still left the eyes apart, and the derived scale and shear measured best.
 +//
-+// This hook wraps the pass. Every couple of seconds it logs how far the pass camera
++// This hook wraps the pass. Every 30 seconds it logs how far the pass camera
 +// (+0x520) is from the eye's ViewMatrix rotation (+0x3e0) and from the game camera
 +// recorded before the head pose is applied, and the eye's projection. The camera
 +// setting picks what the pass renders from, for the duration of the call only:
@@ -283753,7 +283758,7 @@ index 0000000000000000000000000000000000000000..57570e583afdbc5715894fe0d74e83eb
 +    last_shear_x.store(shear_x, std::memory_order_relaxed);
 +    last_shear_y.store(shear_y, std::memory_order_relaxed);
 +    if (now >= next_log_ms.load(std::memory_order_relaxed)) {
-+        next_log_ms.store(now + 2000, std::memory_order_relaxed);
++        next_log_ms.store(now + 30000, std::memory_order_relaxed);
 +        spdlog::info("[WuWaGodRay] pass={} fov={:.2f} views={} mode={} pass_vs_eye={:.2f} deg "
 +            "pass_vs_game={:.2f} deg eye_vs_game={:.2f} deg P00={:.4f} P11={:.4f} P20={:.4f} P21={:.4f} "
 +            "scale={:.4f} shear=({:.4f},{:.4f}) calls={} replaced={}",

@@ -8,9 +8,13 @@
 // FOV (+0xca4) stays the game's 75 degrees in VR, while the material maps each eye
 // pixel into the target from the eye's own, wider and off-centre, projection. With the
 // god-ray layer isolated (volume on minus off) it moved about 1.5 times as far as the
-// world for a head turn, so the rays slid across the clouds (13 Oct, simulator).
+// world for a head turn, so the rays slid across the clouds, and with the headset's
+// off-centre eyes (AO off) each eye drew them in a different place (13 Oct, simulator).
+// Mode 3, the default in VR, keeps them on the clouds within the scene's own error for
+// yaw +-12 and pitch +-8 degrees and makes the eyes agree, with AO on or off; mode 4
+// still left the eyes apart, and the derived scale and shear measured best.
 //
-// This hook wraps the pass. Every couple of seconds it logs how far the pass camera
+// This hook wraps the pass. Every 30 seconds it logs how far the pass camera
 // (+0x520) is from the eye's ViewMatrix rotation (+0x3e0) and from the game camera
 // recorded before the head pose is applied, and the eye's projection. The camera
 // setting picks what the pass renders from, for the duration of the call only:
@@ -173,7 +177,7 @@ inline void pass_hook(void* renderer, void* graph) {
     last_shear_x.store(shear_x, std::memory_order_relaxed);
     last_shear_y.store(shear_y, std::memory_order_relaxed);
     if (now >= next_log_ms.load(std::memory_order_relaxed)) {
-        next_log_ms.store(now + 2000, std::memory_order_relaxed);
+        next_log_ms.store(now + 30000, std::memory_order_relaxed);
         spdlog::info("[WuWaGodRay] pass={} fov={:.2f} views={} mode={} pass_vs_eye={:.2f} deg "
             "pass_vs_game={:.2f} deg eye_vs_game={:.2f} deg P00={:.4f} P11={:.4f} P20={:.4f} P21={:.4f} "
             "scale={:.4f} shear=({:.4f},{:.4f}) calls={} replaced={}",

@@ -1352,10 +1352,11 @@ private:
     const ModToggle::Ptr m_wuwa_stereo_translucency{ ModToggle::create(generate_name("WuWaStereoTranslucency"), false) };
     const ModToggle::Ptr m_wuwa_kuro_water_stereo{ ModToggle::create(generate_name("WuWaKuroWaterStereo"), false) };
     const ModToggle::Ptr m_wuwa_hide_kuro_reflections{ ModToggle::create(generate_name("WuWaHideKuroReflections"), false) };
-    // Camera the storm-sky god-ray pass renders from (WuWaGodRay.hpp): 0 game, 1 eye, 2 game without head,
-    // 3 eye frustum, 4 eye FOV. Scale and shear multiply the mode 3/4 terms; hidden, for live tuning.
-    const ModCombo::Ptr m_wuwa_god_ray_camera{ ModCombo::create(generate_name("WuWaGodRayCamera"),
-        {"Game", "Eye", "Game without head", "Eye frustum", "Eye FOV"}, 0) };
+    // View the storm-sky god-ray pass renders with in VR (WuWaGodRay.hpp): 0 game, 1 eye, 2 game without head,
+    // 3 eye frustum (default, the fix), 4 eye FOV. Scale and shear multiply the mode 3/4 terms. Hidden, for
+    // diagnostics; the key replaces WuWaGodRayCamera, which test profiles saved as 0.
+    const ModCombo::Ptr m_wuwa_god_ray_camera{ ModCombo::create(generate_name("WuWaGodRayView"),
+        {"Game", "Eye", "Game without head", "Eye frustum", "Eye FOV"}, 3) };
     const ModSlider::Ptr m_wuwa_god_ray_scale{ ModSlider::create(generate_name("WuWaGodRayScale"), 0.25f, 4.0f, 1.0f) };
     const ModSlider::Ptr m_wuwa_god_ray_shear{ ModSlider::create(generate_name("WuWaGodRayShear"), -4.0f, 4.0f, 1.0f) };
     const ModToggle::Ptr m_wuwa_native_frame_timing{ ModToggle::create(generate_name("WuWaNativeFrameTiming"), false) };

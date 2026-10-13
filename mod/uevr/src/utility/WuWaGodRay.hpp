@@ -5,18 +5,24 @@
 // Views[0]'s TranslatedViewMatrix (+0x520 = ViewMatrices +0x200; ViewMatrices sit at
 // +0x320, ViewMatrix at +0x3e0) with a square projection of Views[0].FOV (+0xca4) plus
 // ExtraFOV. The region's post material (parent M_GodRayPost) then blurs it on screen.
-// In VR the streaks stay put on screen when only the head turns (simulator, game
-// camera fixed: the world moves +-49 px for 12 degrees of head yaw, the fan 11-12 px,
-// also with a symmetric FOV and IPD 0), so one rotation in that chain is the game
-// camera's rather than the eye's.
+// FOV (+0xca4) stays the game's 75 degrees in VR, while the material maps each eye
+// pixel into the target from the eye's own, wider and off-centre, projection. With the
+// god-ray layer isolated (volume on minus off) it moved about 1.5 times as far as the
+// world for a head turn, so the rays slid across the clouds (13 Oct, simulator).
 //
 // This hook wraps the pass. Every couple of seconds it logs how far the pass camera
 // (+0x520) is from the eye's ViewMatrix rotation (+0x3e0) and from the game camera
-// recorded before the head pose is applied. The camera setting picks what the pass
-// renders from, for the duration of the call only:
+// recorded before the head pose is applied, and the eye's projection. The camera
+// setting picks what the pass renders from, for the duration of the call only:
 //   0  the game's own matrix (unchanged)
 //   1  the eye's ViewMatrix rotation (head-tracked)
 //   2  the game camera without the head pose (diagnostic)
+//   3  eye frustum: view space scaled by tan(FOV/2) * P00 and sheared by the eye's
+//      off-centre terms, so the square target covers exactly what the material maps
+//      each eye pixel to when it works in screen coordinates
+//   4  eye FOV: the same scale without the shear, for a material that works from
+//      true view directions
+// Scale and shear multiply the mode 3/4 terms (1 = as derived), for tuning live.
 // The function is found by its code bytes; if they do not match, nothing is hooked.
 #include <Windows.h>
 
@@ -44,6 +50,7 @@ inline constexpr const char* pass_pattern =
 inline constexpr uint32_t views_offset = 0x108, view_count_offset = 0x110;
 inline constexpr uint32_t pass_offset = 0xc90, fov_offset = 0xca4;
 inline constexpr uint32_t view_matrix_offset = 0x3e0, translated_view_offset = 0x520;
+inline constexpr uint32_t projection_no_aa_offset = 0x360; // ViewMatrices + 0x40
 
 using Matrix = std::array<float, 16>; // UE FMatrix, row-major, row vectors
 
@@ -52,6 +59,8 @@ inline std::atomic<uint64_t> calls{}, replaced{}, faults{}, next_log_ms{};
 inline std::atomic<float> pre_pitch{}, pre_yaw{}, pre_roll{};
 inline std::atomic<bool> has_pre{};
 inline std::atomic<float> last_eye_angle{-1.0f}, last_game_angle{-1.0f}, last_fov{};
+inline std::atomic<float> scale_factor{1.0f}, shear_factor{1.0f};
+inline std::atomic<float> last_p00{}, last_p11{}, last_p20{}, last_p21{}, last_scale{}, last_shear_x{}, last_shear_y{};
 inline safetyhook::InlineHook hook{};
 inline std::once_flag install_once;
 
@@ -95,6 +104,15 @@ inline float rotation_angle(const Matrix& a, const Matrix& b) noexcept {
     return std::acos(c) * 180.0f / 3.14159265358979f;
 }
 
+// UE perspective (row vectors): x and y scale on the diagonal, off-centre terms in
+// row 2, w = z.
+inline bool plausible_projection(const Matrix& p) noexcept {
+    for (const float v : p)
+        if (!std::isfinite(v)) return false;
+    return p[0] > 0.05f && p[5] > 0.05f && p[3] == 0.0f && p[11] == 1.0f && std::abs(p[8]) < 2.0f &&
+        std::abs(p[9]) < 2.0f;
+}
+
 inline bool plausible_rotation(const Matrix& m) noexcept {
     for (int i = 0; i < 3; ++i) {
         float len = 0.0f;
@@ -116,13 +134,15 @@ inline void pass_hook(void* renderer, void* graph) {
         hook.call<void>(renderer, graph);
         return;
     }
-    Matrix pass_matrix{}, eye_matrix{};
+    Matrix pass_matrix{}, eye_matrix{}, projection{};
     int32_t pass{};
     float fov{};
     const bool readable = checked::read(views + translated_view_offset, pass_matrix) &&
         checked::read(views + view_matrix_offset, eye_matrix) &&
+        checked::read(views + projection_no_aa_offset, projection) &&
         checked::read(views + pass_offset, pass) && checked::read(views + fov_offset, fov) &&
-        plausible_rotation(pass_matrix) && plausible_rotation(eye_matrix);
+        plausible_rotation(pass_matrix) && plausible_rotation(eye_matrix) && plausible_projection(projection) &&
+        fov > 1.0f && fov < 170.0f;
     if (!readable) {
         ++faults;
         hook.call<void>(renderer, graph);
@@ -135,22 +155,48 @@ inline void pass_hook(void* renderer, void* graph) {
     last_eye_angle.store(eye_angle, std::memory_order_relaxed);
     last_game_angle.store(game_angle, std::memory_order_relaxed);
     last_fov.store(fov, std::memory_order_relaxed);
+    // Modes 3 and 4: view space x' = a x + bx z, y' = a y + by z before the pass's square
+    // projection of FOV + ExtraFOV. a = tan(FOV/2) * P00 makes the target span the eye's
+    // width with the same extra margin the game gives its own 75 degrees; bx, by move its
+    // centre onto the eye's off-centre screen centre. In 2D (P00 = 1/tan(FOV/2), no
+    // off-centre terms) this is the identity.
+    const float tan_half = std::tan(fov * 0.5f * 3.14159265358979f / 180.0f);
+    const float scale = tan_half * projection[0] * scale_factor.load(std::memory_order_relaxed);
+    const float shear = mode == 3 ? shear_factor.load(std::memory_order_relaxed) : 0.0f;
+    const float shear_x = tan_half * projection[8] * shear;
+    const float shear_y = tan_half * projection[9] * projection[0] / projection[5] * shear;
+    last_p00.store(projection[0], std::memory_order_relaxed);
+    last_p11.store(projection[5], std::memory_order_relaxed);
+    last_p20.store(projection[8], std::memory_order_relaxed);
+    last_p21.store(projection[9], std::memory_order_relaxed);
+    last_scale.store(scale, std::memory_order_relaxed);
+    last_shear_x.store(shear_x, std::memory_order_relaxed);
+    last_shear_y.store(shear_y, std::memory_order_relaxed);
     if (now >= next_log_ms.load(std::memory_order_relaxed)) {
         next_log_ms.store(now + 2000, std::memory_order_relaxed);
         spdlog::info("[WuWaGodRay] pass={} fov={:.2f} views={} mode={} pass_vs_eye={:.2f} deg "
-            "pass_vs_game={:.2f} deg eye_vs_game={:.2f} deg calls={} replaced={}",
+            "pass_vs_game={:.2f} deg eye_vs_game={:.2f} deg P00={:.4f} P11={:.4f} P20={:.4f} P21={:.4f} "
+            "scale={:.4f} shear=({:.4f},{:.4f}) calls={} replaced={}",
             pass, fov, count, mode, eye_angle, game_angle,
-            pre_known ? rotation_angle(eye_matrix, game_matrix) : -1.0f, calls.load(), replaced.load());
+            pre_known ? rotation_angle(eye_matrix, game_matrix) : -1.0f, projection[0], projection[5],
+            projection[8], projection[9], scale, shear_x, shear_y, calls.load(), replaced.load());
     }
-    if (mode != 1 && !(mode == 2 && pre_known)) {
+    if (mode < 1 || mode > 4 || (mode == 2 && !pre_known)) {
         hook.call<void>(renderer, graph);
         return;
     }
-    // Swap only the 3x3 rotation for this call; the row of zeros and the 1 stay.
     auto replacement = pass_matrix;
-    const auto& source = mode == 1 ? eye_matrix : game_matrix;
-    for (int i = 0; i < 3; ++i)
-        for (int k = 0; k < 3; ++k) replacement[i * 4 + k] = source[i * 4 + k];
+    if (mode == 1 || mode == 2) {
+        // Swap only the 3x3 rotation for this call; the row of zeros and the 1 stay.
+        const auto& source = mode == 1 ? eye_matrix : game_matrix;
+        for (int i = 0; i < 3; ++i)
+            for (int k = 0; k < 3; ++k) replacement[i * 4 + k] = source[i * 4 + k];
+    } else {
+        for (int i = 0; i < 4; ++i) {
+            replacement[i * 4 + 0] = pass_matrix[i * 4 + 0] * scale + pass_matrix[i * 4 + 2] * shear_x;
+            replacement[i * 4 + 1] = pass_matrix[i * 4 + 1] * scale + pass_matrix[i * 4 + 2] * shear_y;
+        }
+    }
     const auto target = reinterpret_cast<void*>(views + translated_view_offset);
     if (!checked::guarded_copy(target, replacement.data(), sizeof(replacement))) {
         ++faults;
@@ -185,12 +231,14 @@ inline bool install() {
 }
 
 // Game thread, every frame. The hook is installed once on first call and stays.
-inline void configure(bool stereo, int mode) {
+inline void configure(bool stereo, int mode, float scale, float shear) {
     if (!stereo) {
         camera_mode.store(0, std::memory_order_relaxed);
         return;
     }
     if (!install()) return;
+    scale_factor.store(std::isfinite(scale) ? std::clamp(scale, 0.25f, 4.0f) : 1.0f, std::memory_order_relaxed);
+    shear_factor.store(std::isfinite(shear) ? std::clamp(shear, -4.0f, 4.0f) : 1.0f, std::memory_order_relaxed);
     if (camera_mode.exchange(mode, std::memory_order_relaxed) != mode)
         spdlog::info("[WuWaGodRay] camera mode {}", mode);
 }
@@ -198,6 +246,9 @@ inline void configure(bool stereo, int mode) {
 inline nlohmann::json status() {
     return {{"installed", install_result.load()}, {"mode", camera_mode.load()}, {"calls", calls.load()},
         {"replaced", replaced.load()}, {"faults", faults.load()}, {"fov", last_fov.load()},
-        {"pass_vs_eye_deg", last_eye_angle.load()}, {"pass_vs_game_deg", last_game_angle.load()}};
+        {"pass_vs_eye_deg", last_eye_angle.load()}, {"pass_vs_game_deg", last_game_angle.load()},
+        {"projection", {last_p00.load(), last_p11.load(), last_p20.load(), last_p21.load()}},
+        {"scale", last_scale.load()}, {"shear", {last_shear_x.load(), last_shear_y.load()}},
+        {"scale_factor", scale_factor.load()}, {"shear_factor", shear_factor.load()}};
 }
 } // namespace wuwa_god_ray

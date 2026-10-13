@@ -2377,7 +2377,8 @@ void VR::on_frame() {
     const bool translucent_candidate=wuwa_test::stereo_candidate_value(1,m_wuwa_stereo_translucency->value());
     const bool hide_reflections=wuwa_test::stereo_candidate_value(2,m_wuwa_hide_kuro_reflections->value());
     wuwa_planar_probe::configure_correction(wuwa_serial_stereo && planar_candidate);
-    wuwa_god_ray::configure(wuwa_native_stereo, m_wuwa_god_ray_camera->value());
+    wuwa_god_ray::configure(wuwa_native_stereo, m_wuwa_god_ray_camera->value(), m_wuwa_god_ray_scale->value(),
+        m_wuwa_god_ray_shear->value());
     wuwa_reflection_capture::configure(wuwa_native_stereo && is_native_stereo_fix_enabled() &&
         is_native_stereo_fix_same_pass_enabled() && planar_candidate);
     wuwa_translucency::configure(wuwa_serial_stereo && translucent_candidate);

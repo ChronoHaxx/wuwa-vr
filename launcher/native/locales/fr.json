@@ -282,12 +282,11 @@
   "troubleshooting": "Dépannage",
   "backToSetup": "← Retour à l'installation",
   "troubleshootingIntro": "Visibilité des manettes, diagnostic du lancement et réparation quand vous en avez besoin. L'enregistrement et les outils avancés sont dans Outils de développement.",
-  "selectedVersionAction": "Choisissez une autre version ici, confirmez la compatibilité, puis utilisez le bouton principal ci-dessous pour l'installer.",
+  "selectedVersionAction": "Toutes les versions publiées, y compris les versions de test. Choisissez-en une, puis Installer cette version ; utilisez uniquement une version faite pour votre version du jeu.",
   "installSelected": "Installer la version choisie",
   "versionInstalled": "Paquet VR installé : {0}",
   "versionSelected": "Paquet VR choisi : {0}",
   "packageUpdateAvailable": "Mise à jour du paquet VR disponible : {0}",
-  "selectLatestPackage": "Choisir le dernier paquet VR",
   "noPackageUpdate": "Aucun paquet VR plus récent n'est listé.",
   "installConsent": "Mon jeu correspond à cette version et j'accepte le risque pour mon compte indiqué ci-dessus.",
   "launcherVersion": "Application {0}",
@@ -313,5 +312,13 @@
   "launchNextSteam": "Acceptez l'autorisation Windows quand elle est demandée. WuWa démarrera via Steam.",
   "gameSteamUpdateRequired": "Steam sélectionné. Installez le paquet VR mis à jour à l'étape 02 ; votre choix de jeu sera conservé.",
   "launcherUpdateBar": "Une nouvelle version de l'application WuWa VR ({0}) est disponible.",
-  "launcherUpdateBarReady": "L'application WuWa VR {0} est téléchargée. Redémarrez pour terminer la mise à jour."
+  "launcherUpdateBarReady": "L'application WuWa VR {0} est téléchargée. Redémarrez pour terminer la mise à jour.",
+  "updatePackage": "Mettre à jour le paquet VR",
+  "updatePackageTo": "Mettre à jour vers {0}",
+  "rollbackPackage": "Revenir à la version précédente",
+  "rollbackTo": "Revenir à {0}",
+  "installVersion": "Installer cette version",
+  "installVersionConfirm": "Installer {0} pour Wuthering Waves {1} ? Utilisez uniquement une version faite pour votre version du jeu. Les mods comportent le risque pour le compte indiqué à l'étape 02.",
+  "packageAutoUpdated": "Paquet VR mis à jour vers {0}. {1} reste installé : « Revenir à {1} » à l'étape 02 permet d'y revenir.",
+  "packageUpdateLater": "Un paquet VR plus récent est disponible. Fermez le jeu, puis utilisez Mettre à jour à l'étape 02."
 }

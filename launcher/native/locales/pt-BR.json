@@ -282,12 +282,11 @@
   "troubleshooting": "Solução de problemas",
   "backToSetup": "← Voltar à configuração",
   "troubleshootingIntro": "Visibilidade de controles, diagnóstico da inicialização e reparo quando precisar. Gravação e ferramentas avançadas ficam em Ferramentas de desenvolvedor.",
-  "selectedVersionAction": "Escolha outra versão aqui, confirme a compatibilidade e use o botão principal abaixo para instalá-la.",
+  "selectedVersionAction": "Todas as versões publicadas, incluindo as de teste. Escolha uma e clique em Instalar esta versão; use apenas uma versão feita para a sua versão do jogo.",
   "installSelected": "Instalar a versão escolhida",
   "versionInstalled": "Pacote VR instalado: {0}",
   "versionSelected": "Pacote VR escolhido: {0}",
   "packageUpdateAvailable": "Atualização do pacote VR disponível: {0}",
-  "selectLatestPackage": "Escolher o pacote VR mais recente",
   "noPackageUpdate": "Nenhum pacote VR mais recente listado.",
   "installConsent": "Meu jogo corresponde a esta versão e aceito o risco para a conta mostrado acima.",
   "launcherVersion": "App {0}",
@@ -313,5 +312,13 @@
   "launchNextSteam": "Aceite a permissão do Windows quando for pedida. O WuWa vai iniciar pela Steam.",
   "gameSteamUpdateRequired": "Steam selecionada. Instale o pacote VR atualizado na etapa 02; sua escolha de jogo será mantida.",
   "launcherUpdateBar": "Uma nova versão do app WuWa VR ({0}) está disponível.",
-  "launcherUpdateBarReady": "O app WuWa VR {0} foi baixado. Reinicie para concluir a atualização."
+  "launcherUpdateBarReady": "O app WuWa VR {0} foi baixado. Reinicie para concluir a atualização.",
+  "updatePackage": "Atualizar o pacote VR",
+  "updatePackageTo": "Atualizar para {0}",
+  "rollbackPackage": "Voltar à versão anterior",
+  "rollbackTo": "Voltar para {0}",
+  "installVersion": "Instalar esta versão",
+  "installVersionConfirm": "Instalar {0} para Wuthering Waves {1}? Use apenas uma versão feita para a sua versão do jogo. Mods trazem o risco à conta mostrado na etapa 02.",
+  "packageAutoUpdated": "Pacote VR atualizado para {0}. {1} continua instalado: “Voltar para {1}” na etapa 02 retorna a ele.",
+  "packageUpdateLater": "Há um pacote VR mais novo. Feche o jogo e use Atualizar na etapa 02."
 }

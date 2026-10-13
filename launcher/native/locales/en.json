@@ -282,12 +282,11 @@
   "troubleshooting": "Troubleshooting",
   "backToSetup": "← Back to setup",
   "troubleshootingIntro": "Controller visibility, launch diagnostics and repair when you need them. Recording and advanced tools are in Developer tools.",
-  "selectedVersionAction": "Choose a different version here, confirm compatibility, then use the main button below to install it.",
+  "selectedVersionAction": "Every published version, including test builds. Pick one, then Install this version; use only a version made for your game version.",
   "installSelected": "Install selected version",
   "versionInstalled": "VR package installed: {0}",
   "versionSelected": "VR package selected: {0}",
   "packageUpdateAvailable": "VR package update available: {0}",
-  "selectLatestPackage": "Choose latest VR package",
   "noPackageUpdate": "No newer VR package is listed.",
   "installConsent": "My game matches this version and I accept the account risk shown above.",
   "launcherVersion": "App {0}",
@@ -313,5 +312,13 @@
   "launchNextSteam": "Accept Windows permission when prompted. WuWa will start through Steam.",
   "gameSteamUpdateRequired": "Steam selected. Install the updated VR package in step 02; your game choice will be kept.",
   "launcherUpdateBar": "A new version of the WuWa VR app ({0}) is available.",
-  "launcherUpdateBarReady": "WuWa VR app {0} is downloaded. Restart to finish updating."
+  "launcherUpdateBarReady": "WuWa VR app {0} is downloaded. Restart to finish updating.",
+  "updatePackage": "Update VR package",
+  "updatePackageTo": "Update to {0}",
+  "rollbackPackage": "Back to previous version",
+  "rollbackTo": "Back to {0}",
+  "installVersion": "Install this version",
+  "installVersionConfirm": "Install {0} for Wuthering Waves {1}? Use only a version made for your game version. Mods carry the account risk shown in step 02.",
+  "packageAutoUpdated": "VR package updated to {0}. {1} is still installed: Back to {1} in step 02 returns to it.",
+  "packageUpdateLater": "A newer VR package is available. Close the game, then use Update in step 02."
 }

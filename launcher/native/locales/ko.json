@@ -282,12 +282,11 @@
   "troubleshooting": "문제 해결",
   "backToSetup": "← 설정으로 돌아가기",
   "troubleshootingIntro": "필요할 때 컨트롤러 인식, 실행 진단, 복구를 사용하세요. 녹화와 고급 도구는 개발자 도구에 있습니다.",
-  "selectedVersionAction": "여기서 다른 버전을 선택하고 호환 여부를 확인한 뒤, 아래 기본 버튼으로 설치하세요.",
+  "selectedVersionAction": "테스트 빌드를 포함한 모든 공개 버전입니다. 하나를 고른 뒤 “이 버전 설치”를 누르세요. 사용 중인 게임 버전용 버전만 사용하세요.",
   "installSelected": "선택한 버전 설치",
   "versionInstalled": "설치된 VR 패키지: {0}",
   "versionSelected": "선택한 VR 패키지: {0}",
   "packageUpdateAvailable": "VR 패키지 업데이트 있음: {0}",
-  "selectLatestPackage": "최신 VR 패키지 선택",
   "noPackageUpdate": "더 새로운 VR 패키지가 없습니다.",
   "installConsent": "내 게임이 이 버전과 일치하며 위에 표시된 계정 위험에 동의합니다.",
   "launcherVersion": "앱 {0}",
@@ -313,5 +312,13 @@
   "launchNextSteam": "요청이 나오면 Windows 권한을 허용하세요. WuWa는 Steam을 통해 시작됩니다.",
   "gameSteamUpdateRequired": "Steam이 선택되었습니다. 02단계에서 업데이트된 VR 패키지를 설치하세요. 게임 선택은 유지됩니다.",
   "launcherUpdateBar": "WuWa VR 앱의 새 버전({0})이 있습니다.",
-  "launcherUpdateBarReady": "WuWa VR 앱 {0}을(를) 다운로드했습니다. 다시 시작하면 업데이트가 완료됩니다."
+  "launcherUpdateBarReady": "WuWa VR 앱 {0}을(를) 다운로드했습니다. 다시 시작하면 업데이트가 완료됩니다.",
+  "updatePackage": "VR 패키지 업데이트",
+  "updatePackageTo": "{0}(으)로 업데이트",
+  "rollbackPackage": "이전 버전으로 돌아가기",
+  "rollbackTo": "{0}(으)로 돌아가기",
+  "installVersion": "이 버전 설치",
+  "installVersionConfirm": "Wuthering Waves {1}용 {0}을(를) 설치할까요? 사용 중인 게임 버전용으로 만든 버전만 사용하세요. 모드에는 02단계에 표시된 계정 위험이 따릅니다.",
+  "packageAutoUpdated": "VR 패키지를 {0}(으)로 업데이트했습니다. {1}도 설치되어 있으며, 02단계의 “{1}(으)로 돌아가기”로 되돌릴 수 있습니다.",
+  "packageUpdateLater": "새 VR 패키지가 있습니다. 게임을 닫은 뒤 02단계에서 업데이트하세요."
 }

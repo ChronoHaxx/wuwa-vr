@@ -49,7 +49,9 @@ namespace WuWaVR.Manager
         TextBlock launcherVersion;
         Button launcherUpdateButton;
         TextBlock packageUpdateState;
-        Button packageUpdateButton;
+        Button packageUpdateButton, packageRollbackButton;
+        // Releases the startup update already tried this session; a failure is not retried in a loop.
+        readonly HashSet<string> autoPackageTried = new HashSet<string>();
         TextBox controllerDetails;
         ProgressBar controllerProgress;
         Func<CancellationToken, Task<ControllerDiagnostics.Report>> controllerProbeOverride;
@@ -128,6 +130,7 @@ namespace WuWaVR.Manager
                 });
                 poll.Start();
                 await Task.WhenAll(CheckLauncherUpdates(updateLifetime.Token, true), UpdateCatalog(updateLifetime.Token, true));
+                await AutoUpdatePackage();
             };
             Closing += async (s, e) =>
             {
@@ -593,10 +596,8 @@ namespace WuWaVR.Manager
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = card, Foreground = foreground, BorderThickness = new Thickness(0), Padding = new Thickness(10) };
             feedbackPanel = new Expander { Header = text["details"], Content = details, Foreground = muted, Visibility = Visibility.Collapsed };
             footer.Children.Add(feedbackPanel);
-            var web = Action("web", async c => { await EnsureConnected(c); Open(bridge.Address); operationText.Text = text["webOpened"]; });
-            web.Content = text["developerTools"]; StyleFooter(web);
             var footnotes = Wrap(GuideLink("guide", "guide.html", true), GuideLink("fullControls", "guide.html#controls", true),
-                PageLink("troubleshooting", true), web, FooterLink("support", "https://ko-fi.com/chronohax"));
+                PageLink("troubleshooting", true), FooterLink("support", "https://ko-fi.com/chronohax"));
             var footerRow = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
             DockPanel.SetDock(launcherVersion, Dock.Right); footerRow.Children.Add(launcherVersion); footerRow.Children.Add(footnotes);
             footer.Children.Add(footerRow); DockPanel.SetDock(footer, Dock.Bottom); outer.Children.Add(footer);
@@ -656,8 +657,7 @@ namespace WuWaVR.Manager
         ScrollViewer Page(UIElement body)
         { return new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = body }; }
-        bool WantsInstall()
-        { return store.Selected == null || SelectedRelease().id != store.Selected.release.id; }
+        bool WantsInstall() { return store.Selected == null; }
         bool SelectedPackageSupportsSteam()
         {
             if (store.Selected == null) return false;
@@ -677,19 +677,8 @@ namespace WuWaVR.Manager
         void OfferSteamPackageUpdate()
         {
             if (!SteamChoiceNeedsPackage()) return;
-            // Propose an update without installing it or changing the old helper.
-            // Retain an already deliberate package selection and require consent.
-            if (store.Selected != null && !WantsInstall())
-            {
-                Func<Release, DateTimeOffset> date = r => {
-                    DateTimeOffset parsed;
-                    return DateTimeOffset.TryParse(r.published ?? r.created, out parsed) ? parsed : DateTimeOffset.MinValue;
-                };
-                var newer = releases.Items.Cast<Release>().Where(r => r.id != store.Selected.release.id && date(r) > date(store.Selected.release))
-                    .OrderByDescending(date).FirstOrDefault();
-                if (newer != null) releases.SelectedItem = newer;
-            }
-            advancedPanel.IsExpanded = true;
+            // Step 02's Update button installs the newer package; the old helper
+            // and the game choice are left alone until the player uses it.
             operationText.Text = text["gameSteamUpdateRequired"];
         }
         UIElement Setup()
@@ -766,9 +755,19 @@ namespace WuWaVR.Manager
                 if (SelectedRelease().channel == "candidate") { details.Text = text["candidateNotes"]; feedbackPanel.IsExpanded = true; operationText.Text = text["candidatePackage"]; }
                 else { Open(SelectedRelease().notesUrl); operationText.Text = text["browserOpened"]; }
                 return Task.CompletedTask;
+            }), Action("installVersion", async c =>
+            {
+                var release = SelectedRelease();
+                if (!Confirm("installVersionConfirm", release.DisplayLabel, release.gameVersion)) return;
+                // The dialog names the game version and the account risk: the same
+                // consent as step 02's checkbox, for a version chosen here.
+                risk.IsChecked = true;
+                await InstallOrSelect(release, c);
             })));
             updates.Children.Add(Label(text["selectedVersionAction"], 11, muted));
-            advancedPanel = new Expander { Header = text["advanced"], Foreground = muted, Content = updates, Margin = new Thickness(0, 4, 0, 0) };
+            // Every listed version, including diagnostic builds, lives on the
+            // troubleshooting page; step 02 offers only Update and Back.
+            advancedPanel = new Expander { Header = text["advanced"], Foreground = foreground, Content = updates, Margin = new Thickness(0, 0, 0, 14) };
             risk = new CheckBox { Content = Label(text["riskAccept"], 12), Foreground = foreground, Margin = new Thickness(0, 3, 0, 0) };
             risk.Checked += (s, e) => ShowStatus(); risk.Unchecked += (s, e) => ShowStatus();
             riskNotice = Label(text["risk"], 12, Color("#F0B4A3"));
@@ -776,12 +775,14 @@ namespace WuWaVR.Manager
             var notice = new Border { Child = consent, Padding = new Thickness(12, 6, 12, 7), CornerRadius = new CornerRadius(9), Background = Color("#22130F"),
                 BorderBrush = Color("#5E3026"), BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 4) };
             packageUpdateState = Label("", 12, accent);
-            packageUpdateButton = Action("selectLatestPackage", c => {
+            packageUpdateButton = Action("updatePackage", async c =>
+            {
                 var newer = NewerPackage();
-                if (newer != null) { releases.SelectedItem = newer; advancedPanel.IsExpanded = true; operationText.Text = text["installNext"]; }
-                return Task.CompletedTask;
-            });
-            panel.Children.Add(Step("02", text["package"], null, packageState, gameVersion, packageUpdateState, Wrap(packageUpdateButton), notice, advancedPanel));
+                if (newer == null) throw new InvalidOperationException(text["noPackageUpdate"]);
+                await InstallOrSelect(newer, c);
+            }, true);
+            packageRollbackButton = Action("rollbackPackage", async c => await UsePrevious(c));
+            panel.Children.Add(Step("02", text["package"], null, packageState, gameVersion, packageUpdateState, Wrap(packageUpdateButton, packageRollbackButton), notice));
             panel.Children.Add(runtimeStep);
             return panel;
         }
@@ -824,8 +825,11 @@ namespace WuWaVR.Manager
             panel.Children.Add(Label(text["troubleshooting"], 22));
             panel.Children.Add(Label(text["troubleshootingIntro"], 12, muted));
             panel.Children.Add(ControllerCheck());
-            panel.Children.Add(Wrap(runtimeCheck, Action("copyDiagnostics", async c => await CopyDiagnostics(c)), GuideLink("report", "feedback.html")));
+            var web = Action("web", async c => { await EnsureConnected(c); Open(bridge.Address); operationText.Text = text["webOpened"]; });
+            web.Content = text["developerTools"];
+            panel.Children.Add(Wrap(runtimeCheck, Action("copyDiagnostics", async c => await CopyDiagnostics(c)), GuideLink("report", "feedback.html"), web));
             panel.Children.Add(ProcessRecovery());
+            panel.Children.Add(advancedPanel);
             installed = Choice(); foreach (var item in store.State.installed) installed.Items.Add(item);
             installed.SelectedItem = store.Selected;
             installed.SelectionChanged += (s, e) => ShowStatus();
@@ -842,13 +846,7 @@ namespace WuWaVR.Manager
                     if (item == null) throw new InvalidOperationException(text["chooseVersion"]);
                     await InstallRelease(item.release, c);
                 }),
-                Action("rollback", async c =>
-                {
-                    var prior = store.State.installed.FirstOrDefault(x => x.folder == store.State.previous);
-                    if (prior == null) throw new InvalidOperationException(text["noPrevious"]);
-                    await Task.Run(() => PackageStore.Verify(store.Folder(prior), prior.release, c), c);
-                    await PreparePackageChange(c); store.Select(prior); PopulateInstalled(); await Connect(c);
-                })),
+                Action("rollback", async c => await UsePrevious(c))),
                 Wrap(Action("restore", async c =>
                 {
                     if (!Confirm("restoreConfirm")) return;
@@ -1182,9 +1180,10 @@ namespace WuWaVR.Manager
             lastJobSnapshot = null;
         }
         Func<string, bool> confirmationOverride = null;
-        bool Confirm(string key)
+        bool Confirm(string key, params object[] args)
         {
-            bool accepted = confirmationOverride != null ? confirmationOverride(key) : MessageBox.Show(this, text[key], text["title"], MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+            string message = args.Length == 0 ? text[key] : String.Format(text[key], args);
+            bool accepted = confirmationOverride != null ? confirmationOverride(key) : MessageBox.Show(this, message, text["title"], MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
             if (!accepted) operationText.Text = text["notChanged"];
             return accepted;
         }
@@ -1276,6 +1275,57 @@ namespace WuWaVR.Manager
             details.Clear(); feedbackPanel.IsExpanded = false;
             operationText.Text = text["complete"];
         }
+        // A version already on disk with the same identity (release, build and
+        // archive checksum) is verified and selected, never downloaded again.
+        async Task InstallOrSelect(Release release, CancellationToken c)
+        {
+            var present = store.State.installed.FirstOrDefault(i => i.release.id == release.id && i.release.buildId == release.buildId &&
+                String.Equals(i.release.sha256, release.sha256, StringComparison.OrdinalIgnoreCase));
+            if (present == null) { await InstallRelease(release, c); return; }
+            await Task.Run(() => PackageStore.Verify(store.Folder(present), present.release, c), c);
+            await PreparePackageChange(c); store.Select(present); PopulateInstalled(); await Connect(c);
+            operationText.Text = String.Format(text["versionInstalled"], present.release.DisplayLabel);
+        }
+        Installed PreviousPackage()
+        {
+            return store.State.previous == store.State.selected ? null : store.State.installed.FirstOrDefault(i => i.folder == store.State.previous);
+        }
+        async Task UsePrevious(CancellationToken c)
+        {
+            var prior = PreviousPackage();
+            if (prior == null) throw new InvalidOperationException(text["noPrevious"]);
+            await Task.Run(() => PackageStore.Verify(store.Folder(prior), prior.release, c), c);
+            await PreparePackageChange(c); store.Select(prior); PopulateInstalled(); await Connect(c);
+            operationText.Text = String.Format(text["versionInstalled"], prior.release.DisplayLabel);
+        }
+        // Players should not have to notice that the VR package updates apart
+        // from the app (Lelouche kept 1.1.x after updating the app, 13 Oct 2026).
+        // On start, which includes the restart after an app update, a newer
+        // public package for the same game version is installed while nothing
+        // runs. The old one stays installed, one click away (step 02, Back to).
+        // A version already installed is never reinstalled here: having it and
+        // going back is a choice the player made.
+        Release AutoPackageUpdate()
+        {
+            if (store.Selected == null || store.Selected.release.channel != "beta") return null;
+            var newer = NewerPackage();
+            if (newer == null || newer.gameVersion != store.Selected.release.gameVersion) return null;
+            return store.State.installed.Any(i => i.release.id == newer.id) ? null : newer;
+        }
+        async Task AutoUpdatePackage()
+        {
+            var newer = AutoPackageUpdate();
+            if (newer == null || preview || closing || operation != null || !connectionReady || bridge.Conflict != null || !autoPackageTried.Add(newer.id)) return;
+            string from = store.Selected.release.DisplayLabel;
+            await Run(async c =>
+            {
+                status = await bridge.Status(c);
+                if (Json.Flag(status, "gameRunning") || Json.Flag(status, "injectorRunning") || Json.Flag(Json.Child(status, "job"), "running") ||
+                    LauncherBridge.LaunchWorkerRunning(status)) { operationText.Text = text["packageUpdateLater"]; return; }
+                await InstallRelease(newer, c);
+                operationText.Text = String.Format(text["packageAutoUpdated"], newer.DisplayLabel, from);
+            });
+        }
         void Disconnected()
         {
             connectionReady = false;
@@ -1322,7 +1372,7 @@ namespace WuWaVR.Manager
                 releases.Items.Cast<Release>().FirstOrDefault(r => store.Selected != null && r.id == store.Selected.release.id) ?? (Release)releases.Items[0];
             catalogState.Text = text[catalogKey];
             if (!quiet) {
-                operationText.Text = text[catalogKey]; advancedPanel.IsExpanded = true;
+                operationText.Text = text[catalogKey];
                 if (catalogKey == "catalogOffline") feedbackPanel.IsExpanded = true;
                 OfferSteamPackageUpdate();
             }
@@ -1458,10 +1508,14 @@ namespace WuWaVR.Manager
                 String.Format(text["versionSelected"], SelectedRelease().DisplayLabel) : "");
             packageState.ToolTip = (store.Selected == null ? "" : store.Selected.release.id + Environment.NewLine) + SelectedRelease().id;
             releases.ToolTip = SelectedRelease().id;
-            var newerPackage = NewerPackage();
+            var newerPackage = store.Selected == null ? null : NewerPackage();
+            var previousPackage = store.Selected == null ? null : PreviousPackage();
             packageUpdateState.Text = newerPackage == null ? "" : String.Format(text["packageUpdateAvailable"], newerPackage.DisplayLabel);
             packageUpdateState.Visibility = newerPackage == null ? Visibility.Collapsed : Visibility.Visible;
-            packageUpdateButton.Visibility = newerPackage == null || WantsInstall() ? Visibility.Collapsed : Visibility.Visible;
+            packageUpdateButton.Visibility = newerPackage == null ? Visibility.Collapsed : Visibility.Visible;
+            if (newerPackage != null) packageUpdateButton.Content = String.Format(text["updatePackageTo"], newerPackage.DisplayLabel);
+            packageRollbackButton.Visibility = previousPackage == null ? Visibility.Collapsed : Visibility.Visible;
+            if (previousPackage != null) packageRollbackButton.Content = String.Format(text["rollbackTo"], previousPackage.release.DisplayLabel);
             var game = Json.Child(status, "game"); string launcher = Json.Text(game, "launcher");
             bool pendingChoice = !String.IsNullOrWhiteSpace(store.State.pendingLauncherPath);
             gamePath.Text = pendingChoice ? store.State.pendingLauncherPath : Json.Flag(game, "saved") && Json.Text(game, "mode") == "manual" ? text["manualStart"] : String.IsNullOrEmpty(launcher) ? (discovery == null ? store.State.launcherPath : discovery.Path) : launcher;
@@ -1532,14 +1586,16 @@ namespace WuWaVR.Manager
                         case "useGameLocation": reason = running ? "busy" : gameLocations.SelectedItem == null ? "gameChooseHint" : null; break;
                         case "browse": case "browseGameFile": reason = running ? "busy" : null; break;
                         case "install": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : compatible.IsChecked != true ? "compatRequired" : null; break;
-                        case "selectLatestPackage": reason = running ? "busy" : NewerPackage() == null ? "noPackageUpdate" : null; break;
+                        case "updatePackage": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : NewerPackage() == null ? "noPackageUpdate" : null; break;
+                        case "installVersion": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" :
+                            store.Selected != null && SelectedRelease().id == store.Selected.release.id ? "alreadySelected" : null; break;
                         case "updateLauncher": reason = launcherUpdates.Busy ? "busy" : launcherUpdates.AvailableVersion == null ? "launcherUpdateHint" :
                             launcherUpdates.ReadyToRestart && (running || recording || gameRunning || injectorRunning) ? "launcherRestartIdle" : null; break;
                         case "launch": reason = running ? "busy" : gameRunning ? "alreadyRunning" : injectorRunning ? "runtimeCloseFirst" : wantsInstall ? (conflict ? "connectionRequired" : compatible.IsChecked != true ? "compatRequired" : null) : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : runtimeBlock ?? (risk.IsChecked != true ? "riskAccept" : null); break;
                         case "recordStart": reason = !hasPackage ? "chooseVersion" : running || recording ? "busy" : !gameRunning ? "recordNeedsGame" : !canRecord ? "recordUnavailable" : null; break;
                         case "recordStop": reason = !recording ? "noRecording" : null; break;
                         case "repair": case "useVersion": case "remove": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : installed.SelectedItem == null ? "chooseVersion" : null; break;
-                        case "rollback": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : store.State.previous == store.State.selected || !store.State.installed.Any(i => i.folder == store.State.previous) ? "noPrevious" : null; break;
+                        case "rollback": case "rollbackPackage": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : PreviousPackage() == null ? "noPrevious" : null; break;
                         case "useHeadset": case "useSimulator":
                             reason = !hasPackage ? "chooseVersion" : running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" :
                                 !Json.Flag(xr, key == "useHeadset" ? "canHeadset" : "canSimulator") ? "runtimeUnavailableHint" :
@@ -1552,7 +1608,7 @@ namespace WuWaVR.Manager
                         case "retryConnection": reason = hasPackage ? null : "chooseVersion"; break;
                     }
                     if (hasPackage && !connectionReady && new[] { "recordStart", "recordStop", "remove", "useHeadset", "useSimulator", "restore", "reset", "check", "web", "openRecordings" }.Contains(key)) reason = "connectionRequired";
-                    if (conflict && new[] { "install", "repair", "useVersion", "rollback" }.Contains(key)) reason = "connectionRequired";
+                    if (conflict && new[] { "install", "repair", "useVersion", "rollback", "rollbackPackage", "updatePackage", "installVersion" }.Contains(key)) reason = "connectionRequired";
                 }
                 button.IsEnabled = reason == null;
                 button.ToolTip = reason == null ? null : text[reason];
@@ -1614,6 +1670,7 @@ namespace WuWaVR.Manager
             risk.IsChecked = Json.Flag(fixture, "riskAccepted");
             compatible.IsChecked = Json.Flag(fixture, "versionConfirmed");
             operationText.Text = Json.Text(fixture, "operation");
+            if (Json.Flag(fixture, "troubleshooting")) { ShowPage(true); advancedPanel.IsExpanded = true; }
             ShowStatus();
         }
         public void SavePreview(string path, double scale = 1)

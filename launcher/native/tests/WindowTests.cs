@@ -258,11 +258,17 @@ public static class WindowTests
         public readonly HelperHttp Http;
         public readonly NoDownload Downloads = new NoDownload();
         public readonly Installed A, B;
-        public Fixture(string root, bool install = true, bool oldSelectedHelper = false)
+        readonly string folder;
+        // publicBetas: A and B are published betas (B newer and selected) instead of local candidates.
+        public Fixture(string root, bool install = true, bool oldSelectedHelper = false, bool publicBetas = false)
         {
-            string folder = Path.Combine(root, "window-ui", Guid.NewGuid().ToString("N"));
+            folder = Path.Combine(root, "window-ui", Guid.NewGuid().ToString("N"));
             Store = new PackageStore(Path.Combine(folder, "manager"));
-            if (install) { A = AddCandidate(folder, "a"); B = AddCandidate(folder, "b", !oldSelectedHelper); }
+            if (install)
+            {
+                A = AddPackage("a", true, publicBetas ? "2026-10-01T00:00:00Z" : null);
+                B = AddPackage("b", !oldSelectedHelper, publicBetas ? "2026-10-02T00:00:00Z" : null);
+            }
             string data = Path.Combine(folder, "backend");
             Json.Save(Path.Combine(data, "settings.json"), new { gameStart = "manual", gameLauncher = "" });
             Json.Save(Path.Combine(data, "launcher.json"), new { url = "http://127.0.0.1:34671/", pid = int.MaxValue });
@@ -279,9 +285,15 @@ public static class WindowTests
             Set(Window, "status", Http.Status);
             Invoke(Window, "ShowStatus"); Offscreen(Window);
         }
-        Installed AddCandidate(string folder, string suffix, bool steamSupport = true)
+        Installed AddPackage(string suffix, bool steamSupport, string published)
         {
-            string id = "candidate-window-" + suffix, build = "window-" + suffix;
+            var release = Package(suffix, published, steamSupport);
+            return Store.Install(Path.Combine(Store.Cache, release.sha256 + ".zip"), release, CancellationToken.None);
+        }
+        // An inert package in the download cache: a local candidate, or a public beta when published is set.
+        public Release Package(string suffix, string published = null, bool steamSupport = true)
+        {
+            string id = (published == null ? "candidate-window-" : "beta-window-") + suffix, build = "window-" + suffix;
             var files = new Dictionary<string, byte[]> {
                 { "python/pythonw.exe", Encoding.UTF8.GetBytes("Inert fixture. Never execute.") },
                 { "app/dev/wuwa_player.py", Encoding.UTF8.GetBytes("# inert window fixture " + suffix) },
@@ -302,9 +314,14 @@ public static class WindowTests
                 foreach (var item in files) using (var output = zip.CreateEntry("WuWa VR/" + item.Key).Open()) output.Write(item.Value, 0, item.Value.Length);
                 using (var output = new StreamWriter(zip.CreateEntry("WuWa VR/manifest.json").Open())) output.Write(Json.Write(new { packageId = "wuwa-vr-launcher-" + id, defaultBuild = build, files = hashes }));
             }
-            var release = new Release { id = id, buildId = build, channel = "candidate", gameVersion = "3.7", created = "2026-10-03T00:00:00Z", size = new FileInfo(archive).Length, sha256 = RepoClient.Hash(archive) };
-            Directory.CreateDirectory(Store.Cache); File.Copy(archive, Path.Combine(Store.Cache, release.sha256 + ".zip"));
-            return Store.Install(archive, release, CancellationToken.None);
+            var release = published == null
+                ? new Release { id = id, buildId = build, channel = "candidate", gameVersion = "3.7", created = "2026-10-03T00:00:00Z" }
+                : new Release { id = id, buildId = build, channel = "beta", gameVersion = "3.7", published = published,
+                    url = "https://github.com/ChronoHaxx/wuwa-vr/releases/download/" + id + "/WuWa-VR-Launcher.zip",
+                    notesUrl = "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/" + id };
+            release.size = new FileInfo(archive).Length; release.sha256 = RepoClient.Hash(archive);
+            Directory.CreateDirectory(Store.Cache); File.Copy(archive, Path.Combine(Store.Cache, release.sha256 + ".zip"), true);
+            return release;
         }
         public void Dispose()
         {
@@ -565,7 +582,8 @@ public static class WindowTests
                 f.Http.RejectGameSettings = true; // An older helper cannot understand Steam.
                 Await(w, "ChooseLauncher", bootstrap, CancellationToken.None);
                 Check(f.Http.GameSettingsWrites == 0 && f.Store.State.pendingLauncherPath == bootstrap, "Steam selection contacted old/no helper or lost pending intent");
-                Check(versions.SelectedItem == f.A.release && Field<Expander>(w, "advancedPanel").IsExpanded, "pending Steam did not offer the newer package in step 02");
+                Check(versions.SelectedItem == (freshInstall ? f.A.release : f.B.release) && f.Store.Selected?.release.id == (freshInstall ? null : f.B.release.id),
+                    "pending Steam changed the version choice before the player updated");
                 Check(Field<TextBlock>(w, "gameHint").Text == new Strings()["gameSteamUpdateRequired"], "pending upgrade explanation missing");
                 if (!freshInstall)
                 {
@@ -579,9 +597,14 @@ public static class WindowTests
                     Check(!Field<Button>(w, "launchButton").IsEnabled, "unsupported old package could launch with pending Steam choice");
                     versions.SelectedItem = f.A.release;
                 }
-                Field<CheckBox>(w, "compatible").IsChecked = true;
                 f.Http.RejectGameSettings = false;
-                Click(w, Field<Button>(w, "launchButton"));
+                if (freshInstall) { Field<CheckBox>(w, "compatible").IsChecked = true; Click(w, Field<Button>(w, "launchButton")); }
+                else
+                {
+                    // A test build is installed from the troubleshooting version list.
+                    Set(w, "confirmationOverride", new Func<string, bool>(key => key == "installVersionConfirm"));
+                    Click(w, Button(w, "installVersion"));
+                }
                 var applied = Field<PackageStore>(w, "store");
                 Check(applied.Selected.release.id == f.A.release.id && f.Http.GameSettingsWrites == 1 && Json.Text(Json.Child(f.Http.Status, "game"), "mode") == "steam", "new package did not apply Steam intent exactly once");
                 Check(applied.State.pendingLauncherPath == null && new PackageStore(applied.Root).State.pendingLauncherPath == null, "confirmed Steam intent remained queued");
@@ -761,32 +784,68 @@ public static class WindowTests
                 // Dated far ahead so it stays newer than every real entry in the shipped catalog.
                 var newer = new Release { id = "beta-1.1.0", displayName = "1.1.0 beta", channel = "beta", gameVersion = "3.7", published = "2099-01-01T00:00:00Z" };
                 Field<Catalog>(w, "catalog").releases.Add(newer); Field<ComboBox>(w, "releases").Items.Add(newer); Refresh(w);
-                Check(Field<TextBlock>(w, "packageUpdateState").Text.Contains("1.1.0 beta") && Button(w, "selectLatestPackage").Visibility == Visibility.Visible &&
+                Check(Field<TextBlock>(w, "packageUpdateState").Text.Contains("1.1.0 beta") && Button(w, "updatePackage").Visibility == Visibility.Visible &&
+                    Convert.ToString(Button(w, "updatePackage").Content) == String.Format(new Strings()["updatePackageTo"], "1.1.0 beta") &&
                     f.Store.Selected.release.id == f.B.release.id, "VR package update is hidden or silently migrated rollback selection");
-                Click(w, Button(w, "selectLatestPackage"));
-                Check(((Release)Field<ComboBox>(w, "releases").SelectedItem).id == newer.id && f.Store.Selected.release.id == f.B.release.id &&
-                    Field<TextBlock>(w, "packageState").Text.Contains("1.1.0 beta") && Field<TextBlock>(w, "packageState").ToolTip.ToString().Contains(newer.id) &&
-                    Convert.ToString(Button(w, "launch").Content) == new Strings()["installSelected"] && f.Http.Launches == 0,
-                    "choosing latest package lost the immutable identity or installed/launched without consent");
-                Console.WriteLine("PASS WINDOW separate VR package update and friendly name preserve rollback; choosing update only selects it");
+                Check(Invoke(w, "AutoPackageUpdate") == null, "a test build installed from a candidate bundle was offered an automatic update");
+                Await(w, "AutoUpdatePackage");
+                Check(f.Store.Selected.release.id == f.B.release.id && f.Downloads.Requests == 0 && f.Http.Launches == 0, "a test build was replaced automatically");
+                Check(Convert.ToString(Button(w, "launch").Content) == new Strings()["launch"], "an available update replaced Play");
+                Console.WriteLine("PASS WINDOW step 02 names the VR package update; test builds are never replaced automatically");
+            }
+            foreach (string state in new[] { "idle", "gameRunning", "alreadyInstalled", "otherGameVersion" })
+            using (var f = new Fixture(root, publicBetas: true))
+            {
+                var w = f.Window;
+                // B (public beta) is in use; C is a newer public beta in the list and the download cache.
+                var c = f.Package("c", "2099-01-01T00:00:00Z");
+                if (state == "otherGameVersion") c.gameVersion = "3.8";
+                if (state == "alreadyInstalled") { f.Store.Install(Path.Combine(f.Store.Cache, c.sha256 + ".zip"), c, CancellationToken.None); f.Store.Select(f.B); }
+                Field<Catalog>(w, "catalog").releases.Add(c);
+                Connect(w);
+                if (state == "gameRunning") { f.Http.Status["gameRunning"] = true; Refresh(w); }
+                int installedBefore = f.Store.State.installed.Count;
+                Await(w, "AutoUpdatePackage");
+                if (state == "idle")
+                {
+                    Check(f.Store.Selected.release.id == c.id && f.Store.State.previous == f.B.folder && f.Downloads.Requests == 0 && f.Http.Launches == 0,
+                        "newer public package was not installed while idle, lost the previous one, or launched");
+                    Check(Field<TextBlock>(w, "operationText").Text == String.Format(new Strings()["packageAutoUpdated"], c.DisplayLabel, f.B.release.DisplayLabel) &&
+                        Button(w, "rollbackPackage").Visibility == Visibility.Visible && Button(w, "updatePackage").Visibility == Visibility.Collapsed,
+                        "automatic update did not explain itself or offer Back");
+                }
+                else
+                {
+                    Check(f.Store.Selected.release.id == f.B.release.id && f.Store.State.installed.Count == installedBefore && f.Http.Launches == 0,
+                        state + ": package changed automatically");
+                    Check(Button(w, "updatePackage").Visibility == Visibility.Visible, state + ": manual update not offered");
+                    if (state == "gameRunning") Check(Field<TextBlock>(w, "operationText").Text == new Strings()["packageUpdateLater"], "deferred update not explained");
+                }
+                Await(w, "AutoUpdatePackage");
+                Check(f.Http.Launches == 0 && f.Store.State.installed.Count(i => i.release.id == c.id) == (state == "idle" || state == "alreadyInstalled" ? 1 : 0),
+                    state + ": automatic update repeated in one session");
+                Console.WriteLine("PASS WINDOW automatic public package update: " + state + " (local cache and fake HTTP only)");
             }
             using (var f = new Fixture(root))
             {
                 var w = f.Window; Connect(w);
                 Check(!Field<Expander>(w, "advancedPanel").IsExpanded && !Field<Expander>(w, "recoveryPanel").IsExpanded && !Field<Expander>(w, "recordingOptions").IsExpanded, "expert controls clutter initial public flow");
                 var publicTree = Tree((DependencyObject)w.Content).ToArray();
-                Check(!publicTree.OfType<TabControl>().Any() && publicTree.Contains(Field<Expander>(w, "advancedPanel")) &&
-                    !publicTree.Contains(Button(w, "recordStart")) && !Field<List<Button>>(w, "actions").Any(b => (string)b.Tag == "install"),
-                    "public page retained tabs/recording or a duplicate install action, or misplaced updates");
+                Check(!publicTree.OfType<TabControl>().Any() && !publicTree.Contains(Field<Expander>(w, "advancedPanel")) &&
+                    !publicTree.Contains(Button(w, "web")) && !publicTree.Contains(Button(w, "recordStart")) &&
+                    !Field<List<Button>>(w, "actions").Any(b => (string)b.Tag == "install"),
+                    "public page retained tabs/recording/developer tools, the version list, or a duplicate install action");
                 Check(Field<TextBlock>(w, "packageState").Text.Contains(f.B.release.id), "step02 omitted the actual installed version");
                 Click(w, Button(w, "troubleshooting"));
-                Check(Field<bool>(w, "troubleshootingVisible") && Tree((DependencyObject)w.Content).Contains(Field<Expander>(w, "controllerPanel")),
-                    "footer did not open controller troubleshooting");
+                var helpTree = Tree((DependencyObject)w.Content).ToArray();
+                Check(Field<bool>(w, "troubleshootingVisible") && helpTree.Contains(Field<Expander>(w, "controllerPanel")) &&
+                    helpTree.Contains(Field<Expander>(w, "advancedPanel")) && helpTree.Contains(Button(w, "web")),
+                    "troubleshooting lacks controllers, the version list or developer tools");
                 Click(w, Button(w, "backToSetup"));
                 Check(!Field<bool>(w, "troubleshootingVisible") && Field<Button>(w, "launchButton").Parent != null,
                     "Back did not restore setup or main action disappeared");
                 Click(w, Button(w, "checkUpdates"));
-                Check(Field<Expander>(w, "advancedPanel").IsExpanded && Field<TextBlock>(w, "catalogState").Text == new Strings()["catalogOffline"] &&
+                Check(Field<TextBlock>(w, "catalogState").Text == new Strings()["catalogOffline"] &&
                     Field<Expander>(w, "feedbackPanel").IsExpanded, "failed update refresh was hidden");
                 string opened = null; Set(w, "openOverride", new Action<string>(url => opened = url));
                 Click(w, Button(w, "web"));
@@ -795,7 +854,7 @@ public static class WindowTests
                 Click(w, Button(w, "reset")); Check(f.Http.Resets == 0, "declining reset still sent it");
                 Set(w, "confirmationOverride", new Func<string, bool>(key => true));
                 Click(w, Button(w, "reset")); Check(f.Http.Resets == 1, "reset did not reach selected build once");
-                Console.WriteLine("PASS WINDOW public setup has one CTA/no tabs; updates stay visible, troubleshooting returns, web uses same package, reset confirms (fake HTTP/browser)");
+                Console.WriteLine("PASS WINDOW public setup has one CTA/no tabs; versions and developer tools live in troubleshooting, web uses same package, reset confirms (fake HTTP/browser)");
             }
             using (var f = new Fixture(root))
             {
@@ -816,14 +875,24 @@ public static class WindowTests
             {
                 var w = f.Window; Connect(w);
                 var choices = Field<ComboBox>(w, "releases"); choices.Items.Add(f.A.release); choices.SelectedItem = f.A.release;
-                Check(Convert.ToString(Field<Button>(w, "launchButton").Content) == new Strings()["installSelected"] &&
-                    !Field<Button>(w, "launchButton").IsEnabled && Field<TextBlock>(w, "packageState").Text.Contains(f.A.release.id) &&
-                    Field<TextBlock>(w, "packageState").Text.Contains(f.B.release.id), "choosing a version did not distinguish installed/selected or require compatibility");
-                Field<CheckBox>(w, "compatible").IsChecked = true;
-                Click(w, Field<Button>(w, "launchButton"));
-                Check(f.Store.Selected.release.id == f.A.release.id && Convert.ToString(Field<Button>(w, "launchButton").Content) == new Strings()["launch"] &&
-                    f.Http.Launches == 0 && f.Downloads.Requests == 0, "one primary install-selected action launched the game or ignored local cache");
-                Console.WriteLine("PASS WINDOW step02 version selection reuses the primary install action, preserves identity and returns to Launch");
+                Check(Convert.ToString(Field<Button>(w, "launchButton").Content) == new Strings()["launch"] &&
+                    Field<TextBlock>(w, "packageState").Text.Contains(f.B.release.id) && !Field<TextBlock>(w, "packageState").Text.Contains(f.A.release.id),
+                    "browsing the version list changed the main action or the installed package line");
+                var asked = new List<string>();
+                Set(w, "confirmationOverride", new Func<string, bool>(key => { asked.Add(key); return false; }));
+                Click(w, Button(w, "installVersion"));
+                Check(f.Store.Selected.release.id == f.B.release.id && asked.SequenceEqual(new[] { "installVersionConfirm" }), "declined version install changed the package");
+                Set(w, "confirmationOverride", new Func<string, bool>(key => true));
+                Click(w, Button(w, "installVersion"));
+                Check(f.Store.Selected.release.id == f.A.release.id && f.Store.State.previous == f.B.folder &&
+                    Convert.ToString(Field<Button>(w, "launchButton").Content) == new Strings()["launch"] &&
+                    f.Http.Launches == 0 && f.Downloads.Requests == 0, "installing a listed version launched the game, lost rollback or ignored the installed copy");
+                Check(!Button(w, "installVersion").IsEnabled, "the version in use can be installed again");
+                Check(Button(w, "rollbackPackage").Visibility == Visibility.Visible &&
+                    Convert.ToString(Button(w, "rollbackPackage").Content) == String.Format(new Strings()["rollbackTo"], f.B.release.DisplayLabel), "step 02 lost the one-click way back");
+                Click(w, Button(w, "rollbackPackage"));
+                Check(f.Store.Selected.release.id == f.B.release.id && f.Store.State.previous == f.A.folder && f.Http.Launches == 0, "Back did not return to the previous package");
+                Console.WriteLine("PASS WINDOW listed versions install from troubleshooting after a named confirmation; step 02 Back returns in one click");
             }
             using (var f = new Fixture(root))
             {
@@ -1205,12 +1274,12 @@ public static class WindowTests
                 if (wrongBuild) release.buildId += "-wrong"; else release.id += "-wrong";
                 release.Validate();
                 var choices = Field<ComboBox>(w, "releases"); choices.Items.Add(release); choices.SelectedItem = release;
-                Field<CheckBox>(w, "compatible").IsChecked = true;
+                Set(w, "confirmationOverride", new Func<string, bool>(key => key == "installVersionConfirm"));
                 var bridge = Field<LauncherBridge>(w, "bridge"); var address = bridge.Address;
                 string priorState = Json.Write(f.Store.State);
                 string priorDiskState = File.ReadAllText(Path.Combine(f.Store.Root, "manager.json"));
                 int priorWrites = f.Http.Writes.Count;
-                Click(w, Field<Button>(w, "launchButton"));
+                Click(w, Button(w, "installVersion"));
                 Check(Field<TextBox>(w, "details").Text.Contains("Package identity does not match selected release") &&
                     Field<Expander>(w, "feedbackPanel").IsExpanded, "mismatched intact archive did not show its identity rejection");
                 Check(f.Http.Stops == 0 && !f.Http.Writes.Skip(priorWrites).Any() && f.Http.Launches == 0 && f.Downloads.Requests == 0,

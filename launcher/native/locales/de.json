@@ -282,12 +282,11 @@
   "troubleshooting": "Fehlerbehebung",
   "backToSetup": "← Zurück zur Einrichtung",
   "troubleshootingIntro": "Controller-Sichtbarkeit, Startdiagnose und Reparatur, wenn du sie brauchst. Aufnahme und erweiterte Werkzeuge findest du unter Entwicklertools.",
-  "selectedVersionAction": "Wähle hier eine andere Version, bestätige die Kompatibilität und installiere sie dann mit der Hauptschaltfläche unten.",
+  "selectedVersionAction": "Alle veröffentlichten Versionen, einschließlich Testversionen. Wähle eine aus und klicke auf „Diese Version installieren“; verwende nur eine Version für deine Spielversion.",
   "installSelected": "Ausgewählte Version installieren",
   "versionInstalled": "VR-Paket installiert: {0}",
   "versionSelected": "VR-Paket ausgewählt: {0}",
   "packageUpdateAvailable": "VR-Paket-Update verfügbar: {0}",
-  "selectLatestPackage": "Neuestes VR-Paket wählen",
   "noPackageUpdate": "Kein neueres VR-Paket aufgeführt.",
   "installConsent": "Mein Spiel entspricht dieser Version und ich akzeptiere das oben genannte Kontorisiko.",
   "launcherVersion": "App {0}",
@@ -313,5 +312,13 @@
   "launchNextSteam": "Erlaube die Windows-Berechtigung, wenn danach gefragt wird. WuWa startet über Steam.",
   "gameSteamUpdateRequired": "Steam ausgewählt. Installiere in Schritt 02 das aktualisierte VR-Paket; deine Spielauswahl bleibt erhalten.",
   "launcherUpdateBar": "Eine neue Version der WuWa VR-App ({0}) ist verfügbar.",
-  "launcherUpdateBarReady": "WuWa VR-App {0} ist heruntergeladen. Starte neu, um das Update abzuschließen."
+  "launcherUpdateBarReady": "WuWa VR-App {0} ist heruntergeladen. Starte neu, um das Update abzuschließen.",
+  "updatePackage": "VR-Paket aktualisieren",
+  "updatePackageTo": "Auf {0} aktualisieren",
+  "rollbackPackage": "Zurück zur vorherigen Version",
+  "rollbackTo": "Zurück zu {0}",
+  "installVersion": "Diese Version installieren",
+  "installVersionConfirm": "{0} für Wuthering Waves {1} installieren? Verwende nur eine Version für deine Spielversion. Mods bergen das in Schritt 02 genannte Kontorisiko.",
+  "packageAutoUpdated": "VR-Paket auf {0} aktualisiert. {1} ist weiterhin installiert: „Zurück zu {1}“ in Schritt 02 kehrt dorthin zurück.",
+  "packageUpdateLater": "Ein neueres VR-Paket ist verfügbar. Schließe das Spiel und aktualisiere dann in Schritt 02."
 }

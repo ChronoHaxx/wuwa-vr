@@ -282,12 +282,11 @@
   "troubleshooting": "故障排查",
   "backToSetup": "← 返回设置",
   "troubleshootingIntro": "按需检查手柄、启动诊断及修复。录制和高级功能请打开“开发者工具”。",
-  "selectedVersionAction": "在此选择其他版本并确认兼容性，再使用下方主按钮安装。",
+  "selectedVersionAction": "所有已发布的版本，包括测试版。选择一个后点击“安装此版本”；请只使用为你的游戏版本制作的版本。",
   "installSelected": "安装所选版本",
   "versionInstalled": "已安装的 VR 安装包：{0}",
   "versionSelected": "已选择的 VR 安装包：{0}",
   "packageUpdateAvailable": "有新的 VR 安装包：{0}",
-  "selectLatestPackage": "选择最新 VR 安装包",
   "noPackageUpdate": "版本列表中没有更新的 VR 安装包。",
   "installConsent": "我的游戏版本与此版本匹配，并接受上方所示的账号风险。",
   "launcherVersion": "应用 {0}",
@@ -313,5 +312,13 @@
   "launchNextSteam": "出现 Windows 权限提示时请允许。鸣潮将通过 Steam 启动。",
   "gameSteamUpdateRequired": "已选择 Steam。请在第 02 步安装更新的 VR 包；游戏选择会保留。",
   "launcherUpdateBar": "WuWa VR 应用有新版本（{0}）可用。",
-  "launcherUpdateBarReady": "WuWa VR 应用 {0} 已下载。重启即可完成更新。"
+  "launcherUpdateBarReady": "WuWa VR 应用 {0} 已下载。重启即可完成更新。",
+  "updatePackage": "更新 VR 安装包",
+  "updatePackageTo": "更新到 {0}",
+  "rollbackPackage": "回到上一个版本",
+  "rollbackTo": "回到 {0}",
+  "installVersion": "安装此版本",
+  "installVersionConfirm": "为 Wuthering Waves {1} 安装 {0}？请只使用为你的游戏版本制作的版本。使用模组有第 02 步所示的账号风险。",
+  "packageAutoUpdated": "VR 安装包已更新到 {0}。{1} 仍已安装：在第 02 步点“回到 {1}”即可返回。",
+  "packageUpdateLater": "有更新的 VR 安装包。请关闭游戏，然后在第 02 步点击更新。"
 }

@@ -282,12 +282,11 @@
   "troubleshooting": "トラブルシューティング",
   "backToSetup": "← セットアップに戻る",
   "troubleshootingIntro": "コントローラーの認識、起動の診断、修復が必要なときはこちら。録画と高度なツールは「開発者ツール」にあります。",
-  "selectedVersionAction": "ここで別のバージョンを選び、互換性を確認してから、下のメインボタンでインストールしてください。",
+  "selectedVersionAction": "テスト版を含む、公開済みのすべてのバージョンです。選んでから「このバージョンをインストール」を押してください。お使いのゲームのバージョン向けのものだけを使ってください。",
   "installSelected": "選択したバージョンをインストール",
   "versionInstalled": "インストール済みの VR パッケージ：{0}",
   "versionSelected": "選択中の VR パッケージ：{0}",
   "packageUpdateAvailable": "VR パッケージの更新があります：{0}",
-  "selectLatestPackage": "最新の VR パッケージを選ぶ",
   "noPackageUpdate": "新しい VR パッケージはありません。",
   "installConsent": "自分のゲームはこのバージョンと一致しており、上記のアカウントへのリスクを了承します。",
   "launcherVersion": "アプリ {0}",
@@ -313,5 +312,13 @@
   "launchNextSteam": "求められたら Windows の許可を承認してください。WuWa は Steam 経由で起動します。",
   "gameSteamUpdateRequired": "Steam が選択されています。手順 02 で更新版の VR パッケージをインストールしてください。ゲームの選択は保持されます。",
   "launcherUpdateBar": "WuWa VR アプリの新しいバージョン（{0}）があります。",
-  "launcherUpdateBarReady": "WuWa VR アプリ {0} をダウンロードしました。再起動すると更新が完了します。"
+  "launcherUpdateBarReady": "WuWa VR アプリ {0} をダウンロードしました。再起動すると更新が完了します。",
+  "updatePackage": "VR パッケージを更新",
+  "updatePackageTo": "{0} に更新",
+  "rollbackPackage": "前のバージョンに戻す",
+  "rollbackTo": "{0} に戻す",
+  "installVersion": "このバージョンをインストール",
+  "installVersionConfirm": "Wuthering Waves {1} 用の {0} をインストールしますか？お使いのゲームのバージョン向けに作られたものだけを使ってください。MOD には手順 02 に示したアカウントのリスクがあります。",
+  "packageAutoUpdated": "VR パッケージを {0} に更新しました。{1} もインストールされたままです。手順 02 の「{1} に戻す」で戻せます。",
+  "packageUpdateLater": "新しい VR パッケージがあります。ゲームを閉じてから、手順 02 で更新してください。"
 }

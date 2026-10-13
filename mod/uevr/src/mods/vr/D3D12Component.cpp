@@ -331,7 +331,10 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
     }
 
     const float clear_color[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    const bool composite_hud = !is_mono_theatre || vr->is_gui_enabled();
+    // In both screen modes the panel is the game picture: hiding the HUD (L3 + B)
+    // leaves the HUD out of it. Before 1.2.2 the stereo screen dropped its panels
+    // instead, a fully black view (Lelouche, 13 Oct 2026); mono was already right.
+    const bool composite_hud = !is_2d_screen || vr->is_gui_enabled();
     const auto game_source_desc = m_game_tex.texture ? m_game_tex.texture->GetDesc() : D3D12_RESOURCE_DESC{};
     const bool screen_source_ready = m_game_tex.texture.Get() != nullptr && m_game_tex.srv_heap != nullptr &&
         m_2d_screen_tex[0].texture.Get() != nullptr && m_2d_screen_tex[0].rtv_heap != nullptr &&

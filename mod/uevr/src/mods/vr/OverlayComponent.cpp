@@ -409,7 +409,7 @@ void OverlayComponent::update_slate_openvr() {
         return;
     }
 
-    if (!vr->is_gui_enabled() && !vr->is_using_mono_theatre()) {
+    if (!vr->is_gui_enabled() && !vr->is_using_2d_screen()) {
         vr::VROverlay()->ClearOverlayTexture(m_slate_overlay_handle);
         return;
     }
@@ -930,7 +930,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
 {
     auto& vr = VR::get();
 
-    if (!vr->is_gui_enabled() && !vr->is_using_mono_theatre()) {
+    if (!vr->is_gui_enabled() && !vr->is_using_2d_screen()) {
         m_parent->m_intersect_state.intersecting = false;
         return std::nullopt;
     }
@@ -1047,7 +1047,7 @@ std::optional<std::reference_wrapper<XrCompositionLayerCylinderKHR>> OverlayComp
 {
     auto& vr = VR::get();
 
-    if (!vr->is_gui_enabled() && !vr->is_using_mono_theatre()) {
+    if (!vr->is_gui_enabled() && !vr->is_using_2d_screen()) {
         return std::nullopt;
     }
 

@@ -22,16 +22,32 @@ struct RejectedDescription {
 // allocated at setup. A null RHI alone never identifies a UI draw. This policy
 // was observed at the fingerprinted stage-2 0x4117a20 hook. It is a live,
 // default-off comparison, not a claim that every Tonemap pass contains UI.
+// With native stereo fix each eye has its own Tonemap; the caller decides which
+// eye's copy may reach the shared UI panel (transient_eye below).
 inline constexpr bool is_transient_menu_candidate(const RejectedDescription& value,
-        const std::array<int32_t, 2>& game_size, bool native_stereo_fix) noexcept {
+        const std::array<int32_t, 2>& game_size) noexcept {
     constexpr std::array<char, 48> expected_name{'T', 'o', 'n', 'e', 'm', 'a', 'p'};
-    if (native_stereo_fix || value.status != GraphStatus::null_rhi || !value.metadata_valid ||
+    if (value.status != GraphStatus::null_rhi || !value.metadata_valid ||
         value.vtable_rva != 0x7d81540 || value.name != expected_name || value.type != 0 || value.format != 37) return false;
     if (value.flags != 0x30 && value.flags != 0x34 && value.flags != 0xb0 && value.flags != 0xb4) return false;
     for (size_t i = 0; i < 2; ++i) {
         if (game_size[i] < 64 || game_size[i] > 16384 || value.size[i] < 64 || value.size[i] > game_size[i]) return false;
     }
     return true;
+}
+
+// Native stereo fix, 13 Oct 2026 (journey menu, simulator): while some full-screen
+// menus are open the stage-2 canvases, including the menu's background picture,
+// draw into each eye's transient Tonemap, so the picture stayed fixed in front of
+// the eyes. Its texture has no RHI at setup, so the eye comes from the view's
+// stereo pass, learned from setups whose target is known: the main target's pass
+// and the second eye's capture pass. Unknown or equal passes leave the draw alone.
+enum class TransientEye { unknown, main, capture };
+inline constexpr TransientEye transient_eye(int32_t pass, int32_t main_pass, int32_t capture_pass) noexcept {
+    if (pass < 0 || main_pass < 0 || capture_pass < 0 || main_pass == capture_pass) return TransientEye::unknown;
+    if (pass == main_pass) return TransientEye::main;
+    if (pass == capture_pass) return TransientEye::capture;
+    return TransientEye::unknown;
 }
 
 // Stage 3's September 24 Esc capture uses the current game ViewFamilyTexture,

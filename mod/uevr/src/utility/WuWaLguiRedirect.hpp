@@ -68,6 +68,8 @@ struct State {
     std::atomic<uint64_t> calls{}, no_target{}, foreign_color{}, depth_bound{},
         registered{}, redirected{}, fitted{}, capture_suppressed{}, capture_pending{}, invalid{}, callback_errors{};
     std::atomic<uint64_t> menu_candidates{}, menu_redirected{}, menu_fitted{};
+    std::atomic<uint64_t> menu_capture_suppressed{}, menu_capture_pending{}, menu_eye_unknown{};
+    std::atomic<int32_t> main_pass{-1}, capture_pass{-1}; // stereo pass of each NSF eye
     std::atomic<uint64_t> stage3_calls{}, stage3_redirected{}, stage3_fitted{}, stage3_empty{}, stage3_samples{};
     std::atomic<uint64_t> stage3_capture_suppressed{}, stage3_capture_pending{};
     struct MenuObservation {
@@ -307,6 +309,20 @@ struct SetupRoute { uintptr_t color{}; bool suppress{}; bool menu{}; MenuTargets
 struct SetupContext { uintptr_t graph{}; bool menu{}, stage3{}; MenuTargets targets{}; };
 inline thread_local SetupContext active_setup{};
 inline thread_local MenuFitReceipt menu_fit_receipt{};
+inline thread_local MenuFitReceipt transient_fit_receipt{}; // stage-2 Tonemap copy, NSF
+inline constexpr uint32_t view_stereo_pass_offset = 0xc90;
+
+// Native stereo fix: remember which stereo pass renders into the main target and
+// which into the second eye's capture, from setups whose target is known.
+inline void learn_eye(State& s, uintptr_t view, uintptr_t source, const wuwa_lgui_route::Target& target) noexcept {
+    if (!target.native_stereo_fix || !source || !target.game) return;
+    const bool main = source == target.game;
+    const bool capture = target.capture && target.capture != target.game && source == target.capture;
+    if (!main && !capture) return;
+    int32_t pass{};
+    if (!checked::read_field(view, view_stereo_pass_offset, pass) || pass < 0 || pass > 8) return;
+    (main ? s.main_pass : s.capture_pass).store(pass, std::memory_order_relaxed);
+}
 struct ScopedSetupContext {
     SetupContext previous{active_setup};
     explicit ScopedSetupContext(SetupContext value) { active_setup = value; }
@@ -364,9 +380,28 @@ inline SetupRoute route_setup(uintptr_t renderer, uintptr_t builder, uintptr_t c
             const auto description = read_rejected(color, graph_vtable, graph_status);
             std::array<int32_t, 2> game_size{};
             const bool known_menu_target = extent(target.game, game_size) &&
-                is_transient_menu_candidate(description, game_size, target.native_stereo_fix);
+                is_transient_menu_candidate(description, game_size);
             if (known_menu_target) sample_menu_stages(s, renderer, view, ViewContext::tonemap, target);
-            if (target.menu_redirect_enabled && known_menu_target) {
+            auto eye = TransientEye::main;
+            if (known_menu_target && target.native_stereo_fix) {
+                int32_t pass{-1};
+                if (!checked::read_field(view, view_stereo_pass_offset, pass)) pass = -1;
+                eye = transient_eye(pass, s.main_pass.load(std::memory_order_relaxed),
+                    s.capture_pass.load(std::memory_order_relaxed));
+                if (eye == TransientEye::unknown) ++s.menu_eye_unknown;
+            }
+            if (target.menu_redirect_enabled && known_menu_target && eye == TransientEye::capture) {
+                // The main eye's copy went to the UI panel; omit this one only after
+                // that copy was fitted, never on a registration alone.
+                if (s.mode == Mode::redirect &&
+                    transient_fit_receipt.consume(MenuTargets{target.ui, target.game, target.capture}, GetTickCount64())) {
+                    ++s.menu_capture_suppressed;
+                    return {color, true};
+                }
+                ++s.menu_capture_pending;
+                return unchanged;
+            }
+            if (target.menu_redirect_enabled && known_menu_target && eye == TransientEye::main) {
                 transient_menu = true;
                 if (++s.menu_candidates <= 3) {
                     spdlog::info("[WuWaLguiRedirect] menu_candidate color={:x} game_size={}x{} {}",
@@ -391,6 +426,7 @@ inline SetupRoute route_setup(uintptr_t renderer, uintptr_t builder, uintptr_t c
         else if (!transient_menu && target.capture && source == target.capture)
             sample_menu_stages(s, renderer, view, ViewContext::capture, target);
         if (!checked::read_field(view, 0x25ac, depth_flag)) { record_invalid(s, s.invalid_view); return unchanged; }
+        if (!transient_menu) learn_eye(s, view, source, target);
         s.last_source.store(source, std::memory_order_relaxed);
         s.last_ui.store(target.ui, std::memory_order_relaxed);
         s.last_capture.store(target.capture, std::memory_order_relaxed);
@@ -458,6 +494,7 @@ inline SetupRoute route_menu_setup(uintptr_t builder, uintptr_t color, uintptr_t
         const auto description = read_rejected(color, vtable, status);
         if (source == target.game || !target.redirect_enabled || !target.menu_redirect_enabled)
             menu_fit_receipt.reset();
+        learn_eye(s, view, source, target);
         int32_t early{}, dispatch{};
         uint8_t depth_flag{}, constrain_flag{};
         float aspect{};
@@ -560,7 +597,10 @@ inline void fit_pass(safetyhook::Context& context, bool stage3) noexcept {
                 }
             } else {
                 ++s.fitted;
-                if (active_setup.menu) ++s.menu_fitted;
+                if (active_setup.menu) {
+                    ++s.menu_fitted;
+                    transient_fit_receipt.fitted(MenuTargets{target.ui, target.game, target.capture}, GetTickCount64());
+                }
                 s.last_fitted_ui.store(target.ui, std::memory_order_release);
             }
         }
@@ -886,8 +926,11 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                 bool(s.world_setup), target.world_labels_enabled, s.world_calls.load(), s.world_prepared.load(),
                 s.world_layout_skips.load(), s.world_guard_skips.load(), s.world_caller_skips.load(),
                 s.world_disabled_skips.load(), s.world_mode_skips.load());
-            spdlog::info("[WuWaLguiRedirect] menu_test enabled={} native_fix={} candidates={} redirected={} fitted={}",
-                target.menu_redirect_enabled, target.native_stereo_fix, s.menu_candidates.load(), s.menu_redirected.load(), s.menu_fitted.load());
+            spdlog::info("[WuWaLguiRedirect] menu_test enabled={} native_fix={} candidates={} redirected={} fitted={} "
+                "eye_passes={}/{} capture_suppressed={} capture_pending={} eye_unknown={}",
+                target.menu_redirect_enabled, target.native_stereo_fix, s.menu_candidates.load(), s.menu_redirected.load(),
+                s.menu_fitted.load(), s.main_pass.load(), s.capture_pass.load(), s.menu_capture_suppressed.load(),
+                s.menu_capture_pending.load(), s.menu_eye_unknown.load());
             spdlog::info("[WuWaLguiRedirect] stage3 ready={} calls={} empty={} redirected={} fitted={} capture_suppressed={} capture_pending={}",
                 s.menu_ready.load(), s.stage3_calls.load(), s.stage3_empty.load(), s.stage3_redirected.load(), s.stage3_fitted.load(),
                 s.stage3_capture_suppressed.load(), s.stage3_capture_pending.load());

@@ -285911,10 +285911,10 @@ index 0000000000000000000000000000000000000000..5455c019a6f31bfdc1273e72f35c0223
 +} // namespace wuwa_lgui_probe
 diff --git a/src/utility/WuWaLguiRedirect.hpp b/src/utility/WuWaLguiRedirect.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..4d87901a6d9408574aef3b1f8c0d675079fc5151
+index 0000000000000000000000000000000000000000..a3a6bd855ab1cd4b44209e36b353cb0aa1b6c434
 --- /dev/null
 +++ b/src/utility/WuWaLguiRedirect.hpp
-@@ -0,0 +1,919 @@
+@@ -0,0 +1,962 @@
 +#pragma once
 +
 +// Opt-in experiment pinned to the inspected September 8 WuWa code. See
@@ -285985,6 +285985,8 @@ index 0000000000000000000000000000000000000000..4d87901a6d9408574aef3b1f8c0d6750
 +    std::atomic<uint64_t> calls{}, no_target{}, foreign_color{}, depth_bound{},
 +        registered{}, redirected{}, fitted{}, capture_suppressed{}, capture_pending{}, invalid{}, callback_errors{};
 +    std::atomic<uint64_t> menu_candidates{}, menu_redirected{}, menu_fitted{};
++    std::atomic<uint64_t> menu_capture_suppressed{}, menu_capture_pending{}, menu_eye_unknown{};
++    std::atomic<int32_t> main_pass{-1}, capture_pass{-1}; // stereo pass of each NSF eye
 +    std::atomic<uint64_t> stage3_calls{}, stage3_redirected{}, stage3_fitted{}, stage3_empty{}, stage3_samples{};
 +    std::atomic<uint64_t> stage3_capture_suppressed{}, stage3_capture_pending{};
 +    struct MenuObservation {
@@ -286224,6 +286226,20 @@ index 0000000000000000000000000000000000000000..4d87901a6d9408574aef3b1f8c0d6750
 +struct SetupContext { uintptr_t graph{}; bool menu{}, stage3{}; MenuTargets targets{}; };
 +inline thread_local SetupContext active_setup{};
 +inline thread_local MenuFitReceipt menu_fit_receipt{};
++inline thread_local MenuFitReceipt transient_fit_receipt{}; // stage-2 Tonemap copy, NSF
++inline constexpr uint32_t view_stereo_pass_offset = 0xc90;
++
++// Native stereo fix: remember which stereo pass renders into the main target and
++// which into the second eye's capture, from setups whose target is known.
++inline void learn_eye(State& s, uintptr_t view, uintptr_t source, const wuwa_lgui_route::Target& target) noexcept {
++    if (!target.native_stereo_fix || !source || !target.game) return;
++    const bool main = source == target.game;
++    const bool capture = target.capture && target.capture != target.game && source == target.capture;
++    if (!main && !capture) return;
++    int32_t pass{};
++    if (!checked::read_field(view, view_stereo_pass_offset, pass) || pass < 0 || pass > 8) return;
++    (main ? s.main_pass : s.capture_pass).store(pass, std::memory_order_relaxed);
++}
 +struct ScopedSetupContext {
 +    SetupContext previous{active_setup};
 +    explicit ScopedSetupContext(SetupContext value) { active_setup = value; }
@@ -286281,9 +286297,28 @@ index 0000000000000000000000000000000000000000..4d87901a6d9408574aef3b1f8c0d6750
 +            const auto description = read_rejected(color, graph_vtable, graph_status);
 +            std::array<int32_t, 2> game_size{};
 +            const bool known_menu_target = extent(target.game, game_size) &&
-+                is_transient_menu_candidate(description, game_size, target.native_stereo_fix);
++                is_transient_menu_candidate(description, game_size);
 +            if (known_menu_target) sample_menu_stages(s, renderer, view, ViewContext::tonemap, target);
-+            if (target.menu_redirect_enabled && known_menu_target) {
++            auto eye = TransientEye::main;
++            if (known_menu_target && target.native_stereo_fix) {
++                int32_t pass{-1};
++                if (!checked::read_field(view, view_stereo_pass_offset, pass)) pass = -1;
++                eye = transient_eye(pass, s.main_pass.load(std::memory_order_relaxed),
++                    s.capture_pass.load(std::memory_order_relaxed));
++                if (eye == TransientEye::unknown) ++s.menu_eye_unknown;
++            }
++            if (target.menu_redirect_enabled && known_menu_target && eye == TransientEye::capture) {
++                // The main eye's copy went to the UI panel; omit this one only after
++                // that copy was fitted, never on a registration alone.
++                if (s.mode == Mode::redirect &&
++                    transient_fit_receipt.consume(MenuTargets{target.ui, target.game, target.capture}, GetTickCount64())) {
++                    ++s.menu_capture_suppressed;
++                    return {color, true};
++                }
++                ++s.menu_capture_pending;
++                return unchanged;
++            }
++            if (target.menu_redirect_enabled && known_menu_target && eye == TransientEye::main) {
 +                transient_menu = true;
 +                if (++s.menu_candidates <= 3) {
 +                    spdlog::info("[WuWaLguiRedirect] menu_candidate color={:x} game_size={}x{} {}",
@@ -286308,6 +286343,7 @@ index 0000000000000000000000000000000000000000..4d87901a6d9408574aef3b1f8c0d6750
 +        else if (!transient_menu && target.capture && source == target.capture)
 +            sample_menu_stages(s, renderer, view, ViewContext::capture, target);
 +        if (!checked::read_field(view, 0x25ac, depth_flag)) { record_invalid(s, s.invalid_view); return unchanged; }
++        if (!transient_menu) learn_eye(s, view, source, target);
 +        s.last_source.store(source, std::memory_order_relaxed);
 +        s.last_ui.store(target.ui, std::memory_order_relaxed);
 +        s.last_capture.store(target.capture, std::memory_order_relaxed);
@@ -286375,6 +286411,7 @@ index 0000000000000000000000000000000000000000..4d87901a6d9408574aef3b1f8c0d6750
 +        const auto description = read_rejected(color, vtable, status);
 +        if (source == target.game || !target.redirect_enabled || !target.menu_redirect_enabled)
 +            menu_fit_receipt.reset();
++        learn_eye(s, view, source, target);
 +        int32_t early{}, dispatch{};
 +        uint8_t depth_flag{}, constrain_flag{};
 +        float aspect{};
@@ -286477,7 +286514,10 @@ index 0000000000000000000000000000000000000000..4d87901a6d9408574aef3b1f8c0d6750
 +                }
 +            } else {
 +                ++s.fitted;
-+                if (active_setup.menu) ++s.menu_fitted;
++                if (active_setup.menu) {
++                    ++s.menu_fitted;
++                    transient_fit_receipt.fitted(MenuTargets{target.ui, target.game, target.capture}, GetTickCount64());
++                }
 +                s.last_fitted_ui.store(target.ui, std::memory_order_release);
 +            }
 +        }
@@ -286803,8 +286843,11 @@ index 0000000000000000000000000000000000000000..4d87901a6d9408574aef3b1f8c0d6750
 +                bool(s.world_setup), target.world_labels_enabled, s.world_calls.load(), s.world_prepared.load(),
 +                s.world_layout_skips.load(), s.world_guard_skips.load(), s.world_caller_skips.load(),
 +                s.world_disabled_skips.load(), s.world_mode_skips.load());
-+            spdlog::info("[WuWaLguiRedirect] menu_test enabled={} native_fix={} candidates={} redirected={} fitted={}",
-+                target.menu_redirect_enabled, target.native_stereo_fix, s.menu_candidates.load(), s.menu_redirected.load(), s.menu_fitted.load());
++            spdlog::info("[WuWaLguiRedirect] menu_test enabled={} native_fix={} candidates={} redirected={} fitted={} "
++                "eye_passes={}/{} capture_suppressed={} capture_pending={} eye_unknown={}",
++                target.menu_redirect_enabled, target.native_stereo_fix, s.menu_candidates.load(), s.menu_redirected.load(),
++                s.menu_fitted.load(), s.main_pass.load(), s.capture_pass.load(), s.menu_capture_suppressed.load(),
++                s.menu_capture_pending.load(), s.menu_eye_unknown.load());
 +            spdlog::info("[WuWaLguiRedirect] stage3 ready={} calls={} empty={} redirected={} fitted={} capture_suppressed={} capture_pending={}",
 +                s.menu_ready.load(), s.stage3_calls.load(), s.stage3_empty.load(), s.stage3_redirected.load(), s.stage3_fitted.load(),
 +                s.stage3_capture_suppressed.load(), s.stage3_capture_pending.load());
@@ -287073,10 +287116,10 @@ index 0000000000000000000000000000000000000000..8ed04f0c3873e0de36cdcd875e54b1b4
 +} // namespace wuwa_lgui_route
 diff --git a/src/utility/WuWaLguiTargetPolicy.hpp b/src/utility/WuWaLguiTargetPolicy.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..489b168d860c8cd88f7806366f54676c8a1a7365
+index 0000000000000000000000000000000000000000..44b4a1fcb7e490236bdf18df953c12aceac7a08f
 --- /dev/null
 +++ b/src/utility/WuWaLguiTargetPolicy.hpp
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,104 @@
 +#pragma once
 +
 +#include <array>
@@ -287101,16 +287144,32 @@ index 0000000000000000000000000000000000000000..489b168d860c8cd88f7806366f54676c
 +// allocated at setup. A null RHI alone never identifies a UI draw. This policy
 +// was observed at the fingerprinted stage-2 0x4117a20 hook. It is a live,
 +// default-off comparison, not a claim that every Tonemap pass contains UI.
++// With native stereo fix each eye has its own Tonemap; the caller decides which
++// eye's copy may reach the shared UI panel (transient_eye below).
 +inline constexpr bool is_transient_menu_candidate(const RejectedDescription& value,
-+        const std::array<int32_t, 2>& game_size, bool native_stereo_fix) noexcept {
++        const std::array<int32_t, 2>& game_size) noexcept {
 +    constexpr std::array<char, 48> expected_name{'T', 'o', 'n', 'e', 'm', 'a', 'p'};
-+    if (native_stereo_fix || value.status != GraphStatus::null_rhi || !value.metadata_valid ||
++    if (value.status != GraphStatus::null_rhi || !value.metadata_valid ||
 +        value.vtable_rva != 0x7d81540 || value.name != expected_name || value.type != 0 || value.format != 37) return false;
 +    if (value.flags != 0x30 && value.flags != 0x34 && value.flags != 0xb0 && value.flags != 0xb4) return false;
 +    for (size_t i = 0; i < 2; ++i) {
 +        if (game_size[i] < 64 || game_size[i] > 16384 || value.size[i] < 64 || value.size[i] > game_size[i]) return false;
 +    }
 +    return true;
++}
++
++// Native stereo fix, 13 Oct 2026 (journey menu, simulator): while some full-screen
++// menus are open the stage-2 canvases, including the menu's background picture,
++// draw into each eye's transient Tonemap, so the picture stayed fixed in front of
++// the eyes. Its texture has no RHI at setup, so the eye comes from the view's
++// stereo pass, learned from setups whose target is known: the main target's pass
++// and the second eye's capture pass. Unknown or equal passes leave the draw alone.
++enum class TransientEye { unknown, main, capture };
++inline constexpr TransientEye transient_eye(int32_t pass, int32_t main_pass, int32_t capture_pass) noexcept {
++    if (pass < 0 || main_pass < 0 || capture_pass < 0 || main_pass == capture_pass) return TransientEye::unknown;
++    if (pass == main_pass) return TransientEye::main;
++    if (pass == capture_pass) return TransientEye::capture;
++    return TransientEye::unknown;
 +}
 +
 +// Stage 3's September 24 Esc capture uses the current game ViewFamilyTexture,

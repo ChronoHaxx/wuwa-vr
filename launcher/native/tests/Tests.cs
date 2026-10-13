@@ -167,9 +167,26 @@ class Tests
         Assert(constructor != null, "promotion fixture seam missing");
         return (PackageStore)constructor.Invoke(new object[] { folder, move });
     }
+    // JavaScriptSerializer writes properties in reflection order, which .NET does not
+    // guarantee to stay the same (13 Oct: it changed mid-run on a slow USB drive while
+    // the values were equal). Compare state by value: the JSON with sorted keys.
+    internal static string CanonicalJson(string json) { return Json.Write(SortedKeys(Json.Read<object>(json))); }
+    static object SortedKeys(object value)
+    {
+        var map = value as IDictionary<string, object>;
+        if (map != null)
+        {
+            var sorted = new SortedDictionary<string, object>(StringComparer.Ordinal);
+            foreach (var item in map) sorted[item.Key] = SortedKeys(item.Value);
+            return sorted;
+        }
+        var items = value as System.Collections.IList;
+        return items == null ? value : items.Cast<object>().Select(SortedKeys).ToArray();
+    }
     static void AssertPromotionUnchanged(PackageStore store, string before)
     {
-        Assert(Json.Write(store.State) == before && Json.Write(new PackageStore(store.Root).State) == before,
+        Assert(CanonicalJson(Json.Write(store.State)) == CanonicalJson(before) &&
+            CanonicalJson(Json.Write(new PackageStore(store.Root).State)) == CanonicalJson(before),
             "failed promotion changed selected/previous version or its persisted receipt");
         Assert(Directory.GetDirectories(store.Root, "stage-*").Length == 0, "failed promotion left a staging directory");
         Assert(Directory.GetDirectories(Path.Combine(store.Root, "versions")).Length == store.State.installed.Count,

@@ -1215,7 +1215,7 @@ public static class WindowTests
                     Field<Expander>(w, "feedbackPanel").IsExpanded, "mismatched intact archive did not show its identity rejection");
                 Check(f.Http.Stops == 0 && !f.Http.Writes.Skip(priorWrites).Any() && f.Http.Launches == 0 && f.Downloads.Requests == 0,
                     "identity rejection stopped the working helper, wrote to it, launched or downloaded");
-                Check(f.Store.Selected.folder == f.B.folder && Json.Write(f.Store.State) == priorState &&
+                Check(f.Store.Selected.folder == f.B.folder && Tests.CanonicalJson(Json.Write(f.Store.State)) == Tests.CanonicalJson(priorState) &&
                     File.ReadAllText(Path.Combine(f.Store.Root, "manager.json")) == priorDiskState,
                     "identity rejection changed the selected package, rollback state or persisted settings");
                 Check(Field<bool>(w, "connectionReady") && bridge.Address == address && address != null,

@@ -486,7 +486,8 @@ vr::EVRCompositorError D3D11Component::on_frame(VR* vr) {
                 );
             }
 
-            if (m_engine_ui_ref.has_texture() && m_engine_ui_ref.has_srv()) {
+            // Same rule as the first panel; either one can be the left eye.
+            if (composite_hud && m_engine_ui_ref.has_texture() && m_engine_ui_ref.has_srv()) {
                 render_srv_to_rtv(
                     m_game_batch.get(),
                     m_engine_ui_ref,

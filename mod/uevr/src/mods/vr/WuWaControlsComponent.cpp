@@ -345,9 +345,11 @@ void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_
     if (!set_defaults && !cfg.get("WuWaPrivacy_Mode") && cfg.get<bool>("WuWaPrivacy_Enabled").value_or(false))
         m_privacy->value()=2;
     // 1.2.2 turns ambient occlusion on by default. A config saved before then
-    // says off only because that was the default, so switch it on once; the
-    // marker is saved with the config, and a later choice to turn it off stays.
-    if (!set_defaults && m_ambient_occlusion_default->value() < 1) {
+    // says off only because that was the default, so switch it on; the marker
+    // is saved with the config, and a later choice to turn it off stays. Read
+    // the marker from the file, not memory: startup loads the config twice
+    // (test 9, 14 Oct), and the second load would restore the old off.
+    if (!set_defaults && cfg.get<int32_t>("WuWaStereo_AmbientOcclusionDefault").value_or(0) < 1) {
         if (!m_ambient_occlusion->value()) spdlog::info("[WuWa] Ambient occlusion: on, the new default (once, for configs from before 1.2.2)");
         m_ambient_occlusion->value() = true;
         m_ambient_occlusion_default->value() = 1;

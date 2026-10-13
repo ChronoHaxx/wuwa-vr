@@ -424,7 +424,8 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                     );
                 }
 
-                if (m_game_ui_tex.texture.Get() != nullptr && m_game_ui_tex.srv_heap != nullptr) {
+                // Same rule as the first panel; either one can be the left eye.
+                if (composite_hud && m_game_ui_tex.texture.Get() != nullptr && m_game_ui_tex.srv_heap != nullptr) {
                     d3d12::render_srv_to_rtv(
                         m_game_batch.get(),
                         commands.cmd_list.Get(),

@@ -463,8 +463,7 @@ inline void install() {
         memory::require(memory::read(base, dos) && dos.e_magic == IMAGE_DOS_SIGNATURE &&
             dos.e_lfanew >= sizeof(dos) && dos.e_lfanew <= 0x100000 &&
             memory::read_field(base, dos.e_lfanew, nt) && nt.Signature == IMAGE_NT_SIGNATURE &&
-            (nt.OptionalHeader.SizeOfImage == wuwa_code_compatibility::image_sizes[0] ||
-             nt.OptionalHeader.SizeOfImage == wuwa_code_compatibility::image_sizes[1]),
+            nt.OptionalHeader.SizeOfImage != 0,
             "Cannot read verified LOD producer module extent");
         owner->image_base = base; owner->image_size = nt.OptionalHeader.SizeOfImage;
         memory::require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,

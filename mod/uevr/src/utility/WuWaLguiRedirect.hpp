@@ -30,9 +30,6 @@ constexpr uintptr_t graph_vtable_rva = 0x7d81540;
 constexpr uintptr_t pooled_vtable_rva = 0x80b76c0;
 constexpr uintptr_t release_rva = 0x485c140;
 constexpr uintptr_t addref_rva = 0x4848bc0;
-// September 19 disk variant: same PE timestamp, image smaller by two pages.
-// Accept its metadata only together with the code checks below, before hooks.
-constexpr uint32_t september19_image_size = 1029853184;
 constexpr std::array<std::array<uint8_t, 32>, 4> signatures{{
     {0x4c,0x8b,0xdc,0x4d,0x89,0x4b,0x20,0x4d,0x89,0x43,0x18,0x55,0x41,0x55,0x41,0x56,0x49,0x8d,0xab,0x68,0xfe,0xff,0xff,0x48,0x81,0xec,0x80,0x02,0x00,0x00,0x48,0x8b},
     {0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57,0x48,0x83,0xec,0x30,0x41,0x0f,0xb7,0xd9,0x4c,0x89,0x44,0x24,0x20,0x48,0x8b,0xfa,0x48,0x8b,0xf1,0xe8,0x6d},
@@ -877,11 +874,12 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                 "Cannot read executable PE headers");
             spdlog::info("[WuWaLguiRedirect] PE identity base={:x} timestamp={:x} image_size={} machine={:x} magic={:x}",
                 s.base, nt.FileHeader.TimeDateStamp, nt.OptionalHeader.SizeOfImage, nt.FileHeader.Machine, nt.OptionalHeader.Magic);
+            // Any image size of this build (Kuro launcher, Steam): the code ranges,
+            // engine signatures and vtable checks below decide before any hook.
             checked::require(
                 nt.Signature == IMAGE_NT_SIGNATURE && nt.FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64 &&
                 nt.OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC && nt.FileHeader.TimeDateStamp == checked::timestamp &&
-                (nt.OptionalHeader.SizeOfImage == checked::image_size || nt.OptionalHeader.SizeOfImage == september19_image_size),
-                "Game identity mismatch");
+                nt.OptionalHeader.SizeOfImage != 0, "Game identity mismatch");
             checked::require(verify_code(executable, nt.OptionalHeader.SizeOfImage, compatibility::code_ranges, "hud"), "Inspected LGUI/graph code changed; hooks remain disabled");
             constexpr std::array<uintptr_t, 4> sites{setup_rva, pass_rva, wrap_rva, register_rva};
             for (size_t i = 0; i < sites.size(); ++i) {

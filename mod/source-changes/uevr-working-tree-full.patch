@@ -271241,7 +271241,7 @@ index f7d93967b39ece43a2e556805e46846550cb8c3e..0b0391133ea4ad3876f2054d4a6d1a70
      for (auto&& cb : m_on_custom_event_cbs) {
          try {
 diff --git a/src/mods/VR.cpp b/src/mods/VR.cpp
-index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0bb909300 100644
+index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..4fc1ec94b82ba1386b6d1cf2c5c871570d410b86 100644
 --- a/src/mods/VR.cpp
 +++ b/src/mods/VR.cpp
 @@ -1,5 +1,7 @@
@@ -271844,7 +271844,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
  
      // Save camera offsets
      save_cameras();
-@@ -1965,9 +2349,44 @@ void VR::handle_keybinds() {
+@@ -1965,9 +2349,45 @@ void VR::handle_keybinds() {
  void VR::on_frame() {
      ZoneScopedN(__FUNCTION__);
  
@@ -271876,6 +271876,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
 +    const bool translucent_candidate=wuwa_test::stereo_candidate_value(1,m_wuwa_stereo_translucency->value());
 +    const bool hide_reflections=wuwa_test::stereo_candidate_value(2,m_wuwa_hide_kuro_reflections->value());
 +    wuwa_planar_probe::configure_correction(wuwa_serial_stereo && planar_candidate);
++    wuwa_god_ray::configure(wuwa_native_stereo, m_wuwa_god_ray_camera->value());
 +    wuwa_reflection_capture::configure(wuwa_native_stereo && is_native_stereo_fix_enabled() &&
 +        is_native_stereo_fix_same_pass_enabled() && planar_candidate);
 +    wuwa_translucency::configure(wuwa_serial_stereo && translucent_candidate);
@@ -271889,7 +271890,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
      if (!get_runtime()->ready()) {
          return;
      }
-@@ -2250,7 +2669,7 @@ void VR::on_post_present() {
+@@ -2250,7 +2670,7 @@ void VR::on_post_present() {
  }
  
  uint32_t VR::get_hmd_width() const {
@@ -271898,7 +271899,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
          if (get_runtime()->is_openxr()) {
              return g_framework->get_rt_size().x * m_openxr->resolution_scale->value();
          }
-@@ -2266,7 +2685,7 @@ uint32_t VR::get_hmd_width() const {
+@@ -2266,7 +2686,7 @@ uint32_t VR::get_hmd_width() const {
  }
  
  uint32_t VR::get_hmd_height() const {
@@ -271907,7 +271908,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
          if (get_runtime()->is_openxr()) {
              return g_framework->get_rt_size().y * m_openxr->resolution_scale->value();
          }
-@@ -2304,6 +2723,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2304,6 +2724,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
          PAGE_CONSOLE,
          PAGE_COMPATIBILITY,
          PAGE_DEBUG,
@@ -271915,7 +271916,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
      };
  
      SelectedPage selected_page = PAGE_RUNTIME;
-@@ -2370,11 +2790,237 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2370,11 +2791,237 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
      case "Debug"_fnv:
          selected_page = PAGE_DEBUG;
          break;
@@ -272153,7 +272154,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
      if (selected_page == PAGE_RUNTIME) {
          if (m_has_hw_scheduling) {
              ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-@@ -2393,8 +3039,31 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2393,8 +3040,31 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
          ImGui::Text((std::string{"Runtime Information ("} + get_runtime()->name().data() + ")").c_str());
  
          m_desktop_fix->draw("Desktop Spectator View");
@@ -272187,7 +272188,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
  
          ImGui::TextWrapped("Render Resolution (per-eye): %d x %d", get_runtime()->get_width(), get_runtime()->get_height());
          ImGui::TextWrapped("Total Render Resolution: %d x %d", get_runtime()->get_width() * 2, get_runtime()->get_height());
-@@ -2415,6 +3084,10 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2415,6 +3085,10 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
          m_synced_afr_method->draw("Synced Sequential Method");
  
          m_world_scale->draw("World Scale");
@@ -272198,7 +272199,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
          m_depth_scale->draw("Depth Scale");
  
          m_disable_hzbocclusion->draw("Disable HZBOcclusion");
-@@ -2431,6 +3104,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2431,6 +3105,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
          if (ImGui::TreeNode("Native Stereo Fix")) {
              m_native_stereo_fix->draw("Enabled");
              m_native_stereo_fix_same_pass->draw("Use Same Stereo Pass");
@@ -272206,7 +272207,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
              ImGui::TreePop();
          }
  
-@@ -2456,6 +3130,11 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
+@@ -2456,6 +3131,11 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
              m_joystick_deadzone->draw("VR Joystick Deadzone");
              m_controller_pitch_offset->draw("Controller Pitch Offset");
  
@@ -272218,7 +272219,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
              m_dpad_shifting->draw("DPad Shifting");
              ImGui::SameLine();
              m_swap_controllers->draw("Left-handed Controller Inputs");
-@@ -3221,6 +3900,11 @@ void VR::set_standing_origin(const Vector4f& origin) {
+@@ -3221,6 +3901,11 @@ void VR::set_standing_origin(const Vector4f& origin) {
      m_standing_origin = origin;
  }
  
@@ -272231,7 +272232,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..ce65410bd74ecf340e44e0f44a0a65f0
      ZoneScopedN(__FUNCTION__);
  
 diff --git a/src/mods/VR.hpp b/src/mods/VR.hpp
-index 941840c7f61a353fab6a22452267ba259608a81f..2fc694cfe7c18c155caffb8f8ec4de06930cdced 100644
+index 941840c7f61a353fab6a22452267ba259608a81f..52182c18ac17102c7dc1855f95b06864bd9029e6 100644
 --- a/src/mods/VR.hpp
 +++ b/src/mods/VR.hpp
 @@ -13,12 +13,16 @@
@@ -272568,7 +272569,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..2fc694cfe7c18c155caffb8f8ec4de06
              *m_roomscale_movement,
              *m_roomscale_sweep,
              *m_swap_controllers,
-@@ -1091,6 +1261,25 @@ public:
+@@ -1091,6 +1261,26 @@ public:
              *m_show_fps,
              *m_show_statistics,
              *m_controllers_allowed,
@@ -272588,13 +272589,14 @@ index 941840c7f61a353fab6a22452267ba259608a81f..2fc694cfe7c18c155caffb8f8ec4de06
 +            *m_wuwa_stereo_translucency,
 +            *m_wuwa_kuro_water_stereo,
 +            *m_wuwa_hide_kuro_reflections,
++            *m_wuwa_god_ray_camera,
 +            *m_wuwa_native_frame_timing,
 +            *m_wuwa_early_stereo_views,
 +            *m_wuwa_stereo_base_pose,
              *m_lerp_camera_pitch,
              *m_lerp_camera_yaw,
              *m_lerp_camera_roll,
-@@ -1105,6 +1294,64 @@ private:
+@@ -1105,6 +1295,67 @@ private:
      bool m_stereo_emulation_mode{false}; // not a good config option, just for debugging
      bool m_wait_for_present{true};
      const ModToggle::Ptr m_controllers_allowed{ ModToggle::create(generate_name("ControllersAllowed"), true) };
@@ -272653,6 +272655,9 @@ index 941840c7f61a353fab6a22452267ba259608a81f..2fc694cfe7c18c155caffb8f8ec4de06
 +    const ModToggle::Ptr m_wuwa_stereo_translucency{ ModToggle::create(generate_name("WuWaStereoTranslucency"), false) };
 +    const ModToggle::Ptr m_wuwa_kuro_water_stereo{ ModToggle::create(generate_name("WuWaKuroWaterStereo"), false) };
 +    const ModToggle::Ptr m_wuwa_hide_kuro_reflections{ ModToggle::create(generate_name("WuWaHideKuroReflections"), false) };
++    // Camera the storm-sky god-ray pass renders from (WuWaGodRay.hpp): 0 game, 1 eye, 2 game without head.
++    const ModCombo::Ptr m_wuwa_god_ray_camera{ ModCombo::create(generate_name("WuWaGodRayCamera"),
++        {"Game", "Eye", "Game without head"}, 0) };
 +    const ModToggle::Ptr m_wuwa_native_frame_timing{ ModToggle::create(generate_name("WuWaNativeFrameTiming"), false) };
 +    const ModToggle::Ptr m_wuwa_early_stereo_views{ ModToggle::create(generate_name("WuWaEarlyStereoViews"), false) };
 +    const ModToggle::Ptr m_wuwa_stereo_base_pose{ ModToggle::create(generate_name("WuWaStereoBasePose"), true) };
@@ -275425,7 +275430,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
 \ No newline at end of file
 +} // namespace vrmod
 diff --git a/src/mods/vr/FFakeStereoRenderingHook.cpp b/src/mods/vr/FFakeStereoRenderingHook.cpp
-index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9db100b3c1 100644
+index 148f14391b004cdefc4389c529c329c967a1aaf5..8e879373cf349c2e52945c27de145dfc284fafbb 100644
 --- a/src/mods/vr/FFakeStereoRenderingHook.cpp
 +++ b/src/mods/vr/FFakeStereoRenderingHook.cpp
 @@ -4,7 +4,9 @@
@@ -275438,7 +275443,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
  #include <spdlog/spdlog.h>
  #include <utility/Memory.hpp>
-@@ -55,6 +57,22 @@
+@@ -55,6 +57,23 @@
  #include <sdk/threading/RHIThreadWorker.hpp>
  #include "../VR.hpp"
  #include "../../utility/Logging.hpp"
@@ -275457,11 +275462,12 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
 +#include "../../utility/WuWaPerf.hpp"
 +#include "../../utility/WuWaMonoNativeProjection.hpp"
 +#include "../../utility/WuWaDofSync.hpp"
++#include "../../utility/WuWaGodRay.hpp"
 +#include "../../utility/WuWaCinematicMetadata.hpp"
  
  #include "FFakeStereoRenderingHook.hpp"
  
-@@ -65,6 +83,553 @@
+@@ -65,6 +84,553 @@
  FFakeStereoRenderingHook* g_hook = nullptr;
  uint32_t g_frame_count{};
  
@@ -276015,7 +276021,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  // Scan through function instructions to detect usage of double
  // floating point precision instructions.
  bool is_using_double_precision(uintptr_t addr) {
-@@ -101,6 +666,18 @@ FFakeStereoRenderingHook::FFakeStereoRenderingHook() {
+@@ -101,6 +667,18 @@ FFakeStereoRenderingHook::FFakeStereoRenderingHook() {
  }
  
  void FFakeStereoRenderingHook::on_frame() {
@@ -276034,7 +276040,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      attempt_hook_game_engine_tick();
      attempt_hook_slate_thread();
      attempt_hook_fsceneview_constructor();
-@@ -2365,6 +2942,9 @@ FRHITexture2D** FFakeStereoRenderingHook::viewport_get_render_target_texture_hoo
+@@ -2365,6 +2943,9 @@ FRHITexture2D** FFakeStereoRenderingHook::viewport_get_render_target_texture_hoo
  
  void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewportClient* viewport_client, sdk::FViewport* viewport, sdk::FCanvas* canvas, void* a4) {
      ZoneScopedN(__FUNCTION__);
@@ -276044,7 +276050,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      // UI compatibility mode
      // Tries to redirect calls to GetRenderTargetTexture to point towards our UI
-@@ -2410,9 +2990,29 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
+@@ -2410,9 +2991,29 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
          return;
      }
  
@@ -276074,7 +276080,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      if (hook_attempts < 100 && !g_hook->m_hooked_game_engine_tick && g_hook->m_attempted_hook_game_engine_tick) {
          ZoneScopedN("UGameViewportClient::Draw (hook UGameEngine::Tick)");
          SPDLOG_INFO("Performing alternative UGameEngine::Tick hook for synced AFR.");
-@@ -2454,6 +3054,15 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
+@@ -2454,6 +3055,15 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
          }
      }
  
@@ -276090,7 +276096,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      const auto& mods = g_framework->get_mods()->get_mods();
  
      for (const auto& mod : mods) {
-@@ -3016,6 +3625,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3016,6 +3626,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
      SPDLOG_INFO_ONCE("Called FSceneView constructor for the first time");
  
      auto& vr = VR::get();
@@ -276098,7 +276104,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      if (!g_hook->is_in_viewport_client_draw() || !vr->is_hmd_active()) {
          return g_hook->m_sceneview_data.constructor_hook.unsafe_call<sdk::FSceneView*>(view, init_options, a3, a4);
-@@ -3046,7 +3656,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3046,7 +3657,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      const auto init_options_scene_state = init_options->get_scene_state();
  
@@ -276112,7 +276118,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
          if (is_ue5) {
              auto& vio_entry = g_hook->m_sceneview_data.view_init_options_ue5[init_options_scene_state];
              memcpy(&vio_entry, init_options, sizeof(sdk::FSceneViewInitOptionsUE5));
-@@ -3054,6 +3669,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3054,6 +3670,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
              auto& vio_entry = g_hook->m_sceneview_data.view_init_options_ue4[init_options_scene_state];
              memcpy(&vio_entry, init_options, sizeof(sdk::FSceneViewInitOptionsUE4));
          }
@@ -276127,7 +276133,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      }
  
      auto& known_scene_states = g_hook->m_sceneview_data.known_scene_states;
-@@ -3068,7 +3691,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3068,7 +3692,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      const auto true_index = vr->is_using_afr() ? (g_frame_count + last_index) % 2 : last_index;
  
@@ -276142,7 +276148,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
          int32_t w = vr->get_hmd_width();
          int32_t h = vr->get_hmd_height();
  
-@@ -3142,11 +3771,78 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3142,11 +3772,78 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
          }
      }
  
@@ -276222,7 +276228,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
          if (g_hook->get_render_target_manager()->get_scene_capture_render_target() != nullptr) {
              init_options->set_stereo_pass(EStereoscopicPass::eSSP_PRIMARY);
  
-@@ -3165,7 +3861,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3165,7 +3862,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      bool new_scene_state_inserted_this_frame = false;
  
@@ -276236,7 +276242,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
          SPDLOG_INFO("Inserting new scene state {:x}", (uintptr_t)init_options_scene_state);
          known_scene_states.insert(init_options_scene_state);
          new_scene_state_inserted_this_frame = true;
-@@ -3177,7 +3878,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3177,7 +3879,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
          }
      }
  
@@ -276245,7 +276251,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
          init_options->set_stereo_pass(EStereoscopicPass::eSSP_PRIMARY);
  
          // Set the scene state to the one that isn't the current one
-@@ -3192,7 +3893,105 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3192,7 +3894,105 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      last_index++;
  
@@ -276351,7 +276357,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      // Reset the view count back to what it was.
      if (views_original_count.has_value()) {
-@@ -3305,6 +4104,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3305,6 +4105,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
      auto& vr = VR::get();
      auto rtm = g_hook->get_render_target_manager();
@@ -276360,7 +276366,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      if (!vr->is_hmd_active() || !vr->is_native_stereo_fix_enabled()) {
          rtm->destroy_scene_capture();
-@@ -3342,6 +4143,16 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3342,6 +4144,16 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      const auto rtrsrc = rt != nullptr ? (sdk::FTextureRenderTargetResource*)rt->get_resource() : nullptr;
      const auto rtfrt = rtrsrc != nullptr ? rtrsrc->as_render_target() : nullptr;
  
@@ -276377,7 +276383,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      if (rtfrt == nullptr) {
          // This is fine to call constantly because we use an in-flight render target
          // that gets unset after the texture is fully created. This function exits early otherwise.
-@@ -3359,6 +4170,35 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3359,6 +4171,35 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          return;
      }
  
@@ -276413,7 +276419,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      bool wants_swap = false;
      if (views.count > 1) {
          views.count = 1;
-@@ -3374,8 +4214,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3374,8 +4215,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
              const auto last_frame = (frame_count) % runtimes::OpenXR::QUEUE_SIZE;
              const auto now_frame = (frame_count + 1) % runtimes::OpenXR::QUEUE_SIZE;
@@ -276434,7 +276440,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
          } else {
              auto openvr = (runtimes::OpenVR*)runtime;
              std::unique_lock __{ openvr->pose_mtx };
-@@ -3401,7 +4252,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3401,7 +4253,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          view_family.views.data[1]->constructor((sdk::FSceneViewInitOptions*)init_options_copy2.data());*/
      }
  
@@ -276514,7 +276520,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      if (wants_swap) {
          // Swap out the existing render target for our custom one
-@@ -3410,11 +4332,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3410,11 +4333,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          // because the engine is still working on the old render target
          const auto original_target = view_family_target;
  
@@ -276543,7 +276549,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
              // We decrement the frame count because it fixes motion vectors in the right eye.
              scene->decrement_frame_count();
          }
-@@ -3422,7 +4358,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3422,7 +4359,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          std::swap(views[0], views[1]);
  
          // Call it again
@@ -276563,7 +276569,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
          std::swap(views[0], views[1]);
  
-@@ -3430,6 +4377,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3430,6 +4378,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      }
  
      views.count = prev_count;
@@ -276572,7 +276578,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  }
  
  void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* extension, sdk::FSceneViewFamily& view_family) {
-@@ -3444,7 +4393,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
+@@ -3444,7 +4394,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
      sdk::FSceneViewFamily::update_offsets(&view_family, g_hook->get_render_target_manager()->get_viewport());
      auto si = view_family.get_scene_interface();
  
@@ -276581,7 +276587,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
          sdk::FScene::update_offsets((sdk::FScene*)si);
      }
  
-@@ -4092,6 +5041,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
+@@ -4092,6 +5042,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
      SPDLOG_INFO("Current ext count: {}", view_extensions.extensions.count);
      SPDLOG_INFO("Current ext capacity: {}", view_extensions.extensions.capacity);
  
@@ -276651,7 +276657,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      // Verifications on the current memory of the FSceneViewExtensions, because pre-4.10 (?) the view extensions array did not actually exist
      if (m_rendertarget_manager_embedded_in_stereo_device) {
          SPDLOG_INFO("Performing verifications on the current memory of the FSceneViewExtensions...");
-@@ -4621,6 +5633,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
+@@ -4621,6 +5634,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
          g_hook->set_should_recreate_textures(true);
          return true;
      }
@@ -276661,7 +276667,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      
      /*if (g_hook->m_analyzing_view_extensions) {
          const auto now = std::chrono::high_resolution_clock::now();
-@@ -4696,13 +5711,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4696,13 +5712,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -276680,7 +276686,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      // The purpose of this is to prevent the game from crashing in IDirect3D12CommandList::Close
      // Because the game will try to copy a texture region that is out of bounds.
-@@ -4725,6 +5739,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4725,6 +5740,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -276693,7 +276699,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      if (VR::get()->is_stereo_emulation_enabled()) {
          *w *= 2;
      } else {
-@@ -4735,7 +5755,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4735,7 +5756,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
  
      *w = *w / 2;
  
@@ -276702,7 +276708,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      if (!VR::get()->is_native_stereo_fix_enabled()) {
          *x += *w * true_index;
-@@ -4756,6 +5776,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4756,6 +5777,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          return;
      }
  
@@ -276714,7 +276720,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      auto vr = VR::get();
      //std::scoped_lock _{vr->get_vr_mutex()};
  
-@@ -4787,8 +5812,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4787,8 +5813,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto is_full_pass = view_index == 0 && !index_was_ever_two && !index_was_ever_negative && !g_hook->m_has_double_precision;
  
      auto true_index = index_starts_from_one ? ((view_index + 1) % 2) : (view_index % 2);
@@ -276772,7 +276778,15 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      if (vr->is_using_afr() && !is_full_pass) {
          true_index = g_frame_count % 2;
-@@ -4852,6 +5926,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4815,6 +5890,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+             g_hook->m_last_pre_rotation_double = *rot_d;
+         } else {
+             g_hook->m_last_pre_rotation = *view_rotation;
++            wuwa_god_ray::record_pre_rotation(view_rotation->pitch, view_rotation->yaw, view_rotation->roll);
+         }
+ 
+         //vr->wait_for_present();
+@@ -4852,6 +5928,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -276781,7 +276795,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
      const auto view_d = (Vector3d*)view_location;
  
      const auto view_mat = !has_double_precision ? 
-@@ -4905,6 +5981,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4905,6 +5983,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto camera_up = quat_converter * (vqi_norm * glm::vec3{0, -camera_up_offset, 0});
  
      const auto world_scale = world_to_meters * vr->get_world_scale();
@@ -276789,7 +276803,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      if (has_double_precision) {
          *view_d += camera_forward;
-@@ -4924,6 +6001,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4924,6 +6003,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto rotation_offset = vr->get_rotation_offset();
          const auto current_hmd_rotation = glm::normalize(rotation_offset * glm::quat{vr->get_rotation(0)});
@@ -276803,7 +276817,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
          const auto current_eye_rotation_offset = glm::normalize(glm::quat{vr->get_eye_transform(true_index)});
  
          const auto new_rotation = glm::normalize(vqi_norm * current_hmd_rotation * current_eye_rotation_offset);
-@@ -4938,7 +6022,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4938,7 +6024,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto head_offset = quat_converter * (vqi_norm * (pos * world_scale));
          const auto head_offset_flat = quat_converter * (vqi_norm * (pos_flat * world_scale));
@@ -276822,7 +276836,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
          if (!has_double_precision) {
              if (!is_2d_screen) {
-@@ -5047,6 +6141,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -5047,6 +6143,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -276832,7 +276846,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  #ifdef FFAKE_STEREO_RENDERING_LOG_ALL_CALLS
      SPDLOG_INFO("Finished calculating stereo view offset!");
  #else
-@@ -5103,22 +6200,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5103,22 +6202,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          return out;
      }
  
@@ -276859,7 +276873,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
      // Can happen if we hooked this differently.
      if (g_hook->m_calculate_stereo_projection_matrix_hook) {
-@@ -5131,8 +6216,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5131,8 +6218,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          }
      }
  
@@ -276877,7 +276891,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
          const float width = VR::get()->get_hmd_width();
          const float height = VR::get()->get_hmd_height();
-@@ -5163,11 +6256,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5163,11 +6258,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
      // SPDLOG_INFO("NearZ: {}", old_znear);
  
      if (out != nullptr) {
@@ -276896,7 +276910,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
          auto& double_matrix = *(Matrix4x4d*)out;
  
-@@ -5500,6 +6599,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
+@@ -5500,6 +6601,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
  
              if (get_projection_data) {
                  SPDLOG_INFO("Successfully found GetProjectionData at {:x}", *get_projection_data);
@@ -276904,7 +276918,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
                  g_hook->m_hooked_alternative_localplayer_scan = true;
  
-@@ -5682,11 +6782,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5682,11 +6784,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
      if (idx) {
          SPDLOG_INFO("Calling PostInitProperties on local player!");
  
@@ -276932,7 +276946,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..0eb8e76c45ca97744728b531fd2f7c9d
  
          // If the exception count exceeds a certain amount, we need to un-nop the function call because it was supposed to return a pointer.
          static auto exception_count = 0;
-@@ -5804,7 +6915,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5804,7 +6917,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
  
          // remove the handler
          RemoveVectoredExceptionHandler(exception_handler);
@@ -283552,6 +283566,215 @@ index 0000000000000000000000000000000000000000..8c81eb42fa75ab03b670eaac2b42a30f
 +};
 +
 +} // namespace wuwa_eye_diff
+diff --git a/src/utility/WuWaGodRay.hpp b/src/utility/WuWaGodRay.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..5a1ce10eb553ca58facea3fe65f8c743856871c0
+--- /dev/null
++++ b/src/utility/WuWaGodRay.hpp
+@@ -0,0 +1,203 @@
++#pragma once
++// Kuro's screen-space god ray (storm sky at the Mengzhou Fogveil Pagoda, 13 Oct 2026).
++// KuroGlobalGI::ApplyGodRay hands the scene a 256x256 GodRayRT and ExtraFOV; each
++// scene render then runs a pass that draws the god-ray source into that target from
++// Views[0]'s TranslatedViewMatrix (+0x520 = ViewMatrices +0x200; ViewMatrices sit at
++// +0x320, ViewMatrix at +0x3e0) with a square projection of Views[0].FOV (+0xca4) plus
++// ExtraFOV. The region's post material (parent M_GodRayPost) then blurs it on screen.
++// In VR the streaks stay put on screen when only the head turns (simulator, game
++// camera fixed: the world moves +-49 px for 12 degrees of head yaw, the fan 11-12 px,
++// also with a symmetric FOV and IPD 0), so one rotation in that chain is the game
++// camera's rather than the eye's.
++//
++// This hook wraps the pass. Every couple of seconds it logs how far the pass camera
++// (+0x520) is from the eye's ViewMatrix rotation (+0x3e0) and from the game camera
++// recorded before the head pose is applied. The camera setting picks what the pass
++// renders from, for the duration of the call only:
++//   0  the game's own matrix (unchanged)
++//   1  the eye's ViewMatrix rotation (head-tracked)
++//   2  the game camera without the head pose (diagnostic)
++// The function is found by its code bytes; if they do not match, nothing is hooked.
++#include <Windows.h>
++
++#include <algorithm>
++#include <array>
++#include <atomic>
++#include <cmath>
++#include <cstdint>
++#include <mutex>
++
++#include <nlohmann/json.hpp>
++#include <safetyhook.hpp>
++#include <spdlog/spdlog.h>
++#include <utility/Scan.hpp>
++
++#include "WuWaLguiProbe.hpp"
++
++namespace wuwa_god_ray {
++namespace checked = wuwa_lgui_probe::detail;
++
++inline constexpr const char* pass_pattern =
++    "40 57 41 54 41 56 48 81 EC 20 01 00 00 4C 8B B1 08 01 00 00 48 8B FA 4C 8B E1 "
++    "41 83 BE 6C CA 00 00 00 0F 8E ? ? ? ? 49 8B 06 48 8B 48 20 48 8B 01 FF 90 00 06 00 00 "
++    "48 85 C0 0F 84 ? ? ? ? 48 8B 10 48 8B C8 FF 92 E8 01 00 00";
++inline constexpr uint32_t views_offset = 0x108, view_count_offset = 0x110;
++inline constexpr uint32_t pass_offset = 0xc90, fov_offset = 0xca4;
++inline constexpr uint32_t view_matrix_offset = 0x3e0, translated_view_offset = 0x520;
++
++using Matrix = std::array<float, 16>; // UE FMatrix, row-major, row vectors
++
++inline std::atomic<int> camera_mode{}, install_result{}; // install: 0 not tried, 1 hooked, -1 refused
++inline std::atomic<uint64_t> calls{}, replaced{}, faults{}, next_log_ms{};
++inline std::atomic<float> pre_pitch{}, pre_yaw{}, pre_roll{};
++inline std::atomic<bool> has_pre{};
++inline std::atomic<float> last_eye_angle{-1.0f}, last_game_angle{-1.0f}, last_fov{};
++inline safetyhook::InlineHook hook{};
++inline std::once_flag install_once;
++
++// Game camera rotation before UEVR adds the head pose (first eye of each frame).
++inline void record_pre_rotation(float pitch, float yaw, float roll) noexcept {
++    pre_pitch.store(pitch, std::memory_order_relaxed);
++    pre_yaw.store(yaw, std::memory_order_relaxed);
++    pre_roll.store(roll, std::memory_order_relaxed);
++    has_pre.store(true, std::memory_order_release);
++}
++
++// FInverseRotationMatrix(rotator) * view planes, i.e. UE's ViewRotationMatrix.
++inline Matrix view_rotation_matrix(float pitch_deg, float yaw_deg, float roll_deg) noexcept {
++    constexpr float to_rad = 3.14159265358979f / 180.0f;
++    const float sp = std::sin(pitch_deg * to_rad), cp = std::cos(pitch_deg * to_rad);
++    const float sy = std::sin(yaw_deg * to_rad), cy = std::cos(yaw_deg * to_rad);
++    const float sr = std::sin(roll_deg * to_rad), cr = std::cos(roll_deg * to_rad);
++    // FRotationMatrix rows; the inverse of a rotation is its transpose.
++    const float r[3][3] = {
++        {cp * cy, cp * sy, sp},
++        {sr * sp * cy - cr * sy, sr * sp * sy + cr * cy, -sr * cp},
++        {-(cr * sp * cy + sr * sy), cy * sr - cr * sp * sy, cr * cp}};
++    const float inv[3][3] = {{r[0][0], r[1][0], r[2][0]}, {r[0][1], r[1][1], r[2][1]}, {r[0][2], r[1][2], r[2][2]}};
++    // View planes: x' = z, y' = x, z' = y (rows (0,0,1), (1,0,0), (0,1,0)).
++    Matrix m{};
++    for (int i = 0; i < 3; ++i) {
++        m[i * 4 + 0] = inv[i][1];
++        m[i * 4 + 1] = inv[i][2];
++        m[i * 4 + 2] = inv[i][0];
++    }
++    m[15] = 1.0f;
++    return m;
++}
++
++// Angle in degrees between the 3x3 rotations of two matrices.
++inline float rotation_angle(const Matrix& a, const Matrix& b) noexcept {
++    float trace = 0.0f;
++    for (int i = 0; i < 3; ++i)
++        for (int k = 0; k < 3; ++k) trace += a[k * 4 + i] * b[k * 4 + i];
++    const float c = std::clamp((trace - 1.0f) * 0.5f, -1.0f, 1.0f);
++    return std::acos(c) * 180.0f / 3.14159265358979f;
++}
++
++inline bool plausible_rotation(const Matrix& m) noexcept {
++    for (int i = 0; i < 3; ++i) {
++        float len = 0.0f;
++        for (int k = 0; k < 3; ++k) len += m[i * 4 + k] * m[i * 4 + k];
++        if (!std::isfinite(len) || std::abs(len - 1.0f) > 1e-2f) return false;
++    }
++    return true;
++}
++
++inline void pass_hook(void* renderer, void* graph) {
++    ++calls;
++    const auto now = GetTickCount64();
++    const int mode = camera_mode.load(std::memory_order_relaxed);
++    uintptr_t views{};
++    int32_t count{};
++    const auto base = reinterpret_cast<uintptr_t>(renderer);
++    if (!checked::read(base + views_offset, views) || !checked::read(base + view_count_offset, count) ||
++        !views || count < 1) {
++        hook.call<void>(renderer, graph);
++        return;
++    }
++    Matrix pass_matrix{}, eye_matrix{};
++    int32_t pass{};
++    float fov{};
++    const bool readable = checked::read(views + translated_view_offset, pass_matrix) &&
++        checked::read(views + view_matrix_offset, eye_matrix) &&
++        checked::read(views + pass_offset, pass) && checked::read(views + fov_offset, fov) &&
++        plausible_rotation(pass_matrix) && plausible_rotation(eye_matrix);
++    if (!readable) {
++        ++faults;
++        hook.call<void>(renderer, graph);
++        return;
++    }
++    const bool pre_known = has_pre.load(std::memory_order_acquire);
++    const auto game_matrix = view_rotation_matrix(pre_pitch.load(), pre_yaw.load(), pre_roll.load());
++    const float eye_angle = rotation_angle(pass_matrix, eye_matrix);
++    const float game_angle = pre_known ? rotation_angle(pass_matrix, game_matrix) : -1.0f;
++    last_eye_angle.store(eye_angle, std::memory_order_relaxed);
++    last_game_angle.store(game_angle, std::memory_order_relaxed);
++    last_fov.store(fov, std::memory_order_relaxed);
++    if (now >= next_log_ms.load(std::memory_order_relaxed)) {
++        next_log_ms.store(now + 2000, std::memory_order_relaxed);
++        spdlog::info("[WuWaGodRay] pass={} fov={:.2f} views={} mode={} pass_vs_eye={:.2f} deg "
++            "pass_vs_game={:.2f} deg eye_vs_game={:.2f} deg calls={} replaced={}",
++            pass, fov, count, mode, eye_angle, game_angle,
++            pre_known ? rotation_angle(eye_matrix, game_matrix) : -1.0f, calls.load(), replaced.load());
++    }
++    if (mode != 1 && !(mode == 2 && pre_known)) {
++        hook.call<void>(renderer, graph);
++        return;
++    }
++    // Swap only the 3x3 rotation for this call; the row of zeros and the 1 stay.
++    auto replacement = pass_matrix;
++    const auto& source = mode == 1 ? eye_matrix : game_matrix;
++    for (int i = 0; i < 3; ++i)
++        for (int k = 0; k < 3; ++k) replacement[i * 4 + k] = source[i * 4 + k];
++    const auto target = reinterpret_cast<void*>(views + translated_view_offset);
++    if (!checked::guarded_copy(target, replacement.data(), sizeof(replacement))) {
++        ++faults;
++        hook.call<void>(renderer, graph);
++        return;
++    }
++    ++replaced;
++    hook.call<void>(renderer, graph);
++    checked::guarded_copy(target, pass_matrix.data(), sizeof(pass_matrix));
++}
++
++inline bool install() {
++    std::call_once(install_once, [] {
++        const auto module = GetModuleHandleW(nullptr);
++        const auto found = utility::scan(module, pass_pattern);
++        if (!found) {
++            install_result = -1;
++            spdlog::error("[WuWaGodRay] god-ray pass not found in this build; camera setting unavailable");
++            return;
++        }
++        auto created = safetyhook::InlineHook::create(reinterpret_cast<void*>(*found), reinterpret_cast<void*>(&pass_hook));
++        if (!created) {
++            install_result = -1;
++            spdlog::error("[WuWaGodRay] could not hook the god-ray pass at {:x}", *found);
++            return;
++        }
++        hook = std::move(*created);
++        install_result = 1;
++        spdlog::info("[WuWaGodRay] god-ray pass hooked at {:x}", *found);
++    });
++    return install_result.load() == 1;
++}
++
++// Game thread, every frame. The hook is installed once on first call and stays.
++inline void configure(bool stereo, int mode) {
++    if (!stereo) {
++        camera_mode.store(0, std::memory_order_relaxed);
++        return;
++    }
++    if (!install()) return;
++    if (camera_mode.exchange(mode, std::memory_order_relaxed) != mode)
++        spdlog::info("[WuWaGodRay] camera mode {}", mode);
++}
++
++inline nlohmann::json status() {
++    return {{"installed", install_result.load()}, {"mode", camera_mode.load()}, {"calls", calls.load()},
++        {"replaced", replaced.load()}, {"faults", faults.load()}, {"fov", last_fov.load()},
++        {"pass_vs_eye_deg", last_eye_angle.load()}, {"pass_vs_game_deg", last_game_angle.load()}};
++}
++} // namespace wuwa_god_ray
 diff --git a/src/utility/WuWaHandDemo.hpp b/src/utility/WuWaHandDemo.hpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..9c7ac51a001295c6775583a722921bb60b7a8b38
@@ -294921,10 +295144,10 @@ index 0000000000000000000000000000000000000000..dc76f68bdca067370b1ddd39f42f15cc
 +}
 diff --git a/src/utility/WuWaTestControl.hpp b/src/utility/WuWaTestControl.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..7fc194cdce78defd89a652ac480d65f57597bdb6
+index 0000000000000000000000000000000000000000..ac0b77b1f884da35584a346b50cb978a1d41063c
 --- /dev/null
 +++ b/src/utility/WuWaTestControl.hpp
-@@ -0,0 +1,875 @@
+@@ -0,0 +1,877 @@
 +#pragma once
 +
 +#include <array>
@@ -294951,6 +295174,7 @@ index 0000000000000000000000000000000000000000..7fc194cdce78defd89a652ac480d65f5
 +#include "WuWaBooleanCVar.hpp"
 +#include "WuWaPlanarCVar.hpp"
 +#include "WuWaPlanarProbe.hpp"
++#include "WuWaGodRay.hpp"
 +#include "WuWaTranslucencyStereo.hpp"
 +#include "WuWaKuroReflection.hpp"
 +#include "WuWaReflectionCapture.hpp"
@@ -295374,6 +295598,7 @@ index 0000000000000000000000000000000000000000..7fc194cdce78defd89a652ac480d65f5
 +    status["motion_recording"] = wuwa_motion::status();
 +    status["planar_probe"] = wuwa_planar_probe::status();
 +    status["planar_eye_correction"] = wuwa_planar_probe::correction_status();
++    status["god_ray"] = wuwa_god_ray::status();
 +    status["stereo_translucency"] = wuwa_translucency::status();
 +    status["kuro_reflection"] = wuwa_kuro_reflection::status();
 +    status["reflection_capture_projection"] = wuwa_reflection_capture::status();

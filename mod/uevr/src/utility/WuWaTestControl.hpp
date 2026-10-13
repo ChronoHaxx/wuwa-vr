@@ -24,6 +24,7 @@
 #include "WuWaBooleanCVar.hpp"
 #include "WuWaPlanarCVar.hpp"
 #include "WuWaPlanarProbe.hpp"
+#include "WuWaGodRay.hpp"
 #include "WuWaTranslucencyStereo.hpp"
 #include "WuWaKuroReflection.hpp"
 #include "WuWaReflectionCapture.hpp"
@@ -447,6 +448,7 @@ inline Json test_status(const Json& camera, const Json& live_options) {
     status["motion_recording"] = wuwa_motion::status();
     status["planar_probe"] = wuwa_planar_probe::status();
     status["planar_eye_correction"] = wuwa_planar_probe::correction_status();
+    status["god_ray"] = wuwa_god_ray::status();
     status["stereo_translucency"] = wuwa_translucency::status();
     status["kuro_reflection"] = wuwa_kuro_reflection::status();
     status["reflection_capture_projection"] = wuwa_reflection_capture::status();

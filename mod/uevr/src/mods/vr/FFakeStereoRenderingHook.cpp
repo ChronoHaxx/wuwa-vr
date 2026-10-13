@@ -72,6 +72,7 @@
 #include "../../utility/WuWaPerf.hpp"
 #include "../../utility/WuWaMonoNativeProjection.hpp"
 #include "../../utility/WuWaDofSync.hpp"
+#include "../../utility/WuWaGodRay.hpp"
 #include "../../utility/WuWaCinematicMetadata.hpp"
 
 #include "FFakeStereoRenderingHook.hpp"
@@ -5889,6 +5890,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
             g_hook->m_last_pre_rotation_double = *rot_d;
         } else {
             g_hook->m_last_pre_rotation = *view_rotation;
+            wuwa_god_ray::record_pre_rotation(view_rotation->pitch, view_rotation->yaw, view_rotation->roll);
         }
 
         //vr->wait_for_present();

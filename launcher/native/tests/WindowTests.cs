@@ -784,7 +784,7 @@ public static class WindowTests
                 // Dated far ahead so it stays newer than every real entry in the shipped catalog.
                 var newer = new Release { id = "beta-1.1.0", displayName = "1.1.0 beta", channel = "beta", gameVersion = "3.7", published = "2099-01-01T00:00:00Z" };
                 Field<Catalog>(w, "catalog").releases.Add(newer); Field<ComboBox>(w, "releases").Items.Add(newer); Refresh(w);
-                Check(Field<TextBlock>(w, "packageUpdateState").Text.Contains("1.1.0 beta") && Button(w, "updatePackage").Visibility == Visibility.Visible &&
+                Check(Button(w, "updatePackage").Visibility == Visibility.Visible &&
                     Convert.ToString(Button(w, "updatePackage").Content) == String.Format(new Strings()["updatePackageTo"], "1.1.0 beta") &&
                     f.Store.Selected.release.id == f.B.release.id, "VR package update is hidden or silently migrated rollback selection");
                 Check(Invoke(w, "AutoPackageUpdate") == null, "a test build installed from a candidate bundle was offered an automatic update");
@@ -825,6 +825,53 @@ public static class WindowTests
                 Check(f.Http.Launches == 0 && f.Store.State.installed.Count(i => i.release.id == c.id) == (state == "idle" || state == "alreadyInstalled" ? 1 : 0),
                     state + ": automatic update repeated in one session");
                 Console.WriteLine("PASS WINDOW automatic public package update: " + state + " (local cache and fake HTTP only)");
+            }
+            // Launch in VR offers a waiting package update once per version per session, and never blocks.
+            foreach (string state in new[] { "launchCurrent", "cancel", "updateFirst", "rolledBack", "testBuild" })
+            using (var f = new Fixture(root, publicBetas: state != "testBuild"))
+            {
+                var w = f.Window; f.Http.AllowLaunch = true; f.Http.Status["riskAcknowledged"] = true;
+                var c = f.Package("c", "2099-01-01T00:00:00Z");
+                if (state == "rolledBack") { f.Store.Install(Path.Combine(f.Store.Cache, c.sha256 + ".zip"), c, CancellationToken.None); f.Store.Select(f.B); }
+                Field<Catalog>(w, "catalog").releases.Add(c);
+                Connect(w);
+                var asked = new List<string>();
+                int answer = state == "cancel" ? -1 : state == "updateFirst" ? 1 : 0;
+                Set(w, "choiceOverride", new Func<string, int>(key => { asked.Add(key); return answer; }));
+                Click(w, Field<Button>(w, "launchButton"));
+                bool offered = state == "launchCurrent" || state == "cancel" || state == "updateFirst";
+                Check(asked.SequenceEqual(offered ? new[] { "launchPackageUpdate" } : new string[0]), state + ": wrong update offer " + String.Join(",", asked));
+                Check(f.Http.Launches == (state == "cancel" ? 0 : 1), state + ": launch count " + f.Http.Launches);
+                Check(f.Store.Selected.release.id == (state == "updateFirst" ? c.id : f.B.release.id) && f.Downloads.Requests == 0,
+                    state + ": package after the offer");
+                if (state == "updateFirst") Check(f.Store.State.previous == f.B.folder, "update first lost the way back");
+                if (state == "cancel") Check(Field<TextBlock>(w, "operationText").Text == new Strings()["notChanged"], "cancelled offer not explained");
+                if (state == "launchCurrent" || state == "cancel")
+                {
+                    // Declined: not asked again this session. Cancelled: asked again next time.
+                    var again = (Task<bool>)Invoke(w, "OfferUpdateBeforeLaunch", CancellationToken.None);
+                    PumpUntil(() => again.IsCompleted, "second offer");
+                    Check(state == "cancel" ? !again.Result && asked.Count == 2 : again.Result && asked.Count == 1, state + ": offer repeated wrongly");
+                }
+                Console.WriteLine("PASS WINDOW launch offers a waiting package update: " + state + " (local cache and fake HTTP only)");
+            }
+            foreach (string state in new[] { "launchNow", "updateApp" })
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; f.Http.AllowLaunch = true; f.Http.Status["riskAcknowledged"] = true;
+                var app = new LauncherUpdateTests.Adapter();
+                var service = new LauncherUpdateService(app); service.CheckAsync(CancellationToken.None).GetAwaiter().GetResult();
+                Set(w, "launcherUpdates", service);
+                Connect(w);
+                Check(Field<TextBlock>(w, "launcherVersion").Text == String.Format(new Strings()["launcherVersion"], "1.0.0") &&
+                    Field<Border>(w, "launcherUpdateBar").Visibility == Visibility.Visible, "app update shown twice, or the bar is missing");
+                var asked = new List<string>();
+                Set(w, "choiceOverride", new Func<string, int>(key => { asked.Add(key); return state == "updateApp" ? 1 : 0; }));
+                Click(w, Field<Button>(w, "launchButton"));
+                Check(asked.SequenceEqual(new[] { "launchAppUpdate" }), state + ": app update not offered once");
+                if (state == "launchNow") Check(f.Http.Launches == 1 && app.Downloads == 0 && app.Applies == 0, "launch now updated the app or did not launch");
+                else Check(f.Http.Launches == 0 && app.Downloads == 1, "update and restart launched the game or did not download");
+                Console.WriteLine("PASS WINDOW launch offers a waiting app update: " + state + " (fake update adapter and HTTP only)");
             }
             using (var f = new Fixture(root))
             {

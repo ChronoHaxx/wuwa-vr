@@ -296,7 +296,9 @@ public static class LauncherUpdateTests
             var w = new MainWindow(new PackageStore(dir), Path.Combine(dir, "backend"), false, "en", service);
             try {
                 Pump(Call(w, "CheckLauncherUpdates", CancellationToken.None, true));
-                Check(Field<TextBlock>(w, "launcherVersion").Text.Contains("1.1.0") && Field<Button>(w, "launcherUpdateButton").Visibility == Visibility.Visible, "available update hidden");
+                // The bar names the new version; the footer names only the current one (no second "available").
+                Check(Field<TextBlock>(w, "launcherUpdateBarText").Text.Contains("1.1.0") && Field<Button>(w, "launcherUpdateButton").Visibility == Visibility.Visible &&
+                    !Field<TextBlock>(w, "launcherVersion").Text.Contains("1.1.0"), "available update hidden or shown twice");
                 Pump(Call(w, "UpdateLauncher", CancellationToken.None));
                 Set(w, "confirmationOverride", new Func<string, bool>(key => false));
                 Pump(Call(w, "UpdateLauncher", CancellationToken.None)); Check(fake.Applies == 0 && service.ReadyToRestart, "declined restart applied");

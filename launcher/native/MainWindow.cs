@@ -48,10 +48,11 @@ namespace WuWaVR.Manager
         TextBlock controllerState;
         TextBlock launcherVersion;
         Button launcherUpdateButton;
-        TextBlock packageUpdateState;
         Button packageUpdateButton, packageRollbackButton;
         // Releases the startup update already tried this session; a failure is not retried in a loop.
         readonly HashSet<string> autoPackageTried = new HashSet<string>();
+        // Updates offered at Launch in VR, by version: asked once per session.
+        readonly HashSet<string> launchOffers = new HashSet<string>();
         TextBox controllerDetails;
         ProgressBar controllerProgress;
         Func<CancellationToken, Task<ControllerDiagnostics.Report>> controllerProbeOverride;
@@ -577,6 +578,7 @@ namespace WuWaVR.Manager
                     String.IsNullOrEmpty(store.State.launcherPath) && !Json.Flag(Json.Child(status, "game"), "saved"))
                     throw new InvalidOperationException(text["gameMultiple"]);
                 if (risk.IsChecked != true) throw new InvalidOperationException(text["riskAccept"]);
+                if (!await OfferUpdateBeforeLaunch(c)) return;
                 await bridge.Post("/api/settings", new { riskAcknowledged = true }, c);
                 await SubmitJob("/api/launch", new { id = CurrentBuild() }, c);
             }, true);
@@ -774,7 +776,6 @@ namespace WuWaVR.Manager
             var consent = new StackPanel(); consent.Children.Add(riskNotice); consent.Children.Add(versionConsent); consent.Children.Add(risk);
             var notice = new Border { Child = consent, Padding = new Thickness(12, 6, 12, 7), CornerRadius = new CornerRadius(9), Background = Color("#22130F"),
                 BorderBrush = Color("#5E3026"), BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 4) };
-            packageUpdateState = Label("", 12, accent);
             packageUpdateButton = Action("updatePackage", async c =>
             {
                 var newer = NewerPackage();
@@ -782,7 +783,8 @@ namespace WuWaVR.Manager
                 await InstallOrSelect(newer, c);
             }, true);
             packageRollbackButton = Action("rollbackPackage", async c => await UsePrevious(c));
-            panel.Children.Add(Step("02", text["package"], null, packageState, gameVersion, packageUpdateState, Wrap(packageUpdateButton, packageRollbackButton), notice));
+            // "Update to X" names the newer package itself; no separate "update available" line.
+            panel.Children.Add(Step("02", text["package"], null, packageState, gameVersion, Wrap(packageUpdateButton, packageRollbackButton), notice));
             panel.Children.Add(runtimeStep);
             return panel;
         }
@@ -1187,6 +1189,65 @@ namespace WuWaVR.Manager
             if (!accepted) operationText.Text = text["notChanged"];
             return accepted;
         }
+        // A three-way question with named buttons: 1 = first (default), 0 = second, -1 = cancel.
+        // A message box would label its buttons in the Windows language, not the app's.
+        Func<string, int> choiceOverride = null;
+        int Choose(string key, string first, string second, params object[] args)
+        {
+            if (choiceOverride != null) return choiceOverride(key);
+            int result = -1;
+            var dialog = new Window { Title = text["title"], Owner = this, SizeToContent = SizeToContent.WidthAndHeight, ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, Background = background, Foreground = foreground,
+                FontFamily = FontFamily, FontSize = FontSize };
+            dialog.Resources.Add(typeof(Button), ButtonStyle());
+            var body = new StackPanel { Margin = new Thickness(22, 18, 22, 14), MaxWidth = 480 };
+            body.Children.Add(Label(String.Format(text[key], args), 14));
+            body.Children.Add(Label(text["launchOfferNote"], 12, muted));
+            Func<string, int, bool, Button> option = (label, value, primary) =>
+            {
+                var button = new Button { Content = label, Padding = new Thickness(14, 9, 14, 9), Margin = new Thickness(0, 10, 8, 0), IsDefault = primary,
+                    Background = primary ? accent : Color("#26262A"), Foreground = primary ? background : foreground, Cursor = System.Windows.Input.Cursors.Hand };
+                button.Click += (s, e) => { result = value; dialog.Close(); };
+                return button;
+            };
+            var cancel = option(text["cancel"], -1, false); cancel.IsCancel = true;
+            body.Children.Add(Wrap(option(first, 1, true), option(second, 0, false), cancel));
+            dialog.Content = body; dialog.ShowDialog();
+            return result;
+        }
+        // Launch in VR offers an update that is waiting, once per version per session,
+        // and never blocks: the automatic install at start is skipped while the game
+        // runs, when the check failed, or when a version came out after start.
+        // Returns false when this click should not launch.
+        async Task<bool> OfferUpdateBeforeLaunch(CancellationToken c)
+        {
+            string app = launcherUpdates.AvailableVersion;
+            if (app != null && launchOffers.Add("app " + app))
+            {
+                int answer = Choose(launcherUpdates.ReadyToRestart ? "launchAppUpdateReady" : "launchAppUpdate", text["launchAppRestart"], text["launchNow"],
+                    app, launcherUpdates.CurrentVersion);
+                if (answer < 0) { launchOffers.Remove("app " + app); operationText.Text = text["notChanged"]; return false; }
+                if (answer > 0) { await UpdateLauncherNow(c); return false; }
+            }
+            // The same rule as the automatic install: public packages only, the same
+            // game version, and never a version already installed (going back is a choice).
+            var newer = AutoPackageUpdate();
+            if (newer != null && launchOffers.Add(newer.id))
+            {
+                string current = store.Selected.release.DisplayLabel;
+                int answer = Choose("launchPackageUpdate", text["launchUpdateFirst"], String.Format(text["launchCurrent"], current), newer.DisplayLabel, current);
+                if (answer < 0) { launchOffers.Remove(newer.id); operationText.Text = text["notChanged"]; return false; }
+                if (answer > 0)
+                {
+                    await InstallOrSelect(newer, c);
+                    // The new package's runtime may differ (its own simulator): check again.
+                    status = await bridge.Status(c);
+                    var block = LauncherPresentation.RuntimeLaunchBlock(connectionReady, status);
+                    if (block != null) throw new InvalidOperationException(text[block]);
+                }
+            }
+            return true;
+        }
         Release SelectedRelease() { return releases.SelectedItem as Release ?? catalog.releases[0]; }
         string CurrentBuild() { return store.Selected.release.buildId; }
         async Task ChooseLauncher(string path, CancellationToken c)
@@ -1399,7 +1460,11 @@ namespace WuWaVR.Manager
             }
             if (!closing) ShowStatus();
         }
-        async Task UpdateLauncher(CancellationToken c)
+        // The update bar downloads on the first click and asks before the restart.
+        Task UpdateLauncher(CancellationToken c) { return RunLauncherUpdate(c, true); }
+        // From the launch offer the player has already chosen to update: download and restart.
+        Task UpdateLauncherNow(CancellationToken c) { return RunLauncherUpdate(c, false); }
+        async Task RunLauncherUpdate(CancellationToken c, bool ask)
         {
             if (!launcherUpdates.ReadyToRestart)
             {
@@ -1410,20 +1475,21 @@ namespace WuWaVR.Manager
                 });
                 await launcherUpdates.DownloadAsync(percent => reporter.Report(percent), c);
                 operationText.Text = text["launcherReady"];
-                ShowStatus(); return;
+                ShowStatus();
+                if (ask) return;
             }
-            if (!Confirm("launcherRestartConfirm")) return;
+            if (ask && !Confirm("launcherRestartConfirm")) return;
             // ApplyUpdatesAndRestart exits immediately. Persist settings first;
             // the service rechecks helper/native activity after the save.
             await launcherUpdates.RestartAsync(bridge.RequireLauncherUpdateIdle, store.Save, c);
         }
         void ShowLauncherUpdate()
         {
-            string state = launcherUpdates.ReadyToRestart ? "launcherReady" : launcherUpdates.AvailableVersion != null ? "launcherAvailable" :
-                !launcherUpdates.Installed ? "launcherPortable" : launcherUpdates.CheckFailed ? "launcherUpdateOffline" :
-                launcherUpdates.CheckedOnce ? "launcherCurrent" : "launcherUpdateHint";
-            launcherVersion.Text = String.Format(text["launcherVersion"], launcherUpdates.CurrentVersion) + " · " +
-                String.Format(text[state], launcherUpdates.AvailableVersion);
+            string state = launcherUpdates.ReadyToRestart ? "launcherReady" : !launcherUpdates.Installed ? "launcherPortable" :
+                launcherUpdates.CheckFailed ? "launcherUpdateOffline" : launcherUpdates.CheckedOnce ? "launcherCurrent" : "launcherUpdateHint";
+            // While the update bar shows, the footer names only the version: the bar says the rest.
+            launcherVersion.Text = String.Format(text["launcherVersion"], launcherUpdates.CurrentVersion) +
+                (launcherUpdates.AvailableVersion != null ? "" : " · " + text[state]);
             launcherUpdateButton.Content = text[launcherUpdates.ReadyToRestart ? "restartLauncher" : "updateLauncher"];
             launcherUpdateButton.Visibility = launcherUpdates.AvailableVersion == null ? Visibility.Collapsed : Visibility.Visible;
             launcherUpdateBar.Visibility = launcherUpdateButton.Visibility;
@@ -1510,8 +1576,6 @@ namespace WuWaVR.Manager
             releases.ToolTip = SelectedRelease().id;
             var newerPackage = store.Selected == null ? null : NewerPackage();
             var previousPackage = store.Selected == null ? null : PreviousPackage();
-            packageUpdateState.Text = newerPackage == null ? "" : String.Format(text["packageUpdateAvailable"], newerPackage.DisplayLabel);
-            packageUpdateState.Visibility = newerPackage == null ? Visibility.Collapsed : Visibility.Visible;
             packageUpdateButton.Visibility = newerPackage == null ? Visibility.Collapsed : Visibility.Visible;
             if (newerPackage != null) packageUpdateButton.Content = String.Format(text["updatePackageTo"], newerPackage.DisplayLabel);
             packageRollbackButton.Visibility = previousPackage == null ? Visibility.Collapsed : Visibility.Visible;

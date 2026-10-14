@@ -59,7 +59,7 @@ struct State {
     safetyhook::MidHook menu_pass{};
     safetyhook::MidHook stage0_construct{}, stage0_dispatch{};
     safetyhook::InlineHook world_setup{};
-    std::array<safetyhook::MidHook, 3> viewport{};
+    std::array<safetyhook::MidHook, 5> viewport{};
     std::atomic<uint64_t> world_calls{}, world_prepared{}, world_layout_skips{}, world_guard_skips{};
     std::atomic<uint64_t> world_caller_skips{}, world_disabled_skips{}, world_mode_skips{}, world_samples{};
     std::array<std::atomic<uint64_t>,16> next_stage0_sample{};
@@ -827,12 +827,19 @@ inline void install_menu(State& s, HMODULE executable, uint32_t image_size) noex
 }
 
 // Each site is the instruction after the left-eye GetProjectionData call,
-// where the function starts reading the constrained view rect at rsp + offset.
-inline constexpr std::array<std::pair<uintptr_t, uint32_t>, 3> viewport_sites{{
-    {0xc63849, 0xe0}, // GetProjectionMatrix: inlined canvas size
-    {0xc66881, 0xd0}, // view-rect getter: mouse ray, scaler
-    {0xc66986, 0xd0}, // GetViewportSize: scaler layout, Project3DToScreen
+// where the function starts reading the constrained view rect at rsp/rbp + offset.
+struct ViewportSite { uintptr_t rva; uint32_t offset; bool rbp; };
+inline constexpr std::array<ViewportSite, 5> viewport_sites{{
+    {0xc63849, 0xe0, false}, // GetProjectionMatrix: inlined canvas size
+    {0xc66881, 0xd0, false}, // view-rect getter: mouse ray, scaler
+    {0xc66986, 0xd0, false}, // GetViewportSize: scaler layout, Project3DToScreen
+    {0xc94363, 0x40, true},  // UI point -> viewport pixels (controller button presses)
+    {0xc9482e, 0x30, true},  // UI point -> normalised viewport point
 }};
+template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
+    constexpr auto site = viewport_sites[I];
+    wuwa_lgui_viewport::rewrite(site.rbp ? c.rbp : c.rsp, site.offset);
+}
 
 inline void disable_viewport(State& s) noexcept {
     wuwa_lgui_viewport::state().installed.store(false, std::memory_order_release);
@@ -846,20 +853,19 @@ inline void install_viewport(State& s, HMODULE executable, uint32_t image_size) 
     try {
         checked::require(verify_code(executable, image_size, compatibility::viewport_code_ranges, "lgui-viewport"),
             "LGUI canvas code changed; full VR keeps the eye-shaped UI");
-        const std::array<safetyhook::MidHookFn, 3> callbacks{
-            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[0].second); },
-            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[1].second); },
-            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[2].second); }};
+        constexpr std::array<safetyhook::MidHookFn, 5> callbacks{viewport_callback<0>, viewport_callback<1>,
+            viewport_callback<2>, viewport_callback<3>, viewport_callback<4>};
+        static_assert(callbacks.size() == viewport_sites.size());
         for (size_t i = 0; i < viewport_sites.size(); ++i) {
-            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + viewport_sites[i].first),
+            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + viewport_sites[i].rva),
                 callbacks[i], safetyhook::MidHook::StartDisabled);
             checked::require(hook.has_value(), "Cannot create LGUI viewport hook");
             s.viewport[i] = std::move(*hook);
         }
         for (auto& hook : s.viewport) checked::require(hook.enable().has_value(), "Cannot enable LGUI viewport hook");
         wuwa_lgui_viewport::state().installed.store(true, std::memory_order_release);
-        spdlog::info("[WuWaLguiViewport] installed sites={:x},{:x},{:x}; full VR UI uses the window size",
-            viewport_sites[0].first, viewport_sites[1].first, viewport_sites[2].first);
+        spdlog::info("[WuWaLguiViewport] installed sites={:x},{:x},{:x},{:x},{:x}; full VR UI uses the window size",
+            viewport_sites[0].rva, viewport_sites[1].rva, viewport_sites[2].rva, viewport_sites[3].rva, viewport_sites[4].rva);
     } catch (const std::exception& error) {
         disable_viewport(s);
         try { spdlog::error("[WuWaLguiViewport] unavailable: {}", error.what()); } catch (...) {}

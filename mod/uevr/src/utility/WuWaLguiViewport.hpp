@@ -7,12 +7,15 @@
 // full VR that is the eye (2064 x 2208, 3292 x 3292, ...), so the layout, the
 // UI projection and the mouse ray all took the eye's shape: story pictures
 // were cropped at the sides, the HUD needed the 4:3 "HUD shape" stretch, and
-// the cursor picked the wrong item. Three copies read that rect (canvas
-// viewport size, the inlined copy in GetProjectionMatrix, and a view-rect
-// getter used by the mouse ray and the scaler); the redirect hooks each one
-// just after the engine call and replaces the rect with the UI target size,
-// which is the window. Live test 14 Oct 2026: whole story pictures, round
-// HUD on a 16:9 panel, ray hit under the pointer, no relayout on view switch.
+// the cursor picked the wrong item. Five LGUI functions read that rect (canvas
+// viewport size, the inlined copy in GetProjectionMatrix, a view-rect getter
+// used by the mouse ray and the scaler, and two UI-point <-> pixel conversions
+// that controller button presses use); the redirect hooks each one just after
+// the engine call and replaces the rect with the window size. The binary has
+// two more left-eye readers (0xd56ec0, 0xd577e0): world positions through the
+// player camera, sized by the window, independent of the canvas; left alone.
+// Test 12 (14 Oct 2026) hooked only the first three: controller buttons in the
+// Terminal clicked at eye-sized pixel positions and missed.
 #include <atomic>
 #include <cstdint>
 
@@ -35,12 +38,12 @@ inline void update(bool enable, uint32_t width, uint32_t height) noexcept {
     state().size.store(enable && sane ? (uint64_t{width} << 32) | height : 0, std::memory_order_release);
 }
 
-// The engine call filled a local FIntRect {min x, min y, max x, max y} at rsp + offset.
-inline void rewrite(uintptr_t rsp, uint32_t offset) noexcept {
+// The engine call filled a local FIntRect {min x, min y, max x, max y} at frame + offset.
+inline void rewrite(uintptr_t frame, uint32_t offset) noexcept {
     auto& s = state();
     const auto size = s.size.load(std::memory_order_acquire);
     if (!size) return;
-    auto* rect = reinterpret_cast<int32_t*>(rsp + offset);
+    auto* rect = reinterpret_cast<int32_t*>(frame + offset);
     if (rect[2] <= rect[0] || rect[3] <= rect[1]) return; // no projection data: keep the game's fallback
     rect[0] = 0;
     rect[1] = 0;

@@ -676,7 +676,8 @@ void FFakeStereoRenderingHook::on_frame() {
             reinterpret_cast<uintptr_t>(manager->get_scene_capture_render_target()), VR::get()->is_wuwa_lgui_redirect_enabled(),
             VR::get()->is_wuwa_lgui_menu_redirect_enabled(), VR::get()->is_native_stereo_fix_enabled(),
             VR::get()->is_using_afr(), VR::get()->is_wuwa_world_labels_enabled(),
-            !VR::get()->is_using_2d_screen() && !VR::get()->is_using_mono_theatre()};
+            VR::get()->is_wuwa_ui_window_size_enabled() && !VR::get()->is_using_2d_screen() &&
+                !VR::get()->is_using_mono_theatre()};
     };
     wuwa_lgui_route::tick(g_framework->get_framework_module(), lgui_targets);
     wuwa_lgui_redirect::tick(g_framework->get_framework_module(), lgui_targets);

@@ -377,6 +377,11 @@ public:
         return m_wuwa_lgui_redirect->value();
     }
 
+    // Full VR lays out the screen UI at the window size (WuWaLguiViewport.hpp).
+    bool is_wuwa_ui_window_size_enabled() const {
+        return m_wuwa_ui_window_size->value();
+    }
+
     bool is_wuwa_lgui_menu_redirect_enabled() const {
         return m_wuwa_lgui_menu_redirect->value();
     }
@@ -1273,6 +1278,7 @@ public:
             *m_wuwa_gamepad_slot,
             *m_wuwa_focused_motion,
             *m_wuwa_lgui_redirect,
+            *m_wuwa_ui_window_size,
             *m_wuwa_lgui_menu_redirect,
             *m_wuwa_world_labels,
             *m_wuwa_planar_eye_parameters,
@@ -1348,6 +1354,8 @@ private:
         {"All slots (unchanged)", "Only slot 0", "Only slot 1", "Only slot 2", "Only slot 3"}, 0) };
     const ModToggle::Ptr m_wuwa_focused_motion{ ModToggle::create(generate_name("WuWaFocusedMotionInput"), false) };
     const ModToggle::Ptr m_wuwa_lgui_redirect{ ModToggle::create(generate_name("WuWaLguiRedirect"), true) };
+    // Hidden: off restores 1.2.2's eye-shaped full VR UI, for A/B checks.
+    const ModToggle::Ptr m_wuwa_ui_window_size{ ModToggle::create(generate_name("WuWaUiWindowSize"), true) };
     const ModToggle::Ptr m_wuwa_lgui_menu_redirect{ ModToggle::create(generate_name("WuWaLguiMenuRedirect"), false) };
     const ModToggle::Ptr m_wuwa_world_labels{ ModToggle::create(generate_name("WuWaWorldLabelsStereo"), false) };
     const ModToggle::Ptr m_wuwa_planar_eye_parameters{ ModToggle::create(generate_name("WuWaPlanarEyeParameters"), false) };

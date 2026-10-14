@@ -272233,7 +272233,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..3099069db389851c3cfa7c109f81f34d
      ZoneScopedN(__FUNCTION__);
  
 diff --git a/src/mods/VR.hpp b/src/mods/VR.hpp
-index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead27c15de13 100644
+index 941840c7f61a353fab6a22452267ba259608a81f..8eedc517c7bab4a16702fad5a72486b09bbb9228 100644
 --- a/src/mods/VR.hpp
 +++ b/src/mods/VR.hpp
 @@ -13,12 +13,16 @@
@@ -272329,7 +272329,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      uint32_t get_hmd_width() const;
      uint32_t get_hmd_height() const;
  
-@@ -304,12 +345,56 @@ public:
+@@ -304,12 +345,61 @@ public:
      }
  
      bool is_using_controllers() const {
@@ -272368,6 +272368,11 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
 +        return m_wuwa_lgui_redirect->value();
 +    }
 +
++    // Full VR lays out the screen UI at the window size (WuWaLguiViewport.hpp).
++    bool is_wuwa_ui_window_size_enabled() const {
++        return m_wuwa_ui_window_size->value();
++    }
++
 +    bool is_wuwa_lgui_menu_redirect_enabled() const {
 +        return m_wuwa_lgui_menu_redirect->value();
 +    }
@@ -272389,7 +272394,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      }
  
      int get_hmd_index() const {
-@@ -373,7 +458,18 @@ public:
+@@ -373,7 +463,18 @@ public:
      }
  
      auto get_world_scale() const {
@@ -272409,7 +272414,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      }
  
      auto is_stereo_emulation_enabled() const {
-@@ -437,7 +533,7 @@ public:
+@@ -437,7 +538,7 @@ public:
      }
  
      float get_world_to_meters() const {
@@ -272418,7 +272423,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      }
  
      float get_depth_scale() const {
-@@ -550,6 +646,10 @@ public:
+@@ -550,6 +651,10 @@ public:
          return m_native_stereo_fix_same_pass->value();
      }
  
@@ -272429,7 +272434,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      bool is_ahud_compatibility_enabled() const {
          return m_compatibility_ahud->value();
      }
-@@ -573,7 +673,42 @@ public:
+@@ -573,7 +678,42 @@ public:
      }
  
      bool is_using_2d_screen() const {
@@ -272473,7 +272478,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      }
  
      bool is_roomscale_enabled() const {
-@@ -628,6 +763,16 @@ public:
+@@ -628,6 +768,16 @@ public:
          return m_horizontal_projection_override->value();
      }
  
@@ -272490,7 +272495,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      auto get_vertical_projection_override() const {
          return m_vertical_projection_override->value();
      }
-@@ -723,7 +868,8 @@ private:
+@@ -723,7 +873,8 @@ private:
              m_fake_stereo_hook.get(),
              m_render_target_pool_hook.get(),
              m_cvar_manager.get(),
@@ -272500,7 +272505,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
          };
      }
  
-@@ -752,6 +898,7 @@ private:
+@@ -752,6 +903,7 @@ private:
      vrmod::D3D11Component m_d3d11{};
      vrmod::D3D12Component m_d3d12{};
      vrmod::OverlayComponent m_overlay_component;
@@ -272508,7 +272513,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      bool m_disable_overlay{false};
  
      // Action set handles
-@@ -824,6 +971,7 @@ private:
+@@ -824,6 +976,7 @@ private:
      std::chrono::steady_clock::time_point m_last_controller_update{};
      std::chrono::steady_clock::time_point m_last_xinput_update{};
      std::chrono::steady_clock::time_point m_last_xinput_spoof_sent{};
@@ -272516,7 +272521,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      std::chrono::steady_clock::time_point m_last_xinput_l3_r3_menu_open{};
      std::chrono::steady_clock::time_point m_last_interaction_display{};
      std::chrono::steady_clock::time_point m_last_engine_tick{};
-@@ -895,6 +1043,14 @@ private:
+@@ -895,6 +1048,14 @@ private:
      const ModToggle::Ptr m_decoupled_pitch_ui_adjust{ ModToggle::create(generate_name("DecoupledPitchUIAdjust"), true) };
      const ModToggle::Ptr m_load_blueprint_code{ ModToggle::create(generate_name("LoadBlueprintCode"), false, true) };
      const ModToggle::Ptr m_2d_screen_mode{ ModToggle::create(generate_name("2DScreenMode"), false) };
@@ -272531,7 +272536,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
      const ModToggle::Ptr m_roomscale_movement{ ModToggle::create(generate_name("RoomscaleMovement"), false) };
      const ModToggle::Ptr m_roomscale_sweep{ ModToggle::create(generate_name("RoomscaleMovementSweep"), true) };
      const ModToggle::Ptr m_swap_controllers{ ModToggle::create(generate_name("SwapControllerInputs"), false) };
-@@ -949,11 +1105,19 @@ private:
+@@ -949,11 +1110,19 @@ private:
      const ModSlider::Ptr m_camera_up_offset{ ModSlider::create(generate_name("CameraUpOffset"), -4000.0f, 4000.0f, 0.0f) };
      const ModSlider::Ptr m_camera_fov_distance_multiplier{ ModSlider::create(generate_name("CameraFOVDistanceMultiplier"), 0.00f, 1000.0f, 0.0f) };
      const ModSlider::Ptr m_world_scale{ ModSlider::create(generate_name("WorldScale"), 0.01f, 10.0f, 1.0f) };
@@ -272551,7 +272556,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
  
      const ModSlider::Ptr m_custom_z_near{ ModSlider::create(generate_name("CustomZNear"), 0.001f, 100.0f, 0.01f, true) };
      const ModToggle::Ptr m_custom_z_near_enabled{ ModToggle::create(generate_name("EnableCustomZNear"), false, true) };
-@@ -1035,12 +1199,20 @@ public:
+@@ -1035,12 +1204,20 @@ public:
              *m_disable_hzbocclusion,
              *m_disable_instance_culling,
              *m_desktop_fix,
@@ -272572,7 +272577,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
              *m_roomscale_movement,
              *m_roomscale_sweep,
              *m_swap_controllers,
-@@ -1091,6 +1263,28 @@ public:
+@@ -1091,6 +1268,29 @@ public:
              *m_show_fps,
              *m_show_statistics,
              *m_controllers_allowed,
@@ -272586,6 +272591,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
 +            *m_wuwa_gamepad_slot,
 +            *m_wuwa_focused_motion,
 +            *m_wuwa_lgui_redirect,
++            *m_wuwa_ui_window_size,
 +            *m_wuwa_lgui_menu_redirect,
 +            *m_wuwa_world_labels,
 +            *m_wuwa_planar_eye_parameters,
@@ -272601,7 +272607,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
              *m_lerp_camera_pitch,
              *m_lerp_camera_yaw,
              *m_lerp_camera_roll,
-@@ -1105,6 +1299,71 @@ private:
+@@ -1105,6 +1305,73 @@ private:
      bool m_stereo_emulation_mode{false}; // not a good config option, just for debugging
      bool m_wait_for_present{true};
      const ModToggle::Ptr m_controllers_allowed{ ModToggle::create(generate_name("ControllersAllowed"), true) };
@@ -272654,6 +272660,8 @@ index 941840c7f61a353fab6a22452267ba259608a81f..1f9be2d52e34867dac52b45d0d0aead2
 +        {"All slots (unchanged)", "Only slot 0", "Only slot 1", "Only slot 2", "Only slot 3"}, 0) };
 +    const ModToggle::Ptr m_wuwa_focused_motion{ ModToggle::create(generate_name("WuWaFocusedMotionInput"), false) };
 +    const ModToggle::Ptr m_wuwa_lgui_redirect{ ModToggle::create(generate_name("WuWaLguiRedirect"), true) };
++    // Hidden: off restores 1.2.2's eye-shaped full VR UI, for A/B checks.
++    const ModToggle::Ptr m_wuwa_ui_window_size{ ModToggle::create(generate_name("WuWaUiWindowSize"), true) };
 +    const ModToggle::Ptr m_wuwa_lgui_menu_redirect{ ModToggle::create(generate_name("WuWaLguiMenuRedirect"), false) };
 +    const ModToggle::Ptr m_wuwa_world_labels{ ModToggle::create(generate_name("WuWaWorldLabelsStereo"), false) };
 +    const ModToggle::Ptr m_wuwa_planar_eye_parameters{ ModToggle::create(generate_name("WuWaPlanarEyeParameters"), false) };
@@ -275474,7 +275482,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..bdbfc1bb3d3f13ebb1f459bef9dc01c8
 \ No newline at end of file
 +} // namespace vrmod
 diff --git a/src/mods/vr/FFakeStereoRenderingHook.cpp b/src/mods/vr/FFakeStereoRenderingHook.cpp
-index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0bbbd13af1 100644
+index 148f14391b004cdefc4389c529c329c967a1aaf5..3e8d51010a171bc8fb351439675d6061fa994ccb 100644
 --- a/src/mods/vr/FFakeStereoRenderingHook.cpp
 +++ b/src/mods/vr/FFakeStereoRenderingHook.cpp
 @@ -4,7 +4,9 @@
@@ -276065,7 +276073,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  // Scan through function instructions to detect usage of double
  // floating point precision instructions.
  bool is_using_double_precision(uintptr_t addr) {
-@@ -101,6 +667,19 @@ FFakeStereoRenderingHook::FFakeStereoRenderingHook() {
+@@ -101,6 +667,20 @@ FFakeStereoRenderingHook::FFakeStereoRenderingHook() {
  }
  
  void FFakeStereoRenderingHook::on_frame() {
@@ -276078,14 +276086,15 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
 +            reinterpret_cast<uintptr_t>(manager->get_scene_capture_render_target()), VR::get()->is_wuwa_lgui_redirect_enabled(),
 +            VR::get()->is_wuwa_lgui_menu_redirect_enabled(), VR::get()->is_native_stereo_fix_enabled(),
 +            VR::get()->is_using_afr(), VR::get()->is_wuwa_world_labels_enabled(),
-+            !VR::get()->is_using_2d_screen() && !VR::get()->is_using_mono_theatre()};
++            VR::get()->is_wuwa_ui_window_size_enabled() && !VR::get()->is_using_2d_screen() &&
++                !VR::get()->is_using_mono_theatre()};
 +    };
 +    wuwa_lgui_route::tick(g_framework->get_framework_module(), lgui_targets);
 +    wuwa_lgui_redirect::tick(g_framework->get_framework_module(), lgui_targets);
      attempt_hook_game_engine_tick();
      attempt_hook_slate_thread();
      attempt_hook_fsceneview_constructor();
-@@ -2365,6 +2944,9 @@ FRHITexture2D** FFakeStereoRenderingHook::viewport_get_render_target_texture_hoo
+@@ -2365,6 +2945,9 @@ FRHITexture2D** FFakeStereoRenderingHook::viewport_get_render_target_texture_hoo
  
  void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewportClient* viewport_client, sdk::FViewport* viewport, sdk::FCanvas* canvas, void* a4) {
      ZoneScopedN(__FUNCTION__);
@@ -276095,7 +276104,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      // UI compatibility mode
      // Tries to redirect calls to GetRenderTargetTexture to point towards our UI
-@@ -2410,9 +2992,29 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
+@@ -2410,9 +2993,29 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
          return;
      }
  
@@ -276125,7 +276134,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      if (hook_attempts < 100 && !g_hook->m_hooked_game_engine_tick && g_hook->m_attempted_hook_game_engine_tick) {
          ZoneScopedN("UGameViewportClient::Draw (hook UGameEngine::Tick)");
          SPDLOG_INFO("Performing alternative UGameEngine::Tick hook for synced AFR.");
-@@ -2454,6 +3056,15 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
+@@ -2454,6 +3057,15 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
          }
      }
  
@@ -276141,7 +276150,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      const auto& mods = g_framework->get_mods()->get_mods();
  
      for (const auto& mod : mods) {
-@@ -3016,6 +3627,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3016,6 +3628,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
      SPDLOG_INFO_ONCE("Called FSceneView constructor for the first time");
  
      auto& vr = VR::get();
@@ -276149,7 +276158,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      if (!g_hook->is_in_viewport_client_draw() || !vr->is_hmd_active()) {
          return g_hook->m_sceneview_data.constructor_hook.unsafe_call<sdk::FSceneView*>(view, init_options, a3, a4);
-@@ -3046,7 +3658,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3046,7 +3659,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      const auto init_options_scene_state = init_options->get_scene_state();
  
@@ -276163,7 +276172,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          if (is_ue5) {
              auto& vio_entry = g_hook->m_sceneview_data.view_init_options_ue5[init_options_scene_state];
              memcpy(&vio_entry, init_options, sizeof(sdk::FSceneViewInitOptionsUE5));
-@@ -3054,6 +3671,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3054,6 +3672,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
              auto& vio_entry = g_hook->m_sceneview_data.view_init_options_ue4[init_options_scene_state];
              memcpy(&vio_entry, init_options, sizeof(sdk::FSceneViewInitOptionsUE4));
          }
@@ -276178,7 +276187,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      }
  
      auto& known_scene_states = g_hook->m_sceneview_data.known_scene_states;
-@@ -3068,7 +3693,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3068,7 +3694,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      const auto true_index = vr->is_using_afr() ? (g_frame_count + last_index) % 2 : last_index;
  
@@ -276193,7 +276202,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          int32_t w = vr->get_hmd_width();
          int32_t h = vr->get_hmd_height();
  
-@@ -3142,11 +3773,78 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3142,11 +3774,78 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
          }
      }
  
@@ -276273,7 +276282,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          if (g_hook->get_render_target_manager()->get_scene_capture_render_target() != nullptr) {
              init_options->set_stereo_pass(EStereoscopicPass::eSSP_PRIMARY);
  
-@@ -3165,7 +3863,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3165,7 +3864,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      bool new_scene_state_inserted_this_frame = false;
  
@@ -276287,7 +276296,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          SPDLOG_INFO("Inserting new scene state {:x}", (uintptr_t)init_options_scene_state);
          known_scene_states.insert(init_options_scene_state);
          new_scene_state_inserted_this_frame = true;
-@@ -3177,7 +3880,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3177,7 +3881,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
          }
      }
  
@@ -276296,7 +276305,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          init_options->set_stereo_pass(EStereoscopicPass::eSSP_PRIMARY);
  
          // Set the scene state to the one that isn't the current one
-@@ -3192,7 +3895,105 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3192,7 +3896,105 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      last_index++;
  
@@ -276402,7 +276411,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      // Reset the view count back to what it was.
      if (views_original_count.has_value()) {
-@@ -3305,6 +4106,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3305,6 +4107,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
      auto& vr = VR::get();
      auto rtm = g_hook->get_render_target_manager();
@@ -276411,7 +276420,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      if (!vr->is_hmd_active() || !vr->is_native_stereo_fix_enabled()) {
          rtm->destroy_scene_capture();
-@@ -3342,6 +4145,16 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3342,6 +4146,16 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      const auto rtrsrc = rt != nullptr ? (sdk::FTextureRenderTargetResource*)rt->get_resource() : nullptr;
      const auto rtfrt = rtrsrc != nullptr ? rtrsrc->as_render_target() : nullptr;
  
@@ -276428,7 +276437,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      if (rtfrt == nullptr) {
          // This is fine to call constantly because we use an in-flight render target
          // that gets unset after the texture is fully created. This function exits early otherwise.
-@@ -3359,6 +4172,35 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3359,6 +4173,35 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          return;
      }
  
@@ -276464,7 +276473,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      bool wants_swap = false;
      if (views.count > 1) {
          views.count = 1;
-@@ -3374,8 +4216,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3374,8 +4217,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
              const auto last_frame = (frame_count) % runtimes::OpenXR::QUEUE_SIZE;
              const auto now_frame = (frame_count + 1) % runtimes::OpenXR::QUEUE_SIZE;
@@ -276485,7 +276494,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          } else {
              auto openvr = (runtimes::OpenVR*)runtime;
              std::unique_lock __{ openvr->pose_mtx };
-@@ -3401,7 +4254,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3401,7 +4255,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          view_family.views.data[1]->constructor((sdk::FSceneViewInitOptions*)init_options_copy2.data());*/
      }
  
@@ -276565,7 +276574,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      if (wants_swap) {
          // Swap out the existing render target for our custom one
-@@ -3410,11 +4334,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3410,11 +4335,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          // because the engine is still working on the old render target
          const auto original_target = view_family_target;
  
@@ -276594,7 +276603,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
              // We decrement the frame count because it fixes motion vectors in the right eye.
              scene->decrement_frame_count();
          }
-@@ -3422,7 +4360,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3422,7 +4361,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          std::swap(views[0], views[1]);
  
          // Call it again
@@ -276614,7 +276623,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
          std::swap(views[0], views[1]);
  
-@@ -3430,6 +4379,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3430,6 +4380,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      }
  
      views.count = prev_count;
@@ -276623,7 +276632,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  }
  
  void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* extension, sdk::FSceneViewFamily& view_family) {
-@@ -3444,7 +4395,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
+@@ -3444,7 +4396,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
      sdk::FSceneViewFamily::update_offsets(&view_family, g_hook->get_render_target_manager()->get_viewport());
      auto si = view_family.get_scene_interface();
  
@@ -276632,7 +276641,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          sdk::FScene::update_offsets((sdk::FScene*)si);
      }
  
-@@ -4092,6 +5043,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
+@@ -4092,6 +5044,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
      SPDLOG_INFO("Current ext count: {}", view_extensions.extensions.count);
      SPDLOG_INFO("Current ext capacity: {}", view_extensions.extensions.capacity);
  
@@ -276702,7 +276711,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      // Verifications on the current memory of the FSceneViewExtensions, because pre-4.10 (?) the view extensions array did not actually exist
      if (m_rendertarget_manager_embedded_in_stereo_device) {
          SPDLOG_INFO("Performing verifications on the current memory of the FSceneViewExtensions...");
-@@ -4621,6 +5635,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
+@@ -4621,6 +5636,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
          g_hook->set_should_recreate_textures(true);
          return true;
      }
@@ -276712,7 +276721,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      
      /*if (g_hook->m_analyzing_view_extensions) {
          const auto now = std::chrono::high_resolution_clock::now();
-@@ -4696,13 +5713,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4696,13 +5714,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -276731,7 +276740,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      // The purpose of this is to prevent the game from crashing in IDirect3D12CommandList::Close
      // Because the game will try to copy a texture region that is out of bounds.
-@@ -4725,6 +5741,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4725,6 +5742,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -276744,7 +276753,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      if (VR::get()->is_stereo_emulation_enabled()) {
          *w *= 2;
      } else {
-@@ -4735,7 +5757,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4735,7 +5758,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
  
      *w = *w / 2;
  
@@ -276753,7 +276762,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      if (!VR::get()->is_native_stereo_fix_enabled()) {
          *x += *w * true_index;
-@@ -4756,6 +5778,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4756,6 +5779,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          return;
      }
  
@@ -276765,7 +276774,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      auto vr = VR::get();
      //std::scoped_lock _{vr->get_vr_mutex()};
  
-@@ -4787,8 +5814,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4787,8 +5815,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto is_full_pass = view_index == 0 && !index_was_ever_two && !index_was_ever_negative && !g_hook->m_has_double_precision;
  
      auto true_index = index_starts_from_one ? ((view_index + 1) % 2) : (view_index % 2);
@@ -276823,7 +276832,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      if (vr->is_using_afr() && !is_full_pass) {
          true_index = g_frame_count % 2;
-@@ -4815,6 +5891,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4815,6 +5892,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
              g_hook->m_last_pre_rotation_double = *rot_d;
          } else {
              g_hook->m_last_pre_rotation = *view_rotation;
@@ -276831,7 +276840,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          }
  
          //vr->wait_for_present();
-@@ -4852,6 +5929,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4852,6 +5930,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -276840,7 +276849,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
      const auto view_d = (Vector3d*)view_location;
  
      const auto view_mat = !has_double_precision ? 
-@@ -4905,6 +5984,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4905,6 +5985,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto camera_up = quat_converter * (vqi_norm * glm::vec3{0, -camera_up_offset, 0});
  
      const auto world_scale = world_to_meters * vr->get_world_scale();
@@ -276848,7 +276857,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      if (has_double_precision) {
          *view_d += camera_forward;
-@@ -4924,6 +6004,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4924,6 +6005,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto rotation_offset = vr->get_rotation_offset();
          const auto current_hmd_rotation = glm::normalize(rotation_offset * glm::quat{vr->get_rotation(0)});
@@ -276862,7 +276871,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
          const auto current_eye_rotation_offset = glm::normalize(glm::quat{vr->get_eye_transform(true_index)});
  
          const auto new_rotation = glm::normalize(vqi_norm * current_hmd_rotation * current_eye_rotation_offset);
-@@ -4938,7 +6025,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4938,7 +6026,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto head_offset = quat_converter * (vqi_norm * (pos * world_scale));
          const auto head_offset_flat = quat_converter * (vqi_norm * (pos_flat * world_scale));
@@ -276881,7 +276890,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
          if (!has_double_precision) {
              if (!is_2d_screen) {
-@@ -5047,6 +6144,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -5047,6 +6145,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -276891,7 +276900,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  #ifdef FFAKE_STEREO_RENDERING_LOG_ALL_CALLS
      SPDLOG_INFO("Finished calculating stereo view offset!");
  #else
-@@ -5103,22 +6203,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5103,22 +6204,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          return out;
      }
  
@@ -276918,7 +276927,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
      // Can happen if we hooked this differently.
      if (g_hook->m_calculate_stereo_projection_matrix_hook) {
-@@ -5131,8 +6219,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5131,8 +6220,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          }
      }
  
@@ -276936,7 +276945,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
          const float width = VR::get()->get_hmd_width();
          const float height = VR::get()->get_hmd_height();
-@@ -5163,11 +6259,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5163,11 +6260,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
      // SPDLOG_INFO("NearZ: {}", old_znear);
  
      if (out != nullptr) {
@@ -276955,7 +276964,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
          auto& double_matrix = *(Matrix4x4d*)out;
  
-@@ -5500,6 +6602,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
+@@ -5500,6 +6603,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
  
              if (get_projection_data) {
                  SPDLOG_INFO("Successfully found GetProjectionData at {:x}", *get_projection_data);
@@ -276963,7 +276972,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
                  g_hook->m_hooked_alternative_localplayer_scan = true;
  
-@@ -5682,11 +6785,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5682,11 +6786,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
      if (idx) {
          SPDLOG_INFO("Calling PostInitProperties on local player!");
  
@@ -276991,7 +277000,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..dfe98c8e88a469a00f9a90c76124af0b
  
          // If the exception count exceeds a certain amount, we need to un-nop the function call because it was supposed to return a pointer.
          static auto exception_count = 0;
-@@ -5804,7 +6918,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5804,7 +6919,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
  
          // remove the handler
          RemoveVectoredExceptionHandler(exception_handler);
@@ -285408,10 +285417,10 @@ index 0000000000000000000000000000000000000000..ceb3b1ebddd2899942896257b955244d
 +} // namespace wuwa_kuro_reflection
 diff --git a/src/utility/WuWaLguiCompatibility.hpp b/src/utility/WuWaLguiCompatibility.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..74a49aa0e5a8286e08bb8fe2cf5b3d9af1dd9b15
+index 0000000000000000000000000000000000000000..4a7f7030d360e5a8af4c76b7cfd1732b10c33472
 --- /dev/null
 +++ b/src/utility/WuWaLguiCompatibility.hpp
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,111 @@
 +#pragma once
 +#include <array>
 +#include <cstdint>
@@ -285512,13 +285521,15 @@ index 0000000000000000000000000000000000000000..74a49aa0e5a8286e08bb8fe2cf5b3d9a
 +    {0x4116295, 0x8e, 0x41ee189bd6f0325cULL},
 +    {0x4116323, 0xa, 0x64f168621e06bd1eULL},
 +}};
-+// LGUICanvas GetProjectionMatrix, view-rect getter and GetViewportSize, whole
-+// bodies (build 0x6aa96d2d, read 14 Oct 2026). Each asks the local player for
-+// the left-eye projection data; see WuWaLguiViewport.hpp.
-+inline constexpr std::array<CodeRange, 3> viewport_code_ranges{{
++// LGUICanvas GetProjectionMatrix, view-rect getter, GetViewportSize and the two
++// UI point conversions, whole bodies (build 0x6aa96d2d, read 14 Oct 2026). Each
++// asks the local player for the left-eye projection data; see WuWaLguiViewport.hpp.
++inline constexpr std::array<CodeRange, 5> viewport_code_ranges{{
 +    {0xc63750, 0x1b4, 0x39cdd7840045179cULL},
 +    {0xc667c0, 0xfc, 0x42b37eb3416bd418ULL},
 +    {0xc668c0, 0x10e, 0xa14df2f8c0878a40ULL},
++    {0xc941a0, 0x4d6, 0x670221723626114bULL},
++    {0xc94680, 0x432, 0x68d1b82bfbaf7c15ULL},
 +}};
 +} // namespace wuwa_lgui_redirect::compatibility
 diff --git a/src/utility/WuWaLguiProbe.hpp b/src/utility/WuWaLguiProbe.hpp
@@ -285985,10 +285996,10 @@ index 0000000000000000000000000000000000000000..5455c019a6f31bfdc1273e72f35c0223
 +} // namespace wuwa_lgui_probe
 diff --git a/src/utility/WuWaLguiRedirect.hpp b/src/utility/WuWaLguiRedirect.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..f5b41de86c0a4b738b3bb1d13b7112fce6d54b2c
+index 0000000000000000000000000000000000000000..69a517369a1d8acf09ec99d33a0bea08445584db
 --- /dev/null
 +++ b/src/utility/WuWaLguiRedirect.hpp
-@@ -0,0 +1,1020 @@
+@@ -0,0 +1,1026 @@
 +#pragma once
 +
 +// Opt-in experiment pinned to the inspected September 8 WuWa code. See
@@ -286050,7 +286061,7 @@ index 0000000000000000000000000000000000000000..f5b41de86c0a4b738b3bb1d13b7112fc
 +    safetyhook::MidHook menu_pass{};
 +    safetyhook::MidHook stage0_construct{}, stage0_dispatch{};
 +    safetyhook::InlineHook world_setup{};
-+    std::array<safetyhook::MidHook, 3> viewport{};
++    std::array<safetyhook::MidHook, 5> viewport{};
 +    std::atomic<uint64_t> world_calls{}, world_prepared{}, world_layout_skips{}, world_guard_skips{};
 +    std::atomic<uint64_t> world_caller_skips{}, world_disabled_skips{}, world_mode_skips{}, world_samples{};
 +    std::array<std::atomic<uint64_t>,16> next_stage0_sample{};
@@ -286818,12 +286829,19 @@ index 0000000000000000000000000000000000000000..f5b41de86c0a4b738b3bb1d13b7112fc
 +}
 +
 +// Each site is the instruction after the left-eye GetProjectionData call,
-+// where the function starts reading the constrained view rect at rsp + offset.
-+inline constexpr std::array<std::pair<uintptr_t, uint32_t>, 3> viewport_sites{{
-+    {0xc63849, 0xe0}, // GetProjectionMatrix: inlined canvas size
-+    {0xc66881, 0xd0}, // view-rect getter: mouse ray, scaler
-+    {0xc66986, 0xd0}, // GetViewportSize: scaler layout, Project3DToScreen
++// where the function starts reading the constrained view rect at rsp/rbp + offset.
++struct ViewportSite { uintptr_t rva; uint32_t offset; bool rbp; };
++inline constexpr std::array<ViewportSite, 5> viewport_sites{{
++    {0xc63849, 0xe0, false}, // GetProjectionMatrix: inlined canvas size
++    {0xc66881, 0xd0, false}, // view-rect getter: mouse ray, scaler
++    {0xc66986, 0xd0, false}, // GetViewportSize: scaler layout, Project3DToScreen
++    {0xc94363, 0x40, true},  // UI point -> viewport pixels (controller button presses)
++    {0xc9482e, 0x30, true},  // UI point -> normalised viewport point
 +}};
++template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
++    constexpr auto site = viewport_sites[I];
++    wuwa_lgui_viewport::rewrite(site.rbp ? c.rbp : c.rsp, site.offset);
++}
 +
 +inline void disable_viewport(State& s) noexcept {
 +    wuwa_lgui_viewport::state().installed.store(false, std::memory_order_release);
@@ -286837,20 +286855,19 @@ index 0000000000000000000000000000000000000000..f5b41de86c0a4b738b3bb1d13b7112fc
 +    try {
 +        checked::require(verify_code(executable, image_size, compatibility::viewport_code_ranges, "lgui-viewport"),
 +            "LGUI canvas code changed; full VR keeps the eye-shaped UI");
-+        const std::array<safetyhook::MidHookFn, 3> callbacks{
-+            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[0].second); },
-+            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[1].second); },
-+            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[2].second); }};
++        constexpr std::array<safetyhook::MidHookFn, 5> callbacks{viewport_callback<0>, viewport_callback<1>,
++            viewport_callback<2>, viewport_callback<3>, viewport_callback<4>};
++        static_assert(callbacks.size() == viewport_sites.size());
 +        for (size_t i = 0; i < viewport_sites.size(); ++i) {
-+            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + viewport_sites[i].first),
++            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + viewport_sites[i].rva),
 +                callbacks[i], safetyhook::MidHook::StartDisabled);
 +            checked::require(hook.has_value(), "Cannot create LGUI viewport hook");
 +            s.viewport[i] = std::move(*hook);
 +        }
 +        for (auto& hook : s.viewport) checked::require(hook.enable().has_value(), "Cannot enable LGUI viewport hook");
 +        wuwa_lgui_viewport::state().installed.store(true, std::memory_order_release);
-+        spdlog::info("[WuWaLguiViewport] installed sites={:x},{:x},{:x}; full VR UI uses the window size",
-+            viewport_sites[0].first, viewport_sites[1].first, viewport_sites[2].first);
++        spdlog::info("[WuWaLguiViewport] installed sites={:x},{:x},{:x},{:x},{:x}; full VR UI uses the window size",
++            viewport_sites[0].rva, viewport_sites[1].rva, viewport_sites[2].rva, viewport_sites[3].rva, viewport_sites[4].rva);
 +    } catch (const std::exception& error) {
 +        disable_viewport(s);
 +        try { spdlog::error("[WuWaLguiViewport] unavailable: {}", error.what()); } catch (...) {}
@@ -287361,10 +287378,10 @@ index 0000000000000000000000000000000000000000..114cd315c3078f9ddcc05efdb05f2d79
 +} // namespace wuwa_lgui_redirect
 diff --git a/src/utility/WuWaLguiViewport.hpp b/src/utility/WuWaLguiViewport.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..7d36762f79935b9f7aae2e8c6ce1d32fb6c4c980
+index 0000000000000000000000000000000000000000..15a714ce5e2674a460d71f504fa066c02bd13ab9
 --- /dev/null
 +++ b/src/utility/WuWaLguiViewport.hpp
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,54 @@
 +#pragma once
 +
 +// Full VR shows the flat game's 16:9 screen UI.
@@ -287374,12 +287391,15 @@ index 0000000000000000000000000000000000000000..7d36762f79935b9f7aae2e8c6ce1d32f
 +// full VR that is the eye (2064 x 2208, 3292 x 3292, ...), so the layout, the
 +// UI projection and the mouse ray all took the eye's shape: story pictures
 +// were cropped at the sides, the HUD needed the 4:3 "HUD shape" stretch, and
-+// the cursor picked the wrong item. Three copies read that rect (canvas
-+// viewport size, the inlined copy in GetProjectionMatrix, and a view-rect
-+// getter used by the mouse ray and the scaler); the redirect hooks each one
-+// just after the engine call and replaces the rect with the UI target size,
-+// which is the window. Live test 14 Oct 2026: whole story pictures, round
-+// HUD on a 16:9 panel, ray hit under the pointer, no relayout on view switch.
++// the cursor picked the wrong item. Five LGUI functions read that rect (canvas
++// viewport size, the inlined copy in GetProjectionMatrix, a view-rect getter
++// used by the mouse ray and the scaler, and two UI-point <-> pixel conversions
++// that controller button presses use); the redirect hooks each one just after
++// the engine call and replaces the rect with the window size. The binary has
++// two more left-eye readers (0xd56ec0, 0xd577e0): world positions through the
++// player camera, sized by the window, independent of the canvas; left alone.
++// Test 12 (14 Oct 2026) hooked only the first three: controller buttons in the
++// Terminal clicked at eye-sized pixel positions and missed.
 +#include <atomic>
 +#include <cstdint>
 +
@@ -287402,12 +287422,12 @@ index 0000000000000000000000000000000000000000..7d36762f79935b9f7aae2e8c6ce1d32f
 +    state().size.store(enable && sane ? (uint64_t{width} << 32) | height : 0, std::memory_order_release);
 +}
 +
-+// The engine call filled a local FIntRect {min x, min y, max x, max y} at rsp + offset.
-+inline void rewrite(uintptr_t rsp, uint32_t offset) noexcept {
++// The engine call filled a local FIntRect {min x, min y, max x, max y} at frame + offset.
++inline void rewrite(uintptr_t frame, uint32_t offset) noexcept {
 +    auto& s = state();
 +    const auto size = s.size.load(std::memory_order_acquire);
 +    if (!size) return;
-+    auto* rect = reinterpret_cast<int32_t*>(rsp + offset);
++    auto* rect = reinterpret_cast<int32_t*>(frame + offset);
 +    if (rect[2] <= rect[0] || rect[3] <= rect[1]) return; // no projection data: keep the game's fallback
 +    rect[0] = 0;
 +    rect[1] = 0;

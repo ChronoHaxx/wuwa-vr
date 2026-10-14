@@ -4180,6 +4180,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     // LOD sync fix candidate: the second view takes the first view's LOD distance
     // factor and FOV, so both eyes choose the same far LODs.
     if (prev_count == 2) wuwa_shadow::lod_sync(vr->get_wuwa_controls().sync_eye_lod(), view_family, views[0], views[1], prev_count);
+    // Camera fades (login fade-in, white story cuts) reach the second eye too.
+    if (prev_count == 2) wuwa_shadow::overlay_sync(view_family, views[0], views[1], prev_count);
     // Depth of field experiment: one eye's settings into the other (test 3d: one eye blurred).
     if (prev_count == 2 && wuwa_test::is_wuwa())
         wuwa_dof_sync::sync(vr->get_wuwa_controls().stereo_dof(), vr->get_wuwa_controls().stereo_all_effects(),

@@ -77,7 +77,9 @@ std::optional<std::string> OverlayComponent::on_initialize_openvr() {
 }
 
 void OverlayComponent::on_pre_imgui_frame() {
-    if (VR::get()->get_wuwa_controls().passive_overlay_visible()) {
+    // The VR mouse cursor alone keeps the laser's mouse emulation: it shows where that mouse is.
+    const auto& controls = VR::get()->get_wuwa_controls();
+    if (controls.status_warning_visible() || controls.floor_visible()) {
         m_framework_intersect_state.intersecting = false;
         if (m_forced_aim) { VR::get()->set_aim_allowed(true); m_forced_aim = false; }
         return;
@@ -725,7 +727,10 @@ void OverlayComponent::update_overlay_openvr() {
 
     const bool hidden_ui_warning = vr->get_wuwa_controls().status_warning_visible();
     const bool floor_sheet = !hidden_ui_warning && vr->get_wuwa_controls().floor_visible();
-    const bool passive_overlay = hidden_ui_warning || floor_sheet;
+    // The VR mouse cursor alone: shown over the game UI below, never interactive.
+    const bool cursor_only = !hidden_ui_warning && !floor_sheet && !g_framework->is_drawing_ui() &&
+        vr->get_wuwa_controls().cursor_visible();
+    const bool passive_overlay = hidden_ui_warning || floor_sheet || cursor_only;
     vr::VROverlay()->SetOverlayInputMethod(m_overlay_handle,
         passive_overlay ? vr::VROverlayInputMethod_None : vr::VROverlayInputMethod_Mouse);
     bool should_show_overlay = !passive_overlay && update_wrist_overlay_openvr();
@@ -1169,22 +1174,27 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
 // follows its aim. On the stereo screen and mono theatre the menu stays in front
 // of the picture (SteamVR hides layers behind it), and "Low" puts its top edge
 // just under the picture, worked out from the screen's size, height and distance.
+// UEVR's classic window takes the same place and the same clamp: it used to fall back
+// to straight ahead at the raw menu distance once the WuWa menu stopped drawing, which
+// on the stereo screen was behind the picture (hidden) and looked like it closed itself.
 float OverlayComponent::place_wuwa_menu(glm::mat4& frame, float quad_height, float quad_aspect) {
     float distance = m_framework_distance->value();
-    if (!wuwa_test::is_wuwa() || !wuwa_menu_host::showing()) return distance;
+    if (!wuwa_test::is_wuwa()) return distance;
+    const bool wuwa_menu = wuwa_menu_host::showing();
     auto& vr = VR::get();
     const bool screen = vr->is_using_2d_screen() || vr->is_using_mono_theatre();
     auto& yaw = screen ? m_wuwa_menu_yaw_screen : m_wuwa_menu_yaw;
     auto& pitch = screen ? m_wuwa_menu_pitch_screen : m_wuwa_menu_pitch;
     const bool aiming = wuwa_menu_host::moving() && vr->menu_pointer_active() && !vr->get_controllers().empty();
     if (screen) {
-        const float half = 0.5f * quad_height * wuwa_menu_host::height_share(quad_aspect);  // menu, metres
+        // The classic window may use the whole quad.
+        const float half = 0.5f * quad_height * (wuwa_menu ? wuwa_menu_host::height_share(quad_aspect) : 1.0f);  // metres
         const float screen_distance = std::max(m_slate_distance->value(), 0.3f);
         // Every point of the tilted menu is at most distance / cos(half angle) deep.
         const float wide = std::atan2(half, std::max(distance, 0.3f));
         distance = std::min(distance, std::max(0.3f, (screen_distance - 0.15f) * std::cos(wide)));
         if (aiming) m_wuwa_menu_screen_low->value() = false;
-        if (m_wuwa_menu_screen_low->value()) {
+        if (wuwa_menu && m_wuwa_menu_screen_low->value()) {
             const float bottom = std::atan2(m_slate_y_offset->value() - 0.5f * m_slate_size->value() * hud_shape(), screen_distance);
             const float angle = std::atan2(half, distance);
             yaw->value() = 0.0f;
@@ -1245,6 +1255,25 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
         layer.pose.orientation = runtimes::OpenXR::to_openxr(glm::quat_cast(transform));
         layer.pose.position = runtimes::OpenXR::to_openxr(transform[3]);
         m_parent->m_framework_intersect_state.intersecting = false;
+        return layer;
+    }
+
+    // WuWa: the mouse cursor alone (no menu) lies on the game UI panel: this frame's slate quad's
+    // space, pose and size (HUD shape, portal, follow view), 1 cm nearer the eye. Not on a cylinder.
+    if (!g_framework->is_drawing_ui() && vr->get_wuwa_controls().cursor_visible()) {
+        m_parent->m_framework_intersect_state.intersecting = false;
+        if ((OverlayComponent::OverlayType)m_parent->m_slate_overlay_type->value() != OverlayComponent::OverlayType::QUAD ||
+            m_slate_layer.space == XR_NULL_HANDLE) {
+            return std::nullopt;
+        }
+        layer.space = m_slate_layer.space;
+        layer.size = m_slate_layer.size;
+        layer.pose = m_slate_layer.pose;
+        const auto& orientation = m_slate_layer.pose.orientation;
+        const auto nearer = glm::quat{orientation.w, orientation.x, orientation.y, orientation.z} * glm::vec3{0.0f, 0.0f, 0.01f};
+        layer.pose.position.x += nearer.x;
+        layer.pose.position.y += nearer.y;
+        layer.pose.position.z += nearer.z;
         return layer;
     }
 

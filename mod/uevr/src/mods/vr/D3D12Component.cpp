@@ -838,7 +838,12 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::AFR_LEFT_EYE) &&
                 m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::AFR_RIGHT_EYE) :
                 m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::DOUBLE_WIDE);
-            const bool omit_world = is_mono_theatre || !world_ready;
+            // WuWa: after frames without the world (story transitions, view switches) the first
+            // copy back showed a black left eye and a stale, offset right eye for one frame (the
+            // second eye's capture is recreated black). Show the world from the second ready frame.
+            const bool world_resumed = world_ready && m_world_was_ready;
+            m_world_was_ready = world_ready && !is_mono_theatre;
+            const bool omit_world = is_mono_theatre || !world_resumed;
             auto result = vr->m_openxr->end_frame(quad_layers, scene_depth_tex.Get() != nullptr && !omit_world, omit_world);
 
             if (result == XR_ERROR_LAYER_INVALID) {

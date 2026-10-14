@@ -37,6 +37,7 @@ namespace {
 using namespace wuwa_menu;
 
 bool classic{};
+std::atomic<int> open_request{};
 State state{};
 MoveReader mover{};
 StickReader stick{};
@@ -1092,6 +1093,13 @@ float height_share(float aspect) {
 bool draw(const ImVec2& target_size) {
     if (!wuwa_test::is_wuwa()) return false;
     tick();
+    // Emergency keys (window thread): 1 = this menu (turned back on), 2 = the classic window.
+    if (const auto request = open_request.exchange(0, std::memory_order_acq_rel); request == 2) {
+        classic = true;
+    } else if (request == 1) {
+        if (auto* enabled = typed<bool>("VR_WuWaVrMenu")) enabled->value() = true;
+        classic = false;
+    }
     if (classic) return false;
     auto* enabled = typed<bool>("VR_WuWaVrMenu");
     if (enabled && !enabled->value()) return false;
@@ -1153,9 +1161,18 @@ bool draw(const ImVec2& target_size) {
     return true;
 }
 
+// Always in the classic window, also after "Use this menu when opening UEVR" was turned off
+// (the window then showed no way back, even after a restart); it turns that setting on again.
 void draw_back_button() {
-    if (!wuwa_test::is_wuwa() || !classic) return;
-    if (ImGui::Button(wuwa_l10n::label("Back to the WuWa VR menu").c_str())) classic = false;
+    if (!wuwa_test::is_wuwa()) return;
+    if (ImGui::Button(wuwa_l10n::label("Back to the WuWa VR menu").c_str())) {
+        if (auto* enabled = typed<bool>("VR_WuWaVrMenu")) enabled->value() = true;
+        classic = false;
+    }
+}
+
+void request_open(bool classic_window) {
+    open_request.store(classic_window ? 2 : 1, std::memory_order_release);
 }
 
 void on_closed() {

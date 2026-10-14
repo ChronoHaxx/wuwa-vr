@@ -11,6 +11,9 @@ namespace wuwa_menu_host {
 bool draw(const ImVec2& target_size);
 // Inside the classic window: the way back to the VR menu.
 void draw_back_button();
+// Emergency keys: the next draw() shows the VR menu (turning "Use this menu" back
+// on) or UEVR's classic window. Any thread; the caller opens UEVR's UI.
+void request_open(bool classic_window);
 // When UEVR's UI closes; the next open shows the VR menu again.
 void on_closed();
 // The VR menu (not the classic window) was drawn in the last few frames.

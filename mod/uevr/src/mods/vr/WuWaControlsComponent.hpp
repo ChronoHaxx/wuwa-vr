@@ -72,7 +72,9 @@ public:
     bool menu_warning_visible() const;
     bool mode_warning_active() const;
     bool status_warning_visible() const;
-    bool passive_overlay_visible() const { return status_warning_visible() || floor_visible(); }
+    // The game's mouse cursor drawn over its UI in the headset (the system cursor never reaches it).
+    bool cursor_visible() const;
+    bool passive_overlay_visible() const { return status_warning_visible() || floor_visible() || cursor_visible(); }
     void draw_passive_overlay();
     Matrix4x4f floor_transform() const;
     float floor_width() const;

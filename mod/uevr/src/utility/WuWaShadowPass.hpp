@@ -2,7 +2,9 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -101,6 +103,7 @@ inline bool write_field(uintptr_t address, uint32_t value) {
 // factor and FOV fields into the second view before either submission. 3.7 offsets.
 inline constexpr std::array<uint32_t, 6> lod_sync_offsets{0x2b8, 0x2d0, 0x2d4, 0xca4, 0xca8, 0xfd8};
 inline std::atomic<uint64_t> lod_sync_until{}, lod_sync_off_until{}, lod_sync_applied{}, lod_sync_failed{};
+inline std::atomic<uint64_t> overlay_sync_applied{}, overlay_sync_failed{}, overlay_sync_rejected{};
 inline bool lod_sync_active() { return GetTickCount64() < lod_sync_until.load(); }
 inline bool lod_sync_bypassed() { return GetTickCount64() < lod_sync_off_until.load(); }
 // Test control: force LOD sync on (enabled) or off for a window; 0 seconds ends either.
@@ -223,6 +226,8 @@ inline nlohmann::json status() {
         {"eye_swap_active", eye_swap_active()}, {"eye_swap_applied", eye_swap_applied.load()},
         {"lod_sync_active", lod_sync_active()}, {"lod_sync_bypassed", lod_sync_bypassed()}, {"lod_sync_applied", lod_sync_applied.load()},
         {"lod_sync_failed", lod_sync_failed.load()},
+        {"overlay_sync_applied", overlay_sync_applied.load()}, {"overlay_sync_failed", overlay_sync_failed.load()},
+        {"overlay_sync_rejected", overlay_sync_rejected.load()},
         {"state_swap_applied", swap_applied.load()}, {"state_swap_restored", swap_restored.load()},
         {"state_swap_skipped", swap_skipped.load()}};
 }
@@ -379,6 +384,62 @@ inline void lod_sync(bool enabled, const void* family, void* first, void* second
         if (!checked::read_field(a, offset, value) || !write_field(b + offset, value)) { ++lod_sync_failed; return; }
     }
     ++lod_sync_applied;
+}
+
+// Camera fades in both eyes. FSceneView OverlayColor (+0xc70: the PlayerCameraManager's FadeColor
+// with FadeAmount as alpha) and ColorScale (+0xc80) come from the camera manager only for the first
+// view; the second eye's default camera leaves them clear. So the game's fades reached the right eye
+// alone: black at login while the left eye already showed the world, white at story cuts. 3.7
+// offsets, from the view constructor (0x1454cb855..0x1454cb87b: init +0x120/+0x130/+0x140 to view
+// +0xc60/+0xc70/+0xc80, then the stereo pass +0xc90 that lod_sync checks). Verified main pair only;
+// values must be finite colours, and every write is read back.
+inline constexpr uint32_t overlay_sync_offset = 0xc70;
+inline constexpr size_t overlay_sync_floats = 8;
+// The constructor's OverlayColor and ColorScale stores (init +0x130/+0x140 -> view +0xc70/+0xc80),
+// checked on their own so a game patch that moves them disables only this copy.
+inline constexpr uint32_t overlay_code_rva = 0x54cb864;
+inline constexpr std::array<uint8_t, 30> overlay_code{
+    0x41,0x0f,0x10,0x85,0x30,0x01,0x00,0x00, 0x0f,0x11,0x83,0x70,0x0c,0x00,0x00,
+    0x41,0x0f,0x10,0x85,0x40,0x01,0x00,0x00, 0x0f,0x11,0x83,0x80,0x0c,0x00,0x00};
+inline bool overlay_compatible() {
+    static const bool matched = [] {
+        const auto module = GetModuleHandleW(nullptr);
+        const auto site = reinterpret_cast<uintptr_t>(module) + overlay_code_rva;
+        std::array<uint8_t, overlay_code.size()> bytes{};
+        const bool ok = compatible() && checked::executable_site(site, overlay_code.size(), module) &&
+            checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(site), bytes.size()) && bytes == overlay_code;
+        if (ok) spdlog::info("[WuWaShadow] camera fade fields matched; fades copied to the second eye");
+        else spdlog::error("[WuWaShadow] camera fade code check failed at {:x}; fades not copied", overlay_code_rva);
+        return ok;
+    }();
+    return matched;
+}
+inline void overlay_sync(const void* family, void* first, void* second, int32_t count) {
+    if (count != 2 || !family || !first || !second || faulted.load() || !overlay_compatible()) return;
+    const auto a = reinterpret_cast<uintptr_t>(first), b = reinterpret_cast<uintptr_t>(second);
+    uintptr_t fa{}, fb{};
+    uint32_t pa{}, pb{};
+    if (!checked::read_field(a, 0, fa) || !checked::read_field(b, 0, fb) ||
+        fa != reinterpret_cast<uintptr_t>(family) || fb != fa) return;
+    if (!checked::read_field(a, 0xc90, pa) || !checked::read_field(b, 0xc90, pb) || pa != 2 || (pb != 3 && pb != 2)) return;
+    if (!writable_span(b + overlay_sync_offset, overlay_sync_floats * sizeof(float))) { ++overlay_sync_failed; return; }
+    std::array<uint32_t, overlay_sync_floats> source{}, target{};
+    for (size_t i = 0; i < overlay_sync_floats; ++i) {
+        const auto offset = overlay_sync_offset + static_cast<uint32_t>(i * sizeof(float));
+        if (!checked::read_field(a, offset, source[i]) || !checked::read_field(b, offset, target[i])) { ++overlay_sync_failed; return; }
+        float value{};
+        std::memcpy(&value, &source[i], sizeof(value));
+        // RGB then fade amount (0..1), then the colour scale (never negative).
+        const bool fade_amount = i == 3, scale = i >= 4;
+        if (!std::isfinite(value) || value > 64.0f || value < (scale || fade_amount ? 0.0f : -1.0f) ||
+            (fade_amount && value > 1.0f)) { ++overlay_sync_rejected; return; }
+    }
+    if (source == target) return;
+    for (size_t i = 0; i < overlay_sync_floats; ++i) {
+        if (source[i] != target[i] &&
+            !write_field(b + overlay_sync_offset + static_cast<uint32_t>(i * sizeof(float)), source[i])) { ++overlay_sync_failed; return; }
+    }
+    ++overlay_sync_applied;
 }
 
 // Diagnostic only, opened by the WuWa test control `state_swap` for at most 60

@@ -930,6 +930,56 @@ bool WuWaControlsComponent::status_warning_visible() const {
         (!floor_visible() && (menu_warning_active() || mode_warning_active()));
 }
 
+namespace {
+// The system cursor over the game window, in client pixels (ImGui's DisplaySize); false outside it.
+bool vr_cursor_position(ImVec2& out) {
+    const auto window = g_framework->get_window();
+    POINT point{};
+    RECT client{};
+    if (window == nullptr || !GetCursorPos(&point) || !ScreenToClient(window, &point) || !GetClientRect(window, &client)) return false;
+    if (point.x < 0 || point.y < 0 || point.x >= client.right || point.y >= client.bottom) return false;
+    out = {(float)point.x, (float)point.y};
+    return true;
+}
+
+// The cursor shows for a while after the mouse last moved, so a controller player's menus stay clean.
+bool vr_cursor_moved_recently() {
+    static std::atomic<uint64_t> last_position{UINT64_MAX}, moved_at{};
+    POINT point{};
+    if (!GetCursorPos(&point)) return false;
+    const auto packed = (uint64_t)(uint32_t)point.x << 32 | (uint32_t)point.y;
+    const auto now = GetTickCount64();
+    if (last_position.exchange(packed, std::memory_order_relaxed) != packed) moved_at.store(now, std::memory_order_relaxed);
+    const auto moved = moved_at.load(std::memory_order_relaxed);
+    return moved != 0 && now - moved <= 10000;
+}
+
+// A classic arrow, tip at the hot spot, outlined so it reads on light and dark UI.
+void draw_vr_cursor(ImDrawList* list, ImVec2 tip, float scale) {
+    const auto at = [&](float x, float y) { return ImVec2{tip.x + x * scale, tip.y + y * scale}; };
+    const ImVec2 outline[]{at(0, 0), at(0, 17), at(4, 13), at(7, 19.5f), at(9.5f, 18.5f), at(6.5f, 12), at(12, 12)};
+    const ImVec2 head[]{at(0, 0), at(0, 17), at(4, 13), at(6.5f, 12), at(12, 12)};
+    const ImVec2 tail[]{at(4, 13), at(7, 19.5f), at(9.5f, 18.5f), at(6.5f, 12)};
+    const auto white = IM_COL32(255, 255, 255, 255), black = IM_COL32(0, 0, 0, 255);
+    list->AddConvexPolyFilled(head, IM_ARRAYSIZE(head), white);
+    list->AddConvexPolyFilled(tail, IM_ARRAYSIZE(tail), white);
+    list->AddPolyline(outline, IM_ARRAYSIZE(outline), black, ImDrawFlags_Closed, std::max(1.5f, scale * 0.9f));
+}
+}
+
+bool WuWaControlsComponent::cursor_visible() const {
+    // Only over the game UI panel: never with a menu, warning or card using the overlay, and
+    // only while the game itself shows its cursor (menus, Alt) and the mouse moved lately.
+    if (!wuwa_test::is_wuwa() || g_framework->get_window() == nullptr || g_framework->is_drawing_ui()) return false;
+    auto& vr = VR::get();
+    if (!vr->is_hmd_active() || !vr->is_gui_enabled() || status_warning_visible() || floor_visible()) return false;
+    if (!fresh_menu_cursor() || !vr_cursor_moved_recently()) return false;
+    DWORD process{};
+    GetWindowThreadProcessId(GetForegroundWindow(), &process);
+    ImVec2 position{};
+    return process == GetCurrentProcessId() && vr_cursor_position(position);
+}
+
 bool WuWaControlsComponent::floor_visible() const {
     // A guided test plan uses the card's place for its current step.
     return wuwa_test::is_wuwa() && !g_framework->is_drawing_ui() && VR::get()->is_hmd_active() &&
@@ -1173,7 +1223,12 @@ void WuWaControlsComponent::draw_passive_overlay() {
         return;
     }
     wuwa_menu_host::tick();
-    if (!floor_visible()) return;
+    if (!floor_visible()) {
+        ImVec2 position{};
+        // About the flat game's cursor size at 1440 lines; DisplaySize is the window's client area.
+        if (cursor_visible() && vr_cursor_position(position)) draw_vr_cursor(list, position, std::max(1.0f, size.y / 1440.0f * 2.2f));
+        return;
+    }
     wuwa_sheet::CardState state;
     const bool held=m_cards->value() && held_card(state);
     if (held) {

@@ -260,5 +260,7 @@ private:
     int m_last_presentation_mode{-1};
     bool m_mono_openvr_ready{false};
     bool m_submitted_left_eye{false};
+    // OpenXR: the world was ready on the previous submitted frame (see on_frame).
+    bool m_world_was_ready{false};
 };
 } // namespace vrmod

@@ -904,6 +904,15 @@ bool Framework::on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_para
             m_last_keys[w_param] = true;
         }
 
+        // WuWa emergency keys, whatever the menu settings: Ctrl+Shift+Home opens the WuWa
+        // VR menu (and turns it back on), Ctrl+Shift+End UEVR's classic window.
+        if ((w_param == VK_HOME || w_param == VK_END) && wuwa_test::is_wuwa() &&
+            (GetKeyState(VK_CONTROL) & 0x8000) != 0 && (GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+            wuwa_menu_host::request_open(w_param == VK_END);
+            if (!m_draw_ui) set_draw_ui(true, true);
+            return false;
+        }
+
         if (w_param == VK_INSERT ||
             w_param == FrameworkConfig::get()->get_menu_key()->value()) 
         {

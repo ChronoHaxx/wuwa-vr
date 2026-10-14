@@ -32,7 +32,16 @@ controllers, diorama, HUD size and distance, recording, recenter), **Camera**,
 notices). They change the same settings as UEVR's own menu:
 **All settings (classic UEVR menu)** on the Menu page opens UEVR's full window,
 and turning off **Use this menu when opening UEVR** makes L3 + R3 open UEVR's
-window again.
+window again. UEVR's window always has **Back to the WuWa VR menu** at the top,
+which also turns this menu back on.
+
+**Emergency keys** work whatever the menu settings: **Ctrl+Shift+Home** opens the
+WuWa VR menu (and turns it back on), **Ctrl+Shift+End** opens UEVR's classic
+window.
+
+**Mouse cursor:** in the headset the game's mouse cursor is drawn on the game's
+UI panel while the game shows it (menus, Alt), until 10 seconds after the mouse
+last moved, so keyboard-and-mouse players can see what they point at.
 
 **Move the menu:** press **Y** (gamepad) or choose **Move menu** on the Menu
 page. Gamepad: left stick moves it, right stick changes the distance, A puts it

@@ -15,10 +15,11 @@ Launch requires the current installed package's simulator or a valid headset
 runtime. An older package's simulator or a missing/broken runtime blocks launch.
 Close game and injector before switching. Updating never switches automatically.
 
-The launcher app and VR package have separate update status. Update the app,
-then deliberately select/install the new VR package in step 02. Checking for
-updates preserves your selection, including a rollback. Settings, backups,
-recordings and logs are kept. Older packages remain available for rollback.
+The launcher app and VR package have separate update status. Update the app;
+when it starts with the game closed, it installs a newer VR package for the
+same game version by itself, and Back to ... in step 02 returns to the one you
+had. Test builds are never replaced. Settings, backups, recordings and logs are
+kept. Every published version is in Troubleshooting > Versions & updates.
 
 L3 + R3 opens the WuWa VR menu (laser, gamepad or mouse); UEVR's full
 settings: Menu > All settings (classic UEVR menu). Hold both triggers first,

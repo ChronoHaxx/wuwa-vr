@@ -140,7 +140,7 @@
       ],
       [
         "How do updates work?",
-        "The app checks for its own updates and asks before restarting. VR packages update separately in step 02, and you can roll back to a previous installed version."
+        "The app checks for its own updates and asks before restarting. When it starts, a newer VR package for your game version installs by itself while the game is closed, and Back to … in step 02 returns to the one you had."
       ],
       [
         "Does it change my game files?",

@@ -86,7 +86,7 @@
       ["Steam, Kuro-Launcher oder Epic?", "Steam und der offizielle Kuro-Launcher werden unterstützt. Epic noch nicht."],
       ["Kann mein Konto eingeschränkt werden?", "Ja, das ist möglich. Die Mod wird in das Spiel injiziert, und Anti-Cheat kann das erkennen. Kuro Games hat sie nicht genehmigt. Lies vor der Installation den Risikohinweis."],
       ["Windows warnt vor dem Installer. Ist das normal?", "Der Installer ist nicht signiert, daher kann SmartScreen warnen. Lade ihn nur aus dem GitHub-Release des Projekts und vergleiche die SHA-256-Prüfsumme. Schalte niemals Virenschutz oder Anti-Cheat ab."],
-      ["Wie funktionieren Updates?", "Die App sucht selbst nach Updates und fragt vor dem Neustart. VR-Pakete werden getrennt in Schritt 02 aktualisiert, und du kannst zu einer vorher installierten Version zurückkehren."],
+      ["Wie funktionieren Updates?", "Die App sucht selbst nach Updates und fragt vor dem Neustart. Beim Start installiert sie ein neueres VR-Paket für deine Spielversion selbst, solange das Spiel geschlossen ist, und „Zurück zu …“ in Schritt 02 kehrt zum bisherigen zurück."],
       ["Werden Spieldateien verändert?", "Nein. Der Launcher lässt die Spieldateien in Ruhe; die VR-Mod wird beim Start injiziert."],
       ["Wie deinstalliere ich?", "Nutze in der App Fehlerbehebung → Deinstallation vorbereiten und entferne WuWa VR dann unter Windows-Einstellungen → Apps. Einstellungen, Backups und Aufnahmen bleiben erhalten, solange du sie nicht löschst."],
       ["Ist es kostenlos?", "Ja. Es ist ein kostenloses Fanprojekt, und der Launcher ist Open Source unter MIT. Unterstützung auf Ko-fi ist freiwillig und kauft keine Garantien."]

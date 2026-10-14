@@ -37,7 +37,7 @@
   ".faq.items[3][0]": "9fc474dc5d69",
   ".faq.items[3][1]": "458abd68992e",
   ".faq.items[4][0]": "18a4c959a131",
-  ".faq.items[4][1]": "3b86e9427692",
+  ".faq.items[4][1]": "be2cace317c3",
   ".faq.items[5][0]": "9aa416a83e41",
   ".faq.items[5][1]": "81ceb5a681b5",
   ".faq.items[6][0]": "01cb13245808",
@@ -509,8 +509,8 @@
   ".strings.uninstall.body": "e442a214f396",
   ".strings.uninstall.summary": "8e3492f6754b",
   ".strings.updates.blocked": "28926008d6f7",
-  ".strings.updates.check": "1b767313aa4d",
-  ".strings.updates.release": "262373457862",
+  ".strings.updates.check": "3329616d18e8",
+  ".strings.updates.release": "15a86ad69f0b",
   ".strings.updates.title": "f57e321fe86b"
  },
  "web tool": {

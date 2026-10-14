@@ -6,7 +6,7 @@ Free, unofficial Wuthering Waves VR mod for Windows, built on praydog's UEVR and
 
 Install once, then **01 Choose game → 02 Install VR → 03 Choose headset or simulator → Launch in VR**. Saved choices are remembered for later launches. Steam starts through Steam; Kuro users press Play in the Kuro launcher. The first VR installation needs internet; no separate Python installation is needed.
 
-The launcher app and VR package display their own versions. Update both to **1.2.1** for this release; updating the app preserves your existing package choice. Older packages remain available for deliberate rollback. Launch requires a valid headset runtime or the simulator belonging to the selected installed VR package.
+The launcher app and VR package display their own versions. Update the app to **1.2.1** for this release: when it starts with the game closed, it installs the matching VR package by itself, and **Back to …** in step 02 returns to the one you had. Every published version is listed in Troubleshooting → Versions & updates. Launch requires a valid headset runtime or the simulator belonging to the selected installed VR package.
 
 The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill). The 1.2.1 fixes (ambient occlusion in both eyes, the storm-sky god rays, the live world behind full-screen menus, the journey picture on the menu panel and the HUD after a view switch) were measured on the OpenXR simulator and played there by the owner; a headset check is still pending. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
 

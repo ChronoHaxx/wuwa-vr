@@ -1452,6 +1452,41 @@ function lens.real_focus(pcm)
     if type(f)=="number" and f>=10 then return nil end
     return d
 end
+-- Close-up near clip (test 15, utility/WuWaNearClip.hpp). Story close-ups can
+-- put the game camera right behind someone's head: outside the narrow 2D frame,
+-- inside the headset's wide view, so it fills one eye. In close-ups nothing
+-- nearer than WuWaControls_CloseUpNearClip is drawn, kept 10 cm short of the
+-- game's focus, the centre trace and anyone found in the 2D frame (distances
+-- from the eye, after the close-up move); 10 cm is the game's own plane. The
+-- request is sent every frame and lapses by itself if the script stops.
+local nearclip={sent=-1}
+function nearclip.setting() return number("WuWaControls_CloseUpNearClip",20,10,50) end
+function nearclip.wanted(dolly)
+    local want=nearclip.setting()
+    if want<=10 then return 0 end
+    local room=want
+    local function keep(d) if type(d)=="number" and d==d then room=math.min(room,d-dolly-10) end end
+    keep(lens.subject); keep(lens.live_focus); keep(lens.subject_trace); keep(lens.frame_nearest)
+    if room<=10 then return 0 end
+    return math.floor(room)
+end
+function nearclip.publish(cm)
+    if cm>0 or nearclip.sent~=0 then set("WuWaControls_NearClipNow",tostring(cm)) end
+    nearclip.sent=cm
+end
+function nearclip.text(cm)
+    return cm>0 and string.format("; hiding anything nearer than %d cm",cm) or ""
+end
+-- The nearest near side of anyone in the 2D frame, from the game camera.
+function nearclip.nearest(found)
+    local n=nil
+    for _,c in ipairs(found or {}) do if not n or c.near<n then n=c.near end end
+    return n
+end
+function nearclip.rescan(pos,rot,fov)
+    local ok,found=pcall(people.scan,pos,rot,fov)
+    if ok then lens.frame_nearest=nearclip.nearest(found) end
+end
 -- At a cut: the subject is the game's real focus, or nothing (the eye stays at
 -- the game camera). No guesses: the centre trace passes through characters and
 -- a far wall moved the eye through Shorekeeper in 3i; the people search picked
@@ -1462,13 +1497,17 @@ function lens.pick(pcm,pos,rot,fov)
     lens.live_focus=lens.subject_focus
     lens.subject_trace,lens.trace_error=lens.blocked(pawn or pc,pawn,pos,lens.forward(rot))
     lens.subject_entry,lens.foreground_entry,lens.foreground,lens.people_stats,lens.people_seen=nil,nil,nil,nil,nil
+    lens.frame_nearest=nil
     lens.subject=lens.subject_focus
     lens.subject_kind=lens.subject and "game focus" or nil
-    if lens.subject and number("WuWaControls_LensSubject",0,0,1)==0 then
+    local behind=lens.subject and number("WuWaControls_LensSubject",0,0,1)==0
+    -- The near clip needs anyone in the 2D frame, with or without a focus.
+    if behind or nearclip.setting()>10 then
         local ok,found,stats=pcall(people.scan,pos,rot,fov)
         if ok then lens.people_stats=stats else lens.people_stats="error "..tostring(found):sub(1,80); found=nil end
         lens.people_seen=found and #found or nil
-        for _,c in ipairs(found or {}) do
+        lens.frame_nearest=nearclip.nearest(found)
+        for _,c in ipairs(behind and found or {}) do
             if c.t<lens.subject-40 and c.near<lens.subject-30 and (not lens.foreground or c.near<lens.foreground) then lens.foreground=c.near end
         end
     end
@@ -1507,8 +1546,9 @@ function lens.update()
     -- the headset 10 cm suited best (test 3d).
     local nearest=number("WuWaControls_LensNearest",10,5,150)
     local paused=mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre")
-    if strength<=0 or paused or not pcm then
-        lens.dolly=0; lens.pos=nil
+    local clipping=nearclip.setting()>10
+    if (strength<=0 and not clipping) or paused or not pcm then
+        lens.dolly=0; lens.pos=nil; nearclip.publish(0)
         if pcm then dof.update(pcm,pcm:GetFOVAngle(),0) end
         if strength<=0 then lens.publish("Off"..dof.text())
         elseif paused then lens.publish("Paused: game camera in full VR only"..dof.text()) end
@@ -1516,9 +1556,9 @@ function lens.update()
     end
     local fov=pcm:GetFOVAngle()
     local pos,rot=point(pcm:GetCameraLocation()),rotator(pcm:GetCameraRotation())
-    if type(fov)~="number" or fov~=fov or not valid(pos) or not rot then lens.dolly=0; lens.pos=nil; return end
+    if type(fov)~="number" or fov~=fov or not valid(pos) or not rot then lens.dolly=0; lens.pos=nil; nearclip.publish(0); return end
     if fov>60 or fov<5 then
-        lens.dolly=0; lens.pos=nil; dof.update(pcm,fov,0)
+        lens.dolly=0; lens.pos=nil; nearclip.publish(0); dof.update(pcm,fov,0)
         lens.publish(string.format("Waiting for a close-up (lens now %.0f degrees)",fov)..dof.text()); return
     end
     -- A cut is a jump of the game camera: the subject is picked again and the
@@ -1537,14 +1577,27 @@ function lens.update()
         lens.pick(pcm,pos,rot,fov)
         lens.cut_pos,lens.cut_f,lens.cut_subject,lens.cut_time=pos,lens.forward(rot),lens.subject,now()
         lens.next_follow=lens.frames+8
+        lens.next_people=lens.frames+16
     elseif how~=1 and lens.frames>=(lens.next_follow or 0) then
         lens.next_follow=lens.frames+8
         local ok=pcall(lens.follow,pcm,pos,rot,fov,how)
         if not ok then lens.subject_entry,lens.foreground_entry=nil,nil end
     end
+    -- People move within a shot: look again about twice a second while the near clip is on.
+    if not cut and clipping and lens.frames>=(lens.next_people or 0) then
+        lens.next_people=lens.frames+16
+        nearclip.rescan(pos,rot,fov)
+    end
     if not lens.subject then
         lens.dolly=0; lens.eased_at=nil; dof.update(pcm,fov,0)
-        lens.publish(string.format("Close-up at %.0f degrees: the game sets no focus in this shot, view at the game camera",fov)..dof.text()); return
+        local clip=nearclip.wanted(0)
+        nearclip.publish(clip)
+        if cut then
+            functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f subject=none people=%s [%s] trace=%s near_clip=%d",
+                lens.shot,fov,tostring(lens.people_seen or "-"),tostring(lens.people_stats or ""),
+                tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),clip))
+        end
+        lens.publish(string.format("Close-up at %.0f degrees: the game sets no focus in this shot, view at the game camera",fov)..nearclip.text(clip)..dof.text()); return
     end
     -- The subject keeps strength^1 of its 2D size: distance d becomes d*k^strength.
     local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2)
@@ -1577,19 +1630,21 @@ function lens.update()
     lens.eased_at=t
     local dolly=lens.dolly
     dof.update(pcm,fov,dolly)
+    local clip=nearclip.wanted(dolly)
+    nearclip.publish(clip)
     local text=string.format("Close-up at %.0f degrees: %s %.1f m away, moved %.1f m nearer",
         fov,lens.subject_kind or "subject",d/100,dolly/100)
     if held then text=text..string.format(", held behind the person in front (%.1f m)",lens.foreground/100)
     elseif dolly>0 and d-dolly<=nearest+1 then text=text..string.format(", stopped at the closest %.0f cm",nearest) end
     if cut then
-        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f subject=%.0f (%s) people=%s [%s] foreground=%s focus=%s trace=%s dolly=%.0f strength=%.2f nearest=%.0f%s",
+        functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f subject=%.0f (%s) people=%s [%s] foreground=%s focus=%s trace=%s dolly=%.0f strength=%.2f nearest=%.0f near_clip=%d%s",
             lens.shot,fov,d,tostring(lens.subject_kind),tostring(lens.people_seen or "-"),tostring(lens.people_stats or ""),
             tostring(lens.foreground and math.floor(lens.foreground) or "none"),
             tostring(lens.subject_focus and math.floor(lens.subject_focus) or "none"),
-            tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength,nearest,
+            tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength,nearest,clip,
             lens.trace_error and (" trace_error="..lens.trace_error) or ""))
     end
-    lens.publish(text..dof.text())
+    lens.publish(text..nearclip.text(clip)..dof.text())
 end
 local function update_camera_before_draw()
     -- UGameViewportClient::Draw runs on the game thread after world simulation,
@@ -1642,7 +1697,7 @@ cb.on_pre_viewport_client_draw(function()
     -- The game camera is final for this frame here, so a cut is seen before either eye.
     local lens_ok,lens_err=pcall(lens.update)
     if not lens_ok then
-        lens.dolly=0; lens.pos=nil; lens.publish("Unavailable: "..tostring(lens_err):sub(1,120))
+        lens.dolly=0; lens.pos=nil; pcall(nearclip.publish,0); lens.publish("Unavailable: "..tostring(lens_err):sub(1,120))
     end
     if not enabled("WuWaControls_Recording") then return end
     local ok,err=pcall(function()

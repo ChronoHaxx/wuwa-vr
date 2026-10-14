@@ -120,7 +120,7 @@ constexpr const char* sheet[][2] = {
     {N_("GENERAL"), N_("CAMERA")},
     {N_("L3 + R3    WuWa VR menu"), N_("L3 + RB    Game / fixed camera")},
     {N_("L3 + A     Recenter view / portal"), N_("L3 + Y/X   Fixed / first-person height")},
-    {N_("L3 + LT / F7   Portal on / off"), N_("L3 + RT    Diorama on / off (10x)")},
+    {N_("L3 + LT / F7   Portal on / off"), N_("L3 + RT    Diorama on / off")},
     {N_("LT + RT, R3: next view (hold: full VR)"), N_("LT + RT, L3: blur (hold: stereo screen)")},
     {N_("Double L3  Windows screenshot"), N_("LB + LT/RT Fixed camera farther / closer")},
     {N_("Double R3  Freecam on / off"), N_("Freecam: left stick moves, right looks")},
@@ -324,7 +324,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status,
+        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_closeup_near_clip, m_near_clip_now,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -489,7 +489,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
             {{N_("L3 + B"), N_("Show / hide game HUD and menus")}},
             {{N_("L3 + A"), N_("Recenter headset / portal")}},
             {{N_("L3 + LT / F7"), N_("Portal on / off")}},
-            {{N_("L3 + RT"), N_("Diorama on / off (10x)")}},
+            {{N_("L3 + RT"), N_("Diorama on / off")}},
             {{N_("LT + RT, then click R3"), N_("Next view: full VR, stereo screen, mono theatre")}},
             {{N_("LT + RT, then hold R3"), N_("Back to full VR (hold 0.8 s)")}},
             {{N_("LT + RT, then click L3"), N_("Blur (depth of field) on / off")}},
@@ -509,7 +509,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
         wuwa_ui::TextWrapped("Fully hold both triggers first. R3: click for the next view (full VR, stereo screen, mono theatre), hold 0.8 seconds to go back to full VR. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen. Release the stick before the triggers; release all controls before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
         wuwa_ui::TextWrapped("Mono preserves your saved stereo-screen choice; screen off exits both screen modes. Neither changes portal or normal world scale. Manual toggles take priority over automatic cinema for the current scene.");
-        wuwa_ui::TextWrapped("Diorama uses a temporary 10x scale with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
+        wuwa_ui::TextWrapped("Diorama uses a temporary miniature scale (Diorama scale on the WuWa VR menu's Quick page, 10x by default) with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
         ImGui::TreePop();
     }
     wuwa_ui::draw(*m_cards,"Controls cards (hold L3, or LT + RT)");

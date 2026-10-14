@@ -528,7 +528,8 @@ controllers' sharing style.
 
 ### Requests, not bugs
 
-- **A closer diorama distance.** Planned: closer steps.
+- **A closer diorama distance.** Test 15: a Diorama scale setting (2-10×, Quick page);
+  a gentler scale keeps a close game camera from crossing the eyes.
 - **A thinner portal.** The "vignette" a tester mentioned is the L3 + LT portal.
   Planned: a Cinema shape preset; today, use `WindowMode_PlaneWidth`,
   `WindowMode_PlaneHeight` and `WindowMode_LockAspect`.

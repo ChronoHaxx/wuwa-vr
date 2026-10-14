@@ -171,7 +171,7 @@ nlohmann::json context() {
     for (const char* key : {"VR_RenderingMethod", "VR_NativeStereoFix", "VR_ExtremeCompatibilityMode", "VR_2DScreenMode",
              "VR_MonoTheatreMode", "VR_HorizontalProjectionOverride", "VR_AutoCinema", "VR_DecoupledPitch",
              "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape", "WuWaControls_LensMatch",
-             "WuWaControls_LensNearest", "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
+             "WuWaControls_LensNearest", "WuWaControls_CloseUpNearClip", "VR_WuWaDioramaScale", "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
         if (auto* value = cached(key)) settings[key] = value->get();
     }
     if (auto* scale = resolution_scale()) settings["OpenXR_ResolutionScale"] = scale->get();
@@ -355,6 +355,14 @@ Item lens_follow_choice() {
         "Track the camera: the distance is measured at each cut, then follows only the game camera's own moves, so a focus "
         "change cannot move you. Fixed per shot: test 3g. Follow the focus: test 3h (moved with focus changes).",
         "WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"});
+}
+
+Item near_clip_slider() {
+    return setting_slider("Hide what's at your eyes",
+        "Story close-ups can put the game's camera right behind someone's head, so in VR it fills one eye. In those shots "
+        "nothing nearer than this is drawn. It stops short of the person the game focuses on. 10 cm is the game's own "
+        "value (off). Game camera in full VR only.",
+        "WuWaControls_CloseUpNearClip", 10.0f, 50.0f, 5.0f, "%.0f cm");
 }
 
 Item lens_status() {
@@ -556,11 +564,14 @@ Page quick_page() {
     page.items.push_back(camera_choice());
     page.items.push_back(controllers_toggle(vr));
     auto diorama = make(Kind::Toggle, "Diorama (miniature world)",
-        "Shows the world as a 10x miniature around you, with the portal on or off. Needs Native Stereo. This launch only.");
+        "Shows the world as a miniature around you, with the portal on or off. Needs Native Stereo. This launch only.");
     diorama.enabled = [vr] { return !vr->physical_gamepad_passthrough(); };
     diorama.get_bool = [vr] { return vr->is_diorama_enabled(); };
     diorama.set_bool = [vr](bool on) { vr->set_diorama_enabled(on); };
     page.items.push_back(std::move(diorama));
+    page.items.push_back(setting_slider("Diorama scale",
+        "How small the world gets in diorama. 10x is an action-figure view. If a close game camera crosses your eyes, try 3x to 5x.",
+        "VR_WuWaDioramaScale", 2.0f, 10.0f, 1.0f, "%.0fx"));
     page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear. More HUD options are on the HUD page.",
         "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
     page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
@@ -618,6 +629,7 @@ Page camera_page() {
             "in zoomed-in shots, so they frame people like the 2D view does."));
         page.items.push_back(lens_slider());
         page.items.push_back(lens_nearest_slider());
+        page.items.push_back(near_clip_slider());
         page.items.push_back(lens_status());
         break;
     }
@@ -658,6 +670,7 @@ Page cinema_page() {
     page.items.push_back(lens_nearest_slider());
     page.items.push_back(lens_subject_choice());
     page.items.push_back(lens_follow_choice());
+    page.items.push_back(near_clip_slider());
     page.items.push_back(lens_status());
     page.items.push_back(paragraph("Depth of field and camera effects", true));
     page.items.push_back(setting_toggle("Depth of field",

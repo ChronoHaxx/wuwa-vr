@@ -161,6 +161,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
         }
     } else if (backbuffer.Get() != real_backbuffer.Get() && m_game_tex.texture.Get() != backbuffer.Get()) {
         spdlog::info("[VR] Setting up game texture as reference to original");
+        m_world_was_ready = false; // a new eye source: its first frame is held back like a resumed world
 
         if (!m_game_tex.setup(device, backbuffer.Get(), DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM, L"Game Texture")) {
             spdlog::error("[VR] Failed to fully setup game texture.");
@@ -195,6 +196,7 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
 
         if (scene_capture_rt != nullptr && m_scene_capture_tex.texture.Get() != scene_capture_rt) {
             spdlog::info("[VR] Setting up scene capture texture as reference to original");
+            m_world_was_ready = false; // the second eye's source is new (world load): hold its first frame
 
             if (!m_scene_capture_tex.setup(device, scene_capture_rt, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_B8G8R8A8_UNORM, L"Scene Capture Texture")) {
                 spdlog::error("[VR] Failed to fully setup scene capture texture.");
@@ -1248,6 +1250,7 @@ void D3D12Component::on_post_present(VR* vr) {
 
 void D3D12Component::on_reset(VR* vr) {
     m_mono_openvr_ready = false;
+    m_world_was_ready = false;
     m_force_reset = true;
 
     auto runtime = vr->get_runtime();

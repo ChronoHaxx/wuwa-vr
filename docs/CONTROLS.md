@@ -127,7 +127,7 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 | L3 + B | Hide/show game UI, including game menus |
 | L3 + A | Recenter view and enabled portal; position reset is a separate option |
 | Hold L3, then fully squeeze LT; or F7 | Toggle the portal; release controls before repeating |
-| Hold L3, then fully squeeze RT | Toggle the temporary 10× diorama; release controls before repeating |
+| Hold L3, then fully squeeze RT | Toggle the temporary diorama (Diorama scale, 10× by default); release controls before repeating |
 | L3 + View | First person on/off |
 | L3 + RB | Game/fixed camera |
 | Double R3 | Freecam on/off |
@@ -344,8 +344,11 @@ shortcut. Leave HUD/mouse adjustment before using the diorama shortcut.
 Physical gamepad passthrough bypasses these controller shortcuts.
 
 The menu control remains **VR → WuWa Controls → Diorama mode (optional) →
-Miniature world (this launch only)**. Diorama temporarily uses the maximum **10× world scale** for
-a miniature view, with the portal on or off. It requires Native Stereo; AFR
+Miniature world (this launch only)**. Diorama temporarily uses the **Diorama scale**
+(WuWa VR menu, Quick page; `VR_WuWaDioramaScale`, 2-10×, default 10×) for a
+miniature view, with the portal on or off. 10× is the action-figure view; with
+a close game camera it can cross your eyes, so 3-5× is gentler. The scale is
+saved; the diorama switch itself is not. It requires Native Stereo; AFR
 disables it. No new keyboard binding is added.
 
 Turning it off returns to the current normal `VR_WorldScale`. The toggle never

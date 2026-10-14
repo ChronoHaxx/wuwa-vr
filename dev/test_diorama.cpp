@@ -1,6 +1,7 @@
 #include "../mod/uevr/src/utility/WuWaDiorama.hpp"
 
 #include <cassert>
+#include <cmath>
 #include <iostream>
 #include <thread>
 
@@ -55,5 +56,25 @@ int main() {
     { Scale::Draw next{scale, 0.875f}; assert(scale.effective(0.875f) == 0.875f); }
     Scale restarted;
     assert(!restarted.requested() && restarted.effective(0.875f) == 0.875f);
-    std::cout << "PASS: five normal scales, mid-pair toggles, nested captures, reset, manual edit, exception unwind, restart\n";
+    // The player's diorama scale: taken once per complete draw, clamped to 2x-10x.
+    Scale gentle;
+    assert(gentle.miniature() == 10.0f);
+    gentle.set_miniature(4.0f);
+    gentle.request(true);
+    {
+        Scale::Draw draw{gentle, 1.0f};
+        assert(gentle.effective(1.0f) == 4.0f);
+        std::thread ui([&] { gentle.set_miniature(7.0f); });
+        ui.join();
+        Scale::Draw second_eye{gentle, 1.0f};
+        assert(gentle.effective(1.0f) == 4.0f); // a change between the eyes waits for the next draw
+    }
+    { Scale::Draw next{gentle, 1.0f}; assert(gentle.effective(1.0f) == 7.0f); }
+    gentle.set_miniature(0.5f); assert(gentle.miniature() == 2.0f);
+    gentle.set_miniature(50.0f); assert(gentle.miniature() == 10.0f);
+    gentle.set_miniature(std::nanf("")); assert(gentle.miniature() == 10.0f);
+    gentle.request(false);
+    { Scale::Draw off{gentle, 1.0f}; assert(gentle.effective(1.0f) == 1.0f); }
+    std::cout << "PASS: five normal scales, mid-pair toggles, nested captures, reset, manual edit, exception unwind, restart, "
+                 "player diorama scale per draw and clamped\n";
 }

@@ -28,6 +28,7 @@
 #include "utility/WuWaStereoComparison.hpp"
 #include "utility/WuWaMonoNativeProjection.hpp"
 #include "utility/WuWaRunMarker.hpp"
+#include "utility/WuWaNearClip.hpp"
 
 #include "VR.hpp"
 #include "WindowMode.hpp"
@@ -1873,7 +1874,11 @@ void VR::on_pre_viewport_client_draw(void* viewport_client, void* viewport, void
 
     if (m_custom_z_near_enabled->value()) {
         SPDLOG_INFO_ONCE("Attempting to set custom z near");
+        wuwa_near_clip::applier.release();
         sdk::globals::get_near_clipping_plane() = m_custom_z_near->value();
+    } else if (wuwa_test::is_wuwa()) {
+        // Story close-ups: the camera script's per-shot near clip, or the game's own value.
+        wuwa_near_clip::applier.apply(sdk::globals::get_near_clipping_plane());
     }
 }
 
@@ -2854,7 +2859,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             ImGui::EndDisabled();
             if (is_using_afr())
                 wuwa_ui::TextWrapped("Diorama needs Native Stereo. Choose it under Stereo rendering compatibility.");
-            wuwa_ui::TextWrapped("Uses the maximum 10x world scale for an action-figure view. Turn off to return to your normal scale. Works with or without the portal window.");
+            wuwa_ui::TextWrapped("Shrinks the world by the Diorama scale (%.0fx, set on the WuWa VR menu's Quick page) for an action-figure view. Turn off to return to your normal scale. Works with or without the portal window.", m_diorama_scale->value());
             wuwa_ui::TextWrapped("Normal scale: %.3fx. Your saved scale and camera presets stay unchanged; intentional scale edits become the new normal value.", m_world_scale->value());
             wuwa_ui::TextWrapped("Head movement also scales up. Use Recenter if the view feels displaced. Starts off each launch and after reloading settings.");
         }
@@ -3088,7 +3093,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         m_world_scale->draw("World Scale");
         if (m_diorama.requested()) {
             wuwa_ui::FontScope font;
-            wuwa_ui::TextWrapped("Diorama is on at 10x. This slider edits the normal scale restored when you turn it off in WuWa Controls.");
+            wuwa_ui::TextWrapped("Diorama is on at %.0fx. This slider edits the normal scale restored when you turn it off in WuWa Controls.", m_diorama_scale->value());
         }
         m_depth_scale->draw("Depth Scale");
 

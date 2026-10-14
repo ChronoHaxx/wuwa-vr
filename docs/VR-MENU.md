@@ -227,6 +227,17 @@ since test 3f (closer than the 2D shot).
   unchanged.
 - **Where it applies:** only lenses of 60 degrees or less, in Game camera mode,
   in full VR.
+- **Hide what's at your eyes (test 15, `WuWaControls_CloseUpNearClip`, 10-50 cm,
+  default 20):** some close-ups put the game camera just behind a head, outside
+  the narrow 2D frame but inside the headset's wide view, so it filled one eye
+  (Rover on the Abby balcony: the head 10-20 cm from the right eye). In
+  close-ups the script raises the near clip plane to this distance, kept 10 cm
+  short of the game's focus, the centre trace and anyone found in the 2D frame
+  (after the close-up move), and never below the game's own 10 cm
+  (`utility/WuWaNearClip.hpp` applies it and restores the game's value when the
+  request stops or lapses after a second). The camera does not move. Logged as
+  `near_clip=` on each shot line and `[WuWaNearClip]` on changes; UEVR's own
+  Near Clip Plane option, when on, takes precedence.
 - **Diagnostics:** every shot is logged as `[WuWaLens] shot=... fov=...
   subject=... (kind) people=in-frame/all foreground=... focus=... trace=...
   dolly=...`, plus `people_error`/`trace_error` when a lookup fails. The menu

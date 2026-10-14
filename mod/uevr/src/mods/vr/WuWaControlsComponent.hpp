@@ -14,6 +14,7 @@
 #include "utility/WuWaMenuSignals.hpp"
 #include "utility/WuWaPosePair.hpp"
 #include "utility/WuWaAutoCinema.hpp"
+#include "utility/WuWaNearClip.hpp"
 #include "utility/WuWaPlayStationHid.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
 
@@ -221,6 +222,23 @@ private:
         void config_load(const utility::Config&, bool) override { set(""); }
         void config_save(utility::Config&) override {}
     } m_lens_status;
+    // Close-up near clip (utility/WuWaNearClip.hpp): in story close-ups nothing
+    // nearer than this is drawn, in cm; 10 is the game's own value (off). The
+    // camera script sends the per-shot value, already kept short of the person
+    // in focus, as a transient request.
+    const ModSlider::Ptr m_closeup_near_clip{ModSlider::create("WuWaControls_CloseUpNearClip", 10.0f, 50.0f, 20.0f)};
+    struct NearClipNow : ModString {
+        NearClipNow() : ModString{"WuWaControls_NearClipNow", "0"} {}
+        mutable std::mutex mutex;
+        std::string text{"0"};
+        std::string get() const override { std::scoped_lock lock{mutex}; return text; }
+        void set(const std::string& value) override {
+            { std::scoped_lock lock{mutex}; text = value.substr(0, 16); }
+            wuwa_near_clip::request(value);
+        }
+        void config_load(const utility::Config&, bool) override { set("0"); }
+        void config_save(utility::Config&) override {}
+    } m_near_clip_now;
 
     // Outside control recovery: resetting camera/input does not reset language.
     const ModString::Ptr m_language{ModString::create("WuWaLocale", "en")};

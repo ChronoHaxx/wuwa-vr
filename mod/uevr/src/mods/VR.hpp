@@ -474,6 +474,7 @@ public:
 
     auto begin_diorama_draw(bool supported) {
         if (!supported) m_diorama.request(false);
+        m_diorama.set_miniature(m_diorama_scale->value());
         return wuwa_diorama::Scale::Draw{m_diorama, m_world_scale->value()};
     }
 
@@ -1110,6 +1111,8 @@ private:
     const ModSlider::Ptr m_camera_up_offset{ ModSlider::create(generate_name("CameraUpOffset"), -4000.0f, 4000.0f, 0.0f) };
     const ModSlider::Ptr m_camera_fov_distance_multiplier{ ModSlider::create(generate_name("CameraFOVDistanceMultiplier"), 0.00f, 1000.0f, 0.0f) };
     const ModSlider::Ptr m_world_scale{ ModSlider::create(generate_name("WorldScale"), 0.01f, 10.0f, 1.0f) };
+    // Diorama's miniature scale (utility/WuWaDiorama.hpp); saved, unlike the diorama switch.
+    const ModSlider::Ptr m_diorama_scale{ ModSlider::create(generate_name("WuWaDioramaScale"), 2.0f, 10.0f, 10.0f) };
     wuwa_diorama::Scale m_diorama; // Session-only; deliberately absent from m_options.
     const ModSlider::Ptr m_depth_scale{ ModSlider::create(generate_name("DepthScale"), 0.01f, 1.0f, 1.0f) };
 
@@ -1243,6 +1246,7 @@ public:
             *m_camera_right_offset,
             *m_camera_up_offset,
             *m_world_scale,
+            *m_diorama_scale,
             *m_depth_scale,
             *m_custom_z_near,
             *m_custom_z_near_enabled,

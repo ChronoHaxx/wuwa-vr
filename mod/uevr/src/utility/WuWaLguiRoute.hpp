@@ -22,6 +22,7 @@ struct Target {
     bool native_stereo_fix{};
     bool independent_eyes{};
     bool world_labels_enabled{};
+    bool full_vr_ui{}; // neither the stereo screen nor the mono theatre
 };
 using Provider = Target (*)();
 struct Sample {

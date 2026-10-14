@@ -98,4 +98,12 @@ inline constexpr std::array<CodeRange, 22> menu_code_ranges{{
     {0x4116295, 0x8e, 0x41ee189bd6f0325cULL},
     {0x4116323, 0xa, 0x64f168621e06bd1eULL},
 }};
+// LGUICanvas GetProjectionMatrix, view-rect getter and GetViewportSize, whole
+// bodies (build 0x6aa96d2d, read 14 Oct 2026). Each asks the local player for
+// the left-eye projection data; see WuWaLguiViewport.hpp.
+inline constexpr std::array<CodeRange, 3> viewport_code_ranges{{
+    {0xc63750, 0x1b4, 0x39cdd7840045179cULL},
+    {0xc667c0, 0xfc, 0x42b37eb3416bd418ULL},
+    {0xc668c0, 0x10e, 0xa14df2f8c0878a40ULL},
+}};
 } // namespace wuwa_lgui_redirect::compatibility

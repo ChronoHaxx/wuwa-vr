@@ -2,6 +2,7 @@
 
 // Before windows.h (via Framework.hpp), whose min / max macros break std::min in it.
 #include "utility/WuWaMonoNativeProjection.hpp"
+#include "utility/WuWaLguiViewport.hpp"
 
 #include <imgui_internal.h>
 
@@ -701,13 +702,17 @@ Page hud_page() {
     page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear.", "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
     page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
         "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
-    page.items.push_back(setting_slider("HUD shape (full VR)",
-        "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. Raise it if round "
-        "icons still look like flat ovals. The stereo screen and mono theatre always keep the game's own shape.",
-        "UI_WuWaHudShape", 0.5f, 2.0f, 0.01f, "%.2f"));
-    page.items.push_back(action("Reset HUD shape", "Back to 1.33, the full VR default.", [] {
-        if (auto* v = typed<float>("UI_WuWaHudShape")) v->value() = 4.0f / 3.0f;
-    }));
+    // Only needed when the game lays out full VR's HUD at the eye's shape: with the
+    // window-size layout installed the HUD is the flat game's 16:9 (WuWaLguiViewport.hpp).
+    if (!wuwa_lgui_viewport::installed()) {
+        page.items.push_back(setting_slider("HUD shape (full VR)",
+            "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. Raise it if round "
+            "icons still look like flat ovals. The stereo screen and mono theatre always keep the game's own shape.",
+            "UI_WuWaHudShape", 0.5f, 2.0f, 0.01f, "%.2f"));
+        page.items.push_back(action("Reset HUD shape", "Back to 1.33, the full VR default.", [] {
+            if (auto* v = typed<float>("UI_WuWaHudShape")) v->value() = 4.0f / 3.0f;
+        }));
+    }
     page.items.push_back(setting_slider("Up / down", "Moves the HUD up or down.", "UI_Y_Offset", -1.5f, 1.5f, 0.05f, "%+.2f m"));
     page.items.push_back(setting_slider("Left / right", "Moves the HUD sideways.", "UI_X_Offset", -1.5f, 1.5f, 0.05f, "%+.2f m"));
     page.items.push_back(setting_toggle("HUD follows your head",
@@ -911,7 +916,8 @@ Page menu_page() {
 std::string layout_key() {
     // The language picker lists names drawn for the current language.
     return (steps.loaded() ? "plan " + std::to_string(steps.revision()) : std::string{"no plan"}) + ", camera " +
-        std::to_string(camera_mode()) + ", language " + wuwa_l10n::language();
+        std::to_string(camera_mode()) + ", language " + wuwa_l10n::language() +
+        (wuwa_lgui_viewport::installed() ? ", window-size UI" : "");
 }
 
 void refresh_pages() {

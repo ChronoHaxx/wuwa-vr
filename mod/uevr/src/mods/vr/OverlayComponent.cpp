@@ -6,6 +6,7 @@
 #include "../VR.hpp"
 #include "../WindowMode.hpp"
 #include "utility/PortalHudFit.hpp"
+#include "utility/WuWaLguiViewport.hpp"
 #include "../utility/ImGui.hpp"
 
 #include "OverlayComponent.hpp"
@@ -1152,6 +1153,8 @@ std::optional<std::reference_wrapper<XrCompositionLayerBaseHeader>> OverlayCompo
 float OverlayComponent::hud_shape() const {
     auto& vr = VR::get();
     if (vr->is_using_2d_screen() || vr->is_using_mono_theatre()) return 1.0f;
+    // The game lays out full VR's UI at the window size too (WuWaLguiViewport.hpp).
+    if (wuwa_lgui_viewport::active()) return 1.0f;
     return std::clamp(m_slate_shape->value(), 0.5f, 2.0f);
 }
 

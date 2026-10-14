@@ -123,7 +123,7 @@ REC badge with the elapsed time shows while recording.
    distance, **depth of field (experiment)**, the cinematic scene note,
    automatic cinematic screen and what story scenes use, matched framing.
 5. **HUD:** size, distance, **HUD shape (full VR)** (`UI_WuWaHudShape`,
-   default 1.33; see below), up / down, left / right, follow head, refresh
+   default 1.33; shown only when the window-size UI below cannot install), up / down, left / right, follow head, refresh
    layout, controls cards (on / off, keep open, size, height, distance) and
    view hints.
 6. **Controllers:** VR controllers on / off with a live status line (which
@@ -162,7 +162,18 @@ same page and, where it still exists, the same row stay selected. Live rows
 (status lines, the run line) return catalog English or text filled by
 `wuwa_ui::format`, and are drawn in the current language.
 
-**Why the HUD looks squashed in full VR only.** The log shows the UI pass
+**Full VR uses the flat game's 16:9 UI (1.2.3).** Kuro's LGUICanvas sizes the
+screen canvas from the local player's left-eye projection data, where stock
+LGUI asks for the window size, so in full VR the layout, the UI projection and
+the mouse ray took the eye's shape: cropped story pictures, the squash below,
+and a cursor that picked the wrong item. `WuWaLguiViewport.hpp` replaces that
+rect with the window size in its three readers (canvas size, the projection's
+inlined copy, the view-rect getter), only in full VR with the UI redirect on.
+The HUD is then the flat game's 16:9 layout and the slate keeps 1.0; the HUD
+shape row is hidden. If the code fingerprints differ (a game update), the hooks
+stay off and the behaviour below applies.
+
+**Why the HUD looked squashed in full VR only (before 1.2.3).** The log shows the UI pass
 drawn for the square eye (`stage3_fit original=0,0,3292,3292`) and fitted into
 the 2560 x 1440 HUD image. WuWa lays its UI out for screens no narrower than
 4:3 (it supports 4:3 tablets), so the square eye gets a 4:3 layout, which the

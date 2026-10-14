@@ -5,6 +5,7 @@
 // Uses the game's external-texture registration, not copied graph objects.
 #include "WuWaLguiRoute.hpp"
 #include "WuWaLguiCompatibility.hpp"
+#include "WuWaLguiViewport.hpp"
 #include "WuWaLguiTargetPolicy.hpp"
 #include "WuWaStage0Payload.hpp"
 #include "WuWaWorldLabelStereo.hpp"
@@ -58,6 +59,7 @@ struct State {
     safetyhook::MidHook menu_pass{};
     safetyhook::MidHook stage0_construct{}, stage0_dispatch{};
     safetyhook::InlineHook world_setup{};
+    std::array<safetyhook::MidHook, 3> viewport{};
     std::atomic<uint64_t> world_calls{}, world_prepared{}, world_layout_skips{}, world_guard_skips{};
     std::atomic<uint64_t> world_caller_skips{}, world_disabled_skips{}, world_mode_skips{}, world_samples{};
     std::array<std::atomic<uint64_t>,16> next_stage0_sample{};
@@ -824,10 +826,51 @@ inline void install_menu(State& s, HMODULE executable, uint32_t image_size) noex
     } catch (...) { disable_menu(s); }
 }
 
+// Each site is the instruction after the left-eye GetProjectionData call,
+// where the function starts reading the constrained view rect at rsp + offset.
+inline constexpr std::array<std::pair<uintptr_t, uint32_t>, 3> viewport_sites{{
+    {0xc63849, 0xe0}, // GetProjectionMatrix: inlined canvas size
+    {0xc66881, 0xd0}, // view-rect getter: mouse ray, scaler
+    {0xc66986, 0xd0}, // GetViewportSize: scaler layout, Project3DToScreen
+}};
+
+inline void disable_viewport(State& s) noexcept {
+    wuwa_lgui_viewport::state().installed.store(false, std::memory_order_release);
+    wuwa_lgui_viewport::update(false, 0, 0);
+    for (auto& hook : s.viewport) {
+        try { if (hook && !hook.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
+    }
+}
+
+inline void install_viewport(State& s, HMODULE executable, uint32_t image_size) noexcept {
+    try {
+        checked::require(verify_code(executable, image_size, compatibility::viewport_code_ranges, "lgui-viewport"),
+            "LGUI canvas code changed; full VR keeps the eye-shaped UI");
+        const std::array<safetyhook::MidHookFn, 3> callbacks{
+            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[0].second); },
+            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[1].second); },
+            +[](safetyhook::Context& c) { wuwa_lgui_viewport::rewrite(c.rsp, viewport_sites[2].second); }};
+        for (size_t i = 0; i < viewport_sites.size(); ++i) {
+            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + viewport_sites[i].first),
+                callbacks[i], safetyhook::MidHook::StartDisabled);
+            checked::require(hook.has_value(), "Cannot create LGUI viewport hook");
+            s.viewport[i] = std::move(*hook);
+        }
+        for (auto& hook : s.viewport) checked::require(hook.enable().has_value(), "Cannot enable LGUI viewport hook");
+        wuwa_lgui_viewport::state().installed.store(true, std::memory_order_release);
+        spdlog::info("[WuWaLguiViewport] installed sites={:x},{:x},{:x}; full VR UI uses the window size",
+            viewport_sites[0].first, viewport_sites[1].first, viewport_sites[2].first);
+    } catch (const std::exception& error) {
+        disable_viewport(s);
+        try { spdlog::error("[WuWaLguiViewport] unavailable: {}", error.what()); } catch (...) {}
+    } catch (...) { disable_viewport(s); }
+}
+
 // Caller holds administration. Never hold callbacks exclusively while
 // SafetyHook suspends/relocates threads during disable.
 inline void disable(State& s) noexcept {
     s.active.store(false, std::memory_order_release);
+    disable_viewport(s);
     disable_menu(s);
     disable_stage0_probe(s);
     try { if (s.world_setup && !s.world_setup.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
@@ -906,6 +949,7 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
             checked::require(s.pass.enable().has_value(), "Cannot enable pass hook");
             checked::require(s.setup.enable().has_value(), "Cannot enable setup hook");
             install_menu(s, executable, nt.OptionalHeader.SizeOfImage);
+            install_viewport(s, executable, nt.OptionalHeader.SizeOfImage);
             // Fingerprints include the unmodified stage-0 execution body; do
             // this before installing its optional recording mid-hooks.
             if(request.value("repair_world_labels",false)) install_world_labels(s,executable,nt.OptionalHeader.SizeOfImage);
@@ -915,6 +959,12 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                 mode, s.base, setup_rva, wrap_rva, register_rva);
         }
         if (!s.setup) return;
+        {
+            // Full VR only: the stereo screen and mono theatre already see the window size.
+            const auto target = s.provider ? s.provider() : wuwa_lgui_route::Target{};
+            wuwa_lgui_viewport::update(s.active.load(std::memory_order_acquire) && s.mode == Mode::redirect &&
+                target.redirect_enabled && target.full_vr_ui, target.width, target.height);
+        }
         const auto now = GetTickCount64();
         if (now - s.last_summary >= 5000) {
             s.last_summary = now;
@@ -933,6 +983,12 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                 target.menu_redirect_enabled, target.native_stereo_fix, s.menu_candidates.load(), s.menu_redirected.load(),
                 s.menu_fitted.load(), s.main_family_target.load(), s.capture_family_target.load(), s.menu_capture_suppressed.load(),
                 s.menu_capture_pending.load(), s.menu_eye_unknown.load());
+            {
+                const auto& v = wuwa_lgui_viewport::state();
+                const auto size = v.size.load(std::memory_order_relaxed);
+                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={}", v.installed.load(),
+                    size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed));
+            }
             spdlog::info("[WuWaLguiRedirect] stage3 ready={} calls={} empty={} redirected={} fitted={} capture_suppressed={} capture_pending={}",
                 s.menu_ready.load(), s.stage3_calls.load(), s.stage3_empty.load(), s.stage3_redirected.load(), s.stage3_fitted.load(),
                 s.stage3_capture_suppressed.load(), s.stage3_capture_pending.load());

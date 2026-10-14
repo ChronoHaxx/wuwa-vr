@@ -1,12 +1,12 @@
-WUWA VR — 1.2.1 BETA / GAME 3.7
-Release: beta-1-2-1 | VR build: godray-menu-1-2-1
+WUWA VR — 1.2.2 BETA / GAME 3.7
+Release: beta-1-2-2 | VR build: steam-identity-1-2-2
 
 Run WuWa-VR-Setup.exe, then open WuWa VR from the Start menu.
 First VR installation needs internet; no separate Python install is needed.
 
 01 Game: choose your Steam or Kuro installation. For Steam, select
    Wuthering Waves.exe if browsing and sign into Steam first.
-02 WuWa VR: accept the account-risk notice and install 1.2.1 beta.
+02 WuWa VR: accept the account-risk notice and install 1.2.2 beta.
 03 Headset or simulator: start your headset software and select a valid
    OpenXR runtime, or explicitly choose Use bundled simulator.
    Select Launch in VR. Steam opens through Steam; for Kuro, press Play.
@@ -35,7 +35,7 @@ launcher workers requires explicit selection and confirmation. Game, Steam,
 headset/runtime and injector processes are excluded. Close launcher only does
 not claim that background work stopped. Developer tools holds recording.
 
-The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill). The 1.2.1 fixes (ambient occlusion in both eyes, the storm-sky god rays, the live world behind full-screen menus, the journey picture on the menu panel and the HUD after a view switch) were measured on the OpenXR simulator and played there by the owner; a headset check is still pending. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
+The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill) and played 1.2.1 in the headset with the Kuro launcher copy of the game. 1.2.2 was checked on the OpenXR simulator with both the Steam copy and the Kuro launcher copy: on both, the UI redirect starts, the stereo fixes pass their code checks, and the HUD comes back at the right size after the stereo screen and mono theatre, in the open world and in dialogue (on the Kuro copy also across nine simulated headsets). 1.2.2 has not been played in a headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
 
 The desktop launcher is MIT open source. Mod source changes are public;
 upstream and community components retain their own licences. Read LICENSE.txt
@@ -47,10 +47,10 @@ Not approved by Kuro Games. Do not disable security software.
 Website: https://chronohaxx.github.io/wuwa-vr/
 Source: https://github.com/ChronoHaxx/wuwa-vr
 
-鸣潮 VR — 1.2.1 测试版 / 游戏 3.7
+鸣潮 VR — 1.2.2 测试版 / 游戏 3.7
 
 运行安装程序后，从开始菜单打开 WuWa VR。首次安装 VR 包需要网络，无需另装 Python。
-01 选择 Steam 或库洛游戏；02 阅读风险提示并安装 1.2.1 beta；
+01 选择 Steam 或库洛游戏；02 阅读风险提示并安装 1.2.2 beta；
 03 启动头显软件并选择有效运行时，或明确选择内置模拟器，然后启动 VR。
 Steam 通过 Steam 启动；库洛用户还需在库洛启动器点击开始游戏。
 
@@ -70,7 +70,7 @@ L3 + R3 打开鸣潮 VR 菜单（激光、手柄或鼠标）；UEVR 完整设置
 注入器不在停止目标内。仅关闭启动器窗口不表示后台任务已停止。
 开发工具保存录像和高级诊断功能。
 
-开发者已在头显中（Valve Index 手柄配 Bigscreen Beyond；Meta Quest Pro 配 Reality Runner 跑步机）试玩 1.2.0。1.2.1 的修复（双眼一致的环境光遮蔽、风暴天空的光束、全屏菜单背后实时渲染的世界、旅程菜单图片移到菜单面板、切换视图后的 HUD）已在 OpenXR 模拟器中测量并由开发者在模拟器中试玩，仍待头显确认。“移动菜单”时 VR 摇杆暂时无法调节距离（请用“菜单距离”）。许多对话特写仍比 2D 镜头更远。
+开发者已在头显中（Valve Index 手柄配 Bigscreen Beyond；Meta Quest Pro 配 Reality Runner 跑步机）试玩 1.2.0，并用库洛官方启动器版本的游戏在头显中试玩了 1.2.1。1.2.2 已在 OpenXR 模拟器中分别用 Steam 版和库洛官方启动器版检查：两者的 UI 重定向均能启动，立体修复均通过代码校验，从立体屏幕和单眼影院切回后，HUD 在开放世界和对话中都恢复正确尺寸（库洛版还在九种模拟头显上检查过）。1.2.2 尚未在头显中试玩。“移动菜单”时 VR 摇杆暂时无法调节距离（请用“菜单距离”）。许多对话特写仍比 2D 镜头更远。
 启动器采用 MIT 开源许可；模组改动源代码公开，上游组件保留各自许可。
 病毒扫描报告针对精确文件哈希，不保证安全或账号兼容性。
 非官方注入可能导致反作弊或账号限制，未经库洛批准。不要禁用安全软件。

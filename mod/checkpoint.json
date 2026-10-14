@@ -1,37 +1,37 @@
 {
   "schema": 3,
-  "build": "godray-menu-1-2-1",
+  "build": "steam-identity-1-2-2",
   "privateCandidate": false,
-  "launcherVersion": "1.2.1",
+  "launcherVersion": "1.2.2",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "e41bfe2f01c8f6c69cac479578cff3b140f2ffcc7a2c78631ebe24ea71e86ae4",
-  "frozenPatchSha256": "8710053a890c9abc30c4a5a1ea3bede6e94801243c6e74edce36f77b72afb431",
-  "sourceReconstructedTree": "d9cda3c5f76b1062e886e0d29a6a8f16b742ab08",
-  "buildCompleted": "2026-10-13T16:10:35+0100",
+  "backendSha256": "f474b942bcf242cb10b363ea913d4c27dec4538a31e920b6fedd2a365ed4dd73",
+  "frozenPatchSha256": "92bf6f7409425052e6484824d2246b40767bab7f5188f841021854b8fa17f2a6",
+  "sourceReconstructedTree": "311ad38d079543a91f5574075bb92aff57d75499",
+  "buildCompleted": "2026-10-14T00:32:06+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 52814324,
-    "sha256": "8d7287830d8a3abf505d2c9cce1de82436ea6c911a997158be953241debec8fb",
+    "bytes": 52805213,
+    "sha256": "fbe8d08ce58d857cedf736ec0a3263d60edf12ed83e766aa9e0136e6d8270449",
     "public": true
   },
-  "liveAcceptance": "1.2.0 played in the headset by the owner. The 1.2.1 fixes (AO in both eyes, storm-sky god rays, live world behind full-screen menus, journey picture on the panel, HUD after a view switch) measured on the OpenXR simulator and played there by the owner (test 6). Pending: headset check of the 1.2.1 fixes, Windows 11 Steam PC retest, PlayStation hardware and broad headset compatibility.",
+  "liveAcceptance": "1.2.0 and 1.2.1 played in the headset by the owner (1.2.1 with the Kuro launcher copy). 1.2.2 (test 11) checked on the OpenXR simulator with both the Steam and the Kuro launcher copies: the UI redirect starts, the stereo code checks pass, and the HUD resyncs after the stereo screen and mono theatre in the open world and in dialogue on both (Kuro also across nine simulator headset profiles, test 10). Pending: headset play of 1.2.2, Windows 11 Steam PC retest, PlayStation hardware and broad headset compatibility.",
   "previousPublicRelease": {
-    "tag": "beta-1-2-0",
-    "backendSha256": "917388ee149812183f60d9dabf8717790cb6d83dbbb8b38c95063bc177de09e5"
+    "tag": "beta-1-2-1",
+    "backendSha256": "e41bfe2f01c8f6c69cac479578cff3b140f2ffcc7a2c78631ebe24ea71e86ae4"
   },
-  "sourceIdentity": "1.2.0 plus: AO with a symmetric eye projection while on; Kuro god-ray pass in the eye frustum (utility/WuWaGodRay); full-screen menu backgrounds on the UI panel (utility/WuWaLguiRedirect); r.CacheSceneColor.Enable kept at 0 (utility/WuWaSceneCache); HUD root fitted after a view switch (lua/wuwa_hud_refresh). See docs/launch-kit/GODRAY-MENU-1.2.1.md and PR #17. VR menu, Steam guard, resize guard, DX12 handoff and graphics policy retained.",
+  "sourceIdentity": "1.2.1 plus: the game identity no longer includes the PE image size, so the Steam copy (0xad1c000) is accepted with the code fingerprints deciding (utility/WuWaCodeCompatibility, WuWaLguiRedirect, WuWaLodProbe); the AO symmetric eye projection follows r.AmbientOcclusionLevels (mods/vr/CVarManager, VR.hpp) and AO is on by default with a one-time switch-on marker (mods/vr/WuWaControlsComponent); the HUD scaler viewport cache is resynced in full VR with a once-a-second check (mod/lua/wuwa_hud_refresh.lua); the stereo screen keeps its overlay and HUD composite rules when the GUI is hidden (mods/vr/OverlayComponent, D3D11Component, D3D12Component); the launcher installs newer public packages itself with Back to the previous one (launcher/native/MainWindow.cs). See docs/launch-kit/STEAM-1.2.2.md. 1.2.1 fixes, VR menu, Steam guard, resize guard, DX12 handoff and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "godray-menu-1-2-1",
+  "rendererBuild": "steam-identity-1-2-2",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-1-2-1",
+  "releaseTag": "beta-1-2-2",
   "sdkPatchSha256": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
   "sdkReconstructedTree": "0ad1702a10fec58469ec88265fa7297365fffab6",
-  "launcherSha256": "5abef21af25440b96e37493c3a3928615270c8565c0739739862e6b87768c24f",
-  "setupSha256": "0b44973f82a3ccc2deb4b4951ea59796cf5662f57477285ad6be3bbc179059e7"
+  "launcherSha256": "80c7841961227757082f0dc67d3b9d870372c70c4e48be2e75424cb7656079b3",
+  "setupSha256": "482c04415d8d8b2d9f30f9e0f3ea02048d105bb79a96e12c058de50441b07c64"
 }

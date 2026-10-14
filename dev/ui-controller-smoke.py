@@ -5,18 +5,22 @@ Drives a fixed controller route (Terminal pages and shortcuts, Quests, Journey L
 cursor in each corner, B back to the world) and records, per press, how much the screen changed
 (mean absolute difference of 800 px backbuffer captures). In the chapter view it checks that the
 LGUI pointer ray lands under the pointer. With --ab it runs the route twice in one session: with the
-hidden WuWaUiWindowSize off (1.2.2's eye-shaped full VR UI, the baseline) and on (the candidate),
-and flags every press that changes the screen in one run and not the other. A press that only fails
-in the candidate is a regression, not flaky input.
+hidden VR_WuWaUiWindowSize off (1.2.2's eye-shaped full VR UI, the baseline) and on (the candidate),
+and flags every press that reacts in one and not the other. A press that only fails in the candidate
+is a regression, not flaky input. Only presses marked portable are compared: the d-pad route and the
+A presses depend on the layout (the eye-shaped Terminal fits on one page, so RB/LB do nothing there).
+Without --ab the route runs --repeat times (default 2) on the current build and every judged press
+must react in every run; one-off game overlays (a "Connection error" reconnect) then show up as a run
+that disagrees. Each run writes <tag>-sheet.jpg: look at it before trusting the numbers.
 
 Each press is judged by LGUI's event system (its focused/selected item changes when a screen opens,
 closes or moves focus) and by a screen change above the noise of two input-free captures. The game
 window must stay in the foreground: UE ignores the pad otherwise, and the script stops if it is not.
 
-Start in the open world, full VR, no menu open, controller untouched. Changes only WuWaUiWindowSize
+Start in the open world, full VR, no menu open, controller untouched. Changes only VR_WuWaUiWindowSize
 and VR_2DScreenMode (a view round trip makes the HUD check lay out again) and restores both; never
 saves the UEVR config.
-    python dev/ui-controller-smoke.py OUT_DIR [--ab]      (Python with Pillow)
+    python dev/ui-controller-smoke.py OUT_DIR [--ab] [--repeat N]      (Python with Pillow)
 """
 import base64
 import ctypes
@@ -141,29 +145,30 @@ def relayout():
     setting('VR_2DScreenMode', 'false'); time.sleep(4.0)
 
 
-# (label, press, wait seconds, kind): kind 'big' = a screen opens or closes, 'change' = a page or focus
-# moves, None = not judged. Presses are gamepad state dicts for /api/input/gamepad.
+# (label, press, wait seconds, kind, portable): kind 'big' = a screen opens or closes, 'change' = a page
+# or focus moves, None = not judged; portable = means the same in every layout (compared by --ab).
+# Presses are gamepad state dicts for /api/input/gamepad.
 ROUTE = [
-    ('stick: controller mode', {'leftStick': {'x': 0.3, 'y': 0}}, 1.0, None),
-    ('Start: Terminal', {'buttons': {'start': True}}, 2.5, 'big'),
-    ('RB: page 2', {'buttons': {'rb': True}}, 1.5, 'change'),
-    ('LB: page 1', {'buttons': {'lb': True}}, 1.5, 'change'),
-    ('X: mail', {'buttons': {'x': True}}, 2.5, 'big'),
-    ('B: back from mail', {'buttons': {'b': True}}, 2.0, 'big'),
-    ('RB: page 2 again', {'buttons': {'rb': True}}, 1.5, 'change'),
-    ('d-pad down', {'buttons': {'dpadDown': True}}, 1.0, 'change'),
-    ('d-pad right', {'buttons': {'dpadRight': True}}, 1.0, 'change'),
-    ('d-pad right', {'buttons': {'dpadRight': True}}, 1.0, 'change'),
-    ('d-pad right', {'buttons': {'dpadRight': True}}, 1.0, 'change'),
-    ('A: open focused (Quests)', {'buttons': {'a': True}}, 2.5, 'big'),
-    ('Y: Journey Log', {'buttons': {'y': True}}, 2.5, 'big'),
-    ('A: open chapter', {'buttons': {'a': True}}, 2.5, 'big'),
-    ('CURSOR', None, 0, None),
-    ('B: chapter -> Journey Log', {'buttons': {'b': True}}, 2.5, 'big'),
-    ('B: Journey Log -> Quests', {'buttons': {'b': True}}, 2.5, 'big'),
-    ('B: quest list -> tabs', {'buttons': {'b': True}}, 1.5, None),
-    ('B: Quests -> Terminal', {'buttons': {'b': True}}, 2.5, 'big'),
-    ('B: Terminal -> world', {'buttons': {'b': True}}, 2.5, 'big'),
+    ('stick: controller mode', {'leftStick': {'x': 0.3, 'y': 0}}, 1.0, None, False),
+    ('Start: Terminal', {'buttons': {'start': True}}, 2.5, 'big', True),
+    ('RB: page 2', {'buttons': {'rb': True}}, 1.5, 'change', False),
+    ('LB: page 1', {'buttons': {'lb': True}}, 1.5, 'change', False),
+    ('X: mail', {'buttons': {'x': True}}, 2.5, 'big', True),
+    ('B: back from mail', {'buttons': {'b': True}}, 2.0, 'big', True),
+    ('RB: page 2 again', {'buttons': {'rb': True}}, 1.5, 'change', False),
+    ('d-pad down', {'buttons': {'dpadDown': True}}, 1.0, 'change', False),
+    ('d-pad right', {'buttons': {'dpadRight': True}}, 1.0, 'change', False),
+    ('d-pad right', {'buttons': {'dpadRight': True}}, 1.0, 'change', False),
+    ('d-pad right', {'buttons': {'dpadRight': True}}, 1.0, 'change', False),
+    ('A: open focused (Quests)', {'buttons': {'a': True}}, 2.5, 'big', False),
+    ('Y: Journey Log', {'buttons': {'y': True}}, 2.5, 'big', False),
+    ('A: open chapter', {'buttons': {'a': True}}, 2.5, 'big', False),
+    ('CURSOR', None, 0, None, False),
+    ('B: chapter -> Journey Log', {'buttons': {'b': True}}, 2.5, 'big', False),
+    ('B: Journey Log -> Quests', {'buttons': {'b': True}}, 2.5, 'big', False),
+    ('B: quest list -> tabs', {'buttons': {'b': True}}, 1.5, None, False),
+    ('B: Quests -> Terminal', {'buttons': {'b': True}}, 2.5, 'big', False),
+    ('B: Terminal -> world', {'buttons': {'b': True}}, 2.5, 'big', False),
 ]
 NOISE_FACTOR = 2.5  # a press "changes the screen" when the change exceeds 2.5x the input-free noise
 
@@ -198,7 +203,7 @@ def run(out, tag):
     canvas, cache = ui_sizes()
     system = event_system()
     results = {'canvas': canvas, 'scaler_cache': cache, 'steps': [], 'cursor': None}
-    for i, (label, press, wait, kind) in enumerate(ROUTE):
+    for i, (label, press, wait, kind, portable) in enumerate(ROUTE):
         require_front()
         if label == 'CURSOR':
             results['cursor'] = cursor_corners(out, tag, canvas)
@@ -216,9 +221,16 @@ def run(out, tag):
         reacted = focus_changed or change > NOISE_FACTOR * noise
         ok = None if kind is None else reacted
         results['steps'].append({'step': label, 'change': round(change, 2), 'noise': round(noise, 2),
-                                 'focus_changed': focus_changed, 'kind': kind, 'ok': ok})
+                                 'focus_changed': focus_changed, 'kind': kind, 'ok': ok, 'portable': portable})
         verdict = '' if ok is None else ('ok' if ok else 'NO EFFECT')
         print(f'  [{tag}] {label:28s} change {change:6.2f} noise {noise:5.2f} focus {"moved" if focus_changed else "same "} {verdict}', flush=True)
+    frames = sorted(out.glob(f'{tag}-[0-9][0-9].jpg'))
+    sheet = Image.new('RGB', (320 * 5, 180 * ((len(frames) + 4) // 5)), (30, 30, 30))
+    for k, f in enumerate(frames):
+        im = Image.open(f).convert('RGB').resize((320, 180))
+        ImageDraw.Draw(im).text((4, 4), f.stem.split('-')[-1], fill=(255, 0, 0))
+        sheet.paste(im, ((k % 5) * 320, (k // 5) * 180))
+    sheet.save(out / f'{tag}-sheet.jpg')
     return results
 
 
@@ -228,20 +240,29 @@ def main():
     require_front()
     report = {'started': time.strftime('%Y-%m-%d %H:%M:%S'), 'runs': {}}
     try:
-        modes = [('baseline', 'false'), ('candidate', 'true')] if ab else [('current', None)]
+        repeat = int(sys.argv[sys.argv.index('--repeat') + 1]) if '--repeat' in sys.argv else 2
+        modes = [('baseline', 'false'), ('candidate', 'true')] if ab else [(f'run{n + 1}', None) for n in range(repeat)]
         for tag, value in modes:
             if value is not None:
-                setting('WuWaUiWindowSize', value); relayout()
+                setting('VR_WuWaUiWindowSize', value); relayout()
             canvas, cache = ui_sizes()
             print(f'{tag}: canvas viewport {canvas}, scaler cache {cache}', flush=True)
+            # The baseline must really be the eye-shaped UI and the candidate the window size,
+            # with the scaler laid out for it; otherwise the comparison proves nothing.
+            if cache != canvas:
+                raise SystemExit(f'{tag}: scaler cache {cache} does not match the canvas {canvas}; layout stale')
+            if value == 'false' and canvas[0] * 9 == canvas[1] * 16:
+                raise SystemExit(f'{tag}: canvas is still 16:9 {canvas}; VR_WuWaUiWindowSize did not take effect')
+            if value == 'true' and canvas[0] * 9 != canvas[1] * 16:
+                raise SystemExit(f'{tag}: canvas {canvas} is not the 16:9 window size')
             report['runs'][tag] = run(out, tag)
     finally:
         if ab:
-            setting('WuWaUiWindowSize', 'true'); relayout()
+            setting('VR_WuWaUiWindowSize', 'true'); relayout()
     if ab:
         base, cand = report['runs']['baseline']['steps'], report['runs']['candidate']['steps']
-        report['regressions'] = [c['step'] for b, c in zip(base, cand) if b['ok'] and c['ok'] is False]
-        report['fixed'] = [c['step'] for b, c in zip(base, cand) if b['ok'] is False and c['ok']]
+        report['regressions'] = [c['step'] for b, c in zip(base, cand) if c['portable'] and b['ok'] and c['ok'] is False]
+        report['fixed'] = [c['step'] for b, c in zip(base, cand) if c['portable'] and b['ok'] is False and c['ok']]
     for tag, r in report['runs'].items():
         bad = [s['step'] for s in r['steps'] if s['ok'] is False]
         errs = [c['ray_error_px'] for c in r['cursor'] or [] if c['ray_error_px'] is not None]

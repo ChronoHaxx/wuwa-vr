@@ -74,8 +74,10 @@ local function prop(name, kind_name, nxt)
     return {get_fname = function() return named(name) end, get_next = function() return nxt end,
         get_class = function() return {get_fname = function() return named(kind_name) end} end}
 end
+local PICTURE = "Class /Script/LGUI.UITexture"
 local function plot_fixture(protocol)
-    local f = {objects = {}, lookups = {}, calls = 0, performing = true, samples = {}, clock = 1, generation = 0}
+    local f = {objects = {}, lookups = {}, calls = 0, performing = true, samples = {}, clock = 1, generation = 0,
+        textures = {}, scans = 0}
     local function object(name, outer)
         local o = {name = name, outer = outer}; f.objects[#f.objects + 1] = o; local id = #f.objects
         function o:get_address() return id end
@@ -100,14 +102,22 @@ local function plot_fixture(protocol)
         return name == "IsInPerformingPlot" and {get_child_properties = function() return f.signature end} or nil
     end
     function f.plot_class:get_class_default_object() return f.cdo end
+    f.object, f.picture_class = object, object(PICTURE)
     f.values = {VR_AutoCinema = "false", WuWaControls_StoryLayoutDetect = "true",
         WuWaControls_AutoCinemaSample = protocol or "lease-v2", WuWaControls_AutoCinemaStatus = "test", WuWaControls_AutoCinemaProducer = "0"}
     local module = assert(loadfile(module_path))()
     f.module = module.new({api = {
             to_uobject = function(_, id) return f.objects[id] end,
             get_engine = function() return engine end,
-            find_uobject = function(_, name) f.lookups[#f.lookups + 1] = name; return name == PLOT and f.plot_class or nil end},
-        types = {UObjectHook = {get_objects_by_class = function() return {} end}},
+            find_uobject = function(_, name)
+                f.lookups[#f.lookups + 1] = name
+                if name == PLOT then return f.plot_class end
+                return name == PICTURE and f.picture_class or nil
+            end},
+        types = {UObjectHook = {get_objects_by_class = function(c)
+            if c ~= f.picture_class then return {} end
+            f.scans = f.scans + 1; return f.textures
+        end}},
         get = function(key) if key == "WuWaControls_Clock" then return tostring(f.clock) end; return f.values[key] end,
         set = function(key, value)
             if key == "WuWaControls_AutoCinemaProducer" then
@@ -135,4 +145,80 @@ test("an unexpected plot query signature is unknown and never called", function(
     f.signature = prop("__WorldContext", "ObjectProperty", prop("Extra", "IntProperty", prop("ReturnValue", "BoolProperty")))
     f:tick(); assert(f.calls == 0 and f:last().known & 4 == 0 and f:last().detail:find("signature", 1, true))
 end)
-print("Story layout detection tests passed (with plot): " .. passed)
+
+-- Story pictures (lease-v3, automatic cinema only): the plot view's SprPhoto, found again per dialogue.
+local WIDGET = {displayName = "StrProperty", AttachParent = "ObjectProperty", Alpha = "FloatProperty",
+    texture = "ObjectProperty", bIsUIActive = "BoolProperty"}
+local function widget(f, name, parent)
+    local o = f.object(name, f.world)
+    o.displayName, o.AttachParent, o.Alpha, o.bIsUIActive = name, parent, 0, true
+    o.get_class = function() return {find_property = function(_, key) return WIDGET[key] and prop(key, WIDGET[key]) or nil end} end
+    return o
+end
+-- ScreenSpaceUIRoot > ... > UiView_Plot > PnlSafeZone > PnlAdjust > SprPhoto, after `fillers` other widgets.
+local function plot_view(f, fillers, view_name)
+    for i = 1, fillers or 0 do f.textures[#f.textures + 1] = widget(f, "SprIcon" .. i) end
+    local view = widget(f, view_name or "UiView_Plot", widget(f, "LayerItem"))
+    local photo = widget(f, "SprPhoto", widget(f, "PnlAdjust", widget(f, "PnlSafeZone", view)))
+    photo.texture = f.object("T_CommonDefault_UI")
+    f.textures[#f.textures + 1] = photo
+    return photo
+end
+local function show(f, photo) photo.Alpha, photo.texture = 1, f.object("T_M1_8_01_Seq_p1_Female") end
+local function hide(f, photo) photo.Alpha, photo.texture = 0, f.object("T_CommonDefault_UI") end
+local function picture_fixture()
+    local f = plot_fixture("lease-v3"); f.values.VR_AutoCinema = "true"; return f
+end
+local function bit8(sample) return sample.known & 8 == 8, sample.active & 8 == 8 end
+
+test("lease-v3: a story picture on screen is bit 8; an empty or default picture is clear", function()
+    local f = picture_fixture(); local photo = plot_view(f); f:tick()
+    local known, active = bit8(f:last()); assert(known and not active, f:last().detail)
+    show(f, photo); f:tick(); known, active = bit8(f:last())
+    assert(known and active and f:last().detail:find("story picture on screen", 1, true), f:last().detail)
+    photo.texture = f.object("T_CommonDefault_UI"); f:tick(); assert(not select(2, bit8(f:last())), "default texture")
+    show(f, photo); photo.Alpha = 0; f:tick(); assert(not select(2, bit8(f:last())), "faded out")
+    show(f, photo); f:tick(); hide(f, photo); f:tick(); assert(not select(2, bit8(f:last())))
+    assert(f.scans == 1, "the found widget is read directly")
+end)
+test("the search spreads over ticks (at most 150 widgets each) and stops once found", function()
+    local f = picture_fixture(); local photo = plot_view(f, 400); show(f, photo)
+    f:tick(); assert(not bit8(f:last()) and f:last().detail:find("looking for the story picture", 1, true))
+    f:tick(); assert(not bit8(f:last()))
+    f:tick(); assert(select(2, bit8(f:last())), f:last().detail)
+    for _ = 1, 10 do f:tick() end; assert(f.scans == 1)
+end)
+test("no plot is a known no-picture, with no search", function()
+    local f = picture_fixture(); plot_view(f); f.performing = false
+    for _ = 1, 5 do f:tick() end
+    local known, active = bit8(f:last()); assert(known and not active and f.scans == 0)
+end)
+test("lease-v2 backends, or the story layout alone, never look for pictures", function()
+    local f = plot_fixture("lease-v2"); f.values.VR_AutoCinema = "true"; show(f, plot_view(f)); f:tick()
+    for _, name in ipairs(f.lookups) do assert(name ~= PICTURE, "picture lookup on lease-v2") end
+    assert(not bit8(f:last()) and f.scans == 0)
+    f = plot_fixture("lease-v3"); show(f, plot_view(f)); f:tick()
+    for _, name in ipairs(f.lookups) do assert(name ~= PICTURE, "picture lookup without automatic cinema") end
+    assert(not bit8(f:last()) and f.scans == 0)
+end)
+test("a SprPhoto in another view is ignored; the search retries 2 s later", function()
+    local f = picture_fixture(); show(f, plot_view(f, 0, "UiView_Album")); f:tick()
+    local known, active = bit8(f:last()); assert(known and not active and f:last().detail:find("no story picture view", 1, true))
+    for _ = 1, 15 do f:tick() end; assert(f.scans == 1)
+    for _ = 1, 6 do f:tick() end; assert(f.scans == 2)
+end)
+test("the next dialogue's rebuilt view is found again", function()
+    local f = picture_fixture(); local old = plot_view(f); show(f, old); f:tick()
+    assert(select(2, bit8(f:last())))
+    f.objects[old:get_address()] = nil; f.textures = {}
+    local new = plot_view(f); show(f, new); f:tick()
+    assert(select(2, bit8(f:last())) and f.scans == 2, f:last().detail)
+end)
+test("a closed view still in memory loses to the live one; two live views are unknown", function()
+    local f = picture_fixture(); local stale = plot_view(f); show(f, stale); stale.bIsUIActive = false
+    plot_view(f); f:tick()
+    local known, active = bit8(f:last()); assert(known and not active, f:last().detail)
+    f = picture_fixture(); show(f, plot_view(f)); plot_view(f); f:tick()
+    assert(not bit8(f:last()) and f:last().detail:find("ambiguous story picture", 1, true))
+end)
+print("Story layout detection tests passed (with plot and pictures): " .. passed)

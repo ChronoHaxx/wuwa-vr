@@ -114,6 +114,7 @@ private:
     // The same detector samples, held with the cinema lease's timing, for the 16:9
     // layout during story scenes. Never changes the view.
     wuwa_auto_cinema::Lease m_story_lease;
+    uint64_t m_picture_seen_ms{}; // the last sample with a story picture on screen (cinema mutex)
     std::atomic<bool> m_story_scene{false};
     int8_t m_layout_seen{-1}; // the last full VR layout (game thread), -1 before the first tick
     // Transient protocol: generation fences old Lua callbacks; native expiry

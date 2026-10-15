@@ -6,9 +6,15 @@ local M = {}
 local MOVIE = "MediaPlayer /Game/Aki/UI/UIResources/UiPlot/VideoPlayer/CommonVideoPlayer.CommonVideoPlayer"
 local STORY = "Class /Script/LGUI.UIExtendToggleSpriteTransition"
 -- The plot system's own state (test 17d): true for the whole dialogue whatever the
--- input device, also with the game UI hidden. Only for a lease-v2 backend, which keeps
--- it to the 16:9 story layout; automatic cinema still follows the plot-skip widget.
+-- input device, also with the game UI hidden. Only for a lease-v2 or later backend, which
+-- keeps it to the 16:9 story layout; automatic cinema still follows the plot-skip widget.
 local PLOT = "TypeScriptGeneratedClass /Game/Aki/TypeScript/Game/Module/Sequence/PlotBlueprintFunctionLibrary.PlotBlueprintFunctionLibrary_C"
+-- A story picture (test 17f): the plot view's full-screen UITexture "SprPhoto", shown
+-- with alpha above zero and a real texture (T_CommonDefault_UI when empty). The view is
+-- rebuilt for every dialogue, so the widget is found again while the plot runs, a few
+-- widgets per tick. lease-v3 only, for automatic cinema.
+local PICTURE = "Class /Script/LGUI.UITexture"
+local PICTURE_SCAN, PICTURE_RETRY = 150, 2
 local function finite(v) return type(v) == "number" and v == v and math.abs(v) < math.huge end
 local function kind(p) return p:get_class():get_fname():to_string() end
 local function bool_getter(o, name)
@@ -120,7 +126,73 @@ function M.new(env)
         if performing == false then return "clear", "no plot" end
         return "unknown", "plot query returned no value"
     end
-    local function collect()
+    local function display_name(o)
+        local name = property(o, o:get_class(), "displayName", "StrProperty")
+        return type(name) == "string" and name or nil
+    end
+    -- SprPhoto -> PnlAdjust -> PnlSafeZone -> UiView_Plot; other views may use the same name.
+    local function in_plot_view(o)
+        local parent = property(o, o:get_class(), "AttachParent", "ObjectProperty")
+        for _ = 1, 10 do
+            if not valid(parent) then return false end
+            if display_name(parent) == "UiView_Plot" then return true end
+            parent = property(parent, parent:get_class(), "AttachParent", "ObjectProperty")
+        end
+        return false
+    end
+    local function forget_picture() s.photo, s.photo_scan, s.photo_found, s.photo_index, s.photo_retry = nil, nil, nil, nil, nil end
+    local function picture_signal(current, plot, now)
+        -- Pictures belong to the plot view: no plot is a verified "no picture".
+        if plot == "clear" then forget_picture(); return "clear", "no story picture" end
+        if plot ~= "active" then forget_picture(); return "unknown", "story picture needs the plot state" end
+        local photo = s.photo
+        if photo and not (valid(photo) and in_world(photo, current)) then photo, s.photo = nil, nil end
+        if not photo then
+            if not s.photo_scan then
+                if now < (s.photo_retry or 0) then return "clear", "no story picture view" end
+                local list = objects(s.classes.picture, 5000, PICTURE)
+                if not list then return "unknown", "picture class/index unavailable" end
+                s.photo_scan, s.photo_index, s.photo_found = list, 0, {}
+            end
+            local list, found = s.photo_scan, s.photo_found
+            local last = math.min(#list, s.photo_index + PICTURE_SCAN)
+            for i = s.photo_index + 1, last do
+                local o = list[i]
+                if valid(o) and display_name(o) == "SprPhoto" and in_world(o, current) and in_plot_view(o) then
+                    found[#found + 1] = o
+                end
+            end
+            s.photo_index = last
+            if last < #list then return "unknown", "looking for the story picture" end
+            s.photo_scan, s.photo_found = nil, nil
+            -- A closed view can linger until garbage collection; prefer the active one.
+            if #found > 1 then
+                local live = {}
+                for _, o in ipairs(found) do
+                    if valid(o) and property(o, o:get_class(), "bIsUIActive", "BoolProperty") == true then live[#live + 1] = o end
+                end
+                found = live
+            end
+            if #found ~= 1 then
+                s.photo_retry = now + PICTURE_RETRY
+                if #found > 1 then return "unknown", "ambiguous story picture" end
+                return "clear", "no story picture view"
+            end
+            photo, s.photo, s.photo_retry = found[1], found[1], nil
+        end
+        local desc = photo:get_class()
+        local texture_field = desc:find_property("texture")
+        local alpha = property(photo, desc, "Alpha", "FloatProperty")
+        if not finite(alpha) or not texture_field or kind(texture_field) ~= "ObjectProperty" then
+            return "unknown", "story picture schema unavailable"
+        end
+        local texture = photo.texture
+        if alpha > 0.01 and valid(texture) and texture:get_fname():to_string() ~= "T_CommonDefault_UI" then
+            return "active", "story picture on screen"
+        end
+        return "clear", "no story picture"
+    end
+    local function collect(now)
         local current = world()
         if not current then return {world = "0", active = 0, hold = 0, known = 0, detail = "Current world unavailable"} end
         local start_world = current:get_address()
@@ -132,6 +204,12 @@ function M.new(env)
             plot_ok, plot, plot_detail = pcall(plot_signal, current)
             if not plot_ok then plot, plot_detail = "unknown", "plot query failed" end
         end
+        local picture, picture_detail = nil, nil
+        if s.picture then
+            local picture_ok
+            picture_ok, picture, picture_detail = pcall(picture_signal, current, plot, now)
+            if not picture_ok then forget_picture(); picture, picture_detail = "unknown", "story picture reflection unavailable" end
+        end
         if not movie_ok then movie, movie_detail = "unknown", "movie reflection unavailable" end
         if not story_ok then story, story_detail = "unknown", "dialogue reflection unavailable" end
         local again = world()
@@ -139,12 +217,13 @@ function M.new(env)
             return {world = "0", active = 0, hold = 0, known = 0, detail = "World changed during detection"}
         end
         local sample = {world = string.format("%.0f", start_world), active = 0, hold = 0, known = 0}
-        for bit, state in pairs({[1] = movie, [2] = story, [4] = plot}) do
+        for bit, state in pairs({[1] = movie, [2] = story, [4] = plot, [8] = picture}) do
             if state ~= "unknown" then sample.known = sample.known + bit end
             if state == "active" then sample.active = sample.active + bit end
             if state == "hold" then sample.hold = sample.hold + bit end
         end
         sample.detail = movie_detail .. "; " .. story_detail .. (plot_detail and ("; " .. plot_detail) or "")
+            .. (picture_detail and ("; " .. picture_detail) or "")
         return sample
     end
     local function report(status, now)
@@ -164,6 +243,7 @@ function M.new(env)
             pcall(env.set, "WuWaControls_AutoCinemaProducer", "stop:" .. self.token)
         end
         self.token, self.classes, self.last_poll, self.class_attempts, self.class_retry = nil, nil, nil, nil, nil
+        forget_picture()
     end
     local function tick()
         if not wanted() then s:reset(); s.status = "Automatic cinema off"; return end
@@ -174,8 +254,13 @@ function M.new(env)
         if s.last_poll and now - s.last_poll < 0.1 - 1e-6 then return end
         s.last_poll = now
         local protocol = env.get("WuWaControls_AutoCinemaSample")
-        if protocol ~= "lease-v1" and protocol ~= "lease-v2" then report("Automatic mono needs a compatible backend", now); return end
-        s.plot = protocol == "lease-v2"
+        if protocol ~= "lease-v1" and protocol ~= "lease-v2" and protocol ~= "lease-v3" then
+            report("Automatic mono needs a compatible backend", now); return
+        end
+        s.plot = protocol == "lease-v2" or protocol == "lease-v3"
+        -- Story pictures only change the view, so only automatic cinema looks for them.
+        s.picture = protocol == "lease-v3" and env.get("VR_AutoCinema") == "true"
+        if not s.picture then forget_picture() end
         if s.token and env.get("WuWaControls_AutoCinemaProducer") ~= s.token then
             -- A newer script or native reset owns the producer now. A live
             -- old script must not repeatedly steal the lease back.
@@ -188,16 +273,18 @@ function M.new(env)
             if not tonumber(s.token) or tonumber(s.token) <= 0 then error("producer unavailable") end
             s.classes, s.class_attempts, s.class_retry = {}, {}, {}
         end
-        -- Two exact class descriptors, never an asset/global-instance scan.
+        -- Exact class descriptors (the plot library and story pictures by protocol),
+        -- never an asset/global-instance scan.
         -- Lazy engine classes may load later: at most three attempts each per
         -- enable, five seconds apart; successful descriptors use the index.
-        for name, path in pairs({movie = "Class /Script/MediaAssets.MediaPlayer", story = STORY, plot = s.plot and PLOT or nil}) do
+        for name, path in pairs({movie = "Class /Script/MediaAssets.MediaPlayer", story = STORY, plot = s.plot and PLOT or nil,
+                picture = s.picture and PICTURE or nil}) do
             if not valid(s.classes[name]) and (s.class_attempts[name] or 0) < 3 and now >= (s.class_retry[name] or 0) then
                 s.class_attempts[name], s.class_retry[name] = (s.class_attempts[name] or 0) + 1, now + 5
                 s.classes[name] = api:find_uobject(path)
             end
         end
-        local sample = collect()
+        local sample = collect(now)
         local finished = tonumber(env.get("WuWaControls_Clock"))
         if finite(finished) then
             s.last_detection_ms = math.max(0, (finished - now) * 1000)

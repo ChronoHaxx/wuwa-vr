@@ -150,7 +150,8 @@ REC badge with the elapsed time shows while recording.
 4. **Cinema:** view, the game's own fix for cutscene black bars (Cinematic:
    Fullscreen in WuWa's graphics settings), close-up match and its closest
    distance, **depth of field (experiment)**, the cinematic scene note,
-   automatic cinematic screen and what story scenes use, matched framing.
+   automatic cinematic screen and what story scenes and story pictures use
+   (see below), matched framing.
 5. **HUD:** size, distance, **16:9 UI layout** (`VR_WuWaUiWindowSize`,
    default on; see below), **Story scenes in 16:9** (`VR_WuWaUiStoryWindowSize`,
    default on; only with the taller layout), **HUD shape (full VR)** (`UI_WuWaHudShape`,
@@ -208,7 +209,11 @@ the behaviour below applies.
 
 The HUD page's **16:9 UI layout** switch turns this off for players who prefer
 1.2.2's taller layout (the Terminal fits on one page; the character screen's
-floor reflection lines up in test 16's recordings). Switching moves the hooks
+floor reflection keeps updating). With the 16:9 layout that reflection stops
+updating and can show the previous character until a layout refresh: test 17e
+traced it to one game caller of `GetViewportSize` (return RVA 0xe0d438), which
+also lays out the 16:9 UI, so giving it the eye size fixes the reflection but
+breaks the UI. A known limit for 1.2.3. Switching moves the hooks
 and the panel at once and asks for a HUD layout refresh (as after a view
 switch), because the game's UI scaler keeps its old size until then. The
 taller layout brings back the flatter icons (HUD shape) and the mouse offset.
@@ -230,6 +235,20 @@ cinema keeps the widget and the story video player only. The plugin
 holds the detector's samples in a second lease with the cinema lease's timing:
 100 ms to confirm a scene, and the taller layout returns 500 ms after a verified
 end. This lease never changes the view.
+
+**Story pictures use** (Cinema page, test 17f; `VR_AutoPicturePresentation`,
+default Stereo screen) is what the automatic cinematic screen shows while a 2D
+story picture fills the screen, so a player who keeps story scenes in full VR
+still gets a screen for the pictures. The picture is the plot view's
+full-screen `UITexture` with display name `SprPhoto` (under `UiView_Plot`),
+shown with alpha above zero and a `BgScene` texture, and back to alpha 0 with
+`T_CommonDefault_UI` afterwards (measured 15 Oct in main story 1-8). The view
+is rebuilt for every dialogue, so while the plot runs the detector looks for
+it again, 150 widgets per 100 ms tick (the game has about 900), and then reads
+only that widget. Sample bit 8, protocol `lease-v3`, automatic cinema only:
+the story layout ignores it. A story video still wins (mono theatre). The
+choice is held for 1.2 s after a picture so the crossfade between two pictures
+does not flip the view.
 
 **Why the HUD looked squashed in full VR only (before 1.2.3).** The log shows the UI pass
 drawn for the square eye (`stage3_fit original=0,0,3292,3292`) and fitted into

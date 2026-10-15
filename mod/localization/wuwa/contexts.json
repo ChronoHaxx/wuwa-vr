@@ -1705,7 +1705,7 @@
   "On uses our LGUI capture. Off shows the game's original HUD in the eye images. This does not hide the UEVR settings panel.": [
     "mods/VR.cpp"
   ],
-  "On: full VR lays out the HUD and menus like the flat game (16:9): round icons, story pictures whole, and the mouse hits what it points at. Off: 1.2.2's taller layout, where the Terminal fits on one page and the character screen's floor reflection lines up, but icons look flatter (HUD shape) and the mouse can miss.": [
+  "On: full VR lays out the HUD and menus like the flat game (16:9): round icons, story pictures whole, and the mouse hits what it points at. Off: 1.2.2's taller layout, where the Terminal fits on one page and the character screen's floor reflection keeps updating, but icons look flatter (HUD shape) and the mouse can miss.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "On: the HUD stays in front of your eyes. Off: it stays put in the world and you look at it.": [
@@ -2387,6 +2387,12 @@
   "Story cutscenes and dialogue": [
     "mods/VR.cpp"
   ],
+  "Story pictures": [
+    "mods/VR.cpp"
+  ],
+  "Story pictures use": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Story scenes in 16:9": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2667,6 +2673,9 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "What automatic switching shows during story scenes.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "What automatic switching shows while a story picture fills the screen.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "What happened": [

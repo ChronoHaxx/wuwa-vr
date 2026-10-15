@@ -220,7 +220,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "VR_RenderingMethod", "VR_ExtremeCompatibilityMode",
                 "VR_NativeStereoFix", "VR_HorizontalProjectionOverride", "VR_VerticalProjectionOverride",
                 "VR_GrowRectangleForProjectionCropping", "VR_2DScreenMode", "VR_MonoTheatreMode", "VR_CinematicFramingFix",
-                "VR_AutoCinema", "VR_AutoStoryPresentation", "WuWaControls_AutoCinemaStatus",
+                "VR_AutoCinema", "VR_AutoStoryPresentation", "VR_AutoPicturePresentation", "WuWaControls_AutoCinemaStatus",
                 "WuWaControls_EffectiveMonoTheatre", "WuWaControls_EffectiveScreen",
                 "WuWaControls_ResetHudAspect", "WuWaControls_HudAspectStatus", "VR_EnableGUI", "UI_X_Offset", "UI_Y_Offset",
                 "UI_Distance", "UI_Size", "UI_WuWaHudShape", "UI_FollowView", "WuWaControls_Enabled",

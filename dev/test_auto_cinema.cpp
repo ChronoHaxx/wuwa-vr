@@ -72,6 +72,30 @@ int main() {
     assert(s.active == 0 && s.known == dialogue);
     s = story_bits({dialogue, 0, dialogue}); // plot unknown (lease-v1 or no library): the widget
     assert(s.active == dialogue && s.known == dialogue);
+    // lease-v3: a story picture reaches automatic cinema only and picks its own presentation,
+    // also just after one (the crossfade between pictures); a story video still wins.
+    const auto p = cinema_bits({uint8_t(picture | dialogue | plot), 0, uint8_t(picture | dialogue | plot)});
+    assert(p.active == (picture | dialogue) && p.known == (picture | dialogue));
+    s = story_bits({uint8_t(picture | plot), 0, uint8_t(picture | plot)});
+    assert(s.active == dialogue && s.known == dialogue);
+    s = story_bits({picture, 0, picture}); // plot unknown: a picture alone is no story scene
+    assert(s.active == 0 && s.known == 0);
+    const auto keep = Presentation::none, screen = Presentation::stereo_screen, mono = Presentation::mono_theatre;
+    assert(choose({dialogue, 0, sources}, 0, false, keep, screen) == keep);
+    assert(choose({uint8_t(dialogue | picture), 0, sources}, 0, false, keep, screen) == screen);
+    assert(choose({dialogue, 0, sources}, 0, true, keep, screen) == screen);
+    assert(choose({uint8_t(dialogue | picture), 0, sources}, 0, false, screen, keep) == keep); // pictures in full VR
+    assert(choose({uint8_t(movie | picture), 0, sources}, 0, true, screen, screen) == mono);
+    assert(choose({0, movie, sources}, movie, true, keep, screen) == mono); // a paused video it saw playing
+    assert(choose({0, movie, sources}, 0, false, keep, screen) == keep);
+    // Story scenes in full VR: a picture enters the screen, and its end hands the view back.
+    Lease pictures; const auto pg = pictures.start();
+    assert(pictures.sample(pg, "400", dialogue | picture, 0, sources, screen, 7000));
+    assert(pictures.sample(pg, "400", dialogue | picture, 0, sources, screen, 7100));
+    assert(pictures.presentation(7100) == screen);
+    assert(pictures.sample(pg, "400", dialogue, 0, sources, keep, 8400));
+    assert(!pictures.active(8400));
+    assert(!pictures.sample(pg, "400", plot, 0, plot, screen, 8500)); // the plot bit never reaches a lease
     assert(resolve(true, false, Presentation::none).screen);
     assert(resolve(false, true, Presentation::none).mono);
     std::cout << "PASS automatic cinematic lease, expiry, pause, manual precedence, world and producer fencing\n";

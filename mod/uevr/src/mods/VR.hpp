@@ -720,6 +720,10 @@ public:
         const auto mode = m_auto_story_presentation->value();
         return mode >= 0 && mode <= 2 ? static_cast<wuwa_auto_cinema::Presentation>(mode) : wuwa_auto_cinema::Presentation::none;
     }
+    wuwa_auto_cinema::Presentation auto_picture_presentation() const {
+        const auto mode = m_auto_picture_presentation->value();
+        return mode >= 0 && mode <= 2 ? static_cast<wuwa_auto_cinema::Presentation>(mode) : wuwa_auto_cinema::Presentation::none;
+    }
     void set_mono_theatre_manually(bool enabled) {
         m_wuwa_controls.override_auto_cinema();
         m_mono_theatre_mode->value() = enabled;
@@ -1072,6 +1076,8 @@ private:
     const ModCombo::Ptr m_screen_lens{ ModCombo::create(generate_name("WuWaScreenLens"), {"Game lens (like 2D)", "Wide 90 degrees (before 3f)"}, 0) };
     const ModSlider::Ptr m_screen_depth{ ModSlider::create(generate_name("WuWaScreenDepth"), 0.0f, 3.0f, 1.0f) };
     const ModCombo::Ptr m_auto_story_presentation{ModCombo::create(generate_name("AutoStoryPresentation"), {"Keep immersive", "Stereo screen", "Mono theatre"}, 1)};
+    // A story picture filling the screen (test 17f): the stereo screen by default, as story scenes.
+    const ModCombo::Ptr m_auto_picture_presentation{ModCombo::create(generate_name("AutoPicturePresentation"), {"Keep immersive", "Stereo screen", "Mono theatre"}, 1)};
     const ModToggle::Ptr m_cinematic_framing_fix{ ModToggle::create(generate_name("CinematicFramingFix"), true) };
     const ModToggle::Ptr m_roomscale_movement{ ModToggle::create(generate_name("RoomscaleMovement"), false) };
     const ModToggle::Ptr m_roomscale_sweep{ ModToggle::create(generate_name("RoomscaleMovementSweep"), true) };
@@ -1243,6 +1249,7 @@ public:
         *m_screen_lens,
         *m_screen_depth,
         *m_auto_story_presentation,
+        *m_auto_picture_presentation,
         *m_cinematic_framing_fix,
             *m_roomscale_movement,
             *m_roomscale_sweep,

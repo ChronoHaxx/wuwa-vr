@@ -262,6 +262,7 @@ void WuWaControlsComponent::reset_auto_cinema() {
     std::scoped_lock lock{m_cinema_mutex};
     // Keeps the producer generation: the story-scene detector may be running.
     m_cinema_lease.clear();
+    m_picture_seen_ms = 0;
     m_cinema_presentation.store(wuwa_auto_cinema::Presentation::none);
     m_cinema_signal = "Detector has not reported";
     m_cinema_detection_ms = 0;
@@ -272,7 +273,7 @@ void WuWaControlsComponent::override_auto_cinema() {
     m_cinema_presentation.store(wuwa_auto_cinema::Presentation::none);
 }
 std::string WuWaControlsComponent::CinemaValue::get() const {
-    if (kind == 1) return "lease-v2";
+    if (kind == 1) return "lease-v3";
     if (kind == 2) return owner.auto_cinema_status();
     if (kind == 3) return VR::get()->is_using_mono_theatre() ? "true" : "false";
     // v2 (test 3i): explicit "on" / "off" as well as "toggle", for the view cycle.
@@ -314,7 +315,7 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
         const auto detail = sample.value("detail", std::string{});
         const auto elapsed = sample.value("elapsed_ms", 0.0);
         if (world.empty() || world.size() > 32 || world.find_first_not_of("0123456789") != std::string::npos ||
-            active < 0 || active > 7 || hold < 0 || hold > 7 || known < 0 || known > 7 ||
+            active < 0 || active > 15 || hold < 0 || hold > 15 || known < 0 || known > 15 ||
             detail.size() > 240 || !std::isfinite(elapsed) || elapsed < 0 || elapsed > 50) return;
         std::scoped_lock lock{owner.m_cinema_mutex};
         const bool cinema = VR::get()->is_auto_cinema_enabled(), story = VR::get()->wants_story_scene_layout();
@@ -325,9 +326,10 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
         const wuwa_auto_cinema::Bits bits{static_cast<uint8_t>(active), static_cast<uint8_t>(hold), static_cast<uint8_t>(known)};
         if (cinema) {
             const auto c = wuwa_auto_cinema::cinema_bits(bits);
-            const auto presentation = ((c.active & wuwa_auto_cinema::movie) ||
-                    (c.hold & owner.m_cinema_lease.seen_sources() & wuwa_auto_cinema::movie)) ?
-                wuwa_auto_cinema::Presentation::mono_theatre : VR::get()->auto_story_presentation();
+            if (c.active & wuwa_auto_cinema::picture) owner.m_picture_seen_ms = now;
+            const bool picture_recent = owner.m_picture_seen_ms && now - owner.m_picture_seen_ms < 1200;
+            const auto presentation = wuwa_auto_cinema::choose(c, owner.m_cinema_lease.seen_sources(), picture_recent,
+                VR::get()->auto_story_presentation(), VR::get()->auto_picture_presentation());
             accepted = owner.m_cinema_lease.sample(generation, world, c.active, c.hold, c.known, presentation, now);
         }
         if (story) {

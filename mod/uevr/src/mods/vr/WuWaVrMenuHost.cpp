@@ -786,6 +786,13 @@ Page cinema_page() {
         return automatic && automatic->value() && typed<int32_t>("VR_AutoStoryPresentation") != nullptr;
     };
     page.items.push_back(std::move(story));
+    auto pictures = setting_choice("Story pictures use", "What automatic switching shows while a story picture fills the screen.",
+        "VR_AutoPicturePresentation", {"Full VR", "Stereo screen", "Mono theatre"});
+    pictures.enabled = [] {
+        auto* automatic = typed<bool>("VR_AutoCinema");
+        return automatic && automatic->value() && typed<int32_t>("VR_AutoPicturePresentation") != nullptr;
+    };
+    page.items.push_back(std::move(pictures));
     page.items.push_back(setting_toggle("Match cinematic framing",
         "Gives both eyes the same framing during letterboxed scenes. Leave on unless a scene looks cropped.", "VR_CinematicFramingFix"));
     return page;
@@ -803,7 +810,7 @@ Page hud_page() {
         auto layout = make(Kind::Toggle, "16:9 UI layout",
             "On: full VR lays out the HUD and menus like the flat game (16:9): round icons, story pictures whole, and the "
             "mouse hits what it points at. Off: 1.2.2's taller layout, where the Terminal fits on one page and the "
-            "character screen's floor reflection lines up, but icons look flatter (HUD shape) and the mouse can miss.");
+            "character screen's floor reflection keeps updating, but icons look flatter (HUD shape) and the mouse can miss.");
         layout.get_bool = [] { return VR::get()->is_wuwa_ui_window_size_enabled(); };
         layout.set_bool = [](bool on) {
             if (auto* value = typed<bool>("VR_WuWaUiWindowSize")) value->value() = on;

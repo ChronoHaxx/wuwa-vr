@@ -240,7 +240,11 @@ follows the plot system's own state (`PlotBlueprintFunctionLibrary`
 dialogue with controller or keyboard and mouse, with the game UI hidden and on
 the skip summary, false as the plot ends, and the same for a chat with an
 overworld NPC (measured 15 Oct on the simulator), so every conversation counts. The
-plot-skip widget is the fallback when that query is unavailable. Automatic
+plot-skip widget is the fallback when that query is unavailable. The plot
+library is a TypeScript class that loads with the game world, so the detector
+looks each class up at most three times per world, 5 s apart, and a new world
+(login, teleport) allows three more. Test 17g's detector started at launch and
+gave up on the login screen; the lookups also stay out of the 50 ms budget. Automatic
 cinema keeps the widget and the story video player only. The plugin
 holds the detector's samples in a second lease with the cinema lease's timing:
 100 ms to confirm a scene, and the taller layout returns 500 ms after a verified

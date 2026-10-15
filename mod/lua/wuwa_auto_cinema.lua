@@ -292,6 +292,7 @@ function M.new(env)
             pcall(env.set, "WuWaControls_AutoCinemaProducer", "stop:" .. self.token)
         end
         self.token, self.classes, self.last_poll, self.class_attempts, self.class_retry = nil, nil, nil, nil, nil
+        self.class_world = nil
         forget_picture()
     end
     local function tick()
@@ -324,8 +325,14 @@ function M.new(env)
         end
         -- Exact class descriptors (the plot library and story pictures by protocol),
         -- never an asset/global-instance scan.
-        -- Lazy engine classes may load later: at most three attempts each per
-        -- enable, five seconds apart; successful descriptors use the index.
+        -- Lazy classes may load later: at most three attempts each per world, five
+        -- seconds apart; successful descriptors use the index. The plot library is a
+        -- TypeScript class that loads with the game world, after the detector may have
+        -- started on the login screen (test 17g starts it at launch), so a new world
+        -- (login, teleport) allows three more attempts.
+        local here = world()
+        local here_id = here and here:get_address() or 0
+        if here_id ~= s.class_world then s.class_world, s.class_attempts, s.class_retry = here_id, {}, {} end
         for name, path in pairs({movie = "Class /Script/MediaAssets.MediaPlayer", story = STORY, plot = s.plot and PLOT or nil,
                 picture = s.picture and PICTURE or nil, showroom = s.showroom and SHOWROOM or nil}) do
             if not valid(s.classes[name]) and (s.class_attempts[name] or 0) < 3 and now >= (s.class_retry[name] or 0) then
@@ -333,10 +340,14 @@ function M.new(env)
                 s.classes[name] = api:find_uobject(path)
             end
         end
+        -- The bounded lookups above (about 25 ms for a TypeScript class) are not part
+        -- of the recurring detection the guard below watches.
+        local started = tonumber(env.get("WuWaControls_Clock"))
+        if not finite(started) then started = now end
         local sample = collect(now)
         local finished = tonumber(env.get("WuWaControls_Clock"))
         if finite(finished) then
-            s.last_detection_ms = math.max(0, (finished - now) * 1000)
+            s.last_detection_ms = math.max(0, (finished - started) * 1000)
             -- Back off rather than turn an unexpectedly expensive class index
             -- or reflection path into recurring loading stalls. Native expiry
             -- restores the base view; re-enable explicitly after inspection.

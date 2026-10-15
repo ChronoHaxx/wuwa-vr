@@ -90,6 +90,7 @@ local function plot_fixture(protocol)
     f.world = object("World")
     local viewport, engine = object("Viewport"), object("Engine")
     viewport.World, engine.GameViewport = f.world, viewport
+    f.viewport = viewport
     local function described(o, props)
         o.get_class = function() return {find_property = function(_, key)
             return props[key] and prop(key, "ObjectProperty") or nil end} end
@@ -117,7 +118,7 @@ local function plot_fixture(protocol)
             get_player_controller = function() return f.pc end,
             find_uobject = function(_, name)
                 f.lookups[#f.lookups + 1] = name
-                if name == PLOT then return f.plot_class end
+                if name == PLOT then return not f.plot_missing and f.plot_class or nil end
                 if name == SHOWROOM then return f.showroom_class end
                 return name == PICTURE and f.picture_class or nil
             end},
@@ -147,6 +148,18 @@ test("lease-v1 backends never look up or call the plot library", function()
     local f = plot_fixture("lease-v1"); for _ = 1, 5 do f:tick() end
     for _, name in ipairs(f.lookups) do assert(name ~= PLOT, "plot lookup on lease-v1") end
     assert(f.calls == 0 and f:last().known & 4 == 0)
+end)
+test("a plot library missing on the login screen is found after the next world loads", function()
+    local f = plot_fixture(); f.plot_missing = true
+    local function plot_lookups() local n = 0; for _, name in ipairs(f.lookups) do if name == PLOT then n = n + 1 end end; return n end
+    for _ = 1, 200 do f:tick() end
+    assert(plot_lookups() == 3 and f:last().known & 4 == 0, "three spaced attempts per world")
+    f.plot_missing = false
+    for _ = 1, 100 do f:tick() end
+    assert(plot_lookups() == 3, "no global retries within the same world")
+    local game_world = f.object("Game world"); game_world.get_class = f.world.get_class
+    f.viewport.World = game_world; f:tick()
+    assert(plot_lookups() == 4 and f:last().known & 4 == 4 and f.context == game_world, f:last().detail)
 end)
 test("an unexpected plot query signature is unknown and never called", function()
     local f = plot_fixture()

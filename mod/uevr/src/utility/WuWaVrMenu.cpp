@@ -299,7 +299,8 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
             std::snprintf(text, sizeof(text), wuwa_l10n::translate("Default: %s. Saved for next time.").c_str(),
                 wuwa_l10n::translate_quiet(item.default_text()).c_str());
             std::string logical = text;
-            if (item.is_default && !item.is_default() && !pointer) logical += "  " + wuwa_l10n::translate("X or Delete: back to the default.");
+            // Also with a pointer: Delete (keyboard) or X (Xbox / VR controller) resets the row under it.
+            if (item.is_default && !item.is_default()) logical += "  " + wuwa_l10n::translate("X or Delete: back to the default.");
             note = wuwa_l10n::visual(logical);
         }
         if (!note.empty()) write(at(left, strip + 80.0f), 21.0f, gold_dim, note, right - left);

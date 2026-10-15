@@ -44,4 +44,6 @@ void draw_step_overlay(ImDrawList* list, const ImVec2& size);
 // suggests a screen mode. Any thread.
 bool hint_active();
 void draw_hint(ImDrawList* list, const ImVec2& size);
+// The note shown is "someone at your eyes": the overlay lifts it above the game's HUD.
+bool near_note_showing();
 }

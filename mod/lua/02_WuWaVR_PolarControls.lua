@@ -1258,7 +1258,18 @@ function lens.forward(r)
     local p,y=math.rad(r.x),math.rad(r.y)
     return {x=math.cos(p)*math.cos(y),y=math.cos(p)*math.sin(y),z=math.sin(p)}
 end
-function lens.publish(text)
+-- The menu translates the status (WuWaStatusText.hpp): each part is an English format whose
+-- values are %s, then the values, joined by \30; parts are joined by \31. A new format needs
+-- an N_ entry in lens_formats there.
+function lens.part(format,...)
+    local t={format}
+    for i=1,select("#",...) do t[#t+1]=tostring((select(i,...))) end
+    return table.concat(t,"\30")
+end
+function lens.publish(...)
+    local parts={}
+    for i=1,select("#",...) do local v=select(i,...); if v and v~="" then parts[#parts+1]=v end end
+    local text=table.concat(parts,"\31")
     if text~=lens.report then lens.report=text; set("WuWaControls_LensStatus",text) end
 end
 function lens.focus(pcm)
@@ -1475,9 +1486,9 @@ function dof.update(pcm,fov,dolly)
 end
 function dof.text()
     if not dof.want then return "" end
-    if dof.flag=="missing" then return "; depth of field: not in this game build" end
-    if dof.flag:sub(1,5)=="error" then return "; depth of field: "..dof.flag end
-    return "; depth of field forced on"
+    if dof.flag=="missing" then return lens.part("depth of field: not in this game build") end
+    if dof.flag:sub(1,5)=="error" then return lens.part("depth of field: %s",dof.flag) end
+    return lens.part("depth of field forced on")
 end
 -- The game's focus, when it really focuses (test 3j). Full VR rewrites the
 -- camera's focus and f-stop every frame (dof.update), so a value equal to the
@@ -1520,7 +1531,7 @@ function nearclip.publish(cm)
     nearclip.sent=cm
 end
 function nearclip.text(cm)
-    return cm>0 and string.format("; hiding anything nearer than %d cm",cm) or ""
+    return cm>0 and lens.part("hiding anything nearer than %s cm",string.format("%d",cm)) or ""
 end
 -- The nearest near side of anyone in the 2D frame, from the game camera.
 function nearclip.nearest(found)
@@ -1829,9 +1840,9 @@ function lens.update()
     if (strength<=0 and not clipping and not hiding) or paused or not pcm then
         lens.dolly=0; lens.pos=nil; nearclip.publish(0)
         if pcm then dof.update(pcm,pcm:GetFOVAngle(),0) end
-        if strength<=0 then lens.publish("Off"..dof.text())
-        elseif paused then lens.publish((enabled("WuWaDiorama_Enabled") and "Paused in the diorama" or
-            "Paused: game camera in full VR only")..dof.text()) end
+        if strength<=0 then lens.publish(lens.part("Off"),dof.text())
+        elseif paused then lens.publish(lens.part(enabled("WuWaDiorama_Enabled") and "Paused in the diorama" or
+            "Paused: game camera in full VR only"),dof.text()) end
         return
     end
     local fov=pcm:GetFOVAngle()
@@ -1839,7 +1850,7 @@ function lens.update()
     if type(fov)~="number" or fov~=fov or not valid(pos) or not rot then lens.dolly=0; lens.pos=nil; nearclip.publish(0); return end
     if fov>60 or fov<5 then
         lens.dolly=0; lens.pos=nil; nearclip.publish(0); dof.update(pcm,fov,0)
-        lens.publish(string.format("Waiting for a close-up (lens now %.0f degrees)",fov)..dof.text()); return
+        lens.publish(lens.part("Waiting for a close-up (lens now %s degrees)",string.format("%.0f",fov)),dof.text()); return
     end
     -- A cut is a jump of the game camera: the subject is picked again and the
     -- eye moves at once. Within a shot it is followed and the eye eases.
@@ -1878,7 +1889,8 @@ function lens.update()
                 lens.shot,fov,tostring(lens.people_seen or "-"),tostring(lens.people_stats or ""),
                 tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),clip))
         end
-        lens.publish(string.format("Close-up at %.0f degrees: the game sets no focus in this shot, view at the game camera",fov)..nearclip.text(clip)..dof.text()); return
+        lens.publish(lens.part("Close-up at %s degrees: the game sets no focus in this shot, view at the game camera",
+            string.format("%.0f",fov)),nearclip.text(clip),dof.text()); return
     end
     -- The subject keeps strength^1 of its 2D size: distance d becomes d*k^strength.
     local k=math.tan(math.rad(fov)/2)/math.tan(math.rad(90)/2)
@@ -1914,10 +1926,11 @@ function lens.update()
     lens.ctx={pos=pos,rot=rot,fov=fov,cut=cut,dolly=dolly,frames=lens.frames}
     local clip=nearclip.wanted(dolly)
     nearclip.publish(clip)
-    local text=string.format("Close-up at %.0f degrees: %s %.1f m away, moved %.1f m nearer",
-        fov,lens.subject_kind or "subject",d/100,dolly/100)
-    if held then text=text..string.format(", held behind the person in front (%.1f m)",lens.foreground/100)
-    elseif dolly>0 and d-dolly<=nearest+1 then text=text..string.format(", stopped at the closest %.0f cm",nearest) end
+    local text=lens.part("Close-up at %s degrees: %s %s m away, moved %s m nearer",string.format("%.0f",fov),
+        lens.subject_kind or "subject",string.format("%.1f",d/100),string.format("%.1f",dolly/100))
+    local stop=""
+    if held then stop=lens.part("held behind the person in front (%s m)",string.format("%.1f",lens.foreground/100))
+    elseif dolly>0 and d-dolly<=nearest+1 then stop=lens.part("stopped at the closest %s cm",string.format("%.0f",nearest)) end
     if cut then
         functions.log_info(string.format("[WuWaLens] shot=%d fov=%.1f subject=%.0f (%s) people=%s [%s] foreground=%s focus=%s trace=%s dolly=%.0f strength=%.2f nearest=%.0f near_clip=%d%s",
             lens.shot,fov,d,tostring(lens.subject_kind),tostring(lens.people_seen or "-"),tostring(lens.people_stats or ""),
@@ -1926,7 +1939,7 @@ function lens.update()
             tostring(lens.subject_trace and math.floor(lens.subject_trace) or "none"),dolly,strength,nearest,clip,
             lens.trace_error and (" trace_error="..lens.trace_error) or ""))
     end
-    lens.publish(text..nearclip.text(clip)..dof.text())
+    lens.publish(text,stop,nearclip.text(clip),dof.text())
 end
 local function update_camera_before_draw()
     -- UGameViewportClient::Draw runs on the game thread after world simulation,
@@ -1979,7 +1992,7 @@ cb.on_pre_viewport_client_draw(function()
     -- The game camera is final for this frame here, so a cut is seen before either eye.
     local lens_ok,lens_err=pcall(lens.update)
     if not lens_ok then
-        lens.dolly=0; lens.pos=nil; lens.ctx=nil; pcall(nearclip.publish,0); lens.publish("Unavailable: "..tostring(lens_err):sub(1,120))
+        lens.dolly=0; lens.pos=nil; lens.ctx=nil; pcall(nearclip.publish,0); lens.publish(lens.part("Unavailable: %s",tostring(lens_err):sub(1,120)))
     end
     local hide_ok,hide_err=pcall(hider.tick,lens.ctx)
     if not hide_ok then

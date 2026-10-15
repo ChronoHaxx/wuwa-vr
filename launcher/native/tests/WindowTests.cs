@@ -959,6 +959,14 @@ public static class WindowTests
                 Click(w, Button(w, "guide"));
                 Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(outerGuide) && new Uri(opened).Fragment == "#zh",
                     "launcher guide did not retain priority or Chinese section after installation");
+                // Controls opens the launcher guide too: its language's controls part, else the language section.
+                Click(w, Button(w, "fullControls"));
+                Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(outerGuide) && new Uri(opened).Fragment == "#zh",
+                    "controls without a controls part did not open the Chinese launcher guide: " + opened);
+                File.WriteAllText(outerGuide, "<h1 id='en'>Player guide</h1><h2 id='controls'>Controls</h2><h1 id='zh'>玩家指南</h1><h2 id='controls-zh'>操作</h2>");
+                Click(w, Button(w, "fullControls"));
+                Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(outerGuide) && new Uri(opened).Fragment == "#controls-zh",
+                    "controls did not open the Chinese controls part of the launcher guide: " + opened);
                 File.Delete(outerGuide);
                 Click(w, Button(w, "guide"));
                 Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(guide), "missing outer guide broke installed offline fallback");

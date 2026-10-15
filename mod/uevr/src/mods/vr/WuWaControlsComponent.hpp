@@ -251,6 +251,8 @@ private:
     // While hiding is off: a note naming the shortcut, once per scene, when the script
     // finds such a character (transient WuWaControls_NearSeen).
     const ModToggle::Ptr m_near_hint{ModToggle::create("WuWaControls_NearHint", true)};
+    // Notes shown so far; the third turns the note off (WuWaVrMenuHost.cpp hint_active).
+    const ModInt32::Ptr m_near_hint_shown{ModInt32::create("WuWaControls_NearHintShown", 0)};
     struct NearSeen : ModString {
         NearSeen() : ModString{"WuWaControls_NearSeen", ""} {}
         std::string get() const override { return {}; }

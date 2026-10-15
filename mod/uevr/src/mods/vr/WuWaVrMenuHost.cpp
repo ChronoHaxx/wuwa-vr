@@ -27,6 +27,7 @@
 #include "mods/VR.hpp"
 #include "utility/WuWaDofSync.hpp"
 #include "utility/WuWaNearClip.hpp"
+#include "utility/WuWaStatusText.hpp"
 #include "utility/WuWaConfigSave.hpp"
 #include "utility/WuWaLocalization.hpp"
 #include "utility/WuWaLocalizedUI.hpp"
@@ -70,6 +71,7 @@ CinemaHint hint{};
 // Test 16: "someone at your eyes" uses the same once-per-episode timing; an episode
 // ends after two minutes without such a character.
 CinemaHint near_hint{300, 5000, 120000};
+constexpr int32_t near_note_count = 3;
 int hint_kind{}; // 1 cinematic scene, 2 someone at your eyes
 
 std::int64_t unix_ms() {
@@ -405,7 +407,8 @@ Item near_hide_toggle() {
 
 Item near_hint_toggle() {
     return setting_toggle("Note when someone is at your eyes",
-        "While hiding is off: a short note with the shortcut, once per scene, when a character is right at your eyes.",
+        "While hiding is off: a short note with the shortcut, once per scene, when a character is right at your eyes. "
+        "After 3 notes it turns itself off.",
         "WuWaControls_NearHint");
 }
 
@@ -420,7 +423,10 @@ Item lens_status() {
     return live_text([] {
         auto* status = cached("WuWaControls_LensStatus");
         const auto text = status ? status->get() : std::string{};
-        return text.empty() ? std::string{} : wuwa_ui::format("Now: %s", text.c_str());
+        if (text.empty()) return std::string{};
+        // The script sends parts (an English format and its values); each is translated here.
+        const auto shown = wuwa_status_text::lens(text, [](std::string_view english) { return wuwa_l10n::translate_quiet(english); });
+        return wuwa_ui::format("Now: %s", shown.c_str());
     });
 }
 
@@ -858,9 +864,9 @@ Page hud_page() {
             if (auto* request = cached("WuWaControls_ResetHudAspect")) request->set("true");
         }));
     page.items.push_back(live_text([] {
+        // A plain summary; the script logs the technical status in full ("WuWaHud: ...").
         auto* status = cached("WuWaControls_HudAspectStatus");
-        const auto text = status ? status->get() : std::string{};
-        return text.empty() || text == "Ready" ? std::string{} : "HUD refresh: " + text;
+        return std::string{wuwa_status_text::hud_refresh(status ? status->get() : std::string{})};
     }));
     page.items.push_back(setting_toggle("Controls cards",
         "Hold L3, or LT + RT, for half a second: a card rises under your view and shows what each button does, lighting "
@@ -1365,8 +1371,31 @@ bool hint_active() {
     const bool cinema_on = hint.update(cinematic, eligible, now);
     // One note at a time: the scene note first; this one waits rather than running unseen.
     const bool near_on = !cinema_on && near_hint.update(near_recent, near_eligible, now);
+    // Shown near_note_count times, then it turns itself off, as the view hints do (owner, 15 Oct:
+    // useful at first, then in the way). Counted when a note starts; switched off when the last
+    // one ends (switching off at once would cut that note short).
+    static std::uint64_t counted{};
+    static bool was_near{};
+    if (auto* shown = typed<int32_t>("WuWaControls_NearHintShown")) {
+        if (near_on && near_hint.shown != counted) {
+            counted = near_hint.shown;
+            shown->value() = (std::max)(shown->value(), 0) + 1;
+            g_framework->deferred_save_config();
+        }
+        if (was_near && !near_on && shown->value() >= near_note_count && note) {
+            note->value() = false;
+            shown->value() = 0;
+            g_framework->deferred_save_config();
+        }
+    }
+    was_near = near_on;
     hint_kind = cinema_on ? 1 : near_on ? 2 : 0;
     return hint_kind != 0;
+}
+
+bool near_note_showing() {
+    std::scoped_lock lock{hint_mutex};
+    return hint_kind == 2;
 }
 
 void draw_hint(ImDrawList* list, const ImVec2& size) {
@@ -1377,9 +1406,10 @@ void draw_hint(ImDrawList* list, const ImVec2& size) {
         kind = hint_kind;
     }
     if (kind == 2) {
-        // Short and high: it shows during dialogue (test 16: the full note was in the way).
+        // Short and high: it shows during dialogue (test 16: the full note was in the way; 17p:
+        // the overlay lifts it above the HUD, OverlayComponent).
         wuwa_menu::draw_note(list, size, font, "Hide characters at your eyes", "LT + RT, then Y",
-            "Turn this note off in the menu, Cinema page.", true);
+            "Shows 3 times, then turns itself off (Cinema page).", true);
         return;
     }
     wuwa_menu::draw_note(list, size, font, "Cinematic scene",

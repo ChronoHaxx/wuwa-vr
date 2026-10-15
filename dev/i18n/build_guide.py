@@ -8,7 +8,12 @@ opens at the player's language, from dev/i18n/guide/<lang>.json.
 en.json is the source. Each language has the same keys; values may use
 <strong>, <code>, <em> and <a href="..."> (same tags and links as English) and
 {version} {tag} {game}, filled from the launcher's version and the catalog's
-game version. The launcher opens #en, #zh (Simplified Chinese) or #<code>.
+game version. The launcher opens #en, #zh (Simplified Chinese) or #<code>, and
+the Controls link #controls (#controls-zh, #controls-<code>).
+
+The controls tables are not written here: they come from mod/controls.json,
+in the words of the VR mod's catalogs (mod/localization/wuwa), as the website
+and the in-VR controls cards do, so a shortcut is changed in one place.
 """
 import html
 import json
@@ -33,9 +38,14 @@ STYLE = (':root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;backgrou
          'section{scroll-margin-top:20px}p{margin:8px 0 12px}li{margin:7px 0}code{color:#82dfc7;overflow-wrap:anywhere}'
          'hr{border:0;border-top:1px solid #30454d;margin:40px 0}footer{margin-top:24px;font-size:14px}'
          'table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:start;vertical-align:top;padding:9px 8px;border-bottom:1px solid #30454d}'
-         'th:first-child,td:first-child{width:43%}details{margin:14px 0}summary{cursor:pointer;color:#82dfc7}'
+         'td:first-child{width:43%;color:#82dfc7;font-weight:600}th.when{color:#a5b8be;font-weight:400;font-size:14px;padding-top:14px}'
+         'h3.group{margin:22px 0 4px;color:#dfbd82;font-size:15px;letter-spacing:.04em}details{margin:14px 0}summary{cursor:pointer;color:#82dfc7}'
          '@media(max-width:480px){main{padding:24px 16px}h1{font-size:29px}.card{padding:14px}th,td{padding:8px 4px}}')
-ROWS = ['cards', 'menu', 'next', 'full', 'blur', 'portal', 'recenter', 'camera', 'twice']
+CONTROLS = ROOT / 'mod/controls.json'
+CATALOGS = ROOT / 'mod/localization/wuwa'
+HOME = ROOT / 'dev/i18n/home'
+# Rows that only apply in a mode get a heading naming it and its shortcut, as on the website.
+CONTEXT = {'freecam': ('freecam', 'Double R3'), 'mouse': ('mouse', 'L3 + LB'), 'uevr': ('uevr', 'L3 + R3')}
 
 
 def load(code):
@@ -48,6 +58,27 @@ def fields():
     version = re.search(r'AssemblyInformationalVersion\("([^"]+)"\)', info).group(1)
     game = json.loads((ROOT / 'launcher/native/catalog.json').read_text(encoding='utf-8-sig'))['releases'][0]['gameVersion']
     return {'version': version, 'tag': 'beta-' + version.replace('.', '-'), 'game': game}
+
+
+def controls_tables(code):
+    """One table per group of mod/controls.json, in the catalog's words (English where a
+    catalog has no entry; mod_strings.py check fails while any language lacks one)."""
+    words = {} if code == 'en' else json.loads((CATALOGS / f'{code}.json').read_text(encoding='utf-8'))['strings']
+    pad = json.loads((HOME / f'{code}.json').read_text(encoding='utf-8'))['pad']
+    t = lambda english: html.escape(words.get(english) or english)
+    out = []
+    for group in json.loads(CONTROLS.read_text(encoding='utf-8'))['groups']:
+        rows, context = [], None
+        for row in group['rows']:
+            if row.get('when') != context:
+                context = row.get('when')
+                if context:
+                    label, keys = CONTEXT[context]
+                    rows.append(f'<tr><th class="when" colspan="2">{html.escape(pad[label])} · <bdi dir="ltr">{t(keys)}</bdi></th></tr>')
+            rows.append(f'<tr><td><bdi dir="ltr">{t(row["keys"])}</bdi></td><td>{t(row["action"])}</td></tr>')
+        title = re.sub(r'^\d+\s+', '', words.get(group['title']) or group['title'])
+        out.append(f'<h3 class="group">{html.escape(title)}</h3>\n<table><tbody>\n' + '\n'.join(rows) + '\n</tbody></table>')
+    return '\n'.join(out)
 
 
 def problems_for(code, data, english):
@@ -80,7 +111,6 @@ def section(code, data, english, values):
     anchor = 'zh' if code == 'zh-Hans' else code
     suffix = '' if code == 'en' else '-' + anchor
     direction = data.get('direction', 'ltr')
-    rows = ''.join(f'<tr><td>{t(f"controls.{r}.input")}</td><td>{t(f"controls.{r}.action")}</td></tr>\n' for r in ROWS)
     release = f'https://github.com/ChronoHaxx/wuwa-vr/releases/tag/{values["tag"]}'
     return f'''<section id="{anchor}" lang="{code}" dir="{direction}">
 <h1>{t("title")}</h1>
@@ -105,8 +135,8 @@ def section(code, data, english, values):
 
 <h2 id="controls{suffix}">{t("controls.title")}</h2>
 <p>{t("controls.intro")}</p>
-<table><thead><tr><th>{t("controls.input")}</th><th>{t("controls.action")}</th></tr></thead><tbody>
-{rows}</tbody></table>
+{controls_tables(code)}
+<p>{t("controls.keyboard")}</p>
 <p id="playstation{suffix}">{t("controls.playstation")}</p>
 <p>{t("controls.views")}</p>
 <details><summary>{t("optional.summary")}</summary>
@@ -121,6 +151,7 @@ def section(code, data, english, values):
 <li>{t("recovery.close")}</li>
 <li>{t("recovery.controller")}</li>
 <li>{t("recovery.hud")}</li>
+<li>{t("recovery.menu")}</li>
 <li>{t("recovery.report")}</li>
 </ul>
 <details><summary>{t("uninstall.summary")}</summary><p>{t("uninstall.body")}</p></details>

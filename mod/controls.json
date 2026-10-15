@@ -14,6 +14,7 @@
         {"keys": "L3 + RB", "action": "Game / fixed camera", "button": "RB"},
         {"keys": "L3 + Menu", "action": "Keep this card open", "button": "Menu"},
         {"keys": "L3 + Y / X", "action": "Camera up / down", "button": "YX"},
+        {"keys": "L3 + Y + X", "action": "Y + X together: back to default"},
         {"keys": "L3 + B", "action": "Show / hide game UI", "button": "B"},
         {"keys": "L3 + A", "action": "Recenter view", "button": "A"},
         {"keys": "L3 + R3", "action": "WuWa VR menu", "button": "R3"},
@@ -28,7 +29,8 @@
         {"keys": "LT + RT → R3", "action": "Click: full VR / stereo screen", "gesture": true},
         {"keys": "LT + RT → R3 0.8 s", "action": "Hold: mono theatre on / off", "gesture": true},
         {"keys": "LT + RT → L3", "action": "Click: blur on / off", "gesture": true},
-        {"keys": "LT + RT → L3 0.8 s", "action": "Stereo screen on / off (hold 0.8 s)"}
+        {"keys": "LT + RT → L3 0.8 s", "action": "Stereo screen on / off (hold 0.8 s)"},
+        {"keys": "LT + RT → Y", "action": "Press: hide characters at your eyes", "gesture": true}
       ]
     },
     {

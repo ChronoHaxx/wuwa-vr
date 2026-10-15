@@ -315,15 +315,25 @@ namespace WuWaVR.Manager
         {
             // Resolve on click: install/rollback and language can change while
             // the window stays open. A broken helper must not hide offline help.
-            if (page == "guide.html")
+            var section = page.Split(new[] { '#' }, 2);
+            if (section[0] == "guide.html")
             {
+                // The launcher's own guide is built with this app (dev/i18n/build_guide.py), so it
+                // is current even when the installed package's copy is older.
                 var launcherGuide = Path.Combine(guideDirectoryOverride ?? AppDomain.CurrentDomain.BaseDirectory, "PlayerGuide.html");
                 if (File.Exists(launcherGuide))
                 {
                     // Sections are id'd en, zh, then by language code; a guide
-                    // without this language's section opens at English.
+                    // without this language's section opens at English. A part
+                    // of it (#controls) is id'd per language: controls, controls-zh.
                     string anchor = text.Language == "zh-Hans" ? "zh" : text.Language, guide = File.ReadAllText(launcherGuide);
-                    if (!guide.Contains("id=\"" + anchor + "\"") && !guide.Contains("id='" + anchor + "'")) anchor = "en";
+                    Func<string, bool> has = id => guide.Contains("id=\"" + id + "\"") || guide.Contains("id='" + id + "'");
+                    if (!has(anchor)) anchor = "en";
+                    if (section.Length == 2)
+                    {
+                        var part = section[1] + (anchor == "en" ? "" : "-" + anchor);
+                        if (has(part)) anchor = part;
+                    }
                     return new Uri(launcherGuide).AbsoluteUri + "#" + anchor;
                 }
             }

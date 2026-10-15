@@ -239,7 +239,7 @@ function M.new(env)
     local function showroom_signal(current)
         local list = objects(s.classes.showroom, 64, SHOWROOM)
         if not list then return "unknown", "showroom class/index unavailable" end
-        local camera
+        local camera, nearest
         for _, o in ipairs(list) do
             local owner = valid(o) and o:get_outer() or nil
             local level = valid(owner) and owner:get_outer() or nil
@@ -255,13 +255,18 @@ function M.new(env)
                     local at = location(o:K2_GetComponentLocation())
                     if not at then return "unknown", "showroom location unavailable" end
                     local dx, dy, dz = at[1] - camera[1], at[2] - camera[2], at[3] - camera[3]
-                    if dx * dx + dy * dy + dz * dz < SHOWROOM_RANGE * SHOWROOM_RANGE then
-                        return "active", "camera at the character screen"
+                    local d2 = dx * dx + dy * dy + dz * dz
+                    if d2 < SHOWROOM_RANGE * SHOWROOM_RANGE then
+                        return "active", string.format("camera at the character screen (%.1f m)", math.sqrt(d2) / 100)
                     end
+                    if not nearest or d2 < nearest then nearest = d2 end
                 end
             end
         end
-        return "clear", "no character screen"
+        -- The distance says whether a screen tab (owner, 15 Oct: Weapon, Echoes, Forte and Chain froze
+        -- the reflection) moved the camera out of range, or to another scene.
+        return "clear", nearest and string.format("no character screen (showroom %.0f m away)", math.sqrt(nearest) / 100)
+            or "no character screen"
     end
     local function collect(now)
         local current = world()

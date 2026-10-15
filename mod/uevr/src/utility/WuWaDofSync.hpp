@@ -17,6 +17,11 @@
 // plausible camera values. Game thread (BeginRenderViewFamily).
 #include <Windows.h>
 
+// The status is shown translated in the WuWa VR menu (Cinema page); N_ marks it for the catalog.
+#ifndef N_
+#define N_(english) english
+#endif
+
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -48,7 +53,7 @@ inline Layout layout{};
 inline std::atomic<uint64_t> copies{}, refused{};
 inline int last_auto_source{0};
 // Static strings only: the menu reads this from the UI thread.
-inline std::atomic<const char*> status{"Off"};
+inline std::atomic<const char*> status{N_("Off")};
 
 inline bool read_u32(uintptr_t address, uint32_t& value) { return wuwa_shadow::checked::read(address, value); }
 inline bool read_f32(uintptr_t address, float& value) {
@@ -98,7 +103,7 @@ inline void resolve_plain(sdk::UScriptStruct* settings) {
 inline bool resolve_fields() {
     layout.attempted = true;
     const auto settings = sdk::find_uobject<sdk::UScriptStruct>(L"ScriptStruct /Script/Engine.PostProcessSettings");
-    if (!settings) { status = "PostProcessSettings not found"; return false; }
+    if (!settings) { status = N_("PostProcessSettings not found"); return false; }
     const auto offset_of = [&](const wchar_t* name) -> int32_t {
         const auto property = settings->find_property(name);
         return property ? property->get_offset() : -1;
@@ -106,7 +111,7 @@ inline bool resolve_fields() {
     const auto sensor = offset_of(L"DepthOfFieldSensorWidth"), min_fstop = offset_of(L"DepthOfFieldMinFstop"),
         blades = offset_of(L"DepthOfFieldBladeCount"), focal = offset_of(L"DepthOfFieldFocalDistance"),
         fstop = offset_of(L"DepthOfFieldFstop");
-    if (sensor < 0 || min_fstop < 0 || blades < 0 || focal < 0 || fstop < 0) { status = "Depth-of-field fields not found"; return false; }
+    if (sensor < 0 || min_fstop < 0 || blades < 0 || focal < 0 || fstop < 0) { status = N_("Depth-of-field fields not found"); return false; }
     layout.sensor = uint32_t(sensor); layout.min_fstop = uint32_t(min_fstop); layout.blades = uint32_t(blades);
     layout.focal = uint32_t(focal); layout.fstop = uint32_t(fstop);
     for (const auto* name : {L"DepthOfFieldFocalDistance", L"DepthOfFieldFstop", L"DepthOfFieldMinFstop", L"DepthOfFieldBladeCount",
@@ -168,8 +173,8 @@ inline bool find_block(uintptr_t first, uintptr_t second) {
         }
     }
     if (!ok) {
-        status = matches == 0 ? "Post-process block not found in the view (try again outside a story scene)" :
-            matches > 1 ? "Post-process block ambiguous" : "Second view does not match the first";
+        status = matches == 0 ? N_("Post-process block not found in the view (try again outside a story scene)") :
+            matches > 1 ? N_("Post-process block ambiguous") : N_("Second view does not match the first");
         spdlog::warn("[WuWaDoF] block search failed: {} matches, {}", matches, status.load());
         return false;
     }
@@ -184,7 +189,7 @@ inline bool find_block(uintptr_t first, uintptr_t second) {
 // everything: copy every plain-data field, not only depth of field.
 inline void sync(bool depth_of_field, bool everything, int source, const void* first_view, const void* second_view) {
     if ((!depth_of_field && !everything) || !first_view || !second_view) {
-        status = depth_of_field || everything ? "Waiting for a stereo frame" : "Off";
+        status = depth_of_field || everything ? N_("Waiting for a stereo frame") : N_("Off");
         return;
     }
     const auto a = reinterpret_cast<uintptr_t>(first_view), b = reinterpret_cast<uintptr_t>(second_view);
@@ -202,7 +207,7 @@ inline void sync(bool depth_of_field, bool everything, int source, const void* f
     const auto ca = camera_at(a + layout.base), cb = camera_at(b + layout.base);
     if (!plausible(ca) || !plausible(cb)) {
         ++refused;
-        status = "Views hold unexpected values; copy skipped";
+        status = N_("Views hold unexpected values; copy skipped");
         SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaDoF] copy skipped: focus {:.0f} / {:.0f}, f-stop {:.2f} / {:.2f}, sensor {:.3f} / {:.3f}, "
             "min f-stop {:.2f} / {:.2f}, blades {} / {}", ca.focal, cb.focal, ca.fstop, cb.fstop, ca.sensor, cb.sensor,
             ca.min_fstop, cb.min_fstop, ca.blades, cb.blades);
@@ -217,26 +222,26 @@ inline void sync(bool depth_of_field, bool everything, int source, const void* f
     const auto from = (from_index == 1 ? b : a) + layout.base, to = (from_index == 1 ? a : b) + layout.base;
     bool copied = false;
     if (everything && !layout.plain.empty()) {
-        if (!wuwa_shadow::writable_span(to, layout.size)) { ++refused; status = "Second view not writable; copy skipped"; return; }
+        if (!wuwa_shadow::writable_span(to, layout.size)) { ++refused; status = N_("Second view not writable; copy skipped"); return; }
         copied = true;
         for (const auto& [offset, bytes] : layout.plain) {
             if (!wuwa_shadow::checked::guarded_copy(reinterpret_cast<void*>(to + offset), reinterpret_cast<const void*>(from + offset), bytes)) {
-                ++refused; status = "Copy failed"; return;
+                ++refused; status = N_("Copy failed"); return;
             }
         }
     } else {
         for (const auto offset : layout.fields) {
             uint32_t value{};
             if (!read_u32(from + offset, value) || !wuwa_shadow::write_field(to + offset, value)) {
-                ++refused; status = "Copy failed"; return;
+                ++refused; status = N_("Copy failed"); return;
             }
         }
         copied = true;
     }
     if (!copied) return;
     ++copies;
-    status = everything ? (from_index == 1 ? "All camera effects copied into the first view" : "All camera effects copied into the second view")
-                        : (from_index == 1 ? "Blur copied into the first view" : "Blur copied into the second view");
+    status = everything ? (from_index == 1 ? N_("All camera effects copied into the first view") : N_("All camera effects copied into the second view"))
+                        : (from_index == 1 ? N_("Blur copied into the first view") : N_("Blur copied into the second view"));
     SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaDoF] copy {} {} -> {}{}: focus {:.0f} / {:.0f} cm, f-stop {:.2f} / {:.2f}, sensor {:.2f} / {:.2f}, "
         "blades {} / {}", everything ? "all" : "blur", from_index + 1, 2 - from_index, source == 2 ? " (auto)" : "",
         ca.focal, cb.focal, ca.fstop, cb.fstop, ca.sensor, cb.sensor, ca.blades, cb.blades);

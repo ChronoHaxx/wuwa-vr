@@ -140,7 +140,8 @@ test('a dialogue close-up asks for the setting every frame and logs it with the 
     local logged=false
     for _,line in ipairs(f.logs) do if line:find('%[WuWaLens%] shot=1') and line:find('near_clip=20') then logged=true end end
     assert(logged,'shot log line has no near_clip=20')
-    assert(f.values.WuWaControls_LensStatus:find('hiding anything nearer than 20 cm',1,true),f.values.WuWaControls_LensStatus)
+    -- Sent as parts for the menu to translate (WuWaStatusText.hpp): the format, then its value.
+    assert(f.values.WuWaControls_LensStatus:find('hiding anything nearer than %s cm\30'..'20',1,true),f.values.WuWaControls_LensStatus)
 end)
 test('it stays 10 cm short of the person the game focuses on, after the close-up move',function()
     local f=fixture()

@@ -144,6 +144,12 @@
   "All camera effects": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "All camera effects copied into the first view": [
+    "utility/WuWaDofSync.hpp"
+  ],
+  "All camera effects copied into the second view": [
+    "utility/WuWaDofSync.hpp"
+  ],
   "All detected menus": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
@@ -286,6 +292,12 @@
   ],
   "Blur (depth of field) on / off": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Blur copied into the first view": [
+    "utility/WuWaDofSync.hpp"
+  ],
+  "Blur copied into the second view": [
+    "utility/WuWaDofSync.hpp"
   ],
   "Blur off": [
     "utility/WuWaShortcutSheet.cpp"
@@ -434,6 +446,12 @@
   "Close-up aims at": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Close-up at %s degrees: %s %s m away, moved %s m nearer": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "Close-up at %s degrees: the game sets no focus in this shot, view at the game camera": [
+    "utility/WuWaStatusText.hpp"
+  ],
   "Close-up match": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -476,6 +494,9 @@
   ],
   "Controls cards (hold L3, or LT + RT)": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Copy failed": [
+    "utility/WuWaDofSync.hpp"
   ],
   "Copy from": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -540,6 +561,9 @@
   ],
   "Depth of field and camera effects": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Depth-of-field fields not found": [
+    "utility/WuWaDofSync.hpp"
   ],
   "Detection details": [
     "mods/VR.cpp"
@@ -1003,6 +1027,21 @@
   ],
   "HUD placement and visibility": [
     "mods/VR.cpp"
+  ],
+  "HUD refresh: done. Check the HUD in the headset.": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "HUD refresh: not possible right now. Try again in a moment; the log has the details.": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "HUD refresh: the HUD already matches this view.": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "HUD refresh: the HUD keeps changing. Open ESC or switch views to try again.": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "HUD refresh: working on it.": [
+    "utility/WuWaStatusText.hpp"
   ],
   "HUD right / left (meters)": [
     "mods/vr/OverlayComponent.cpp"
@@ -1691,7 +1730,9 @@
   "Off": [
     "mods/vr/WuWaControlsComponent.hpp",
     "mods/vr/WuWaVrMenuHost.cpp",
+    "utility/WuWaDofSync.hpp",
     "utility/WuWaMonoNativeProjection.hpp",
+    "utility/WuWaStatusText.hpp",
     "utility/WuWaVrMenu.cpp"
   ],
   "Off: UEVR opens its classic window, as before. You can turn this menu back on under VR > WuWa Controls.": [
@@ -1768,6 +1809,12 @@
   ],
   "Pass": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Paused in the diorama": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "Paused: game camera in full VR only": [
+    "utility/WuWaStatusText.hpp"
   ],
   "Physical gamepad passthrough (test)": [
     "mods/VR.cpp"
@@ -1852,6 +1899,15 @@
     "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
+  "Post-process block ambiguous": [
+    "utility/WuWaDofSync.hpp"
+  ],
+  "Post-process block not found in the view (try again outside a story scene)": [
+    "utility/WuWaDofSync.hpp"
+  ],
+  "PostProcessSettings not found": [
+    "utility/WuWaDofSync.hpp"
+  ],
   "Preserve proportions at frame edges": [
     "mods/vr/OverlayComponent.hpp"
   ],
@@ -1859,6 +1915,7 @@
     "mods/VR.cpp"
   ],
   "Press: hide characters at your eyes": [
+    "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Privacy box placement": [
@@ -2152,6 +2209,12 @@
   "Second view": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Second view does not match the first": [
+    "utility/WuWaDofSync.hpp"
+  ],
+  "Second view not writable; copy skipped": [
+    "utility/WuWaDofSync.hpp"
+  ],
   "Selected build: %s": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -2201,6 +2264,9 @@
   ],
   "Show optical hands (this launch only)": [
     "mods/vr/runtimes/OpenXR.cpp"
+  ],
+  "Shows 3 times, then turns itself off (Cinema page).": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Shows the L3 card without holding anything. Shortcut: L3 + Menu. A loaded test plan shows its step there instead.": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -2570,6 +2636,9 @@
   "Unavailable while another graphics test runs.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Unavailable: %s": [
+    "utility/WuWaStatusText.hpp"
+  ],
   "Unavailable: the eye pair is not verified yet (or this game build is not supported).": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -2645,11 +2714,20 @@
   "View modes and cutscenes": [
     "mods/VR.cpp"
   ],
+  "Views hold unexpected values; copy skipped": [
+    "utility/WuWaDofSync.hpp"
+  ],
   "WHILE ADJUSTMENT IS ON": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Wait for the launcher operation to finish.": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Waiting for a close-up (lens now %s degrees)": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "Waiting for a stereo frame": [
+    "utility/WuWaDofSync.hpp"
   ],
   "Waiting for a valid portal anchor.": [
     "mods/vr/OverlayComponent.cpp"
@@ -2714,7 +2792,7 @@
   "Whichever you used last controls the game; the other waits until you press or push something on it.": [
     "mods/VR.cpp"
   ],
-  "While hiding is off: a short note with the shortcut, once per scene, when a character is right at your eyes.": [
+  "While hiding is off: a short note with the shortcut, once per scene, when a character is right at your eyes. After 3 notes it turns itself off.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "While playing in first person, hold L3 + Y to raise eye level or L3 + X to lower it. This lets you see the result with this menu closed.": [
@@ -2789,6 +2867,7 @@
     "utility/WuWaPlayStationHid.hpp"
   ],
   "Y + X together: back to default": [
+    "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Yaw rate (degrees / second)": [
@@ -2812,11 +2891,35 @@
   "Your unsent note is retained in this menu until the game closes.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "depth of field forced on": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "depth of field: %s": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "depth of field: not in this game build": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "game focus": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "held behind the person in front (%s m)": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "hiding anything nearer than %s cm": [
+    "utility/WuWaStatusText.hpp"
+  ],
   "hold {L3} or {LT}+{RT} to see what each button does · {L3}+{R3} opens the WuWa VR menu": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "now": [
     "utility/WuWaShortcutSheet.cpp"
+  ],
+  "stopped at the closest %s cm": [
+    "utility/WuWaStatusText.hpp"
+  ],
+  "subject": [
+    "utility/WuWaStatusText.hpp"
   ],
   "{LT}+{RT}, click {R3} for full VR": [
     "mods/vr/WuWaControlsComponent.cpp"

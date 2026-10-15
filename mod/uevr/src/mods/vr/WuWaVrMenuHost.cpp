@@ -811,8 +811,9 @@ Page hud_page() {
         };
         page.items.push_back(std::move(layout));
         auto story = setting_toggle("Story scenes in 16:9",
-            "With the 16:9 layout off: story dialogue and story videos switch to 16:9 while they play, so story pictures "
-            "show whole, then the taller layout comes back. Uses the same detection as the automatic cinematic screen.",
+            "With the 16:9 layout off: every conversation (story scenes and chats with people in the world) and story "
+            "videos switch to 16:9 while they play, so story pictures show whole, then the taller layout comes back. "
+            "Follows the game's own dialogue state, so it works with any controls and with the game UI hidden.",
             "VR_WuWaUiStoryWindowSize");
         story.enabled = [] {
             return !VR::get()->is_wuwa_ui_window_size_enabled() && typed<bool>("VR_WuWaUiStoryWindowSize") != nullptr;

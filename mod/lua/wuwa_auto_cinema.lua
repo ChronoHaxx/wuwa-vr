@@ -5,6 +5,10 @@
 local M = {}
 local MOVIE = "MediaPlayer /Game/Aki/UI/UIResources/UiPlot/VideoPlayer/CommonVideoPlayer.CommonVideoPlayer"
 local STORY = "Class /Script/LGUI.UIExtendToggleSpriteTransition"
+-- The plot system's own state (test 17d): true for the whole dialogue whatever the
+-- input device, also with the game UI hidden. Only for a lease-v2 backend, which keeps
+-- it to the 16:9 story layout; automatic cinema still follows the plot-skip widget.
+local PLOT = "TypeScriptGeneratedClass /Game/Aki/TypeScript/Game/Module/Sequence/PlotBlueprintFunctionLibrary.PlotBlueprintFunctionLibrary_C"
 local function finite(v) return type(v) == "number" and v == v and math.abs(v) < math.huge end
 local function kind(p) return p:get_class():get_fname():to_string() end
 local function bool_getter(o, name)
@@ -97,12 +101,37 @@ function M.new(env)
         if unknown then return "unknown", "dialogue schema unavailable" end
         return "clear", matched and "plot-skip widget inactive" or "no active plot-skip widget"
     end
+    -- IsInPerformingPlot(__WorldContext) -> bool on the library's default object; the
+    -- signature is checked before the call, as for the getters above.
+    local function plot_signal(current)
+        local class = s.classes.plot
+        if not valid(class) or class:get_full_name() ~= PLOT then return "unknown", "plot library unavailable" end
+        local fn = class:find_function("IsInPerformingPlot")
+        local context = fn and fn:get_child_properties()
+        local ret = context and context:get_next()
+        if not context or context:get_fname():to_string() ~= "__WorldContext" or kind(context) ~= "ObjectProperty"
+            or not ret or ret:get_fname():to_string() ~= "ReturnValue" or kind(ret) ~= "BoolProperty" or ret:get_next() then
+            return "unknown", "plot query signature unavailable"
+        end
+        local cdo = class:get_class_default_object()
+        if not valid(cdo) then return "unknown", "plot library default unavailable" end
+        local performing = cdo:IsInPerformingPlot(current)
+        if performing == true then return "active", "plot performing" end
+        if performing == false then return "clear", "no plot" end
+        return "unknown", "plot query returned no value"
+    end
     local function collect()
         local current = world()
         if not current then return {world = "0", active = 0, hold = 0, known = 0, detail = "Current world unavailable"} end
         local start_world = current:get_address()
         local movie_ok, movie, movie_detail = pcall(movie_signal)
         local story_ok, story, story_detail = pcall(story_signal, current)
+        local plot, plot_detail = nil, nil
+        if s.plot then
+            local plot_ok
+            plot_ok, plot, plot_detail = pcall(plot_signal, current)
+            if not plot_ok then plot, plot_detail = "unknown", "plot query failed" end
+        end
         if not movie_ok then movie, movie_detail = "unknown", "movie reflection unavailable" end
         if not story_ok then story, story_detail = "unknown", "dialogue reflection unavailable" end
         local again = world()
@@ -110,13 +139,12 @@ function M.new(env)
             return {world = "0", active = 0, hold = 0, known = 0, detail = "World changed during detection"}
         end
         local sample = {world = string.format("%.0f", start_world), active = 0, hold = 0, known = 0}
-        for i, state in ipairs({movie, story}) do
-            local bit = i == 1 and 1 or 2
+        for bit, state in pairs({[1] = movie, [2] = story, [4] = plot}) do
             if state ~= "unknown" then sample.known = sample.known + bit end
             if state == "active" then sample.active = sample.active + bit end
             if state == "hold" then sample.hold = sample.hold + bit end
         end
-        sample.detail = movie_detail .. "; " .. story_detail
+        sample.detail = movie_detail .. "; " .. story_detail .. (plot_detail and ("; " .. plot_detail) or "")
         return sample
     end
     local function report(status, now)
@@ -145,7 +173,9 @@ function M.new(env)
         if s.last_poll and now < s.last_poll then s:reset() end
         if s.last_poll and now - s.last_poll < 0.1 - 1e-6 then return end
         s.last_poll = now
-        if env.get("WuWaControls_AutoCinemaSample") ~= "lease-v1" then report("Automatic mono needs a compatible backend", now); return end
+        local protocol = env.get("WuWaControls_AutoCinemaSample")
+        if protocol ~= "lease-v1" and protocol ~= "lease-v2" then report("Automatic mono needs a compatible backend", now); return end
+        s.plot = protocol == "lease-v2"
         if s.token and env.get("WuWaControls_AutoCinemaProducer") ~= s.token then
             -- A newer script or native reset owns the producer now. A live
             -- old script must not repeatedly steal the lease back.
@@ -161,7 +191,7 @@ function M.new(env)
         -- Two exact class descriptors, never an asset/global-instance scan.
         -- Lazy engine classes may load later: at most three attempts each per
         -- enable, five seconds apart; successful descriptors use the index.
-        for name, path in pairs({movie = "Class /Script/MediaAssets.MediaPlayer", story = STORY}) do
+        for name, path in pairs({movie = "Class /Script/MediaAssets.MediaPlayer", story = STORY, plot = s.plot and PLOT or nil}) do
             if not valid(s.classes[name]) and (s.class_attempts[name] or 0) < 3 and now >= (s.class_retry[name] or 0) then
                 s.class_attempts[name], s.class_retry[name] = (s.class_attempts[name] or 0) + 1, now + 5
                 s.classes[name] = api:find_uobject(path)

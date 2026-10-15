@@ -62,6 +62,16 @@ int main() {
     assert(lease.sample(generation, "300", dialogue, 0, sources, Presentation::stereo_screen, 6200));
     assert(lease.sample(generation, "300", dialogue, 0, sources, Presentation::stereo_screen, 6300));
     assert(lease.presentation(6300) == Presentation::stereo_screen); // Not suppressed after clear().
+    // lease-v2: the plot bit drives the story layout in place of the widget whenever it is
+    // known, and never reaches automatic cinema.
+    const auto c = cinema_bits({uint8_t(plot | movie), 0, uint8_t(plot | movie | dialogue)});
+    assert(c.active == movie && c.known == (movie | dialogue));
+    auto s = story_bits({plot, 0, uint8_t(plot | dialogue)}); // plot on, UI hidden: widget inactive
+    assert(s.active == dialogue && s.known == dialogue);
+    s = story_bits({dialogue, 0, uint8_t(plot | dialogue)}); // widget on, plot over: the plot wins
+    assert(s.active == 0 && s.known == dialogue);
+    s = story_bits({dialogue, 0, dialogue}); // plot unknown (lease-v1 or no library): the widget
+    assert(s.active == dialogue && s.known == dialogue);
     assert(resolve(true, false, Presentation::none).screen);
     assert(resolve(false, true, Presentation::none).mono);
     std::cout << "PASS automatic cinematic lease, expiry, pause, manual precedence, world and producer fencing\n";

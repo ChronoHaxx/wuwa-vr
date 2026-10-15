@@ -45,4 +45,94 @@ test("an older backend without the key behaves as before", function()
     for _ = 1, 20 do f:tick() end; assert(#f.writes == 0)
     f:enable(); assert(f:last().known == 3)
 end)
-print("Story layout detection tests passed: " .. passed)
+
+-- The Comfort script starts the detector for the story layout too (test 17c started it
+-- only for automatic cinema, so "Story scenes in 16:9" never ran). Reuses the
+-- auto-cinema test's Comfort fixture.
+local comfort_text = text:sub((assert(text:find("local function comfort_fixture()", 1, true))))
+comfort_text = comfort_text:sub(1, assert(comfort_text:find('test("', 1, true)) - 1)
+local comfort_fixture = assert(load("local module_path = ...\n" .. comfort_text .. "return comfort_fixture",
+    "comfort fixture", "t", env))(module_path)
+test("the Comfort script starts the detector for Story scenes in 16:9 with automatic cinema off", function()
+    -- As UEVR runs the script: its folder is on the search path while it loads.
+    local old_path, old_loaded = package.path, package.loaded.wuwa_auto_cinema
+    package.loaded.wuwa_auto_cinema = nil
+    package.path = (module_path:match("^(.*)[/\\]") or ".") .. "/?.lua;" .. old_path
+    local f = comfort_fixture(); f:load()
+    package.path = old_path
+    f:tick(); assert(#f.writes == 0, "nothing before either setting")
+    f.values.WuWaControls_StoryLayoutDetect = "true"; f:tick()
+    package.loaded.wuwa_auto_cinema = old_loaded
+    assert(#f.errors == 0, f.errors[1])
+    assert(f.writes[1] and f.writes[1][1] == "WuWaControls_AutoCinemaProducer", "detector not started")
+end)
+
+-- The plot system's own state (lease-v2 only): IsInPerformingPlot(world) on the plot library's default object.
+local PLOT = "TypeScriptGeneratedClass /Game/Aki/TypeScript/Game/Module/Sequence/PlotBlueprintFunctionLibrary.PlotBlueprintFunctionLibrary_C"
+local function named(s) return {to_string = function() return s end} end
+local function prop(name, kind_name, nxt)
+    return {get_fname = function() return named(name) end, get_next = function() return nxt end,
+        get_class = function() return {get_fname = function() return named(kind_name) end} end}
+end
+local function plot_fixture(protocol)
+    local f = {objects = {}, lookups = {}, calls = 0, performing = true, samples = {}, clock = 1, generation = 0}
+    local function object(name, outer)
+        local o = {name = name, outer = outer}; f.objects[#f.objects + 1] = o; local id = #f.objects
+        function o:get_address() return id end
+        function o:get_full_name() return self.name end
+        function o:get_outer() return self.outer end
+        function o:get_fname() return named(self.name) end
+        return o
+    end
+    f.world = object("World")
+    local viewport, engine = object("Viewport"), object("Engine")
+    viewport.World, engine.GameViewport = f.world, viewport
+    local function described(o, props)
+        o.get_class = function() return {find_property = function(_, key)
+            return props[key] and prop(key, "ObjectProperty") or nil end} end
+    end
+    described(engine, {GameViewport = true}); described(viewport, {World = true})
+    f.cdo = object("Default__PlotBlueprintFunctionLibrary_C")
+    function f.cdo:IsInPerformingPlot(context) f.calls = f.calls + 1; f.context = context; return f.performing end
+    f.signature = prop("__WorldContext", "ObjectProperty", prop("ReturnValue", "BoolProperty"))
+    f.plot_class = object(PLOT)
+    function f.plot_class:find_function(name)
+        return name == "IsInPerformingPlot" and {get_child_properties = function() return f.signature end} or nil
+    end
+    function f.plot_class:get_class_default_object() return f.cdo end
+    f.values = {VR_AutoCinema = "false", WuWaControls_StoryLayoutDetect = "true",
+        WuWaControls_AutoCinemaSample = protocol or "lease-v2", WuWaControls_AutoCinemaStatus = "test", WuWaControls_AutoCinemaProducer = "0"}
+    local module = assert(loadfile(module_path))()
+    f.module = module.new({api = {
+            to_uobject = function(_, id) return f.objects[id] end,
+            get_engine = function() return engine end,
+            find_uobject = function(_, name) f.lookups[#f.lookups + 1] = name; return name == PLOT and f.plot_class or nil end},
+        types = {UObjectHook = {get_objects_by_class = function() return {} end}},
+        get = function(key) if key == "WuWaControls_Clock" then return tostring(f.clock) end; return f.values[key] end,
+        set = function(key, value)
+            if key == "WuWaControls_AutoCinemaProducer" then
+                if value == "start" then f.generation = f.generation + 1 end
+                f.values[key] = tostring(f.generation)
+            else f.samples[#f.samples + 1] = value end
+        end, encode = function(v) return v end, log = function() end})
+    function f:tick() self.clock = self.clock + .1; self.module:tick() end
+    function f:last() return self.samples[#self.samples] end
+    return f
+end
+test("lease-v2: a performing plot is reported (bit 4) with the current world as context", function()
+    local f = plot_fixture(); f:tick()
+    assert(f:last().known & 4 == 4 and f:last().active & 4 == 4 and f.context == f.world, f:last().detail)
+    assert(f:last().detail:find("plot performing", 1, true))
+    f.performing = false; f:tick(); assert(f:last().known & 4 == 4 and f:last().active & 4 == 0)
+end)
+test("lease-v1 backends never look up or call the plot library", function()
+    local f = plot_fixture("lease-v1"); for _ = 1, 5 do f:tick() end
+    for _, name in ipairs(f.lookups) do assert(name ~= PLOT, "plot lookup on lease-v1") end
+    assert(f.calls == 0 and f:last().known & 4 == 0)
+end)
+test("an unexpected plot query signature is unknown and never called", function()
+    local f = plot_fixture()
+    f.signature = prop("__WorldContext", "ObjectProperty", prop("Extra", "IntProperty", prop("ReturnValue", "BoolProperty")))
+    f:tick(); assert(f.calls == 0 and f:last().known & 4 == 0 and f:last().detail:find("signature", 1, true))
+end)
+print("Story layout detection tests passed (with plot): " .. passed)

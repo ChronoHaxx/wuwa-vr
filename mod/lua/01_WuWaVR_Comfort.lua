@@ -223,7 +223,8 @@ local cinema_attempted = false
 -- Autoloading the helper as a standalone script does not populate require's cache.
 local cinema_ok, cinema_module = pcall(require, "wuwa_auto_cinema")
 local function cinema_tick()
-    if not cinema_attempted and status_bool("VR_AutoCinema") == true then
+    -- Automatic cinema and the HUD page's "Story scenes in 16:9" both use the detector.
+    if not cinema_attempted and (status_bool("VR_AutoCinema") == true or status_bool("WuWaControls_StoryLayoutDetect") == true) then
         cinema_attempted = true
         if cinema_ok and type(cinema_module) == "table" and type(cinema_module.new) == "function" then
             local ready, instance = pcall(cinema_module.new, {api = uevr.api, types = uevr.types,

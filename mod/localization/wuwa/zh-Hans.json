@@ -940,7 +940,7 @@
     "With Native Stereo Fix and Use Same Stereo Pass on, keeps the source eye's projection for supported custom reflection captures. With Native Stereo Fix off, selects verified two-eye atlas parameters. Visual acceptance is pending.": "开启 Native Stereo Fix 和“使用相同立体通道”时，对支持的自定义反射捕获会保留源眼投影。关闭 Native Stereo Fix 时，将使用已验证的双眼图集参数。视觉效果待验证。",
     "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. The WuWa VR menu has the same switch on its Controllers page.": "打开 Reality Runner 时，行走 10 秒即开始跑步，停止行走 5 分钟即结束。WuWa VR 菜单的手柄页面也有同样的开关。",
     "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. Your route is saved in the UEVR profile, wuwa-runs folder.": "打开 Reality Runner 时，行走 10 秒即开始跑步，停止行走 5 分钟即结束。你的路线保存在 UEVR 配置文件的 wuwa-runs 文件夹中。",
-    "With the 16:9 layout off: story dialogue and story videos switch to 16:9 while they play, so story pictures show whole, then the taller layout comes back. Uses the same detection as the automatic cinematic screen.": "16:9 布局关闭时：剧情对话和剧情视频播放期间切换为 16:9，让剧情图片完整显示，结束后恢复较高的布局。与自动电影屏幕使用相同的检测。",
+    "With the 16:9 layout off: every conversation (story scenes and chats with people in the world) and story videos switch to 16:9 while they play, so story pictures show whole, then the taller layout comes back. Follows the game's own dialogue state, so it works with any controls and with the game UI hidden.": "16:9 布局关闭时：所有对话（剧情场景以及与世界中人物的闲聊）和剧情视频在播放期间切换为 16:9，让剧情图片完整显示，结束后恢复较高的布局。依据游戏自身的对话状态，因此任何操作方式下、隐藏游戏界面时都有效。",
     "Within a shot": "镜头内",
     "World scale": "世界缩放",
     "World-space labels in both eyes (candidate)": "双眼显示场景标签（候选修复）",

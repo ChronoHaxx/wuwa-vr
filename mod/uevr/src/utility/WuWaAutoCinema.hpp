@@ -9,6 +9,17 @@
 // This class never owns or edits persisted display preferences.
 namespace wuwa_auto_cinema {
 constexpr uint8_t movie = 1, dialogue = 2, sources = movie | dialogue;
+// lease-v2 samples add the plot system's own state (wuwa_auto_cinema.lua). The story
+// layout uses it in place of the plot-skip widget whenever it is known; automatic
+// cinema keeps the movie and widget bits only.
+constexpr uint8_t plot = 4;
+struct Bits { uint8_t active, hold, known; };
+inline Bits cinema_bits(Bits b) { return {uint8_t(b.active & sources), uint8_t(b.hold & sources), uint8_t(b.known & sources)}; }
+inline Bits story_bits(Bits b) {
+    if (!(b.known & plot)) return cinema_bits(b);
+    const auto story = [](uint8_t v) { return uint8_t((v & movie) | ((v & plot) ? dialogue : 0)); };
+    return {story(b.active), story(b.hold), uint8_t((b.known & movie) | dialogue)};
+}
 enum class Presentation : uint8_t { none, stereo_screen, mono_theatre };
 struct View { bool screen, mono; };
 inline View resolve(bool saved_screen, bool saved_mono, Presentation automatic) {

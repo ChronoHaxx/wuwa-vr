@@ -218,8 +218,15 @@ effect changes, whatever changed it (this switch, a story scene, a steps card).
 **Story scenes in 16:9** (on by default) applies only with the taller layout.
 Story dialogue and story videos then use 16:9 while they play, so story pictures
 show whole. It reuses the automatic cinematic screen's detector
-(`wuwa_auto_cinema.lua`: the active plot-skip widget, the story video player),
-which now also runs for this setting with automatic cinema off. The plugin
+(`wuwa_auto_cinema.lua`), which also runs for this setting with automatic cinema
+off (since test 17e; 17c only started it for automatic cinema). The story layout
+follows the plot system's own state (`PlotBlueprintFunctionLibrary`
+`IsInPerformingPlot`, sample bit 4, protocol `lease-v2`): true for the whole
+dialogue with controller or keyboard and mouse, with the game UI hidden and on
+the skip summary, false as the plot ends, and the same for a chat with an
+overworld NPC (measured 15 Oct on the simulator), so every conversation counts. The
+plot-skip widget is the fallback when that query is unavailable. Automatic
+cinema keeps the widget and the story video player only. The plugin
 holds the detector's samples in a second lease with the cinema lease's timing:
 100 ms to confirm a scene, and the taller layout returns 500 ms after a verified
 end. This lease never changes the view.

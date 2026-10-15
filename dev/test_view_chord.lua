@@ -4,7 +4,7 @@
 -- stereo screen, and the triggers can stay held for the next click. Holding R3
 -- 0.8 s toggles mono theatre, back to the view it was entered from. A click
 -- fires when R3 is released with both triggers still held. The fixture is the
--- one in dev/test_mono_theatre.lua (test 3i), copied so this file stands alone.
+-- one from the retired dev/test_mono_theatre.lua (test 3i), copied so this file stands alone.
 local source=assert(arg[1], 'Pass the PolarControls script path')
 local L3,R3,A,Y=64,128,4096,32768
 local MONO,SCREEN='VR_MonoTheatreMode','VR_2DScreenMode'
@@ -150,6 +150,12 @@ test('a trigger dip or polling pause during an R3 hold cancels it until neutral'
         f:sample(); f:arm(); f:click(); f:count(1); f:expect('full')
     end
 end)
+test('a reversed clock during an R3 hold fails closed until neutral',function()
+    local f=fixture('full'); f:arm(); consumed(f:sample(R3,255,255)); f:hold(.4)
+    f:advance(-.05); consumed(f:input(R3,255,255)); f:tick()
+    f:hold(1); consumed(f:sample(0,255,255)); f:count(0); f:expect('full')
+    f:sample(); f:arm(); f:click(); f:count(1); f:expect('stereo')
+end)
 test('a click or hold starts from the live view, including an automatic cinema view',function()
     local f=fixture('full'); f.auto='stereo'; f:arm(); f:click(); f:expect('full')
     assert(f.requests[#f.requests]=='WuWaControls_ToggleStereoScreen=off',f.requests[#f.requests])
@@ -167,6 +173,76 @@ test('extra buttons cancel the chord until neutral; L3+R3 still reaches the nati
     f:sample(); f:arm(); f:click(); f:count(1)
 end)
 
+-- Ported from dev/test_mono_theatre.lua (the pre-17k chord, where an R3 click toggled mono).
+test('portal, diorama and stereo-screen gestures do not roll into the chord',function()
+    for _,triggers in ipairs({{255,0},{0,255},{255,255}}) do
+        local f=fixture(); f:sample(); f:sample(L3,triggers[1],triggers[2])
+        f:sample(0,255,255); f:sample(R3,255,255); f:sample(0,255,255); f:count(0)
+        f:arm(); f:click(); f:count(1); f:expect('stereo')
+    end
+end)
+test('a fired chord needs a neutral release before another shortcut can take ownership',function()
+    local f=fixture(); f:arm(); f:hold(1.0); f:count(1); f:expect('mono')
+    f:sample(A,0,0); f:sample(L3,255,0)
+    assert(not f.writes.WindowMode_Enabled,'Held non-neutral input rolled the chord into portal')
+    f:sample(); f:sample(L3,255,0)
+    assert(f.writes.WindowMode_Enabled==1,'Fresh portal gesture stopped working')
+end)
+test('the chord stays available in dialogue and game-menu cursor transitions',function()
+    for _,signal in ipairs({'native','cursor'}) do
+        local f=fixture(); f:arm()
+        if signal=='native' then f.values.WuWaControls_NativeMenu='true' else f.pc.bShowMouseCursor=true end
+        f:tick(); f:click(); f:count(1); f:expect('stereo')
+        f:hold(1.0); consumed(f:sample(0,255,255)); f:count(2); f:expect('mono')
+    end
+end)
+test('focus, UEVR, adjustment, disabled controls and passthrough discard a pending click or hold',function()
+    for _,reason in ipairs({'focus','ui','adjust','disabled','passthrough'}) do
+        for _,pending in ipairs({'click','hold'}) do
+            local f=fixture(); f:arm(); consumed(f:sample(R3,255,255))
+            if pending=='hold' then f:hold(.4) end
+            local function block(on)
+                if reason=='focus' then f.values.WuWaControls_Focused=tostring(not on)
+                elseif reason=='ui' then f.ui=on
+                elseif reason=='adjust' then f.values.WuWaControls_AdjustMode=tostring(on)
+                elseif reason=='disabled' then f.values.WuWaControls_Enabled=tostring(not on)
+                else f.values.VR_WuWaGamepadPassthrough=tostring(on) end
+                f:tick()
+            end
+            block(true); block(false)
+            f:sample(0,255,255); f:count(0); f:expect('full')
+            f:sample(); f:arm(); f:click(); f:count(1); f:expect('stereo')
+        end
+    end
+end)
+test('passthrough does not consume or start the chord',function()
+    local f=fixture(); f:arm(); f.values.VR_WuWaGamepadPassthrough='true'
+    local p=f:sample(R3,255,255); f:sample(0,255,255); f:count(0)
+    assert(p.wButtons==R3 and p.bLeftTrigger==255 and p.bRightTrigger==255,'Passthrough input changed')
+end)
+test('disconnect, controller handover and reset cancel a pending click',function()
+    for _,reason in ipairs({'disconnect','handover','reset','unrelated'}) do
+        local f=fixture(); f:sample(0,0,0,1); f:arm(); consumed(f:sample(R3,255,255))
+        if reason=='disconnect' then f:input(0,0,0,0,1167)
+        elseif reason=='handover' then f:advance(1.01); f:input(A,0,0,1)
+        elseif reason=='reset' then f.callbacks.on_script_reset()
+        else f:input(0,0,0,1,1167) end
+        f:tick(); f:sample(0,255,255); f:count(reason=='unrelated' and 1 or 0)
+    end
+end)
+test('chord clicks do not seed the double-R3 free-camera action',function()
+    local f=fixture(); f:arm(); f:click(); consumed(f:sample())
+    f:sample(R3); f:sample(); assert(not f.writes.WuWaControls_CameraMode,'View click seeded freecam tap')
+    f:sample(R3); f:sample(); assert(f.values.WuWaControls_CameraMode=='2','Ordinary double-R3 stopped working')
+end)
+-- From dev/test_auto_cinema.lua: the L3 stereo-screen hold also asks the backend (v2) instead of
+-- writing the saved option; the final check below fails any v2 fixture that wrote one directly.
+test('the L3 stereo-screen hold asks the backend for the view',function()
+    local f=fixture('full'); f:sample(); f:sample(0,255,255); f:sample(L3,255,255)
+    for _=1,9 do f:advance(.1); f:input(L3,255,255); f:tick() end
+    f:count(1); f:expect('stereo')
+    assert(f.requests[#f.requests]=='WuWaControls_ToggleStereoScreen=on',f.requests[#f.requests])
+end)
 for _,f in ipairs(fixtures) do
     for _,key in ipairs({'VR_WorldScale','VR_EnableGUI'}) do
         assert(not f.writes[key],'View workflow changed '..key)

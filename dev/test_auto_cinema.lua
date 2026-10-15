@@ -164,24 +164,8 @@ test("lost world releases the lease; a missing stop method is unknown rather tha
     f:tick(); assert(f:last().known == 2)
     f.viewport.World = nil; f:tick(); assert(f:last().world == "0" and f:last().known == 0)
 end)
-test("real Polar gestures request effective native toggles instead of overwriting saved preferences", function()
-    -- Reuse the established callback fixture, before its tests execute. This
-    -- exercises the production Polar script; preference semantics live in the
-    -- production pure C++ lease/resolve helper tested by test_auto_cinema.cpp.
-    local file = assert(io.open("dev/test_mono_theatre.lua", "r")); local text = file:read("*a"); file:close()
-    local boundary = assert(text:find("local function consumed", 1, true))
-    local env = setmetatable({arg = {"mod/lua/02_WuWaVR_PolarControls.lua"}}, {__index = _G})
-    local make = assert(load(text:sub(1, boundary - 1) .. "return fixture", "shared mono fixture", "t", env))()
-    local mono = make(true); mono.values.WuWaControls_ToggleMonoTheatre = "effective-v1"
-    mono:arm(); mono:sample(128, 255, 255)
-    assert(mono.values.WuWaControls_ToggleMonoTheatre == "toggle" and not mono.writes.VR_MonoTheatreMode)
-    assert(mono.values.VR_2DScreenMode == "true")
-    local screen = make(false); screen.values.WuWaControls_ToggleStereoScreen = "effective-v1"
-    screen:arm(); screen:sample(64, 255, 255)
-    for _ = 1, 55 do screen:sample(64, 255, 255) end
-    assert(screen.values.WuWaControls_ToggleStereoScreen == "toggle" and not screen.writes.VR_2DScreenMode)
-    assert(not screen.writes.VR_MonoTheatreMode)
-end)
+-- The Polar gesture -> effective-toggle checks moved to dev/test_view_chord.lua (17k chord,
+-- effective-v2), which fails any fixture that writes a view option directly.
 local function comfort_fixture()
     local f = {callbacks = {}, values = {VR_AutoCinema = "false", VR_2DScreenMode = "false", VR_MonoTheatreMode = "false",
         WuWaControls_Clock = "1", WuWaControls_AutoCinemaProducer = "0", WuWaControls_AutoCinemaSample = "lease-v1",

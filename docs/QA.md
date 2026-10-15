@@ -33,8 +33,17 @@ add that line to the code and an invariant to `qa.py`.
    `python dev/i18n/check_all.py`. A test this Python can't run (missing `psutil` or
    `playwright`) shows as SKIP with the module it needs. Lua tests need a Python with
    `lupa`: the workspace's `dev-tools\lua-venv`, or set `QA_LUA_PYTHON`. Before this
-   runner, the R3 tests in `test_mono_theatre.lua` and `test_portal_shortcut.lua` broke
-   unnoticed on 11 Oct, because nothing ran them all.
+   runner, the R3 tests (then `test_mono_theatre.lua`) and `test_portal_shortcut.lua` broke
+   unnoticed on 11 Oct, because nothing ran them all; from test 17k to 1.2.3 four tests stayed
+   red because nothing required the runner to pass. `dev/candidate.py` now runs it first.
+
+   Package with one command once the native build has finished:
+   `python dev/candidate.py 17r "Test 17r: what changed (1.2.4, private)" --notes TEST17R.txt [--plan plan.json]`.
+   It refuses while the game runs, if the offline tests fail, if the compiled tree differs from
+   `mod/uevr`, or if `mod/` or `launcher/` has uncommitted changes. It names the folder, build and
+   package from the build's end time, puts the matching PDB beside the DLL, and builds the Test
+   Launcher. The steps card has its own tool: `python dev/steps-plan.py check|install|answers|archive`
+   (archive the plan when the test ends, so it does not follow the owner into normal play).
 2. `python dev/qa.py plan --build <id> --since <last tested commit> --out <candidate>\CHECKLIST.md`.
    The checklist has:
    - every cell of a feature whose code changed;
@@ -57,6 +66,10 @@ A release ships when:
 
 [RELEASING.md](RELEASING.md) has the packaging steps. 1.2.1 shipped broken on Steam because
 only the launcher copy was checked. The `copy` dimension exists to stop that.
+
+Before the release pipeline, regenerate the native patch from `mod/uevr`
+(`python dev/sync-native-patch.py <UEVR clone>`) and commit it; the release's source check
+compares against it. For 1.2.3 it was nine candidates out of date.
 
 ## Fixing any "different in one eye" problem
 

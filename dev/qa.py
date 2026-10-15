@@ -310,14 +310,14 @@ def lua_python() -> str | None:
 def unit_tests(cpp: bool) -> list[tuple[str, list[str] | str]]:
     """(name, command) per test; a string command is a reason it cannot run here."""
     tests, lua = [], lua_python()
-    for t in sorted((ROOT / 'dev').glob('test_*.lua')):
+    for t in sorted((ROOT / 'dev').glob('test_*.lua')) + sorted((ROOT / 'mod/tests').glob('test_*.lua')):
         m = re.search(r'mod/lua/[A-Za-z0-9_]+\.lua', t.read_text(encoding='utf-8', errors='replace')[:4000])
         if not m:
             tests.append((t.name, 'no mod/lua script named in its header'))
         elif not lua:
             tests.append((t.name, 'no Python with lupa (pip install lupa, or set QA_LUA_PYTHON)'))
         else:
-            tests.append((t.name, [lua, '-c', LUA_RUNNER, f'dev/{t.name}', m.group(0)]))
+            tests.append((t.name, [lua, '-c', LUA_RUNNER, t.relative_to(ROOT).as_posix(), m.group(0)]))
     for t in sorted(list((ROOT / 'dev').glob('test_*.py')) + list((ROOT / 'launcher/dev').glob('test_*.py'))):
         tests.append((t.relative_to(ROOT).as_posix(), [sys.executable, str(t)]))
     if cpp:

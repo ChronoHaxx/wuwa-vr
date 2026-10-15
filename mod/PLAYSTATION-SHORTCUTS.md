@@ -77,4 +77,4 @@ This local lifecycle run found no Sony controller, so it does not establish
 pending-read cancellation behavior with real controller hardware.
 Run `mod/tests/test_playstation_shortcuts.lua`
 with Lua 5.4 and `mod/lua/02_WuWaVR_PolarControls.lua` as its argument, plus the
-existing `dev/test_portal_shortcut.lua` and `dev/test_mono_theatre.lua` suites.
+existing `dev/test_portal_shortcut.lua` and `dev/test_view_chord.lua` suites.

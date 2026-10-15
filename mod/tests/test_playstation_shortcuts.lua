@@ -1,3 +1,4 @@
+-- lua mod/tests/test_playstation_shortcuts.lua mod/lua/02_WuWaVR_PolarControls.lua
 -- Uses actual PolarControls callback/state machine, no engine/device I/O.
 local source=assert(arg[1],'Pass PolarControls path')
 local L3,R3=64,128

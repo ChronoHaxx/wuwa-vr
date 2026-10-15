@@ -237,11 +237,33 @@ test("the next dialogue's rebuilt view is found again", function()
     local new = plot_view(f); show(f, new); f:tick()
     assert(select(2, bit8(f:last())) and f.scans == 2, f:last().detail)
 end)
-test("a closed view still in memory loses to the live one; two live views are unknown", function()
+test("an empty remembered picture is searched for again every 2 s (a rebuilt view beside the old one)", function()
+    local f = picture_fixture(); local old = plot_view(f); f:tick()
+    assert(not select(2, bit8(f:last())) and f.scans == 1)
+    -- The game builds a new plot view for the picture; the old, empty one stays in memory and closes.
+    local new = plot_view(f); show(f, new); old.bIsUIActive = false
+    local switched
+    for i = 1, 25 do f:tick(); if select(2, bit8(f:last())) then switched = i; break end end
+    assert(switched and switched <= 22, "picture found within about 2 s: " .. tostring(switched))
+    assert(f.scans == 2, f.scans)
+end)
+test("two live views: the one showing a picture wins; a shown picture is not searched again", function()
+    local f = picture_fixture(); plot_view(f); local shown = plot_view(f); show(f, shown); f:tick()
+    assert(select(2, bit8(f:last())), f:last().detail)
+    for _ = 1, 100 do f:tick() end
+    assert(select(2, bit8(f:last())) and f.scans == 1, "no searches while the picture shows")
+end)
+test("an empty picture costs one search per 2 s, not one per tick", function()
+    local f = picture_fixture(); plot_view(f, 400)
+    for _ = 1, 100 do f:tick() end
+    assert(f.scans >= 3 and f.scans <= 6, f.scans)
+end)
+test("a closed view still in memory loses to the live one; two live views showing pictures are unknown", function()
     local f = picture_fixture(); local stale = plot_view(f); show(f, stale); stale.bIsUIActive = false
     plot_view(f); f:tick()
     local known, active = bit8(f:last()); assert(known and not active, f:last().detail)
-    f = picture_fixture(); show(f, plot_view(f)); plot_view(f); f:tick()
+    -- Two live views both showing a picture stay unknown (one showing wins: see above).
+    f = picture_fixture(); show(f, plot_view(f)); show(f, plot_view(f)); f:tick()
     assert(not bit8(f:last()) and f:last().detail:find("ambiguous story picture", 1, true))
 end)
 

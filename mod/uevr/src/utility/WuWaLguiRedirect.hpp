@@ -843,9 +843,13 @@ template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
         // its return address is at rsp + 0x138 here too.
         const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
         if (ret - state().base == wuwa_lgui_viewport::pointer_ray_return) {
-            wuwa_lgui_viewport::rewrite_pointer(c.rsp, site.offset);
+            wuwa_lgui_viewport::rewrite_input(c.rsp, site.offset, 1);
             return;
         }
+    }
+    if constexpr (I == 3 || I == 4) {
+        wuwa_lgui_viewport::rewrite_input(c.rbp, site.offset, static_cast<uint32_t>(I));
+        return;
     }
     if constexpr (I == 2) {
         // GetViewportSize pushes r14 and reserves 0x130 (fingerprinted with the function), so its
@@ -1008,10 +1012,11 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                 const auto& v = wuwa_lgui_viewport::state();
                 const auto size = v.size.load(std::memory_order_relaxed);
                 const auto pointer = v.pointer_size.load(std::memory_order_relaxed);
-                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} pointer={}x{} pointer_rewrites={} sites={:x} callers={:x} "
+                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} pointer={}x{} pointer_rewrites={} input_rewrites={} sites={:x} callers={:x} "
                     "by_caller={},{},{},{},{},{},{},{},{}", v.installed.load(),
                     size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed),
-                    pointer >> 32, pointer & 0xffffffffu, v.pointer_rewrites.load(std::memory_order_relaxed), v.sites.load(),
+                    pointer >> 32, pointer & 0xffffffffu, v.pointer_rewrites.load(std::memory_order_relaxed),
+                    v.input_rewrites.load(std::memory_order_relaxed), v.sites.load(),
                     v.caller_mask.load(), v.callers[0].load(), v.callers[1].load(), v.callers[2].load(), v.callers[3].load(),
                     v.callers[4].load(), v.callers[5].load(), v.callers[6].load(), v.callers[7].load(), v.callers[8].load());
             }

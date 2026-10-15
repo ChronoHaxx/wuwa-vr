@@ -30,7 +30,7 @@ Legend: ✓ passed (build, date) · ✗ failed · ◐ blocked · ? not yet check
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | LT + RT, R3: click full VR / stereo; hold mono and back; repeat while the triggers stay held (`view-chord`) | ? | ? | ? |  |  | ? | ? |  |
 | Story videos switch to mono theatre and back (`auto-cinema-video`) |  |  |  |  |  | ? |  | ? |
-| Story pictures switch to the stereo screen and back (`auto-cinema-picture`) | ? |  |  |  |  | ? |  | ? |
+| Story pictures switch to the stereo screen and back (`auto-cinema-picture`) | ? |  |  |  |  | ✗ |  | ? |
 | Automatic cinema on by default; story scenes keep the current view (`auto-cinema-default`) | ? | ? |  |  |  | ? |  |  |
 | Cinematic framing matches between the eyes (letterbox) (`framing`) | ? |  |  |  |  | ? |  |  |
 | Diorama: scale, its own camera, and back (`diorama`) |  |  |  | ? | ? |  |  |  |
@@ -41,7 +41,7 @@ Legend: ✓ passed (build, date) · ✗ failed · ◐ blocked · ? not yet check
 | Feature | full169 | fulltall | stereo | mono | switch | dialogue | menu | character | log |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | HUD and menus laid out for the view they are shown in (`ui-layout`) | ? | ? | ? | ? | ✗ | ? | ? |  | ✓ 1015-1658 10-15 |
-| Mouse and controller cursor hit what they point at (`ui-cursor`) — open | ? | ✗ | ? | ? | ? |  | ? | ? |  |
+| Mouse and controller cursor hit what they point at (`ui-cursor`) — open | ? | ✗ | ? | ? | ? |  | ? | ? | ? |
 | Story scenes in 16:9 with the taller layout (`ui-story-169`) |  | ? |  |  |  | ? |  |  |  |
 | Character screen floor reflection stays live (`ui-character`) | ? |  |  |  |  |  |  | ? |  |
 | WuWa VR menu: open, settings, defaults, X / Delete reset, save switch (`vr-menu`) | ? |  | ? | ? |  |  |  |  |  |

@@ -23,6 +23,11 @@
 // scaler's viewport check (0xdd3a80) and a centre-of-screen ray (0xdd94b0), so
 // there only the mouse ray gets the window size (test 17l, 15 Oct 2026: the
 // mouse divided window pixels by the eye rect and missed in the taller layout).
+// Controller presses reach the same ray: the game turns the button's UI point
+// into viewport pixels (sites 3 and 4) and casts the ray there, so with the ray
+// alone on the window size, Y -> Journey log in the quest menu missed (17l). In
+// the taller layout sites 3 and 4 take the window size too (test 17m): every
+// pixel conversion then uses one size, as in 16:9; the layout keeps the eye rect.
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -33,14 +38,15 @@ struct State {
     // Window size as (width << 32 | height); 0 leaves the game's rect alone.
     std::atomic<uint64_t> size{0};
     std::atomic<uint64_t> rewrites{0};
-    // Window size for the mouse ray while full VR shows the taller layout; 0 otherwise.
+    // Window size for the input conversions while full VR shows the taller layout; 0 otherwise.
     std::atomic<uint64_t> pointer_size{0};
-    std::atomic<uint64_t> pointer_rewrites{0};
+    std::atomic<uint64_t> pointer_rewrites{0}; // the mouse ray (site 1, one caller)
+    std::atomic<uint64_t> input_rewrites{0};   // UI point -> pixels (sites 3 and 4)
     // Bit n lets site n rewrite (WuWaLguiRedirect.hpp viewport_sites); all five by default.
-    // Bit 5 lets the mouse ray have the window size in the taller layout.
+    // In the taller layout, bit 5 lets the mouse ray and bit 6 the point conversions have the window size.
     // Diagnostics only (VR_WuWaUiWindowSizeSites, never saved): finds which reader a game
     // system depends on (15 Oct: the Resonators floor reflection froze in 16:9 only).
-    std::atomic<uint32_t> sites{0x3f};
+    std::atomic<uint32_t> sites{0x7f};
     // GetViewportSize (site 2) by caller, for the same test: calls per caller (the direct calls
     // below, then any other) and bit n lets caller n have the window size (VR_WuWaUiViewportCallers,
     // never saved). Without site 2 the reflection is live but the layout breaks, so one caller is it.
@@ -93,13 +99,16 @@ inline void rewrite(uintptr_t frame, uint32_t offset, uint32_t site) noexcept {
     if (apply(reinterpret_cast<int32_t*>(frame + offset), size)) s.rewrites.fetch_add(1, std::memory_order_relaxed);
 }
 
-// The view-rect getter (site 1) called by the mouse ray: the window size in 16:9 as for every
-// caller, and in the taller layout too, where the other callers keep the eye rect.
-inline void rewrite_pointer(uintptr_t frame, uint32_t offset) noexcept {
+// The input conversions: the view-rect getter (site 1) called by the mouse ray, and the UI point
+// -> pixel conversions (sites 3 and 4). The window size in 16:9 as for every reader, and in the
+// taller layout too, where the layout readers keep the eye rect.
+inline void rewrite_input(uintptr_t frame, uint32_t offset, uint32_t site) noexcept {
     auto& s = state();
-    if (s.size.load(std::memory_order_acquire)) return rewrite(frame, offset, 1);
+    if (s.size.load(std::memory_order_acquire)) return rewrite(frame, offset, site);
     const auto size = s.pointer_size.load(std::memory_order_acquire);
-    if (!size || !((s.sites.load(std::memory_order_relaxed) >> 5) & 1u)) return;
-    if (apply(reinterpret_cast<int32_t*>(frame + offset), size)) s.pointer_rewrites.fetch_add(1, std::memory_order_relaxed);
+    const uint32_t bit = site == 1 ? 5u : 6u;
+    if (!size || !((s.sites.load(std::memory_order_relaxed) >> bit) & 1u)) return;
+    if (!apply(reinterpret_cast<int32_t*>(frame + offset), size)) return;
+    (site == 1 ? s.pointer_rewrites : s.input_rewrites).fetch_add(1, std::memory_order_relaxed);
 }
 } // namespace wuwa_lgui_viewport

@@ -336,7 +336,7 @@ def main(argv=None) -> int:
         dims = dict(kv.split('=', 1) for kv in a.dims.split(',') if kv)
         entry = dict(feature=a.feature, state=a.state, dims=dims, result=a.result, build=a.build, by=a.by,
                      date=a.date, note=a.note)
-        with RESULTS.open('a', encoding='utf-8') as out:
+        with RESULTS.open('a', encoding='utf-8', newline='\n') as out:
             out.write(json.dumps(entry, ensure_ascii=False) + '\n')
         print('recorded', key(a.feature, a.state, dims), a.result)
         return 0
@@ -354,12 +354,12 @@ def main(argv=None) -> int:
                 print('--record needs --build', file=sys.stderr)
                 return 1
             rows = session_results(m, parsed, inv, a.build, str(date.today()))
-            with RESULTS.open('a', encoding='utf-8') as out:
+            with RESULTS.open('a', encoding='utf-8', newline='\n') as out:
                 out.writelines(json.dumps(r, ensure_ascii=False) + '\n' for r in rows)
             print(f'recorded {len(rows)} automatic results')
         return 0
     if a.cmd == 'report':
-        REPORT.write_text(report(m, load_results()), encoding='utf-8')
+        REPORT.write_text(report(m, load_results()), encoding='utf-8', newline='\n')
         print('wrote', REPORT.relative_to(ROOT))
         return 0
     return 1

@@ -272366,7 +272366,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..5d89cdb47ce7752ceeb0252f1c0548b0
      ZoneScopedN(__FUNCTION__);
  
 diff --git a/src/mods/VR.hpp b/src/mods/VR.hpp
-index 941840c7f61a353fab6a22452267ba259608a81f..63b5305fdef6ec812e0d921db4d3df2e196b8eeb 100644
+index 941840c7f61a353fab6a22452267ba259608a81f..23259c9f1527318152e2ab42ba6eab65e0b85e87 100644
 --- a/src/mods/VR.hpp
 +++ b/src/mods/VR.hpp
 @@ -13,12 +13,16 @@
@@ -272522,7 +272522,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..63b5305fdef6ec812e0d921db4d3df2e
 +        return m_wuwa_ui_window_size->value() || (wants_story_scene_layout() && m_wuwa_controls.story_scene_active());
 +    }
 +    uint32_t wuwa_ui_window_size_sites() const {
-+        return static_cast<uint32_t>(m_wuwa_ui_window_size_sites->value()) & 0x3fu;
++        return static_cast<uint32_t>(m_wuwa_ui_window_size_sites->value()) & 0x7fu;
 +    }
 +    uint32_t wuwa_ui_viewport_callers() const {
 +        return static_cast<uint32_t>(m_wuwa_ui_viewport_callers->value()) & 0x1ffu;
@@ -272871,15 +272871,15 @@ index 941840c7f61a353fab6a22452267ba259608a81f..63b5305fdef6ec812e0d921db4d3df2e
 +    const ModToggle::Ptr m_wuwa_ui_window_size{ ModToggle::create(generate_name("WuWaUiWindowSize"), true) };
 +    const ModToggle::Ptr m_wuwa_ui_story_window_size{ ModToggle::create(generate_name("WuWaUiStoryWindowSize"), true) };
 +    const ModToggle::Ptr m_wuwa_ui_character_tall{ ModToggle::create(generate_name("WuWaUiCharacterTall"), true) };
-+    // Diagnostics, never saved: bit n lets 16:9 rect hook n apply, bit 5 the mouse ray in the
-+    // taller layout (WuWaLguiViewport.hpp).
++    // Diagnostics, never saved: bit n lets 16:9 rect hook n apply; in the taller layout bit 5 the
++    // mouse ray and bit 6 the controller's point conversions (WuWaLguiViewport.hpp).
 +    struct TransientInt32 : ModInt32 {
 +        using ModInt32::ModInt32;
 +        void config_load(const utility::Config&, bool) override {}
 +        void config_save(utility::Config&) override {}
 +    };
 +    const std::unique_ptr<TransientInt32> m_wuwa_ui_window_size_sites{
-+        std::make_unique<TransientInt32>(generate_name("WuWaUiWindowSizeSites"), 63) };
++        std::make_unique<TransientInt32>(generate_name("WuWaUiWindowSizeSites"), 127) };
 +    // Diagnostics, never saved: bit n lets GetViewportSize caller n have the window size.
 +    const std::unique_ptr<TransientInt32> m_wuwa_ui_viewport_callers{
 +        std::make_unique<TransientInt32>(generate_name("WuWaUiViewportCallers"), 511) };
@@ -286714,10 +286714,10 @@ index 0000000000000000000000000000000000000000..5455c019a6f31bfdc1273e72f35c0223
 +} // namespace wuwa_lgui_probe
 diff --git a/src/utility/WuWaLguiRedirect.hpp b/src/utility/WuWaLguiRedirect.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..b5da55d5b7b13934e6d9c282cc1941b776bddfa2
+index 0000000000000000000000000000000000000000..b77908ab5594bbd0b932c105e7db27d37a85de32
 --- /dev/null
 +++ b/src/utility/WuWaLguiRedirect.hpp
-@@ -0,0 +1,1046 @@
+@@ -0,0 +1,1051 @@
 +#pragma once
 +
 +// Opt-in experiment pinned to the inspected September 8 WuWa code. See
@@ -287563,9 +287563,13 @@ index 0000000000000000000000000000000000000000..b5da55d5b7b13934e6d9c282cc1941b7
 +        // its return address is at rsp + 0x138 here too.
 +        const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
 +        if (ret - state().base == wuwa_lgui_viewport::pointer_ray_return) {
-+            wuwa_lgui_viewport::rewrite_pointer(c.rsp, site.offset);
++            wuwa_lgui_viewport::rewrite_input(c.rsp, site.offset, 1);
 +            return;
 +        }
++    }
++    if constexpr (I == 3 || I == 4) {
++        wuwa_lgui_viewport::rewrite_input(c.rbp, site.offset, static_cast<uint32_t>(I));
++        return;
 +    }
 +    if constexpr (I == 2) {
 +        // GetViewportSize pushes r14 and reserves 0x130 (fingerprinted with the function), so its
@@ -287728,10 +287732,11 @@ index 0000000000000000000000000000000000000000..b5da55d5b7b13934e6d9c282cc1941b7
 +                const auto& v = wuwa_lgui_viewport::state();
 +                const auto size = v.size.load(std::memory_order_relaxed);
 +                const auto pointer = v.pointer_size.load(std::memory_order_relaxed);
-+                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} pointer={}x{} pointer_rewrites={} sites={:x} callers={:x} "
++                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} pointer={}x{} pointer_rewrites={} input_rewrites={} sites={:x} callers={:x} "
 +                    "by_caller={},{},{},{},{},{},{},{},{}", v.installed.load(),
 +                    size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed),
-+                    pointer >> 32, pointer & 0xffffffffu, v.pointer_rewrites.load(std::memory_order_relaxed), v.sites.load(),
++                    pointer >> 32, pointer & 0xffffffffu, v.pointer_rewrites.load(std::memory_order_relaxed),
++                    v.input_rewrites.load(std::memory_order_relaxed), v.sites.load(),
 +                    v.caller_mask.load(), v.callers[0].load(), v.callers[1].load(), v.callers[2].load(), v.callers[3].load(),
 +                    v.callers[4].load(), v.callers[5].load(), v.callers[6].load(), v.callers[7].load(), v.callers[8].load());
 +            }
@@ -288117,10 +288122,10 @@ index 0000000000000000000000000000000000000000..114cd315c3078f9ddcc05efdb05f2d79
 +} // namespace wuwa_lgui_redirect
 diff --git a/src/utility/WuWaLguiViewport.hpp b/src/utility/WuWaLguiViewport.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..ebfa355b74640c602ed1ef4d65f7cf45e3335430
+index 0000000000000000000000000000000000000000..f7d166cd0a2f4b3dc0a781131d546e6a3553bb05
 --- /dev/null
 +++ b/src/utility/WuWaLguiViewport.hpp
-@@ -0,0 +1,105 @@
+@@ -0,0 +1,114 @@
 +#pragma once
 +
 +// Full VR shows the flat game's 16:9 screen UI.
@@ -288146,6 +288151,11 @@ index 0000000000000000000000000000000000000000..ebfa355b74640c602ed1ef4d65f7cf45
 +// scaler's viewport check (0xdd3a80) and a centre-of-screen ray (0xdd94b0), so
 +// there only the mouse ray gets the window size (test 17l, 15 Oct 2026: the
 +// mouse divided window pixels by the eye rect and missed in the taller layout).
++// Controller presses reach the same ray: the game turns the button's UI point
++// into viewport pixels (sites 3 and 4) and casts the ray there, so with the ray
++// alone on the window size, Y -> Journey log in the quest menu missed (17l). In
++// the taller layout sites 3 and 4 take the window size too (test 17m): every
++// pixel conversion then uses one size, as in 16:9; the layout keeps the eye rect.
 +#include <array>
 +#include <atomic>
 +#include <cstdint>
@@ -288156,14 +288166,15 @@ index 0000000000000000000000000000000000000000..ebfa355b74640c602ed1ef4d65f7cf45
 +    // Window size as (width << 32 | height); 0 leaves the game's rect alone.
 +    std::atomic<uint64_t> size{0};
 +    std::atomic<uint64_t> rewrites{0};
-+    // Window size for the mouse ray while full VR shows the taller layout; 0 otherwise.
++    // Window size for the input conversions while full VR shows the taller layout; 0 otherwise.
 +    std::atomic<uint64_t> pointer_size{0};
-+    std::atomic<uint64_t> pointer_rewrites{0};
++    std::atomic<uint64_t> pointer_rewrites{0}; // the mouse ray (site 1, one caller)
++    std::atomic<uint64_t> input_rewrites{0};   // UI point -> pixels (sites 3 and 4)
 +    // Bit n lets site n rewrite (WuWaLguiRedirect.hpp viewport_sites); all five by default.
-+    // Bit 5 lets the mouse ray have the window size in the taller layout.
++    // In the taller layout, bit 5 lets the mouse ray and bit 6 the point conversions have the window size.
 +    // Diagnostics only (VR_WuWaUiWindowSizeSites, never saved): finds which reader a game
 +    // system depends on (15 Oct: the Resonators floor reflection froze in 16:9 only).
-+    std::atomic<uint32_t> sites{0x3f};
++    std::atomic<uint32_t> sites{0x7f};
 +    // GetViewportSize (site 2) by caller, for the same test: calls per caller (the direct calls
 +    // below, then any other) and bit n lets caller n have the window size (VR_WuWaUiViewportCallers,
 +    // never saved). Without site 2 the reflection is live but the layout breaks, so one caller is it.
@@ -288216,14 +288227,17 @@ index 0000000000000000000000000000000000000000..ebfa355b74640c602ed1ef4d65f7cf45
 +    if (apply(reinterpret_cast<int32_t*>(frame + offset), size)) s.rewrites.fetch_add(1, std::memory_order_relaxed);
 +}
 +
-+// The view-rect getter (site 1) called by the mouse ray: the window size in 16:9 as for every
-+// caller, and in the taller layout too, where the other callers keep the eye rect.
-+inline void rewrite_pointer(uintptr_t frame, uint32_t offset) noexcept {
++// The input conversions: the view-rect getter (site 1) called by the mouse ray, and the UI point
++// -> pixel conversions (sites 3 and 4). The window size in 16:9 as for every reader, and in the
++// taller layout too, where the layout readers keep the eye rect.
++inline void rewrite_input(uintptr_t frame, uint32_t offset, uint32_t site) noexcept {
 +    auto& s = state();
-+    if (s.size.load(std::memory_order_acquire)) return rewrite(frame, offset, 1);
++    if (s.size.load(std::memory_order_acquire)) return rewrite(frame, offset, site);
 +    const auto size = s.pointer_size.load(std::memory_order_acquire);
-+    if (!size || !((s.sites.load(std::memory_order_relaxed) >> 5) & 1u)) return;
-+    if (apply(reinterpret_cast<int32_t*>(frame + offset), size)) s.pointer_rewrites.fetch_add(1, std::memory_order_relaxed);
++    const uint32_t bit = site == 1 ? 5u : 6u;
++    if (!size || !((s.sites.load(std::memory_order_relaxed) >> bit) & 1u)) return;
++    if (!apply(reinterpret_cast<int32_t*>(frame + offset), size)) return;
++    (site == 1 ? s.pointer_rewrites : s.input_rewrites).fetch_add(1, std::memory_order_relaxed);
 +}
 +} // namespace wuwa_lgui_viewport
 diff --git a/src/utility/WuWaLocalization.cpp b/src/utility/WuWaLocalization.cpp
@@ -290847,7 +290861,7 @@ index 0000000000000000000000000000000000000000..aa3810a7f85abaa2a65bf9238815a023
 +}
 diff --git a/src/utility/WuWaNearClip.hpp b/src/utility/WuWaNearClip.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..61201c4ad361e51669c9d4aba8561515f9b7a96c
+index 0000000000000000000000000000000000000000..3e64aef21a1ba2e2b6c6c3a0eed2586210835aed
 --- /dev/null
 +++ b/src/utility/WuWaNearClip.hpp
 @@ -0,0 +1,84 @@

@@ -226,8 +226,9 @@ bit 16, protocol `lease-v4`), held in a third lease with the story lease's
 timing. Switching moves the hooks
 and the panel at once and asks for a HUD layout refresh (as after a view
 switch), because the game's UI scaler keeps its old size until then. The
-taller layout brings back the flatter icons (HUD shape). The mouse lines up
-there from test 17l: only the mouse ray takes the window size (REFERENCE.md).
+taller layout brings back the flatter icons (HUD shape). From test 17m the mouse
+and controller buttons line up there too. Only the input conversions take the window
+size; the layout keeps the eye shape (REFERENCE.md).
 Since test 17c the plugin asks for that refresh whenever the full VR layout in
 effect changes, whatever changed it (this switch, a story scene, a steps card).
 

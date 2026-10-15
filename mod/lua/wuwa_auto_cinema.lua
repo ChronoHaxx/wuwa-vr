@@ -152,7 +152,23 @@ function M.new(env)
         end
         return false
     end
-    local function forget_picture() s.photo, s.photo_scan, s.photo_found, s.photo_index, s.photo_retry = nil, nil, nil, nil, nil end
+    local function forget_picture()
+        s.photo, s.photo_scan, s.photo_found, s.photo_index, s.photo_retry, s.photo_recheck = nil, nil, nil, nil, nil, nil
+    end
+    -- What one SprPhoto shows: "active" (a real texture, faded in), "clear", or "unknown" (schema).
+    local function picture_state(photo)
+        local desc = photo:get_class()
+        local texture_field = desc:find_property("texture")
+        local alpha = property(photo, desc, "Alpha", "FloatProperty")
+        if not finite(alpha) or not texture_field or kind(texture_field) ~= "ObjectProperty" then
+            return "unknown", "story picture schema unavailable"
+        end
+        local texture = photo.texture
+        if alpha > 0.01 and valid(texture) and texture:get_fname():to_string() ~= "T_CommonDefault_UI" then
+            return "active", "story picture on screen"
+        end
+        return "clear", "no story picture"
+    end
     local function picture_signal(current, plot, now)
         -- Pictures belong to the plot view: no plot is a verified "no picture".
         if plot == "clear" then forget_picture(); return "clear", "no story picture" end
@@ -177,7 +193,8 @@ function M.new(env)
             s.photo_index = last
             if last < #list then return "unknown", "looking for the story picture" end
             s.photo_scan, s.photo_found = nil, nil
-            -- A closed view can linger until garbage collection; prefer the active one.
+            -- A closed view can linger until garbage collection; prefer the active one, then
+            -- the one showing a picture (an old view can still be active beside the rebuilt one).
             if #found > 1 then
                 local live = {}
                 for _, o in ipairs(found) do
@@ -185,24 +202,31 @@ function M.new(env)
                 end
                 found = live
             end
+            if #found > 1 then
+                local showing = {}
+                for _, o in ipairs(found) do
+                    if picture_state(o) == "active" then showing[#showing + 1] = o end
+                end
+                if #showing == 1 then found = showing end
+            end
             if #found ~= 1 then
                 s.photo_retry = now + PICTURE_RETRY
                 if #found > 1 then return "unknown", "ambiguous story picture" end
                 return "clear", "no story picture view"
             end
-            photo, s.photo, s.photo_retry = found[1], found[1], nil
+            photo, s.photo, s.photo_retry, s.photo_recheck = found[1], found[1], nil, now + PICTURE_RETRY
         end
-        local desc = photo:get_class()
-        local texture_field = desc:find_property("texture")
-        local alpha = property(photo, desc, "Alpha", "FloatProperty")
-        if not finite(alpha) or not texture_field or kind(texture_field) ~= "ObjectProperty" then
-            return "unknown", "story picture schema unavailable"
+        local state, detail = picture_state(photo)
+        if state == "active" then
+            s.photo_recheck = now + PICTURE_RETRY
+        elseif state == "clear" and now >= (s.photo_recheck or 0) then
+            -- The game can build a new plot view while the old one stays in memory and active, so an
+            -- empty remembered widget is searched for again every PICTURE_RETRY seconds (test 17m: the
+            -- Shorekeeper quest's sunset showed for 40 s while the remembered SprPhoto stayed empty,
+            -- until the next line removed the old view).
+            s.photo, s.photo_recheck = nil, nil
         end
-        local texture = photo.texture
-        if alpha > 0.01 and valid(texture) and texture:get_fname():to_string() ~= "T_CommonDefault_UI" then
-            return "active", "story picture on screen"
-        end
-        return "clear", "no story picture"
+        return state, detail
     end
     local function location(v)
         if v == nil then return nil end

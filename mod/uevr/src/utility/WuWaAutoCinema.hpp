@@ -46,6 +46,15 @@ inline void manual_screen(bool& saved_screen, bool& saved_mono, bool enabled) {
     saved_screen = enabled;
     if (!enabled) saved_mono = false; // An explicit screen OFF must leave all screen modes.
 }
+// 1.2.3 turns automatic cinema on once for a profile saved before it (no marker): such a
+// profile holds the old defaults, off with story scenes on the stereo screen. Story scenes
+// then keep the player's view (choice 0). A profile that already had it on keeps its choices.
+constexpr const char* defaults_marker = "VR_AutoCinemaDefaults";
+struct Saved { bool automatic; int32_t story; };
+inline Saved upgrade(bool marked, Saved saved) {
+    if (marked || saved.automatic) return saved;
+    return {true, 0};
+}
 class Lease {
 public:
     uint64_t start() { ++generation_; clear_lease(); return generation_; }

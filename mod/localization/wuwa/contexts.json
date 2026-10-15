@@ -227,7 +227,7 @@
   "Automatic cinematic screen (experimental)": [
     "mods/VR.cpp"
   ],
-  "Automatic cutscene switching (unverified)": [
+  "Automatic cutscene switching": [
     "mods/VR.cpp"
   ],
   "Automatic lease expired; restoration waits for the next game tick": [
@@ -246,9 +246,6 @@
     "utility/WuWaAutoCinema.hpp"
   ],
   "Automatic story switching did not activate in the latest reported replay. Prerecorded video switching has not been tested. Missing or changed signals leave the normal view unchanged.": [
-    "mods/VR.cpp"
-  ],
-  "Automatic switching is unverified and off by default. It is intended to use mono for detected videos and the selected view for story scenes. Manual toggles take priority.": [
     "mods/VR.cpp"
   ],
   "Automatic uses the slot that has a controller, such as a treadmill's virtual pad while the real pad is hidden. Choose a fixed slot only if it picks the wrong one: launcher Troubleshooting > Controller check lists them.": [
@@ -1257,14 +1254,15 @@
   "Keep camera and head hiding during Alt-Tab / UEVR settings": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Keep current view": [
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Keep entire character visible": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
   "Keep first person horizon level (Custom)": [
     "mods/vr/WuWaControlsComponent.cpp"
-  ],
-  "Keep immersive": [
-    "mods/VR.hpp"
   ],
   "Keep matched far-object detail (recommended)": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1692,15 +1690,15 @@
     "utility/WuWaMonoNativeProjection.hpp",
     "utility/WuWaVrMenu.cpp"
   ],
-  "Off by default. Detected movies are intended to use mono; story scenes use your choice above. Recognition remains unverified. Manual view changes take priority.": [
-    "mods/VR.cpp"
-  ],
   "Off: UEVR opens its classic window, as before. You can turn this menu back on under VR > WuWa Controls.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "On": [
     "utility/WuWaShortcutSheet.cpp",
     "utility/WuWaVrMenu.cpp"
+  ],
+  "On by default. Detected story videos use mono; story pictures and story scenes use your choices above. Manual view changes take priority.": [
+    "mods/VR.cpp"
   ],
   "On by default: both eyes render with a symmetric view, so its shading matches on rocks, hills and roofs. Off is a little faster.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2417,7 +2415,7 @@
   "Sweeps the camera against surfaces that block the game's Visibility trace. Slides along contact surfaces. Unsupported queries hold movement and report a reason below. Physical headset leaning is not constrained. Starts off; world geometry still needs live verification.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Switches to a screen during videos and story scenes it can detect, then back to full VR. Experimental.": [
+  "Switches to a screen while a story video (mono theatre) or a story picture plays, then back to the view you had. Story scenes keep your view unless you choose otherwise below.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Sync left eye LOD to right eye (fix candidate)": [
@@ -2675,7 +2673,7 @@
   "Warn when a menu opens with game UI hidden": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "What automatic switching shows during story scenes.": [
+  "What automatic switching shows during story scenes and conversations. Keep current view leaves full VR, the stereo screen or mono as you have it.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "What automatic switching shows while a story picture fills the screen.": [

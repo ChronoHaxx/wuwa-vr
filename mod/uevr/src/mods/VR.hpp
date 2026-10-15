@@ -1078,14 +1078,16 @@ private:
     const ModToggle::Ptr m_load_blueprint_code{ ModToggle::create(generate_name("LoadBlueprintCode"), false, true) };
     const ModToggle::Ptr m_2d_screen_mode{ ModToggle::create(generate_name("2DScreenMode"), false) };
     const ModToggle::Ptr m_mono_theatre_mode{ ModToggle::create(generate_name("MonoTheatreMode"), false) };
-    const ModToggle::Ptr m_auto_cinema{ ModToggle::create(generate_name("AutoCinema"), false) };
+    // On from 1.2.3: story videos and pictures switch, story scenes keep the player's view.
+    const ModToggle::Ptr m_auto_cinema{ ModToggle::create(generate_name("AutoCinema"), true) };
     // WuWa: a short note in view when a letterboxed cinematic camera starts while in full VR.
     const ModToggle::Ptr m_cinema_hint{ ModToggle::create(generate_name("CinemaHint"), true) };
     const ModCombo::Ptr m_screen_lens{ ModCombo::create(generate_name("WuWaScreenLens"), {"Game lens (like 2D)", "Wide 90 degrees (before 3f)"}, 0) };
     const ModSlider::Ptr m_screen_depth{ ModSlider::create(generate_name("WuWaScreenDepth"), 0.0f, 3.0f, 1.0f) };
-    const ModCombo::Ptr m_auto_story_presentation{ModCombo::create(generate_name("AutoStoryPresentation"), {"Keep immersive", "Stereo screen", "Mono theatre"}, 1)};
-    // A story picture filling the screen (test 17f): the stereo screen by default, as story scenes.
-    const ModCombo::Ptr m_auto_picture_presentation{ModCombo::create(generate_name("AutoPicturePresentation"), {"Keep immersive", "Stereo screen", "Mono theatre"}, 1)};
+    // "Keep current view" asks for nothing: whatever the player has (full VR, stereo screen or mono) stays.
+    const ModCombo::Ptr m_auto_story_presentation{ModCombo::create(generate_name("AutoStoryPresentation"), {"Keep current view", "Stereo screen", "Mono theatre"}, 0)};
+    // A story picture filling the screen (test 17f): the stereo screen by default.
+    const ModCombo::Ptr m_auto_picture_presentation{ModCombo::create(generate_name("AutoPicturePresentation"), {"Keep current view", "Stereo screen", "Mono theatre"}, 1)};
     const ModToggle::Ptr m_cinematic_framing_fix{ ModToggle::create(generate_name("CinematicFramingFix"), true) };
     const ModToggle::Ptr m_roomscale_movement{ ModToggle::create(generate_name("RoomscaleMovement"), false) };
     const ModToggle::Ptr m_roomscale_sweep{ ModToggle::create(generate_name("RoomscaleMovementSweep"), true) };

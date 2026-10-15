@@ -23,9 +23,9 @@ separate eye views; it does not provide a free-look camera for every cinematic.
 Manual recovery remains available: fully hold **LT + RT first**, then **click R3**
 for the **next view** (a **stereoscopic screen**, then **mono theatre**: the same
 scene and HUD in both eyes), or **hold R3** to go back to full VR. Release everything before repeating;
-close UEVR and HUD/mouse adjustment. Automatic cinema is **experimental and off**
-by default. It did not activate for the latest reported in-engine scene; a real
-prerendered movie has not been tested. Long scene/dialogue stalls, HUD refresh
+close UEVR and HUD/mouse adjustment. Automatic cinema is **on by default** from
+1.2.3 for story videos (mono theatre) and story pictures (stereo screen); story
+scenes keep your view. Story-video detection is not yet confirmed on game 3.7. Long scene/dialogue stalls, HUD refresh
 and flat-menu background motion remain open. Manual mono theatre is a menu
 workaround, not a demonstrated fix for those loading stalls.
 

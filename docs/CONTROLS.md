@@ -146,9 +146,11 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 | Hold RB | Full speed when optional Polar walk is enabled |
 
 The two screen shortcuts are manual. Release all controls between toggles, with
-UEVR and HUD/mouse adjustment closed. Automatic cinema is experimental, **off
-by default**, and did not activate for the latest reported in-engine scene;
-prerendered movie switching is untested. Do not rely on it to switch for you.
+UEVR and HUD/mouse adjustment closed. Automatic cinema is **on by default**
+from 1.2.3: story videos it detects use mono theatre and story pictures the
+stereo screen, then your view comes back; story scenes keep your current view
+unless you choose otherwise on the Cinema page. Story-video detection is not
+yet confirmed on game 3.7, so keep the manual shortcuts handy.
 
 If returning from a screen view squashes the HUD, try **WuWa Controls → Reset
 HUD aspect** and read its status. It can remain unavailable. Opening and closing

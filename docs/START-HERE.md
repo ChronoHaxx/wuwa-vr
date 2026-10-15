@@ -34,7 +34,7 @@ Older date-and-fix-name packages are historical builds. New releases use a reada
 
 [All controls](CONTROLS.md), including the optional VR controllers for walking.
 
-Cinematic framing is on by default and was accepted in a simulator replay. Automatic cinematic switching is experimental, **off by default**, and has not been verified with a real prerendered movie. Keep the manual shortcuts available.
+Cinematic framing is on by default and was accepted in a simulator replay. Automatic cinema is **on by default** from 1.2.3: story videos it detects use mono theatre and story pictures the stereo screen, then your view comes back; story scenes keep your current view unless you choose otherwise on the Cinema page. Story-video detection is not yet confirmed on game 3.7. Keep the manual shortcuts available.
 
 The optional NPC rim-light suppression starts off and also removes intended rim lighting nearby; the **underlying stereo rendering fault is unresolved**. Scene/dialogue stalls, HUD-aspect refresh failures, some reflections/fog and moving flat-menu backgrounds remain open. Manual mono theatre can help with menus. See [troubleshooting](TROUBLESHOOTING.md).
 

@@ -2151,6 +2151,14 @@ void VR::on_config_load(const utility::Config& cfg, bool set_defaults) {
     for (IModValue& option : m_options) {
         option.config_load(cfg, set_defaults);
     }
+    if (!set_defaults) {
+        const auto saved = wuwa_auto_cinema::upgrade(cfg.get(wuwa_auto_cinema::defaults_marker).has_value(),
+            {m_auto_cinema->value(), m_auto_story_presentation->value()});
+        if (saved.automatic != m_auto_cinema->value())
+            spdlog::info("[VR] Automatic cinematic screen turned on (1.2.3 default); story scenes keep the current view");
+        m_auto_cinema->value() = saved.automatic;
+        m_auto_story_presentation->value() = saved.story;
+    }
 
     if (get_runtime() != nullptr && get_runtime()->loaded) {
         get_runtime()->on_config_load(cfg, set_defaults);
@@ -2187,6 +2195,7 @@ void VR::on_config_save(utility::Config& cfg) {
     for (IModValue& option : m_options) {
         option.config_save(cfg);
     }
+    cfg.set(wuwa_auto_cinema::defaults_marker, "1");
 
     if (m_fake_stereo_hook != nullptr) {
         m_fake_stereo_hook->on_config_save(cfg);
@@ -2831,12 +2840,12 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
         wuwa_ui::TextWrapped("Mono shows the same scene and HUD to both eyes. Use it for troublesome cutscenes or flat menus.");
         wuwa_ui::TextWrapped("Hold LT + RT: click R3 for the next view (hold: full VR), click L3 for blur on / off (hold: stereo screen), press Y to hide characters at your eyes. Release controls before repeating.");
         wuwa_ui::draw(*m_cinematic_framing_fix, "Match cinematic framing between eyes (default on)");
-        if (wuwa_ui::TreeNode("Automatic cutscene switching (unverified)")) {
+        if (wuwa_ui::TreeNode("Automatic cutscene switching")) {
             if (wuwa_ui::draw(*m_auto_cinema, "Enable automatic switching"))
                 m_wuwa_controls.reset_auto_cinema();
             wuwa_ui::draw(*m_auto_story_presentation, "Story cutscenes and dialogue");
             wuwa_ui::draw(*m_auto_picture_presentation, "Story pictures");
-            wuwa_ui::TextWrapped("Off by default. Detected movies are intended to use mono; story scenes use your choice above. Recognition remains unverified. Manual view changes take priority.");
+            wuwa_ui::TextWrapped("On by default. Detected story videos use mono; story pictures and story scenes use your choices above. Manual view changes take priority.");
             if (is_auto_cinema_enabled()) wuwa_ui::TextWrapped("%s", m_wuwa_controls.auto_cinema_status().c_str());
             ImGui::TreePop();
         }
@@ -3074,7 +3083,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             m_wuwa_controls.reset_auto_cinema();
         wuwa_ui::draw(*m_auto_story_presentation, "Story cutscenes and dialogue");
         wuwa_ui::draw(*m_auto_picture_presentation, "Story pictures");
-        wuwa_ui::TextWrapped("Automatic switching is unverified and off by default. It is intended to use mono for detected videos and the selected view for story scenes. Manual toggles take priority.");
+        wuwa_ui::TextWrapped("On by default. Detected story videos use mono; story pictures and story scenes use your choices above. Manual view changes take priority.");
         wuwa_ui::draw(*m_cinematic_framing_fix, "Match cinematic framing between eyes (default on)");
         if (ImGui::TreeNode(wuwa_l10n::label("Detection details").c_str())) {
             wuwa_ui::TextWrapped("Automatic story switching did not activate in the latest reported replay. Prerecorded video switching has not been tested. Missing or changed signals leave the normal view unchanged.");

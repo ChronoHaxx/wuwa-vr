@@ -108,5 +108,16 @@ int main() {
     assert(!pictures.sample(pg, "400", showroom, 0, showroom, screen, 8600)); // nor does the showroom bit itself
     assert(resolve(true, false, Presentation::none).screen);
     assert(resolve(false, true, Presentation::none).mono);
+    // 1.2.3 default: a profile saved before it (no marker) with the old default turns on and
+    // keeps the player's view in story scenes; an opted-in or already-marked profile is left alone.
+    auto up = upgrade(false, {false, 1});
+    assert(up.automatic && up.story == 0);
+    up = upgrade(false, {true, 2});
+    assert(up.automatic && up.story == 2);
+    up = upgrade(true, {false, 1}); // switched off after the upgrade: stays off
+    assert(!up.automatic && up.story == 1);
+    // Story scenes on "Keep current view" leave a manual stereo screen or mono as it is.
+    assert(resolve(true, false, choose({dialogue, 0, sources}, 0, false, keep, screen)).screen);
+    assert(resolve(false, true, choose({dialogue, 0, sources}, 0, false, keep, screen)).mono);
     std::cout << "PASS automatic cinematic lease, expiry, pause, manual precedence, world and producer fencing\n";
 }

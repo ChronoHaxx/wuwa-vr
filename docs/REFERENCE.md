@@ -84,7 +84,7 @@ you what to measure.
 | 2 | A per-view-state cache filled for only one eye | 1 Oct: Kuro's Cascade Lighting Volume (far indirect light) | Swap the eyes' view states; force the cache to refresh |
 | 3 | Temporal history kept per view state | Suspected for AO until 12 Oct 2026, then ruled out: with both eyes at one position and a symmetric FOV the AO matched exactly (see cause 6) | Turn off only the temporal part and see whether the eyes agree |
 | 4 | Work done once per frame, or only for the first view | 4 Oct: cinematic letterbox framing; suspected for the dialogue bars (open) | Does the problem move when you swap eye order? |
-| 5 | Game-thread data read at different moments for each eye | 28 Sep: camera base during ultimate returns (`WuWaStereoBasePose`) | Log the camera inputs for both eyes in one frame |
+| 5 | Game-thread data read at different moments for each eye | 28 Sep: camera base during ultimate returns (`WuWaStereoBasePose`). 15 Oct: the stereo screen, where that shared camera was switched off, so one eye shook in cinematic close-ups | Log the camera inputs for both eyes in one frame |
 | 6 | Screen-space effects with asymmetric eye projections | 12 Oct 2026: ambient occlusion (SSAO) shades rocks and roofs differently per eye; measured and fixed with a symmetric horizontal projection. Community: Symmetric horizontal projection fixed UI parts drawn in one eye (polar, Nov 2024), and fixed many one-eye post-process artifacts in native stereo (SannpoKun, Dec 2025) | Projection overrides (section 1.5); the simulator at IPD 0 with an asymmetric headset profile isolates it |
 
 **First test for any one-eye problem: toggle `NativeStereoFixSwapEyes`.** If the
@@ -207,8 +207,9 @@ come from the code.
 | `WorldScale` | 1.0 | Size of the world relative to you | Scale feels wrong. Third-person players in 2024 preferred 0.7–0.875 |
 | `UI_Size`, `UI_Distance`, `UI_FollowView`, `UI_Y_Offset` | 1.8, 2.27, off, -0.46 | VR panel height, distance, head-follow, height offset | HUD placement |
 | `CinematicFramingFix` | on | Shares the first eye's cutscene framing with the second | Unequal letterbox heights |
-| `MonoTheatreMode`, `2DScreenMode`, `AutoCinema` | off | Manual and automatic screen modes | Cutscene fallbacks |
-| `WuWaStereoBasePose` | on | One game camera pose for both eyes per frame | Ultimate-return camera |
+| `MonoTheatreMode`, `2DScreenMode` | off | Manual screen modes | Cutscene fallbacks |
+| `AutoCinema` | on (1.2.3) | Automatic screen for story videos and pictures | Cutscene fallbacks |
+| `WuWaStereoBasePose` | on | One game camera pose for both eyes per frame (full VR and the stereo screen) | Ultimate-return camera, one eye shaking on the stereo screen |
 | `WuWaLguiRedirect`, `WuWaLguiMenuRedirect` | on, on | HUD and menus into the VR panel | HUD missing or in the eye images |
 | `WuWaKuroWaterStereo`, `WuWaStereoTranslucency`, `WuWaWorldLabelsStereo` | off | Earlier candidates for Kuro materials, translucency and world labels | Only if those symptoms return; they need specific setting combinations |
 | `WuWaHideKuroReflections` | off | Removes custom reflections (workaround) | Comparisons only |
@@ -296,6 +297,14 @@ intended nearby rim light.
 **Camera jumps differently in each eye at the end of an ultimate.**
 **Fixed** 28 Sep (cause 5, `WuWaStereoBasePose`). Owner-confirmed in the headset.
 
+**One eye shakes on the stereo screen in cinematic shots (full VR is fine).**
+**Fixed** 15 Oct, test 17j (cause 5). The shared game camera was switched off for
+the stereo screen since 28 Sep, so the second eye kept its own pass-3 camera. The
+stereo screen uses the game's lens (15° in close-ups), which magnifies a small
+camera difference several times over full VR. Seen in the Shorekeeper quest
+(Aalto, Black Shores): simulator frames showed a different zoom per eye during a
+cinematic move. (verify)
+
 **Shadows missing in one eye (walls, pillars, bridges).**
 **Fixed** 20 Sep (game 3.6), ported to 3.7. WuWa treats the second view (pass 3)
 as secondary, so under the Native Stereo Fix it never got the shadow setup.
@@ -364,7 +373,10 @@ mobile-only. Some bars may be drawn by the UI rather than by post-processing.
   then added "suspend the Native Stereo Fix during menu loads" (Sep 2026).
 - **Untested here:** whether doing the same shortens our stalls.
 
-**Automatic cinema does not switch.** Experimental and off by default.
+**Automatic cinema does not switch.** On by default from 1.2.3: story videos it
+detects use mono theatre and story pictures the stereo screen; story scenes keep
+your view unless you choose otherwise. Story-video detection is not yet confirmed
+on game 3.7. Check its status line on the Cinema page.
 
 **Prerendered movie cutscenes are black (sound and subtitles play).**
 **Untested in our build.**

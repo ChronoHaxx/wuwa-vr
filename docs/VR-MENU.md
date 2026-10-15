@@ -265,6 +265,18 @@ the story layout ignores it. A story video still wins (mono theatre). The
 choice is held for 1.2 s after a picture so the crossfade between two pictures
 does not flip the view.
 
+**On by default from 1.2.3 (test 17j).** `VR_AutoCinema` defaults to on and
+**Story scenes use** (`VR_AutoStoryPresentation`) to **Keep current view**
+(choice 0, formerly "Keep immersive"/"Full VR"). That choice asks for nothing,
+so whatever the player has (full VR, stereo screen or mono) stays during story
+scenes; only story videos (mono theatre) and story pictures (Story pictures use)
+switch. UEVR saves every value, so a profile from before 1.2.3 holds the old
+default (off, story scenes on the stereo screen). `VR::on_config_load` turns it
+on once for a profile without the `VR_AutoCinemaDefaults` marker (written on
+every save) and sets story scenes to Keep current view; a profile that already
+had automatic cinema on keeps its choices (`wuwa_auto_cinema::upgrade`, tested
+in `dev/test_auto_cinema.cpp`).
+
 **Why the HUD looked squashed in full VR only (before 1.2.3).** The log shows the UI pass
 drawn for the square eye (`stage3_fit original=0,0,3292,3292`) and fitted into
 the 2560 x 1440 HUD image. WuWa lays its UI out for screens no narrower than

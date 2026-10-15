@@ -778,16 +778,19 @@ Page cinema_page() {
         "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "
         "A fallback for when automatic switching misses a scene.", "VR_CinemaHint"));
     page.items.push_back(setting_toggle("Automatic cinematic screen",
-        "Switches to a screen during videos and story scenes it can detect, then back to full VR. Experimental.", "VR_AutoCinema"));
-    auto story = setting_choice("Story scenes use", "What automatic switching shows during story scenes.",
-        "VR_AutoStoryPresentation", {"Full VR", "Stereo screen", "Mono theatre"});
+        "Switches to a screen while a story video (mono theatre) or a story picture plays, then back to the view you had. "
+        "Story scenes keep your view unless you choose otherwise below.", "VR_AutoCinema"));
+    auto story = setting_choice("Story scenes use",
+        "What automatic switching shows during story scenes and conversations. Keep current view leaves full VR, "
+        "the stereo screen or mono as you have it.",
+        "VR_AutoStoryPresentation", {"Keep current view", "Stereo screen", "Mono theatre"});
     story.enabled = [] {
         auto* automatic = typed<bool>("VR_AutoCinema");
         return automatic && automatic->value() && typed<int32_t>("VR_AutoStoryPresentation") != nullptr;
     };
     page.items.push_back(std::move(story));
     auto pictures = setting_choice("Story pictures use", "What automatic switching shows while a story picture fills the screen.",
-        "VR_AutoPicturePresentation", {"Full VR", "Stereo screen", "Mono theatre"});
+        "VR_AutoPicturePresentation", {"Keep current view", "Stereo screen", "Mono theatre"});
     pictures.enabled = [] {
         auto* automatic = typed<bool>("VR_AutoCinema");
         return automatic && automatic->value() && typed<int32_t>("VR_AutoPicturePresentation") != nullptr;

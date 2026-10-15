@@ -3063,9 +3063,13 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
         pose_scope.begin(vr->get_wuwa_controls(),
             {vr->get_runtime()->internal_frame_count,g_frame_count,GetCurrentThreadId()});
     }
+    // The stereo screen shares the game camera too (test 17j): without it the second eye kept its
+    // own pass-3 camera (simulator frames showed a different zoom per eye in a cinematic move), and
+    // the game's narrow lens there (15 degrees in close-ups) magnified that into one shaking eye
+    // (Shorekeeper quest, Aalto, 15 Oct).
     stereo_base_scope.begin({vr->get_runtime()->internal_frame_count,g_frame_count,GetCurrentThreadId()},
         vr->is_wuwa_stereo_base_pose_enabled() && vr->is_native_stereo_fix_enabled() &&
-        !vr->is_using_afr() && !vr->is_using_2d_screen() && !vr->is_stereo_emulation_enabled() &&
+        !vr->is_using_afr() && !vr->is_stereo_emulation_enabled() &&
         !g_hook->m_has_double_precision && !vr->is_sceneview_compatibility_enabled() &&
         !vr->is_splitscreen_compatibility_enabled());
     const auto& mods = g_framework->get_mods()->get_mods();

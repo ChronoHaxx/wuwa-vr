@@ -101,17 +101,14 @@ inline constexpr std::array<CodeRange, 22> menu_code_ranges{{
 // LGUICanvas GetProjectionMatrix, view-rect getter, GetViewportSize and the two
 // UI point conversions, whole bodies (build 0x6aa96d2d, read 14 Oct 2026). Each
 // asks the local player for the left-eye projection data; see WuWaLguiViewport.hpp.
-inline constexpr std::array<CodeRange, 5> viewport_code_ranges{{
+// Then the pointer ray (GenerateRay) up to its view-rect call: the event data stays in
+// rbp there, which the taller layout reads to tell the mouse apart (read 15 Oct 2026).
+inline constexpr std::array<CodeRange, 6> viewport_code_ranges{{
     {0xc63750, 0x1b4, 0x39cdd7840045179cULL},
     {0xc667c0, 0xfc, 0x42b37eb3416bd418ULL},
     {0xc668c0, 0x10e, 0xa14df2f8c0878a40ULL},
     {0xc941a0, 0x4d6, 0x670221723626114bULL},
     {0xc94680, 0x432, 0x68d1b82bfbaf7c15ULL},
-}};
-// UGameViewportClient::GetMousePosition and LGUI's standalone ProcessInput, whose three calls to it
-// the taller layout's mouse conversion recognises by return address (read 15 Oct 2026, 3.7).
-inline constexpr std::array<CodeRange, 2> mouse_code_ranges{{
-    {0x512ae90, 0x8e, 0xfcdfafc6f2f97a57ULL},
-    {0xd1f160, 0x5a5, 0xeb6a4754e08f3a0cULL},
+    {0xd58550, 0xc5, 0x5acef5b89b6a75e3ULL},
 }};
 } // namespace wuwa_lgui_redirect::compatibility

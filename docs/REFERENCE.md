@@ -422,7 +422,7 @@ So the fix is probably the LGUI canvas size, not the panel shape.
   it to players until it is.
 
 **The mouse, a controller button or the left-stick cursor misses in the taller layout or on the character screen.**
-**Fixed** in test 17n (15 Oct). Needs a headset check.
+**Fixed** in test 17o (15 Oct). Needs a headset check.
 
 Every UI input meets in one ray (game function `0xd58550` in 3.7). That ray divides
 a pixel position by the view rect, so all three inputs must give pixels in that rect:
@@ -439,9 +439,14 @@ eye rect (2064 x 2208 and so on) for its layout:
 - **Test 17l:** the ray alone took the window size, so the mouse worked, but Y missed.
 - **Test 17m:** the ray and both point conversions took the window size. Y worked, but
   the stick ring is in canvas pixels, so A clicked below it (930 px at 2560 x 2560).
-- **Test 17n:** everything stays on the canvas rect, as before 17l, and the mouse alone
-  is converted where LGUI reads it (`ProcessInput`'s three `GetMousePosition` calls):
-  window pixels become the same 0..1 point in the rect.
+- **Test 17n:** everything stayed on the canvas rect, as before 17l, and the mouse was
+  converted where LGUI reads it (`ProcessInput`'s three `GetMousePosition` calls). The
+  stick and the mouse worked, but the game compares that position with the raw mouse
+  elsewhere: controller input looked like mouse movement, the button hints switched to
+  keyboard and mouse, and the d-pad wheel would not stay open in the taller layout.
+- **Test 17o:** the mouse is left alone. The ray picks the rect per pointer: the mouse
+  (pointer 0 in pointer mode, window pixels) gets the window size; the stick cursor
+  (navigation mode) and controller presses (their own pointer) keep the canvas rect.
 
 How it was found: the view-rect getter `0xc667c0` has exactly three callers in the 3.7
 capture (pointer ray, scaler, centre-of-screen ray). The stick was measured with
@@ -458,10 +463,10 @@ screen and mono all use the window size, so view switches are fine (17n, simulat
 
 Checking it:
 - The log line `[WuWaLguiViewport] ... mouse=true mouse_rewrites=N eye=WxH` shows the
-  mouse conversion installed and working in the taller layout.
+  mouse's ray on (bit 7) and given the window size N times in the taller layout.
 - `VR_WuWaUiWindowSizeSites` (never saved) compares behaviours: the default 159 is
-  17n; 31 turns off the mouse conversion (before 17l); 127 is 17m (bits 5 and 6 give
-  the ray and the controller conversions the window size).
+  17o; 31 turns off the mouse's ray (before 17l); 127 is 17m (bits 5 and 6 give
+  every ray and the controller conversions the window size).
 
 **A flat menu's background moves with your head.**
 **Open**. Mono theatre is the workaround.

@@ -60,7 +60,6 @@ struct State {
     safetyhook::MidHook stage0_construct{}, stage0_dispatch{};
     safetyhook::InlineHook world_setup{};
     std::array<safetyhook::MidHook, 5> viewport{};
-    safetyhook::MidHook mouse{};
     std::atomic<uint64_t> world_calls{}, world_prepared{}, world_layout_skips{}, world_guard_skips{};
     std::atomic<uint64_t> world_caller_skips{}, world_disabled_skips{}, world_mode_skips{}, world_samples{};
     std::array<std::atomic<uint64_t>,16> next_stage0_sample{};
@@ -845,7 +844,8 @@ template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
         // its return address is at rsp + 0x138 here too.
         const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
         if (ret - state().base == wuwa_lgui_viewport::pointer_ray_return) {
-            wuwa_lgui_viewport::rewrite_input(c.rsp, site.offset, 1);
+            // The pointer ray (0xd58550) keeps its event data in rbp across the call.
+            wuwa_lgui_viewport::rewrite_pointer_ray(c.rsp, site.offset, reinterpret_cast<const uint8_t*>(c.rbp));
             return;
         }
     }
@@ -862,42 +862,12 @@ template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
     wuwa_lgui_viewport::rewrite(site.rbp ? c.rbp : c.rsp, site.offset, static_cast<uint32_t>(I));
 }
 
-// UGameViewportClient::GetMousePosition, just after it stores the mouse position: rdi is the
-// FVector2D out parameter; the function pushed rdi and reserved 0x20 (fingerprinted with it), so
-// its return address is at rsp + 0x28.
-inline constexpr uintptr_t mouse_position_rva = 0x512af06;
-inline void mouse_callback(safetyhook::Context& c) noexcept {
-    const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x28);
-    wuwa_lgui_viewport::convert_mouse(reinterpret_cast<float*>(c.rdi), ret - state().base);
-}
-
 inline void disable_viewport(State& s) noexcept {
     wuwa_lgui_viewport::state().installed.store(false, std::memory_order_release);
-    wuwa_lgui_viewport::state().mouse_installed.store(false, std::memory_order_release);
     wuwa_lgui_viewport::update(false, false, 0, 0);
     for (auto& hook : s.viewport) {
         try { if (hook && !hook.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
     }
-    try { if (s.mouse && !s.mouse.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
-}
-
-// The taller layout's mouse conversion; without it the mouse misses there but the
-// controller, the stick cursor and 16:9 are unaffected.
-inline void install_mouse(State& s, HMODULE executable, uint32_t image_size) noexcept {
-    try {
-        checked::require(verify_code(executable, image_size, compatibility::mouse_code_ranges, "lgui-mouse"),
-            "mouse code changed; the taller layout's mouse is not converted");
-        auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + mouse_position_rva),
-            &mouse_callback, safetyhook::MidHook::StartDisabled);
-        checked::require(hook.has_value(), "Cannot create LGUI mouse hook");
-        s.mouse = std::move(*hook);
-        checked::require(s.mouse.enable().has_value(), "Cannot enable LGUI mouse hook");
-        wuwa_lgui_viewport::state().mouse_installed.store(true, std::memory_order_release);
-        spdlog::info("[WuWaLguiViewport] mouse conversion installed at {:x}", mouse_position_rva);
-    } catch (const std::exception& error) {
-        try { if (s.mouse) (void)s.mouse.disable(); } catch (...) {}
-        try { spdlog::error("[WuWaLguiViewport] mouse conversion unavailable: {}", error.what()); } catch (...) {}
-    } catch (...) {}
 }
 
 inline void install_viewport(State& s, HMODULE executable, uint32_t image_size) noexcept {
@@ -917,7 +887,6 @@ inline void install_viewport(State& s, HMODULE executable, uint32_t image_size) 
         wuwa_lgui_viewport::state().installed.store(true, std::memory_order_release);
         spdlog::info("[WuWaLguiViewport] installed sites={:x},{:x},{:x},{:x},{:x}; full VR UI uses the window size",
             viewport_sites[0].rva, viewport_sites[1].rva, viewport_sites[2].rva, viewport_sites[3].rva, viewport_sites[4].rva);
-        install_mouse(s, executable, image_size);
     } catch (const std::exception& error) {
         disable_viewport(s);
         try { spdlog::error("[WuWaLguiViewport] unavailable: {}", error.what()); } catch (...) {}
@@ -1051,7 +1020,7 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                     "by_caller={},{},{},{},{},{},{},{},{}", v.installed.load(),
                     size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed),
                     pointer >> 32, pointer & 0xffffffffu, v.pointer_rewrites.load(std::memory_order_relaxed),
-                    v.input_rewrites.load(std::memory_order_relaxed), v.mouse_installed.load(),
+                    v.input_rewrites.load(std::memory_order_relaxed), ((v.sites.load() >> 7) & 1u) != 0,
                     v.mouse_rewrites.load(std::memory_order_relaxed), eye >> 32, eye & 0xffffffffu, v.sites.load(),
                     v.caller_mask.load(), v.callers[0].load(), v.callers[1].load(), v.callers[2].load(), v.callers[3].load(),
                     v.callers[4].load(), v.callers[5].load(), v.callers[6].load(), v.callers[7].load(), v.callers[8].load());

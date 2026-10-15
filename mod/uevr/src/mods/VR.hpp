@@ -1410,8 +1410,8 @@ private:
     const ModToggle::Ptr m_wuwa_ui_story_window_size{ ModToggle::create(generate_name("WuWaUiStoryWindowSize"), true) };
     const ModToggle::Ptr m_wuwa_ui_character_tall{ ModToggle::create(generate_name("WuWaUiCharacterTall"), true) };
     // Diagnostics, never saved: bit n lets 16:9 rect hook n apply; in the taller layout bit 5 the
-    // pointer ray and bit 6 the controller's point conversions take the window size (off since
-    // test 17n), and bit 7 converts the mouse to the canvas rect (WuWaLguiViewport.hpp).
+    // pointer ray for every pointer and bit 6 the controller's point conversions take the window
+    // size (off since test 17n), and bit 7 the mouse's ray alone (17o, WuWaLguiViewport.hpp).
     struct TransientInt32 : ModInt32 {
         using ModInt32::ModInt32;
         void config_load(const utility::Config&, bool) override {}

@@ -213,14 +213,15 @@ def invariants(s: dict, baseline: dict | None = None) -> list[tuple[str, str, st
     checks = [h for h in s['hud'] if '(screen check)' in h or '(full VR check)' in h]
     out.append(('layout-resyncs', 'fail' if loops else 'pass',
                 f"{len(checks)} resyncs by the layout check; {len(loops)} 'keeps changing' stops"))
-    # The taller layout converts the mouse into the canvas rect (test 17n); 17l/17m builds gave the ray
-    # the window size instead and log no mouse= field.
+    # In the taller layout the ray takes the window size for the mouse alone (test 17o; mouse= is sites
+    # bit 7). 17n logged converted mouse positions in the same fields; 17l/17m builds gave every ray the
+    # window size and log no mouse= field.
     if not s['pointer_layout']:
         mouse = ('unknown', 'taller layout not used in this session')
     elif s['mouse_installed'] is False:
-        mouse = ('fail', 'taller layout used but the mouse conversion is not installed')
+        mouse = ('fail', "taller layout used but the mouse's ray is off (sites bit 7) or not installed")
     elif s['mouse_rewrites']:
-        mouse = ('pass', f"{s['mouse_rewrites']} mouse positions converted to the canvas rect in the taller layout")
+        mouse = ('pass', f"{s['mouse_rewrites']} mouse rays given the window size in the taller layout")
     elif s['mouse_installed'] is None and s['pointer_rewrites']:
         mouse = ('pass', f"{s['pointer_rewrites']} mouse rays given the window size in the taller layout (17l/17m build)")
     else:

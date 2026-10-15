@@ -96,6 +96,16 @@ int main() {
     assert(pictures.sample(pg, "400", dialogue, 0, sources, keep, 8400));
     assert(!pictures.active(8400));
     assert(!pictures.sample(pg, "400", plot, 0, plot, screen, 8500)); // the plot bit never reaches a lease
+    // lease-v4: the character screen reaches its own lease only, as the dialogue bit.
+    auto w = showroom_bits({uint8_t(showroom | dialogue), 0, uint8_t(showroom | dialogue | movie)});
+    assert(w.active == dialogue && w.hold == 0 && w.known == dialogue);
+    w = showroom_bits({dialogue, 0, uint8_t(dialogue | movie)}); // not known: no observation
+    assert(w.active == 0 && w.known == 0);
+    const auto sc = cinema_bits({showroom, 0, showroom});
+    assert(sc.active == 0 && sc.known == 0);
+    s = story_bits({showroom, 0, uint8_t(showroom | plot)});
+    assert(s.active == 0 && s.known == dialogue);
+    assert(!pictures.sample(pg, "400", showroom, 0, showroom, screen, 8600)); // nor does the showroom bit itself
     assert(resolve(true, false, Presentation::none).screen);
     assert(resolve(false, true, Presentation::none).mono);
     std::cout << "PASS automatic cinematic lease, expiry, pause, manual precedence, world and producer fencing\n";

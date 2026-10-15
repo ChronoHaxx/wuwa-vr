@@ -381,6 +381,9 @@
   "Change page": [
     "mod/controls.json"
   ],
+  "Character screen in the taller layout": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Character toon-depth rim is suppressed; the previous value is retained.": [
     "utility/WuWaRimSuppressionPolicy.hpp"
   ],
@@ -2740,6 +2743,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "With the 16:9 layout off: every conversation (story scenes and chats with people in the world) and story videos switch to 16:9 while they play, so story pictures show whole, then the taller layout comes back. Follows the game's own dialogue state, so it works with any controls and with the game UI hidden.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "With the 16:9 layout on: the character screen (Resonators) uses the taller layout while it is open, so its floor reflection keeps showing the current character, then 16:9 comes back. Its icons look flatter there and the mouse can miss.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Within a shot": [

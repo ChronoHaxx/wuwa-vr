@@ -386,7 +386,15 @@ public:
     bool wants_story_scene_layout() const {
         return !m_wuwa_ui_window_size->value() && m_wuwa_ui_story_window_size->value();
     }
+    // HUD page "Character screen in the taller layout" (test 17g): the character screen's
+    // floor reflection only updates in the taller layout, because the game decides it from
+    // the same GetViewportSize call (return RVA 0xe0d438) that lays out the 16:9 UI. With
+    // 16:9 chosen, the taller layout is used while the camera is at that screen's showroom.
+    bool wants_character_screen_layout() const {
+        return m_wuwa_ui_window_size->value() && m_wuwa_ui_character_tall->value();
+    }
     bool is_wuwa_ui_window_size_active() const {
+        if (wants_character_screen_layout() && m_wuwa_controls.character_screen_active()) return false;
         return m_wuwa_ui_window_size->value() || (wants_story_scene_layout() && m_wuwa_controls.story_scene_active());
     }
     uint32_t wuwa_ui_window_size_sites() const {
@@ -1317,6 +1325,7 @@ public:
             *m_wuwa_lgui_redirect,
             *m_wuwa_ui_window_size,
             *m_wuwa_ui_story_window_size,
+            *m_wuwa_ui_character_tall,
             *m_wuwa_ui_window_size_sites,
             *m_wuwa_ui_viewport_callers,
             *m_wuwa_lgui_menu_redirect,
@@ -1397,6 +1406,7 @@ private:
     // HUD page "16:9 UI layout": off restores 1.2.2's taller, eye-shaped full VR UI.
     const ModToggle::Ptr m_wuwa_ui_window_size{ ModToggle::create(generate_name("WuWaUiWindowSize"), true) };
     const ModToggle::Ptr m_wuwa_ui_story_window_size{ ModToggle::create(generate_name("WuWaUiStoryWindowSize"), true) };
+    const ModToggle::Ptr m_wuwa_ui_character_tall{ ModToggle::create(generate_name("WuWaUiCharacterTall"), true) };
     // Diagnostics, never saved: bit n lets 16:9 rect hook n apply (WuWaLguiViewport.hpp).
     struct TransientInt32 : ModInt32 {
         using ModInt32::ModInt32;

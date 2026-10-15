@@ -21,6 +21,13 @@ inline Bits story_bits(Bits b) {
     const auto story = [](uint8_t v) { return uint8_t((v & movie) | ((v & plot) ? dialogue : 0)); };
     return {story(b.active), story(b.hold), uint8_t((b.known & movie) | dialogue)};
 }
+// lease-v4 (test 17g): the camera is at the character screen's showroom. Only the
+// character-screen layout reads it, through a lease of its own (as the dialogue bit).
+constexpr uint8_t showroom = 16;
+inline Bits showroom_bits(Bits b) {
+    const auto at = [](uint8_t v) { return uint8_t((v & showroom) ? dialogue : 0); };
+    return {at(b.active), at(b.hold), at(b.known)};
+}
 enum class Presentation : uint8_t { none, stereo_screen, mono_theatre };
 // What automatic cinema asks for: a story video wins, then a story picture (also for a
 // moment after one, so the crossfade between pictures does not flip the view), then

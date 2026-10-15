@@ -826,6 +826,14 @@ Page hud_page() {
             return !VR::get()->is_wuwa_ui_window_size_enabled() && typed<bool>("VR_WuWaUiStoryWindowSize") != nullptr;
         };
         page.items.push_back(std::move(story));
+        auto character = setting_toggle("Character screen in the taller layout",
+            "With the 16:9 layout on: the character screen (Resonators) uses the taller layout while it is open, so its "
+            "floor reflection keeps showing the current character, then 16:9 comes back. Its icons look flatter there "
+            "and the mouse can miss.", "VR_WuWaUiCharacterTall");
+        character.enabled = [] {
+            return VR::get()->is_wuwa_ui_window_size_enabled() && typed<bool>("VR_WuWaUiCharacterTall") != nullptr;
+        };
+        page.items.push_back(std::move(character));
     }
     // Only needed when the game lays out full VR's HUD at the eye's shape: with the
     // 16:9 layout the HUD is the flat game's 16:9 (WuWaLguiViewport.hpp).

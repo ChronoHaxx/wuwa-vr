@@ -232,7 +232,7 @@ bool WuWaControlsComponent::auto_cinema_active() const {
 wuwa_auto_cinema::Presentation WuWaControlsComponent::auto_cinema_presentation() const {
     return m_cinema_presentation.load();
 }
-void WuWaControlsComponent::advance_auto_cinema(bool runtime_ready, bool story_ready) {
+void WuWaControlsComponent::advance_auto_cinema(bool runtime_ready, bool story_ready, bool character_ready) {
     std::scoped_lock lock{m_cinema_mutex};
     // Apply expiry on a game-frame boundary, never independently between eye
     // getter calls. A fully stalled game thread holds its last presentation
@@ -242,6 +242,8 @@ void WuWaControlsComponent::advance_auto_cinema(bool runtime_ready, bool story_r
     m_cinema_presentation.store(m_cinema_lease.presentation(now));
     if (!story_ready) m_story_lease.invalidate();
     m_story_scene.store(m_story_lease.presentation(now) != wuwa_auto_cinema::Presentation::none);
+    if (!character_ready) m_showroom_lease.invalidate();
+    m_character_screen.store(m_showroom_lease.presentation(now) != wuwa_auto_cinema::Presentation::none);
     // Whatever changed the full VR layout (the HUD page, a story scene, a step's
     // setting), the game's UI scaler keeps the old size until a layout refresh.
     // The stereo screen and mono theatre refresh on their own way back.
@@ -273,13 +275,14 @@ void WuWaControlsComponent::override_auto_cinema() {
     m_cinema_presentation.store(wuwa_auto_cinema::Presentation::none);
 }
 std::string WuWaControlsComponent::CinemaValue::get() const {
-    if (kind == 1) return "lease-v3";
+    if (kind == 1) return "lease-v4";
     if (kind == 2) return owner.auto_cinema_status();
     if (kind == 3) return VR::get()->is_using_mono_theatre() ? "true" : "false";
     // v2 (test 3i): explicit "on" / "off" as well as "toggle", for the view cycle.
     if (kind == 4 || kind == 5) return "effective-v2";
     if (kind == 6) return VR::get()->is_using_2d_screen() ? "true" : "false";
     if (kind == 7) return VR::get()->wants_story_scene_layout() ? "true" : "false";
+    if (kind == 8) return VR::get()->wants_character_screen_layout() ? "true" : "false";
     std::scoped_lock lock{owner.m_cinema_mutex};
     return std::to_string(owner.m_cinema_lease.generation());
 }
@@ -315,12 +318,13 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
         const auto detail = sample.value("detail", std::string{});
         const auto elapsed = sample.value("elapsed_ms", 0.0);
         if (world.empty() || world.size() > 32 || world.find_first_not_of("0123456789") != std::string::npos ||
-            active < 0 || active > 15 || hold < 0 || hold > 15 || known < 0 || known > 15 ||
+            active < 0 || active > 31 || hold < 0 || hold > 31 || known < 0 || known > 31 ||
             detail.size() > 240 || !std::isfinite(elapsed) || elapsed < 0 || elapsed > 50) return;
         std::scoped_lock lock{owner.m_cinema_mutex};
         const bool cinema = VR::get()->is_auto_cinema_enabled(), story = VR::get()->wants_story_scene_layout();
-        // The cinema lease's generation fences old producers for both leases.
-        if ((!cinema && !story) || generation != owner.m_cinema_lease.generation()) return;
+        const bool character = VR::get()->wants_character_screen_layout();
+        // The cinema lease's generation fences old producers for all three leases.
+        if ((!cinema && !story && !character) || generation != owner.m_cinema_lease.generation()) return;
         const auto now = GetTickCount64();
         bool accepted = false;
         const wuwa_auto_cinema::Bits bits{static_cast<uint8_t>(active), static_cast<uint8_t>(hold), static_cast<uint8_t>(known)};
@@ -339,6 +343,13 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
             accepted = owner.m_story_lease.sample(owner.m_story_lease.generation(), world, b.active, b.hold, b.known,
                 wuwa_auto_cinema::Presentation::stereo_screen, now) || accepted;
         }
+        if (character) {
+            // As the story lease: any presentation marks the screen; only the layout reads it.
+            const auto b = wuwa_auto_cinema::showroom_bits(bits);
+            if (!owner.m_showroom_lease.generation()) owner.m_showroom_lease.start();
+            accepted = owner.m_showroom_lease.sample(owner.m_showroom_lease.generation(), world, b.active, b.hold, b.known,
+                wuwa_auto_cinema::Presentation::stereo_screen, now) || accepted;
+        }
         if (accepted) {
             owner.m_cinema_signal = detail;
             owner.m_cinema_detection_ms = elapsed;
@@ -355,7 +366,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
         *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
-        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect,
+        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};

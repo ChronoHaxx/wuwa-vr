@@ -1,7 +1,8 @@
 -- Optional read-only detection. Native owns the expiring display lease; this
 -- module never writes MonoTheatreMode, 2DScreenMode, portal or world scale.
--- Runs for automatic cinema and for the HUD page's "Story scenes in 16:9"
--- (native says so in WuWaControls_StoryLayoutDetect; older backends lack it).
+-- Runs for automatic cinema and for the HUD page's "Story scenes in 16:9" and
+-- "Character screen in the taller layout" (native says so in
+-- WuWaControls_StoryLayoutDetect / WuWaControls_CharacterLayoutDetect; older backends lack them).
 local M = {}
 local MOVIE = "MediaPlayer /Game/Aki/UI/UIResources/UiPlot/VideoPlayer/CommonVideoPlayer.CommonVideoPlayer"
 local STORY = "Class /Script/LGUI.UIExtendToggleSpriteTransition"
@@ -15,6 +16,12 @@ local PLOT = "TypeScriptGeneratedClass /Game/Aki/TypeScript/Game/Module/Sequence
 -- widgets per tick. lease-v3 only, for automatic cinema.
 local PICTURE = "Class /Script/LGUI.UITexture"
 local PICTURE_SCAN, PICTURE_RETRY = 150, 2
+-- The character screen (test 17g): its 3D scene is a streamed UI level far outside the
+-- world, and while the screen is open the camera sits a few metres from the showroom's
+-- floor reflection (2.4 m measured; 2.6 km after closing, while the level stays loaded
+-- for minutes). lease-v4 only, for the taller layout on that screen.
+local SHOWROOM = "Class /Script/Engine.PlanarReflectionComponent"
+local SHOWROOM_OWNER, SHOWROOM_RANGE = "BP_UIShowRoom_C", 3000
 local function finite(v) return type(v) == "number" and v == v and math.abs(v) < math.huge end
 local function kind(p) return p:get_class():get_fname():to_string() end
 local function bool_getter(o, name)
@@ -34,6 +41,7 @@ function M.new(env)
     local s = {status = "Automatic mono off", token = nil, last_poll = nil, classes = nil}
     local function wanted()
         return env.get("VR_AutoCinema") == "true" or env.get("WuWaControls_StoryLayoutDetect") == "true"
+            or env.get("WuWaControls_CharacterLayoutDetect") == "true"
     end
     local api, hook = env.api, env.types and env.types.UObjectHook
     local function valid(o) return o ~= nil and api:to_uobject(o:get_address()) ~= nil end
@@ -192,6 +200,41 @@ function M.new(env)
         end
         return "clear", "no story picture"
     end
+    local function location(v)
+        if v == nil then return nil end
+        local x, y, z = v.x or v.X, v.y or v.Y, v.z or v.Z
+        if finite(x) and finite(y) and finite(z) then return {x, y, z} end
+        return nil
+    end
+    -- The showroom's level is a streamed UI level: its own World is the outer, so the
+    -- level's OwningWorld (not the outer chain) says it belongs to the current world.
+    local function showroom_signal(current)
+        local list = objects(s.classes.showroom, 64, SHOWROOM)
+        if not list then return "unknown", "showroom class/index unavailable" end
+        local camera
+        for _, o in ipairs(list) do
+            local owner = valid(o) and o:get_outer() or nil
+            local level = valid(owner) and owner:get_outer() or nil
+            if valid(level) and owner:get_class():get_fname():to_string() == SHOWROOM_OWNER then
+                local owning = property(level, level:get_class(), "OwningWorld", "ObjectProperty")
+                if valid(owning) and owning:get_address() == current:get_address() then
+                    if not camera then
+                        local pc = api:get_player_controller(0)
+                        local pcm = valid(pc) and property(pc, pc:get_class(), "PlayerCameraManager", "ObjectProperty") or nil
+                        camera = valid(pcm) and location(pcm:GetCameraLocation()) or nil
+                        if not camera then return "unknown", "camera location unavailable" end
+                    end
+                    local at = location(o:K2_GetComponentLocation())
+                    if not at then return "unknown", "showroom location unavailable" end
+                    local dx, dy, dz = at[1] - camera[1], at[2] - camera[2], at[3] - camera[3]
+                    if dx * dx + dy * dy + dz * dz < SHOWROOM_RANGE * SHOWROOM_RANGE then
+                        return "active", "camera at the character screen"
+                    end
+                end
+            end
+        end
+        return "clear", "no character screen"
+    end
     local function collect(now)
         local current = world()
         if not current then return {world = "0", active = 0, hold = 0, known = 0, detail = "Current world unavailable"} end
@@ -210,6 +253,12 @@ function M.new(env)
             picture_ok, picture, picture_detail = pcall(picture_signal, current, plot, now)
             if not picture_ok then forget_picture(); picture, picture_detail = "unknown", "story picture reflection unavailable" end
         end
+        local showroom, showroom_detail = nil, nil
+        if s.showroom then
+            local showroom_ok
+            showroom_ok, showroom, showroom_detail = pcall(showroom_signal, current)
+            if not showroom_ok then showroom, showroom_detail = "unknown", "character screen reflection unavailable" end
+        end
         if not movie_ok then movie, movie_detail = "unknown", "movie reflection unavailable" end
         if not story_ok then story, story_detail = "unknown", "dialogue reflection unavailable" end
         local again = world()
@@ -217,13 +266,13 @@ function M.new(env)
             return {world = "0", active = 0, hold = 0, known = 0, detail = "World changed during detection"}
         end
         local sample = {world = string.format("%.0f", start_world), active = 0, hold = 0, known = 0}
-        for bit, state in pairs({[1] = movie, [2] = story, [4] = plot, [8] = picture}) do
+        for bit, state in pairs({[1] = movie, [2] = story, [4] = plot, [8] = picture, [16] = showroom}) do
             if state ~= "unknown" then sample.known = sample.known + bit end
             if state == "active" then sample.active = sample.active + bit end
             if state == "hold" then sample.hold = sample.hold + bit end
         end
         sample.detail = movie_detail .. "; " .. story_detail .. (plot_detail and ("; " .. plot_detail) or "")
-            .. (picture_detail and ("; " .. picture_detail) or "")
+            .. (picture_detail and ("; " .. picture_detail) or "") .. (showroom_detail and ("; " .. showroom_detail) or "")
         return sample
     end
     local function report(status, now)
@@ -254,12 +303,12 @@ function M.new(env)
         if s.last_poll and now - s.last_poll < 0.1 - 1e-6 then return end
         s.last_poll = now
         local protocol = env.get("WuWaControls_AutoCinemaSample")
-        if protocol ~= "lease-v1" and protocol ~= "lease-v2" and protocol ~= "lease-v3" then
-            report("Automatic mono needs a compatible backend", now); return
-        end
-        s.plot = protocol == "lease-v2" or protocol == "lease-v3"
+        local version = ({["lease-v1"] = 1, ["lease-v2"] = 2, ["lease-v3"] = 3, ["lease-v4"] = 4})[protocol]
+        if not version then report("Automatic mono needs a compatible backend", now); return end
+        s.plot = version >= 2
         -- Story pictures only change the view, so only automatic cinema looks for them.
-        s.picture = protocol == "lease-v3" and env.get("VR_AutoCinema") == "true"
+        s.picture = version >= 3 and env.get("VR_AutoCinema") == "true"
+        s.showroom = version >= 4 and env.get("WuWaControls_CharacterLayoutDetect") == "true"
         if not s.picture then forget_picture() end
         if s.token and env.get("WuWaControls_AutoCinemaProducer") ~= s.token then
             -- A newer script or native reset owns the producer now. A live
@@ -278,7 +327,7 @@ function M.new(env)
         -- Lazy engine classes may load later: at most three attempts each per
         -- enable, five seconds apart; successful descriptors use the index.
         for name, path in pairs({movie = "Class /Script/MediaAssets.MediaPlayer", story = STORY, plot = s.plot and PLOT or nil,
-                picture = s.picture and PICTURE or nil}) do
+                picture = s.picture and PICTURE or nil, showroom = s.showroom and SHOWROOM or nil}) do
             if not valid(s.classes[name]) and (s.class_attempts[name] or 0) < 3 and now >= (s.class_retry[name] or 0) then
                 s.class_attempts[name], s.class_retry[name] = (s.class_attempts[name] or 0) + 1, now + 5
                 s.classes[name] = api:find_uobject(path)

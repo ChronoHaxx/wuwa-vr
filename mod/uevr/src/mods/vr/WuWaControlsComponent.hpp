@@ -83,9 +83,11 @@ public:
     static bool game_focused();
     bool auto_cinema_active() const;
     wuwa_auto_cinema::Presentation auto_cinema_presentation() const;
-    void advance_auto_cinema(bool runtime_ready, bool story_ready);
+    void advance_auto_cinema(bool runtime_ready, bool story_ready, bool character_ready);
     // A story dialogue or video the detector sees (HUD page "Story scenes in 16:9").
     bool story_scene_active() const { return m_story_scene.load(std::memory_order_relaxed); }
+    // The camera at the character screen's showroom (HUD page "Character screen in the taller layout").
+    bool character_screen_active() const { return m_character_screen.load(std::memory_order_relaxed); }
     std::string auto_cinema_status() const;
     void reset_auto_cinema();
     void override_auto_cinema();
@@ -116,6 +118,9 @@ private:
     wuwa_auto_cinema::Lease m_story_lease;
     uint64_t m_picture_seen_ms{}; // the last sample with a story picture on screen (cinema mutex)
     std::atomic<bool> m_story_scene{false};
+    // And for the taller layout while the character screen is open (test 17g).
+    wuwa_auto_cinema::Lease m_showroom_lease;
+    std::atomic<bool> m_character_screen{false};
     int8_t m_layout_seen{-1}; // the last full VR layout (game thread), -1 before the first tick
     // Transient protocol: generation fences old Lua callbacks; native expiry
     // restores the base view even if Lua stops running without reset callbacks.
@@ -135,7 +140,8 @@ private:
       m_toggle_mono{*this, 4, "WuWaControls_ToggleMonoTheatre"},
       m_toggle_screen{*this, 5, "WuWaControls_ToggleStereoScreen"},
       m_effective_screen{*this, 6, "WuWaControls_EffectiveScreen"},
-      m_scene_detect{*this, 7, "WuWaControls_StoryLayoutDetect"};
+      m_scene_detect{*this, 7, "WuWaControls_StoryLayoutDetect"},
+      m_character_detect{*this, 8, "WuWaControls_CharacterLayoutDetect"};
     struct FocusValue : ModToggle {
         FocusValue() : ModToggle{"WuWaControls_Focused", false} {}
         std::string get() const override { return game_focused() ? "true" : "false"; }

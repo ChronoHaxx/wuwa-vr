@@ -153,7 +153,8 @@ REC badge with the elapsed time shows while recording.
    automatic cinematic screen and what story scenes and story pictures use
    (see below), matched framing.
 5. **HUD:** size, distance, **16:9 UI layout** (`VR_WuWaUiWindowSize`,
-   default on; see below), **Story scenes in 16:9** (`VR_WuWaUiStoryWindowSize`,
+   default on; see below), **Character screen in the taller layout**
+   (`VR_WuWaUiCharacterTall`, with 16:9), **Story scenes in 16:9** (`VR_WuWaUiStoryWindowSize`,
    default on; only with the taller layout), **HUD shape (full VR)** (`UI_WuWaHudShape`,
    default 1.33; shown only while the taller layout is in use), up / down, left / right, follow head, refresh
    layout, controls cards (on / off, keep open, size, height, distance) and
@@ -213,7 +214,16 @@ floor reflection keeps updating). With the 16:9 layout that reflection stops
 updating and can show the previous character until a layout refresh: test 17e
 traced it to one game caller of `GetViewportSize` (return RVA 0xe0d438), which
 also lays out the 16:9 UI, so giving it the eye size fixes the reflection but
-breaks the UI. A known limit for 1.2.3. Switching moves the hooks
+breaks the UI. So **Character screen in the taller layout**
+(`VR_WuWaUiCharacterTall`, on by default, test 17g) uses the taller layout while
+the character screen is open. Its 3D scene is a streamed UI level
+(`UL_UIMap_Character`) about 1.5 km outside the world, and while the screen is
+open the camera sits a few metres from that level's `BP_UIShowRoom_C`
+`PlanarReflection` (2.4 m measured). After closing, the camera is 2.6 km away,
+but the level stays loaded for minutes. The detector reports the camera within 30 m of a
+showroom reflection whose level's `OwningWorld` is the current world (sample
+bit 16, protocol `lease-v4`), held in a third lease with the story lease's
+timing. Switching moves the hooks
 and the panel at once and asks for a HUD layout refresh (as after a view
 switch), because the game's UI scaler keeps its old size until then. The
 taller layout brings back the flatter icons (HUD shape) and the mouse offset.

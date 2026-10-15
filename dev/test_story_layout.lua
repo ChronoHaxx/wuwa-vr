@@ -75,9 +75,10 @@ local function prop(name, kind_name, nxt)
         get_class = function() return {get_fname = function() return named(kind_name) end} end}
 end
 local PICTURE = "Class /Script/LGUI.UITexture"
+local SHOWROOM = "Class /Script/Engine.PlanarReflectionComponent"
 local function plot_fixture(protocol)
     local f = {objects = {}, lookups = {}, calls = 0, performing = true, samples = {}, clock = 1, generation = 0,
-        textures = {}, scans = 0}
+        textures = {}, scans = 0, reflections = {}, camera = {x = 6, y = -305, z = 63}}
     local function object(name, outer)
         local o = {name = name, outer = outer}; f.objects[#f.objects + 1] = o; local id = #f.objects
         function o:get_address() return id end
@@ -102,19 +103,26 @@ local function plot_fixture(protocol)
         return name == "IsInPerformingPlot" and {get_child_properties = function() return f.signature end} or nil
     end
     function f.plot_class:get_class_default_object() return f.cdo end
-    f.object, f.picture_class = object, object(PICTURE)
+    f.object, f.picture_class, f.showroom_class = object, object(PICTURE), object(SHOWROOM)
+    f.pcm = object("PlayerCameraManager")
+    function f.pcm:GetCameraLocation() return f.camera end
+    f.pc = object("PlayerController"); f.pc.PlayerCameraManager = f.pcm
+    described(f.pc, {PlayerCameraManager = true})
     f.values = {VR_AutoCinema = "false", WuWaControls_StoryLayoutDetect = "true",
         WuWaControls_AutoCinemaSample = protocol or "lease-v2", WuWaControls_AutoCinemaStatus = "test", WuWaControls_AutoCinemaProducer = "0"}
     local module = assert(loadfile(module_path))()
     f.module = module.new({api = {
             to_uobject = function(_, id) return f.objects[id] end,
             get_engine = function() return engine end,
+            get_player_controller = function() return f.pc end,
             find_uobject = function(_, name)
                 f.lookups[#f.lookups + 1] = name
                 if name == PLOT then return f.plot_class end
+                if name == SHOWROOM then return f.showroom_class end
                 return name == PICTURE and f.picture_class or nil
             end},
         types = {UObjectHook = {get_objects_by_class = function(c)
+            if c == f.showroom_class then return f.reflections end
             if c ~= f.picture_class then return {} end
             f.scans = f.scans + 1; return f.textures
         end}},
@@ -221,4 +229,68 @@ test("a closed view still in memory loses to the live one; two live views are un
     f = picture_fixture(); show(f, plot_view(f)); plot_view(f); f:tick()
     assert(not bit8(f:last()) and f:last().detail:find("ambiguous story picture", 1, true))
 end)
-print("Story layout detection tests passed (with plot and pictures): " .. passed)
+
+-- The character screen (lease-v4, "Character screen in the taller layout"): the camera within 30 m of the
+-- showroom's floor reflection, in a streamed UI level whose OwningWorld is the current world.
+local SCREEN_CAMERA, SHOWROOM_AT = {x = 149801, y = 150000, z = 150134}, {x = 150000, y = 150000, z = 150000}
+local function showroom(f, owning, owner_class)
+    local level = f.object("PersistentLevel", f.object("UL_UIMap_Character"))
+    level.OwningWorld = owning or f.world
+    level.get_class = function() return {find_property = function(_, k) return k == "OwningWorld" and prop(k, "ObjectProperty") or nil end} end
+    local actor = f.object("BP_UIShowRoom_C_1", level)
+    actor.get_class = function() return {get_fname = function() return named(owner_class or "BP_UIShowRoom_C") end} end
+    local component = f.object("PlanarReflection", actor)
+    function component:K2_GetComponentLocation() return SHOWROOM_AT end
+    f.reflections[#f.reflections + 1] = component
+    return component
+end
+local function character_fixture(protocol)
+    local f = plot_fixture(protocol or "lease-v4")
+    f.values.WuWaControls_StoryLayoutDetect, f.values.WuWaControls_CharacterLayoutDetect = "false", "true"
+    return f
+end
+local function bit16(sample) return sample.known & 16 == 16, sample.active & 16 == 16 end
+
+test("lease-v4: the camera at the showroom is bit 16; back in the world is clear while the level stays loaded", function()
+    local f = character_fixture(); showroom(f); f.camera = SCREEN_CAMERA; f:tick()
+    local known, active = bit16(f:last())
+    assert(known and active and f:last().detail:find("camera at the character screen", 1, true), f:last().detail)
+    f.camera = {x = 6, y = -305, z = 63}; f:tick(); known, active = bit16(f:last())
+    assert(known and not active and f:last().detail:find("no character screen", 1, true), f:last().detail)
+end)
+test("the character layout alone starts the detector; nothing loaded is a known clear", function()
+    local f = character_fixture(); f:tick()
+    assert(f.module.token == "1" and f.values.VR_AutoCinema == "false")
+    local known, active = bit16(f:last()); assert(known and not active)
+end)
+test("another world's showroom, a template or another owner never counts", function()
+    local f = character_fixture(); f.camera = SCREEN_CAMERA
+    showroom(f, f.object("Other world")); showroom(f, nil, "BlueprintGeneratedClass"); f:tick()
+    local known, active = bit16(f:last()); assert(known and not active, f:last().detail)
+end)
+test("an unreadable camera is unknown, never a fabricated clear", function()
+    local f = character_fixture(); showroom(f); f.pc = nil; f:tick()
+    assert(not bit16(f:last()) and f:last().detail:find("camera location unavailable", 1, true), f:last().detail)
+end)
+test("lease-v3 backends, or the setting off, never look for the showroom", function()
+    local f = character_fixture("lease-v3"); showroom(f); f.camera = SCREEN_CAMERA; f:tick()
+    for _, name in ipairs(f.lookups) do assert(name ~= SHOWROOM, "showroom lookup on lease-v3") end
+    assert(not bit16(f:last()))
+    f = character_fixture(); f.values.WuWaControls_CharacterLayoutDetect = "false"; f.values.VR_AutoCinema = "true"
+    showroom(f); f.camera = SCREEN_CAMERA; f:tick()
+    for _, name in ipairs(f.lookups) do assert(name ~= SHOWROOM, "showroom lookup with the setting off") end
+    assert(not bit16(f:last()))
+end)
+test("the Comfort script starts the detector for the character layout alone", function()
+    local old_path, old_loaded = package.path, package.loaded.wuwa_auto_cinema
+    package.loaded.wuwa_auto_cinema = nil
+    package.path = (module_path:match("^(.*)[/\\]") or ".") .. "/?.lua;" .. old_path
+    local f = comfort_fixture(); f:load()
+    package.path = old_path
+    f:tick(); assert(#f.writes == 0, "nothing before any setting")
+    f.values.WuWaControls_CharacterLayoutDetect = "true"; f:tick()
+    package.loaded.wuwa_auto_cinema = old_loaded
+    assert(#f.errors == 0, f.errors[1])
+    assert(f.writes[1] and f.writes[1][1] == "WuWaControls_AutoCinemaProducer", "detector not started")
+end)
+print("Story layout detection tests passed (with plot, pictures and the character screen): " .. passed)

@@ -91,6 +91,16 @@ class QaTests(unittest.TestCase):
         inv = {n: (r, d) for n, r, d in qa.invariants(qa.session(LOG + "\n" + tall))}
         self.assertEqual(inv["mouse-ray"][0], "pass")
         self.assertIn("12 mouse rays", inv["mouse-ray"][1])
+        # Since 17n the taller layout converts the mouse instead; the log says whether it could.
+        new = tall.replace("pointer_rewrites=12", "pointer_rewrites=0 input_rewrites=0 mouse=true mouse_rewrites=40 eye=2064x2208")
+        inv = {n: (r, d) for n, r, d in qa.invariants(qa.session(LOG + "\n" + new))}
+        self.assertEqual(inv["mouse-ray"], ("pass", "40 mouse positions converted to the canvas rect in the taller layout"))
+        idle = new.replace("mouse_rewrites=40", "mouse_rewrites=0")
+        inv = {n: (r, d) for n, r, d in qa.invariants(qa.session(LOG + "\n" + idle))}
+        self.assertEqual(inv["mouse-ray"], ("unknown", "mouse not used in the taller layout"))
+        missing = idle.replace("mouse=true", "mouse=false")
+        inv = {n: (r, d) for n, r, d in qa.invariants(qa.session(LOG + "\n" + missing))}
+        self.assertEqual(inv["mouse-ray"][0], "fail")
 
     def test_a_layout_loop_or_an_unshared_camera_fails(self):
         log = LOG + "\n" + line("10:01:00", "info", "[Plugin] WuWaHud: Layout keeps changing; stopped checking") + "\n" + \

@@ -29,6 +29,7 @@
 #include "utility/WuWaMonoNativeProjection.hpp"
 #include "utility/WuWaRunMarker.hpp"
 #include "utility/WuWaNearClip.hpp"
+#include "utility/WuWaInputActivity.hpp"
 
 #include "VR.hpp"
 #include "WindowMode.hpp"
@@ -1036,8 +1037,10 @@ void VR::on_xinput_get_state(uint32_t* retval, uint32_t user_index, XINPUT_STATE
 
     // Runs on every return path below, after the state is final for the game.
     utility::ScopeGuard menu_release{[&]() {
-        if (retval && state && *retval == ERROR_SUCCESS && wuwa_test::is_wuwa())
+        if (retval && state && *retval == ERROR_SUCCESS && wuwa_test::is_wuwa()) {
             hold_back_menu_buttons(user_index, state->Gamepad, g_framework->is_drawing_ui());
+            wuwa_input_activity::note(state->Gamepad, GetTickCount64());
+        }
     }};
 
     // Uses an engine-thread snapshot, never XR or Unreal calls from XInput.

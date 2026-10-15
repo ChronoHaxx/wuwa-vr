@@ -12,6 +12,7 @@
 #include "utility/WuWaStereoBasePose.hpp"
 #include "utility/WuWaPlaytestControl.hpp"
 #include "utility/WuWaLguiProbe.hpp"
+#include "utility/WuWaInputActivity.hpp"
 #include "WuWaVrMenuHost.hpp"
 #include "Mods.hpp"
 #include <nlohmann/json.hpp>
@@ -991,7 +992,8 @@ bool vr_cursor_position(ImVec2& out) {
     return true;
 }
 
-// The cursor shows for a while after the mouse last moved, so a controller player's menus stay clean.
+// The cursor shows for a while after the mouse last moved, so a controller player's menus stay clean,
+// and hides at once on controller input until the mouse moves again (the game shows its own ring).
 bool vr_cursor_moved_recently() {
     static std::atomic<uint64_t> last_position{UINT64_MAX}, moved_at{};
     POINT point{};
@@ -1000,7 +1002,7 @@ bool vr_cursor_moved_recently() {
     const auto now = GetTickCount64();
     if (last_position.exchange(packed, std::memory_order_relaxed) != packed) moved_at.store(now, std::memory_order_relaxed);
     const auto moved = moved_at.load(std::memory_order_relaxed);
-    return moved != 0 && now - moved <= 10000;
+    return moved != 0 && now - moved <= 10000 && moved > wuwa_input_activity::last_gamepad();
 }
 
 // A classic arrow, tip at the hot spot, outlined so it reads on light and dark UI.

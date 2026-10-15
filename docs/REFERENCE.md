@@ -421,32 +421,44 @@ So the fix is probably the LGUI canvas size, not the panel shape.
 - **Not verified:** whether WuWa Controls → Reset HUD aspect works. Do not suggest
   it to players until it is.
 
-**The mouse, or a controller button, misses in the taller layout or on the character screen.**
-**Fixed** in test 17m (15 Oct). Needs a headset check.
+**The mouse, a controller button or the left-stick cursor misses in the taller layout or on the character screen.**
+**Fixed** in test 17n (15 Oct). Needs a headset check.
 
-The mouse and controller presses meet in one ray (game function `0xd58550` in 3.7).
-That ray divides a pixel position by the view rect:
+Every UI input meets in one ray (game function `0xd58550` in 3.7). That ray divides
+a pixel position by the view rect, so all three inputs must give pixels in that rect:
 - The **mouse** gives window pixels, and our VR cursor is drawn at the same window pixels.
 - A **controller press** on a button (for example Y for Journey log in the quest menu)
   gives the button's UI point, converted to pixels by sites 3 and 4.
+- The **left-stick cursor** (journey log chapters, the map) is the game's script. It
+  reads the canvas size once when the screen opens (`__GetViewportSize_Internal`,
+  caller 6), moves LGUI's pointer in those canvas pixels and draws its ring there.
 
-In 16:9 every reader uses the window, so both agree. The taller layout keeps the eye
-rect (2064 x 2208 and so on) for its layout:
-- **Before 17l:** the mouse missed up and to the left.
+In 16:9 every reader uses the window, so all three agree. The taller layout keeps the
+eye rect (2064 x 2208 and so on) for its layout:
+- **Before 17l:** the mouse missed up and to the left; buttons and the stick worked.
 - **Test 17l:** the ray alone took the window size, so the mouse worked, but Y missed.
-- **Test 17m:** the ray and both point conversions take the window size in the taller
-  layout, so every pixel conversion uses one size, as in 16:9. The scaler, GetViewportSize
-  and the projection keep the eye rect, so the layout stays tall.
+- **Test 17m:** the ray and both point conversions took the window size. Y worked, but
+  the stick ring is in canvas pixels, so A clicked below it (930 px at 2560 x 2560).
+- **Test 17n:** everything stays on the canvas rect, as before 17l, and the mouse alone
+  is converted where LGUI reads it (`ProcessInput`'s three `GetMousePosition` calls):
+  window pixels become the same 0..1 point in the rect.
 
 How it was found: the view-rect getter `0xc667c0` has exactly three callers in the 3.7
-capture (mouse ray, scaler, centre-of-screen ray).
+capture (pointer ray, scaler, centre-of-screen ray). The stick was measured with
+`dev/ui-stick-cursor.py`, which compares the ring the game draws, the pointer and the
+ray (the older smoke test only compared the ray with the pointer).
+
+**Known:** if the layout or the view changes while a stick-cursor screen is open, the
+script's size is stale: the ring is offset by half the size difference (560 px between
+2560 x 2560 and 2560 x 1440) and part of the screen is out of reach. Reopening the screen
+fixes it. Entering the stereo screen does not refresh it either.
 
 Checking it:
-- The log line `[WuWaLguiViewport] ... pointer_rewrites=N input_rewrites=M` shows both
-  working.
-- `VR_WuWaUiWindowSizeSites` turns them off for comparison: value 95 turns off bit 5
-  (the mouse ray), value 63 turns off bit 6 (the controller conversions). The default
-  is 127.
+- The log line `[WuWaLguiViewport] ... mouse=true mouse_rewrites=N eye=WxH` shows the
+  mouse conversion installed and working in the taller layout.
+- `VR_WuWaUiWindowSizeSites` (never saved) compares behaviours: the default 159 is
+  17n; 31 turns off the mouse conversion (before 17l); 127 is 17m (bits 5 and 6 give
+  the ray and the controller conversions the window size).
 
 **A flat menu's background moves with your head.**
 **Open**. Mono theatre is the workaround.

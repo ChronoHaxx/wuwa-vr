@@ -108,4 +108,10 @@ inline constexpr std::array<CodeRange, 5> viewport_code_ranges{{
     {0xc941a0, 0x4d6, 0x670221723626114bULL},
     {0xc94680, 0x432, 0x68d1b82bfbaf7c15ULL},
 }};
+// UGameViewportClient::GetMousePosition and LGUI's standalone ProcessInput, whose three calls to it
+// the taller layout's mouse conversion recognises by return address (read 15 Oct 2026, 3.7).
+inline constexpr std::array<CodeRange, 2> mouse_code_ranges{{
+    {0x512ae90, 0x8e, 0xfcdfafc6f2f97a57ULL},
+    {0xd1f160, 0x5a5, 0xeb6a4754e08f3a0cULL},
+}};
 } // namespace wuwa_lgui_redirect::compatibility

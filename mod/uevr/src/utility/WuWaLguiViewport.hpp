@@ -25,9 +25,19 @@
 // mouse divided window pixels by the eye rect and missed in the taller layout).
 // Controller presses reach the same ray: the game turns the button's UI point
 // into viewport pixels (sites 3 and 4) and casts the ray there, so with the ray
-// alone on the window size, Y -> Journey log in the quest menu missed (17l). In
-// the taller layout sites 3 and 4 take the window size too (test 17m): every
-// pixel conversion then uses one size, as in 16:9; the layout keeps the eye rect.
+// alone on the window size, Y -> Journey log in the quest menu missed (17l).
+// Test 17m gave sites 3 and 4 the window size too, but the left-stick cursor
+// (journey log chapters, the map) is the game's script: it reads the canvas
+// viewport size once when the screen opens (caller 6 below, the script binding)
+// and moves the pointer in those canvas pixels. In the taller layout that is
+// the eye rect, so the window-sized ray clicked below the cursor ring (17m,
+// 15 Oct 2026: ring on a quest card, A did nothing). Since test 17n the taller
+// layout keeps one size for everything, the canvas (eye) rect, as 17k did, and
+// the mouse alone is converted where LGUI reads it (ProcessInput's three
+// GetMousePosition calls): window pixels -> the same 0..1 point in the rect.
+// The script's size goes stale if the layout or view changes while such a
+// screen is open (the ring is then offset by half the size difference until
+// the screen is reopened); nothing here can refresh it.
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -38,15 +48,20 @@ struct State {
     // Window size as (width << 32 | height); 0 leaves the game's rect alone.
     std::atomic<uint64_t> size{0};
     std::atomic<uint64_t> rewrites{0};
-    // Window size for the input conversions while full VR shows the taller layout; 0 otherwise.
+    // Window size while full VR shows the taller layout (the mouse conversion); 0 otherwise.
     std::atomic<uint64_t> pointer_size{0};
-    std::atomic<uint64_t> pointer_rewrites{0}; // the mouse ray (site 1, one caller)
+    std::atomic<uint64_t> pointer_rewrites{0}; // the pointer ray (site 1, one caller)
     std::atomic<uint64_t> input_rewrites{0};   // UI point -> pixels (sites 3 and 4)
+    std::atomic<uint64_t> mouse_rewrites{0};   // mouse positions converted for LGUI
+    std::atomic<bool> mouse_installed{false};
+    // The game's own rect, as the sites read it before any rewrite: (x << 32 | y), 0 until seen.
+    std::atomic<uint64_t> eye_min{0}, eye_size{0};
     // Bit n lets site n rewrite (WuWaLguiRedirect.hpp viewport_sites); all five by default.
-    // In the taller layout, bit 5 lets the mouse ray and bit 6 the point conversions have the window size.
+    // In the taller layout, bit 5 gives the pointer ray and bit 6 the point conversions the
+    // window size (test 17m; off since 17n), and bit 7 converts the mouse to the canvas rect.
     // Diagnostics only (VR_WuWaUiWindowSizeSites, never saved): finds which reader a game
     // system depends on (15 Oct: the Resonators floor reflection froze in 16:9 only).
-    std::atomic<uint32_t> sites{0x7f};
+    std::atomic<uint32_t> sites{0x9f};
     // GetViewportSize (site 2) by caller, for the same test: calls per caller (the direct calls
     // below, then any other) and bit n lets caller n have the window size (VR_WuWaUiViewportCallers,
     // never saved). Without site 2 the reflection is live but the layout breaks, so one caller is it.
@@ -58,8 +73,12 @@ inline State& state() { static auto* value = new State{}; return *value; }
 // Return addresses (RVA) of the eight direct calls to GetViewportSize (0xc668c0) in the 3.7 client.
 inline constexpr std::array<uintptr_t, 8> viewport_size_returns{
     0xccd90c, 0xdbb1cf, 0xdd2cb5, 0xdd2d08, 0xdd461f, 0xe0d438, 0x2261c1e, 0x2860cdd};
-// Return address (RVA) of the mouse ray's call to the view-rect getter (0xc667c0) in the 3.7 client.
+// Return address (RVA) of the pointer ray's call to the view-rect getter (0xc667c0) in the 3.7 client.
 inline constexpr uintptr_t pointer_ray_return = 0xd58615;
+// Return addresses (RVA) of LGUI ProcessInput's (0xd1f160) three GetMousePosition calls in the 3.7
+// client: the stick-to-mouse switch check, the previous-position copy and the pointer position.
+// The world-space mouse ray (0xd580d0) divides by the window size itself and is left alone.
+inline constexpr std::array<uintptr_t, 3> mouse_returns{0xd1f2d4, 0xd1f497, 0xd1f4fd};
 // Counts the call and says whether this caller gets the window size.
 inline bool allow_caller(uintptr_t return_rva) noexcept {
     uint32_t caller = 8;
@@ -74,12 +93,41 @@ inline bool installed() noexcept { return state().installed.load(std::memory_ord
 inline bool active() noexcept { return installed() && state().size.load(std::memory_order_acquire) != 0; }
 
 // enable: full VR lays the screen UI out at the window size (16:9). pointer: full VR shows the
-// screen UI in the taller layout, so only the mouse ray takes the window size.
+// screen UI in the taller layout, so the mouse is converted from the window size.
 inline void update(bool enable, bool pointer, uint32_t width, uint32_t height) noexcept {
     const bool sane = width >= 64 && height >= 64 && width <= 32768 && height <= 32768;
     const auto size = sane ? (uint64_t{width} << 32) | height : 0;
     state().size.store(enable ? size : 0, std::memory_order_release);
     state().pointer_size.store(!enable && pointer ? size : 0, std::memory_order_release);
+}
+
+inline uint64_t pack(int32_t x, int32_t y) noexcept { return uint64_t(uint32_t(x)) << 32 | uint32_t(y); }
+
+// Remembers the game's rect (every site reads the same one) for the mouse conversion.
+inline void record(const int32_t* rect) noexcept {
+    if (rect[2] <= rect[0] || rect[3] <= rect[1]) return;
+    auto& s = state();
+    s.eye_min.store(pack(rect[0], rect[1]), std::memory_order_relaxed);
+    s.eye_size.store(pack(rect[2] - rect[0], rect[3] - rect[1]), std::memory_order_relaxed);
+}
+
+// LGUI's GetMousePosition result at xy (window pixels) for the call returning to return_rva:
+// in the taller layout, the same 0..1 point in the canvas rect that the ray, the controller
+// presses and the stick cursor use.
+inline void convert_mouse(float* xy, uintptr_t return_rva) noexcept {
+    auto& s = state();
+    const auto window = s.pointer_size.load(std::memory_order_acquire);
+    if (!window || !((s.sites.load(std::memory_order_relaxed) >> 7) & 1u)) return;
+    bool lgui = false;
+    for (const auto r : mouse_returns) lgui = lgui || r == return_rva;
+    const auto size = s.eye_size.load(std::memory_order_relaxed);
+    if (!lgui || !size) return;
+    const auto min = s.eye_min.load(std::memory_order_relaxed);
+    const auto lo = [](uint64_t v) { return static_cast<float>(static_cast<int32_t>(v & 0xffffffffu)); };
+    const auto hi = [](uint64_t v) { return static_cast<float>(static_cast<int32_t>(v >> 32)); };
+    xy[0] = hi(min) + xy[0] * hi(size) / hi(window);
+    xy[1] = lo(min) + xy[1] * lo(size) / lo(window);
+    s.mouse_rewrites.fetch_add(1, std::memory_order_relaxed);
 }
 
 // The engine call filled a local FIntRect {min x, min y, max x, max y} at rect.
@@ -99,9 +147,9 @@ inline void rewrite(uintptr_t frame, uint32_t offset, uint32_t site) noexcept {
     if (apply(reinterpret_cast<int32_t*>(frame + offset), size)) s.rewrites.fetch_add(1, std::memory_order_relaxed);
 }
 
-// The input conversions: the view-rect getter (site 1) called by the mouse ray, and the UI point
-// -> pixel conversions (sites 3 and 4). The window size in 16:9 as for every reader, and in the
-// taller layout too, where the layout readers keep the eye rect.
+// The input conversions: the view-rect getter (site 1) called by the pointer ray, and the UI
+// point -> pixel conversions (sites 3 and 4). The window size in 16:9 as for every reader; in the
+// taller layout only with bits 5 and 6 (17m's behaviour, a diagnostic since 17n).
 inline void rewrite_input(uintptr_t frame, uint32_t offset, uint32_t site) noexcept {
     auto& s = state();
     if (s.size.load(std::memory_order_acquire)) return rewrite(frame, offset, site);

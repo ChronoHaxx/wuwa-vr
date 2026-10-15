@@ -35,7 +35,7 @@ MATRIX = ROOT / 'qa' / 'matrix.json'
 RESULTS = ROOT / 'qa' / 'results.jsonl'
 REPORT = ROOT / 'docs' / 'QA-MATRIX.md'
 RESULT_KINDS = ('pass', 'fail', 'blocked')
-CHECK_KINDS = ('unit', 'invariant', 'simulator', 'manual')
+CHECK_KINDS = ('unit', 'invariant', 'simulator', 'tool', 'manual')
 # Game image sizes seen for build 0x6aa96d2d (WuWaCodeCompatibility.hpp): which copy a log came from.
 COPIES = {'ad21000': 'launcher', 'ad1c000': 'steam'}
 
@@ -71,8 +71,8 @@ def validate(m: dict, root: Path = ROOT) -> list[str]:
             kind, _, target = c.partition(':')
             if kind not in CHECK_KINDS:
                 problems.append(f'{fid}: unknown check {c}')
-            if kind == 'unit' and target and not (root / target).exists():
-                problems.append(f'{fid}: unit test {target} does not exist')
+            if kind in ('unit', 'tool') and target and not (root / target).exists():
+                problems.append(f'{fid}: {kind} {target} does not exist')
         for pattern in f.get('code', []):
             if not any(root.glob(pattern)):
                 problems.append(f'{fid}: code pattern {pattern} matches no file')
@@ -149,7 +149,7 @@ def session(text: str, known_off: list[dict] = ()) -> dict:
     pinned = [re.compile(k['match']) for k in known_off]
     s = {'runtime': None, 'copy': None, 'game_build': None, 'routes': {}, 'refused': [], 'known_off': [],
          'stereo_base': Counter(), 'hud': [], 'cinema': [], 'errors': Counter(), 'first': None, 'last': None,
-         'pointer_rewrites': 0, 'pointer_layout': False}
+         'pointer_rewrites': 0, 'pointer_layout': False, 'mouse_installed': None, 'mouse_rewrites': 0}
     for raw in text.splitlines():
         m = LINE.match(raw)
         if not m:
@@ -174,6 +174,10 @@ def session(text: str, known_off: list[dict] = ()) -> dict:
         if v:
             s['pointer_layout'] |= v.group(1) != '0'
             s['pointer_rewrites'] = max(s['pointer_rewrites'], int(v.group(2)))
+        mo = re.search(r'\[WuWaLguiViewport\] .* mouse=(true|false) mouse_rewrites=(\d+)', msg)
+        if mo:
+            s['mouse_installed'] = mo.group(1) == 'true'
+            s['mouse_rewrites'] = max(s['mouse_rewrites'], int(mo.group(2)))
         b = re.search(r'\[WuWaStereoBase\] action=(\w+) reason=(\w+)', msg)
         if b:
             s['stereo_base'][f'{b.group(1)}/{b.group(2)}'] += 1
@@ -209,9 +213,19 @@ def invariants(s: dict, baseline: dict | None = None) -> list[tuple[str, str, st
     checks = [h for h in s['hud'] if '(screen check)' in h or '(full VR check)' in h]
     out.append(('layout-resyncs', 'fail' if loops else 'pass',
                 f"{len(checks)} resyncs by the layout check; {len(loops)} 'keeps changing' stops"))
-    out.append(('mouse-ray', 'pass' if s['pointer_rewrites'] else 'unknown',
-                f"{s['pointer_rewrites']} mouse rays given the window size in the taller layout" if s['pointer_layout']
-                else 'taller layout not used in this session'))
+    # The taller layout converts the mouse into the canvas rect (test 17n); 17l/17m builds gave the ray
+    # the window size instead and log no mouse= field.
+    if not s['pointer_layout']:
+        mouse = ('unknown', 'taller layout not used in this session')
+    elif s['mouse_installed'] is False:
+        mouse = ('fail', 'taller layout used but the mouse conversion is not installed')
+    elif s['mouse_rewrites']:
+        mouse = ('pass', f"{s['mouse_rewrites']} mouse positions converted to the canvas rect in the taller layout")
+    elif s['mouse_installed'] is None and s['pointer_rewrites']:
+        mouse = ('pass', f"{s['pointer_rewrites']} mouse rays given the window size in the taller layout (17l/17m build)")
+    else:
+        mouse = ('unknown', 'mouse not used in the taller layout')
+    out.append(('mouse-ray', *mouse))
     auto = [c for c in s['cinema'] if c[1].startswith('Automatic')]
     out.append(('cinema-events', 'pass' if auto else 'unknown',
                 '; '.join(f'{t} {h}' for t, h in auto[:8]) or 'no automatic switch in this session'))

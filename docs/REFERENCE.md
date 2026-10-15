@@ -448,10 +448,13 @@ capture (pointer ray, scaler, centre-of-screen ray). The stick was measured with
 `dev/ui-stick-cursor.py`, which compares the ring the game draws, the pointer and the
 ray (the older smoke test only compared the ray with the pointer).
 
-**Known:** if the layout or the view changes while a stick-cursor screen is open, the
-script's size is stale: the ring is offset by half the size difference (560 px between
+**Known:** if the screen size changes while a stick-cursor screen is open, the script's
+size is stale: the ring is offset by half the size difference (560 px between
 2560 x 2560 and 2560 x 1440) and part of the screen is out of reach. Reopening the screen
-fixes it. Entering the stereo screen does not refresh it either.
+fixes it; entering the stereo screen does not refresh it. That happens when 16:9 is
+toggled, or when the view changes in the taller layout. In 16:9, full VR, the stereo
+screen and mono all use the window size, so view switches are fine (17n, simulator:
+1.6 px before and after a switch).
 
 Checking it:
 - The log line `[WuWaLguiViewport] ... mouse=true mouse_rewrites=N eye=WxH` shows the

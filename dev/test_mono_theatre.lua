@@ -17,7 +17,7 @@ local function fixture(screen)
         get_mod_value=function(_,key) return f.values[key] or 'false' end,
         set_mod_value=function(key,value) f.values[key]=value; f.writes[key]=(f.writes[key] or 0)+1 end},
         functions={is_drawing_ui=function() return f.ui end,dispatch_custom_event=function() end,
-            log_warn=function(e) f.errors[#f.errors+1]=e end,log_error=function(e) f.errors[#f.errors+1]=e end}},
+            log_info=function() end,log_warn=function(e) f.errors[#f.errors+1]=e end,log_error=function(e) f.errors[#f.errors+1]=e end}},
         sdk={callbacks=setmetatable({},{__index=function(_,key) return function(fn) f.callbacks[key]=fn end end})}},
         json={dump_string=function() return '{}' end}},{__index=_G})
     assert(loadfile(source,'t',env))()

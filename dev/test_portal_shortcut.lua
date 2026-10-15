@@ -22,7 +22,7 @@ local function fixture()
                 assert(key~='VR_WorldScale','Shortcut wrote normal VR_WorldScale')
                 f.values[key]=value; f.writes[key]=(f.writes[key] or 0)+1
             end},functions={is_drawing_ui=function() return f.ui end,dispatch_custom_event=function() end,
-                log_warn=function(s) f.errors[#f.errors+1]=s end,log_error=function(s) f.errors[#f.errors+1]=s end}},
+                log_info=function() end,log_warn=function(s) f.errors[#f.errors+1]=s end,log_error=function(s) f.errors[#f.errors+1]=s end}},
         sdk={callbacks=setmetatable({},{__index=function(_,name) return function(fn) f.callbacks[name]=fn end end})}},
         json={dump_string=function(value)
             if value.motion_only then f.motion=value.motion end

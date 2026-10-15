@@ -12,6 +12,9 @@
                                                  runtime, game-code checks, shared camera, layout resyncs,
                                                  automatic cinema events, errors)
     python dev/qa.py report                      write docs/QA-MATRIX.md
+    python dev/qa.py unit [--cpp] [--only TEXT]  run every offline unit test: dev/test_*.lua (under lupa),
+                                                 dev and launcher/dev test_*.py, and with --cpp the
+                                                 single-file C++ tests (MSVC); exits 1 on any failure
 
 docs/QA.md explains the process; docs/GAME-UPDATE.md uses `session` after a game update.
 """
@@ -259,6 +262,96 @@ def session_results(m: dict, parsed: dict, inv: list, build: str, today: str) ->
     return out
 
 
+# ---- unit tests --------------------------------------------------------------------------------
+
+# Lua tests run under lupa (Lua 5.4) with arg = {[0] = test, [1] = the script its header names.
+LUA_RUNNER = '''
+import sys
+from pathlib import Path
+import lupa.lua54 as lupa
+test, module = sys.argv[1], sys.argv[2]
+lua = lupa.LuaRuntime(unpack_returned_tuples=True)
+here = str(Path(module).parent).replace("\\\\", "/")
+lua.execute('package.path = "' + here + '/?.lua;" .. package.path')
+lua.execute('arg = {[0] = "' + test + '", [1] = "' + module + '"}')
+try:
+    lua.execute(Path(test).read_text(encoding="utf-8"))
+except lupa.LuaError as e:
+    print("LUA ERROR:", e); sys.exit(1)
+'''
+VCVARS = Path(r'C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvars64.bat')
+
+
+def lua_python() -> str | None:
+    """A Python with lupa: QA_LUA_PYTHON, the workspace's dev-tools/lua-venv, or this one."""
+    import os
+    for candidate in (os.environ.get('QA_LUA_PYTHON'), ROOT.parent / 'dev-tools/lua-venv/Scripts/python.exe', sys.executable):
+        if candidate and Path(candidate).exists() and subprocess.run([str(candidate), '-c', 'import lupa.lua54'],
+                                                                      capture_output=True).returncode == 0:
+            return str(candidate)
+    return None
+
+
+def unit_tests(cpp: bool) -> list[tuple[str, list[str] | str]]:
+    """(name, command) per test; a string command is a reason it cannot run here."""
+    tests, lua = [], lua_python()
+    for t in sorted((ROOT / 'dev').glob('test_*.lua')):
+        m = re.search(r'mod/lua/[A-Za-z0-9_]+\.lua', t.read_text(encoding='utf-8', errors='replace')[:4000])
+        if not m:
+            tests.append((t.name, 'no mod/lua script named in its header'))
+        elif not lua:
+            tests.append((t.name, 'no Python with lupa (pip install lupa, or set QA_LUA_PYTHON)'))
+        else:
+            tests.append((t.name, [lua, '-c', LUA_RUNNER, f'dev/{t.name}', m.group(0)]))
+    for t in sorted(list((ROOT / 'dev').glob('test_*.py')) + list((ROOT / 'launcher/dev').glob('test_*.py'))):
+        tests.append((t.relative_to(ROOT).as_posix(), [sys.executable, str(t)]))
+    if cpp:
+        for t in sorted((ROOT / 'dev').glob('test_*.cpp')):
+            if t.with_suffix('.ps1').exists():
+                tests.append((t.name, f'built by {t.with_suffix(".ps1").name} (needs its own libraries)'))
+            elif not VCVARS.exists():
+                tests.append((t.name, 'MSVC not found'))
+            else:
+                tests.append((t.name, 'cpp'))
+    return tests
+
+
+def run_unit(cpp: bool, only: str | None) -> int:
+    import tempfile
+    env = dict(__import__('os').environ, PYTHONIOENCODING='utf-8')
+    failed, skipped, passed = [], [], 0
+    work = Path(tempfile.mkdtemp(prefix='wuwa-unit-'))
+    for name, cmd in unit_tests(cpp):
+        if only and only not in name:
+            continue
+        if isinstance(cmd, str) and cmd != 'cpp':
+            skipped.append((name, cmd)); print(f'SKIP {name}: {cmd}'); continue
+        if cmd == 'cpp':
+            exe = work / (Path(name).stem + '.exe')
+            script = work / (Path(name).stem + '.cmd')
+            script.write_text(f'@call "{VCVARS}" >nul\r\n@cl /nologo /utf-8 /std:c++latest /EHsc /MT /Od '
+                              f'"{ROOT / "dev" / name}" /Fo"{work}\\" /Fe"{exe}" >"{exe}.log" 2>&1 || exit /b 9\r\n'
+                              f'@"{exe}"\r\n', encoding='utf-8')
+            cmd = ['cmd', '/c', str(script)]
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=600)
+        text = (r.stdout + r.stderr).strip().splitlines()
+        bad = r.returncode != 0 or any(l.startswith(('FAIL', 'LUA ERROR')) for l in text)
+        missing = sorted(set(re.findall(r"ModuleNotFoundError: No module named '([\w.]+)'", '\n'.join(text))))
+        if bad and missing:
+            skipped.append((name, 'needs ' + ', '.join(missing)))
+            print(f'SKIP {name}: this Python lacks {", ".join(missing)}')
+        elif bad:
+            failed.append(name)
+            print(f'FAIL {name} (exit {r.returncode})')
+            for l in [l for l in text if l.startswith(('FAIL', 'LUA ERROR', 'Assertion', 'Traceback', 'AssertionError'))][:6] or text[-4:]:
+                print('     ' + l[:200])
+        else:
+            passed += 1
+            print(f'pass {name}' + (f'  ({text[-1][:90]})' if text else ''))
+    print(f'\n{passed} passed, {len(failed)} failed, {len(skipped)} skipped')
+    return 1 if failed else 0
+
+
 # ---- report ------------------------------------------------------------------------------------
 
 def mark(rs: list) -> str:
@@ -317,7 +410,10 @@ def main(argv=None) -> int:
     s.add_argument('--baseline', help='a log from the last good session (same copy), to show what changed')
     s.add_argument('--json', action='store_true')
     sub.add_parser('report')
+    u = sub.add_parser('unit'); u.add_argument('--cpp', action='store_true'); u.add_argument('--only')
     a = ap.parse_args(argv)
+    if a.cmd == 'unit':
+        return run_unit(a.cpp, a.only)
     m = load_matrix()
     if a.cmd == 'check':
         problems = validate(m)

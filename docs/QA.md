@@ -28,7 +28,13 @@ add that line to the code and an invariant to `qa.py`.
 
 ## Before a candidate goes to the headset
 
-1. Unit tests and `python dev/i18n/check_all.py` pass.
+1. `python dev/qa.py unit` passes. It runs every offline test: the Lua tests under lupa,
+   the Python tests, and the single-file C++ tests with `--cpp`. Then
+   `python dev/i18n/check_all.py`. A test this Python can't run (missing `psutil` or
+   `playwright`) shows as SKIP with the module it needs. Lua tests need a Python with
+   `lupa`: the workspace's `dev-tools\lua-venv`, or set `QA_LUA_PYTHON`. Before this
+   runner, the R3 tests in `test_mono_theatre.lua` and `test_portal_shortcut.lua` broke
+   unnoticed on 11 Oct, because nothing ran them all.
 2. `python dev/qa.py plan --build <id> --since <last tested commit> --out <candidate>\CHECKLIST.md`.
    The checklist has:
    - every cell of a feature whose code changed;

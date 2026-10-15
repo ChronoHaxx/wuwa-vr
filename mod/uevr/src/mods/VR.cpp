@@ -2816,7 +2816,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             }
         }
         wuwa_ui::TextWrapped("Mono shows the same scene and HUD to both eyes. Use it for troublesome cutscenes or flat menus.");
-        wuwa_ui::TextWrapped("Hold LT + RT: click R3 for the next view (hold: full VR), click L3 for blur on / off (hold: stereo screen). Release controls before repeating.");
+        wuwa_ui::TextWrapped("Hold LT + RT: click R3 for the next view (hold: full VR), click L3 for blur on / off (hold: stereo screen), press Y to hide characters at your eyes. Release controls before repeating.");
         wuwa_ui::draw(*m_cinematic_framing_fix, "Match cinematic framing between eyes (default on)");
         if (wuwa_ui::TreeNode("Automatic cutscene switching (unverified)")) {
             if (wuwa_ui::draw(*m_auto_cinema, "Enable automatic switching"))

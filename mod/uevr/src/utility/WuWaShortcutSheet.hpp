@@ -18,6 +18,7 @@ struct CardState {
     bool vr_controllers{};   // name the VR controllers' triggers, grips and sticks
     int view{};              // 0 full VR, 1 stereo screen, 2 mono theatre
     bool blur{};
+    bool hide_near{};        // Hide characters at your eyes (LT + RT, then Y)
     bool portal{}, diorama{}, mouse_mode{}, first_person{}, fixed_camera{}, ui_hidden{};
     bool pinned{};
 };

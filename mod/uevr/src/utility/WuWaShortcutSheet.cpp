@@ -480,25 +480,28 @@ void views_card(const Canvas& c, const CardState& st) {
     arrow(c, 563, 291);
     arrow(c, 978, 291);
     loop_arrow(c, 1390, 291);
-    const bool r3_held = (st.buttons & r3) != 0, l3_held = (st.buttons & l3) != 0;
+    const bool r3_held = (st.buttons & r3) != 0, l3_held = (st.buttons & l3) != 0, y_held = (st.buttons & button_y) != 0;
     const struct { const char* token; const char* extra; const char* english; bool lit; } moves[]{
         {"R3", nullptr, N_("Click: next view"), r3_held},
         {"R3", "0.8 s", N_("Hold: straight back to full VR"), r3_held},
         {"L3", nullptr, N_("Click: blur on / off"), l3_held},
+        {"Y", nullptr, N_("Press: hide characters at your eyes"), y_held},
     };
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 4; ++i) {
         const auto& m = moves[i];
-        const float top = 484.0f + i * 100.0f, middle = top + 34.0f;
+        const float top = 468.0f + i * 82.0f, middle = top + 34.0f;
         c.list->AddRectFilled(c.at(351, top), c.at(1249, top + 68), m.lit ? row_lit_bg : row_bg, 8.0f * c.s);
         c.list->AddRect(c.at(351, top), c.at(1249, top + 68), m.lit ? lit_line : row_line, 8.0f * c.s, 0, (m.lit ? 2.5f : 1.0f) * c.s);
         float x = 372.0f + chip(c, 372, middle, 26, m.token, m.lit);
         if (m.extra) c.text(x + 8.0f, middle - 20.0f * 0.56f, 20, accent, m.extra);
-        const bool blur = i == 2;
-        const char* state = blur ? (st.blur ? N_("Blur on") : N_("Blur off")) : nullptr;
+        const bool blur = i == 2, hide = i == 3;
+        const bool on = blur ? st.blur : st.hide_near;
+        const char* state = blur ? (st.blur ? N_("Blur on") : N_("Blur off")) :
+            hide ? (st.hide_near ? N_("Hiding on") : N_("Hiding off")) : nullptr;
         const float state_w = state ? pill_width(c, state, 20.0f) + 20.0f : 0.0f;
         const auto f = fit(c, m.english, 29, 1249.0f - 543.0f - 24.0f - state_w, false);
         c.text(543, middle - f.px * 0.56f, f.px, ink, f.lines[0]);
-        if (state) pill(c, 543.0f + c.width(f.px, f.lines[0]) + 20.0f, middle, 20.0f, state, st.blur ? green : muted);
+        if (state) pill(c, 543.0f + c.width(f.px, f.lines[0]) + 20.0f, middle, 20.0f, state, on ? green : muted);
     }
     c.list->AddLine(c.at(58, 810), c.at(1542, 810), row_line, 1.2f * c.s);
     const auto f = fit(c, "Let go of all buttons between switches.", 25, 1480, false);

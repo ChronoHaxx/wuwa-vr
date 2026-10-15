@@ -26,6 +26,7 @@
 #include "Mods.hpp"
 #include "mods/VR.hpp"
 #include "utility/WuWaDofSync.hpp"
+#include "utility/WuWaNearClip.hpp"
 #include "utility/WuWaLocalization.hpp"
 #include "utility/WuWaLocalizedUI.hpp"
 #include "utility/WuWaRunMarker.hpp"
@@ -65,6 +66,10 @@ std::string report_status{};
 
 std::mutex hint_mutex{};
 CinemaHint hint{};
+// Test 16: "someone at your eyes" uses the same once-per-episode timing; an episode
+// ends after two minutes without such a character.
+CinemaHint near_hint{300, 7000, 120000};
+int hint_kind{}; // 1 cinematic scene, 2 someone at your eyes
 
 std::int64_t unix_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -171,7 +176,7 @@ nlohmann::json context() {
     for (const char* key : {"VR_RenderingMethod", "VR_NativeStereoFix", "VR_ExtremeCompatibilityMode", "VR_2DScreenMode",
              "VR_MonoTheatreMode", "VR_HorizontalProjectionOverride", "VR_AutoCinema", "VR_DecoupledPitch",
              "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape", "WuWaControls_LensMatch",
-             "WuWaControls_LensNearest", "WuWaControls_CloseUpNearClip", "VR_WuWaDioramaScale", "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
+             "WuWaControls_LensNearest", "WuWaControls_CloseUpNearClip", "WuWaControls_HideNearCharacters", "VR_WuWaDioramaScale", "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
         if (auto* value = cached(key)) settings[key] = value->get();
     }
     if (auto* scale = resolution_scale()) settings["OpenXR_ResolutionScale"] = scale->get();
@@ -357,11 +362,23 @@ Item lens_follow_choice() {
         "WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"});
 }
 
+Item near_hide_toggle() {
+    return setting_toggle("Hide characters at your eyes",
+        "In story close-ups, a character right at your eyes but outside the flat shot (VR shows more around it) is hidden "
+        "whole while it is there. Anyone the flat shot shows stays. Shortcut: hold LT + RT, then press Y.",
+        "WuWaControls_HideNearCharacters");
+}
+
+Item near_hint_toggle() {
+    return setting_toggle("Note when someone is at your eyes",
+        "While hiding is off: a short note with the shortcut, once per scene, when a character is right at your eyes.",
+        "WuWaControls_NearHint");
+}
+
 Item near_clip_slider() {
-    return setting_slider("Hide what's at your eyes",
-        "Story close-ups can put the game's camera right behind someone's head, so in VR it fills one eye. In those shots "
-        "nothing nearer than this is drawn. It stops short of the person the game focuses on. 10 cm is the game's own "
-        "value (off). Game camera in full VR only.",
+    return setting_slider("Near clip in close-ups",
+        "In story close-ups nothing nearer than this is drawn. It slices characters and props open, so it is off by default "
+        "(10 cm, the game's own value); Hide characters at your eyes is the cleaner fix. Game camera in full VR only.",
         "WuWaControls_CloseUpNearClip", 10.0f, 50.0f, 5.0f, "%.0f cm");
 }
 
@@ -629,6 +646,8 @@ Page camera_page() {
             "in zoomed-in shots, so they frame people like the 2D view does."));
         page.items.push_back(lens_slider());
         page.items.push_back(lens_nearest_slider());
+        page.items.push_back(near_hide_toggle());
+        page.items.push_back(near_hint_toggle());
         page.items.push_back(near_clip_slider());
         page.items.push_back(lens_status());
         break;
@@ -670,6 +689,8 @@ Page cinema_page() {
     page.items.push_back(lens_nearest_slider());
     page.items.push_back(lens_subject_choice());
     page.items.push_back(lens_follow_choice());
+    page.items.push_back(near_hide_toggle());
+    page.items.push_back(near_hint_toggle());
     page.items.push_back(near_clip_slider());
     page.items.push_back(lens_status());
     page.items.push_back(paragraph("Depth of field and camera effects", true));
@@ -1213,14 +1234,35 @@ bool hint_active() {
     const auto now = GetTickCount64();
     const auto seen = wuwa_cinematic_framing::constrained_ms.load(std::memory_order_relaxed);
     const bool cinematic = seen != 0 && now >= seen && now - seen < 500;
-    const bool eligible = vr->is_cinema_hint_enabled() && vr->is_hmd_active() && !g_framework->is_drawing_ui() &&
+    const bool full_vr = vr->is_hmd_active() && !g_framework->is_drawing_ui() &&
         !vr->is_using_2d_screen() && !vr->is_using_mono_theatre();
+    const bool eligible = vr->is_cinema_hint_enabled() && full_vr;
+    const auto near_at = wuwa_near_clip::near_seen_ms.load(std::memory_order_relaxed);
+    const bool near_recent = near_at != 0 && now >= near_at && now - near_at < 600;
+    auto* note = typed<bool>("WuWaControls_NearHint");
+    auto* hiding = typed<bool>("WuWaControls_HideNearCharacters");
+    const bool near_eligible = full_vr && note && note->value() && hiding && !hiding->value();
     std::scoped_lock lock{hint_mutex};
-    return hint.update(cinematic, eligible, now);
+    const bool cinema_on = hint.update(cinematic, eligible, now);
+    // One note at a time: the scene note first; this one waits rather than running unseen.
+    const bool near_on = !cinema_on && near_hint.update(near_recent, near_eligible, now);
+    hint_kind = cinema_on ? 1 : near_on ? 2 : 0;
+    return hint_kind != 0;
 }
 
 void draw_hint(ImDrawList* list, const ImVec2& size) {
     ImFont* font = wuwa_l10n::sheet_font() ? wuwa_l10n::sheet_font() : ImGui::GetFont();
+    int kind{};
+    {
+        std::scoped_lock lock{hint_mutex};
+        kind = hint_kind;
+    }
+    if (kind == 2) {
+        wuwa_menu::draw_note(list, size, font, "Someone at your eyes",
+            "Hold LT + RT, then press Y to hide characters right at your eyes. Anyone in the shot stays.",
+            "Turn this note off in the menu, Cinema page.");
+        return;
+    }
     wuwa_menu::draw_note(list, size, font, "Cinematic scene",
         "Looks wrong? Hold LT + RT, then click R3 for the next view (stereo screen, then mono).",
         "Turn this note off in the menu, Cinema page.");

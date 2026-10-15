@@ -59,7 +59,7 @@ A VR controller that is put down or switched off stops driving the menu after
 You do not need to remember the shortcuts. In VR, **hold L3** (click and hold
 the left stick) for half a second and a card rises under your view with every
 L3 + button shortcut. **Hold LT + RT** for half a second for the views card:
-full VR, stereo screen, mono theatre and blur. Each button lights up while you
+full VR, stereo screen, mono theatre, blur and hiding characters at your eyes. Each button lights up while you
 press it, and the card sinks away when you let go. A quick click of L3 shows
 nothing.
 
@@ -123,6 +123,7 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 | Fully hold LT + RT first, then click R3 | Next view: full VR, stereo screen, mono theatre (one scene and HUD shown identically to both eyes), then full VR again. Release R3 before the triggers |
 | Fully hold LT + RT first, then hold R3 for 0.8 seconds | Back to full VR from any view |
 | Fully hold LT + RT first, then click L3 | Blur (depth of field) on / off; on by default, in both eyes |
+| Fully hold LT + RT first, then press Y | Hide characters at your eyes on / off (off by default): in story close-ups, a character right at your eyes but outside the flat shot is hidden whole; anyone the flat shot shows stays. Y does not reach the game while the triggers are held |
 | Fully hold LT + RT first, then hold L3 for 0.8 seconds | Toggle stereoscopic screen, retaining scene depth (also from mono theatre); release all controls before repeating. Works in dialogue, with UEVR and adjustment closed |
 | L3 + B | Hide/show game UI, including game menus |
 | L3 + A | Recenter view and enabled portal; position reset is a separate option |
@@ -133,7 +134,7 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 | Double R3 | Freecam on/off |
 | Double L3 | Windows screenshot (Win + Print Screen) |
 | Hold L3 for half a second | Controls card: every L3 + button shortcut |
-| Fully hold LT + RT for half a second | Views card: full VR, stereo screen, mono theatre, blur |
+| Fully hold LT + RT for half a second | Views card: full VR, stereo screen, mono theatre, blur, hiding |
 | L3 + Menu | Keep the controls card open / let it close |
 | L3 + D-pad Down | In first person: toggle full animation follow / previous motion choice |
 | L3 + LB, then release | Toggle HUD/mouse adjustment; controller mouse shortcuts must be enabled |

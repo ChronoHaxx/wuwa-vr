@@ -522,6 +522,21 @@ local function process_pad(index,state,result)
         actions.adjust=true; s.adjust_wait=true; s.lone_l=false; s.lone_r=false
         input=nil; zero_pad(state.Gamepad); s.previous=b; return
     end
+    -- Test 16: both triggers fully held first, then Y: hide characters at your eyes
+    -- on / off. A Y already held for the game never starts it. Like the view
+    -- shortcuts it keeps Y and both triggers from the game until all three are up.
+    if s.y_chord or (not s.view_chord and not adjust and not l3 and not r3 and has(rising,B.Y) and
+        s.trig_at and s.trig_at<t and p.bLeftTrigger>=180 and p.bRightTrigger>=180) then
+        if not s.y_chord then
+            s.y_chord=true
+            if b==B.Y then actions.view={kind="hide_near",slot=index,at=t} end
+        end
+        state.Gamepad.wButtons=b & (~B.Y)
+        state.Gamepad.bLeftTrigger=0; state.Gamepad.bRightTrigger=0
+        if not has(b,B.Y) and p.bLeftTrigger<30 and p.bRightTrigger<30 then s.y_chord=nil end
+        s.mono_ready=nil; input=nil; s.previous=b
+        return
+    end
     -- Mono theatre requires a prior, fresh sample with both full triggers and
     -- neither stick pressed. Simultaneous input or R3-first cannot arm it.
     local mono_ready=s.mono_ready and t>=s.mono_ready and t-s.mono_ready<=0.25
@@ -1094,6 +1109,9 @@ local function tick(_,delta)
         elseif view.kind=="blur" then
             set("WuWaStereo_DepthOfField",not enabled("WuWaStereo_DepthOfField"))
             functions.log_info("[WuWaView] shortcut blur -> "..tostring(enabled("WuWaStereo_DepthOfField")))
+        elseif view.kind=="hide_near" then
+            set("WuWaControls_HideNearCharacters",not enabled("WuWaControls_HideNearCharacters"))
+            functions.log_info("[WuWaView] shortcut hide near -> "..tostring(enabled("WuWaControls_HideNearCharacters")))
         elseif view.kind=="mono" then
             if get("WuWaControls_ToggleMonoTheatre")=="effective-v1" then
                 set("WuWaControls_ToggleMonoTheatre","toggle")
@@ -1460,7 +1478,7 @@ end
 -- from the eye, after the close-up move); 10 cm is the game's own plane. The
 -- request is sent every frame and lapses by itself if the script stops.
 local nearclip={sent=-1}
-function nearclip.setting() return number("WuWaControls_CloseUpNearClip",20,10,50) end
+function nearclip.setting() return number("WuWaControls_CloseUpNearClip",10,10,50) end
 function nearclip.wanted(dolly)
     local want=nearclip.setting()
     if want<=10 then return 0 end
@@ -1486,6 +1504,139 @@ end
 function nearclip.rescan(pos,rot,fov)
     local ok,found=pcall(people.scan,pos,rot,fov)
     if ok then lens.frame_nearest=nearclip.nearest(found) end
+end
+-- Hide characters at your eyes (test 16). The near clip slices characters open
+-- (recorded 15 Oct: Rover's head cut, the inside of the face showing), so a
+-- character is hidden whole instead: one whose bones come within REACH of an
+-- eye while none of its bones is inside the 2D frame (the game camera's 16:9
+-- frustum, what the flat shot shows). Its primitives leave the main pass, so
+-- its shadow stays. It comes back when it enters the frame, at a cut that no
+-- longer qualifies it, when the close-up ends or when the option goes off.
+-- With the option off (the default), finding one asks the VR menu for a short
+-- note naming the shortcut (WuWaControls_NearSeen).
+local hider={owners={},next=0,reach=30,was_on=nil}
+local function hdist(a,b) return math.sqrt((a.x-b.x)^2+(a.y-b.y)^2+(a.z-b.z)^2) end
+local function hcount(set_) local n=0; for _ in pairs(set_) do n=n+1 end; return n end
+function hider.fname(name)
+    if type(name)~="string" then return name end
+    if hider.strlib==nil then
+        local k=api:find_uobject("Class /Script/Engine.KismetStringLibrary")
+        hider.strlib=k and k:get_class_default_object() or false
+    end
+    return hider.strlib and hider.strlib:Conv_StringToName(name) or name
+end
+function hider.components(owner,path)
+    if not owner then return nil end
+    hider.classes=hider.classes or {}
+    local class=hider.classes[path]
+    if class==nil then class=api:find_uobject(path) or false; hider.classes[path]=class end
+    if not class then return nil end
+    local ok,list=pcall(function() return owner:K2_GetComponentsByClass(class) end)
+    return ok and type(list)=="table" and #list>0 and list or nil
+end
+function hider.bone(m,i)
+    local p=point(m:GetSocketLocation(hider.fname(m:GetBoneName(i))))
+    return valid(p) and p or nil
+end
+-- The two eyes: the game camera, moved by Close-up match, 3.2 cm to each side.
+function hider.eyes(ctx,fr)
+    local f=fr.f
+    local b={x=ctx.pos.x+f.x*ctx.dolly,y=ctx.pos.y+f.y*ctx.dolly,z=ctx.pos.z+f.z*ctx.dolly}
+    return {{x=b.x-fr.right.x*3.2,y=b.y-fr.right.y*3.2,z=b.z},{x=b.x+fr.right.x*3.2,y=b.y+fr.right.y*3.2,z=b.z}}
+end
+-- Near an eye, and inside the 2D frame, over every skeletal mesh of the character
+-- (hair, clothes and body are separate meshes), up to 48 bones each.
+function hider.judge(e,fr,eyes)
+    local list=hider.components(e.owner,"Class /Script/Engine.SkeletalMeshComponent") or e.meshes
+    local near,count=false,0
+    for _,m in ipairs(list) do
+        local okn,n=pcall(function() return m:GetNumBones() end)
+        if okn and type(n)=="number" and n>0 then
+            for i=0,n-1,math.max(1,math.floor(n/48)) do
+                local ok,pt=pcall(hider.bone,m,i)
+                if ok and pt then
+                    count=count+1
+                    if hdist(pt,eyes[1])<hider.reach or hdist(pt,eyes[2])<hider.reach then near=true end
+                    if people.place(fr,pt,10,10) then return near,true,count end
+                end
+            end
+        end
+    end
+    return near,false,count
+end
+function hider.find(ctx)
+    local fr=people.frame(ctx.pos,ctx.rot,ctx.fov)
+    local eyes=hider.eyes(ctx,fr)
+    local owners={}
+    for i,m in ipairs(people.objects("Class /Script/Engine.SkeletalMeshComponent") or {}) do
+        if i>1500 then break end
+        pcall(function()
+            if m:WasRecentlyRendered(0.25)~=true then return end
+            local c,r,h=people.body({object=m,source="mesh"})
+            if not c or math.min(hdist(c,eyes[1]),hdist(c,eyes[2]))-math.max(r,h)-20>hider.reach then return end
+            local owner=m:GetOwner()
+            local key=owner and owner:get_address() or m:get_address()
+            owners[key]=owners[key] or {owner=owner,meshes={}}
+            table.insert(owners[key].meshes,m)
+        end)
+    end
+    -- Hidden characters are not drawn, so they are judged again from what was kept.
+    for key,e in pairs(hider.owners) do if not owners[key] then owners[key]={owner=e.owner,meshes=e.meshes} end end
+    local hide,framed,bones={},{},0
+    for key,e in pairs(owners) do
+        local near,inside,n=hider.judge(e,fr,eyes)
+        bones=bones+n
+        if inside then framed[key]=true elseif near then hide[key]=e end
+    end
+    return hide,framed,bones
+end
+function hider.hide(key,e)
+    local done={}
+    for _,c in ipairs(hider.components(e.owner,"Class /Script/Engine.PrimitiveComponent") or e.meshes) do
+        pcall(function()
+            if c.bRenderInMainPass~=false then c:SetRenderInMainPass(false); done[#done+1]=c end
+        end)
+    end
+    hider.owners[key]={owner=e.owner,meshes=e.meshes,comps=done}
+end
+function hider.show(key)
+    local e=hider.owners[key]
+    if not e then return end
+    for _,c in ipairs(e.comps) do pcall(function() if alive(c) then c:SetRenderInMainPass(true) end end) end
+    hider.owners[key]=nil
+end
+function hider.restore(why)
+    if next(hider.owners)==nil then return end
+    for key in pairs(hider.owners) do hider.show(key) end
+    functions.log_info("[WuWaHide] shown again ("..why..")")
+end
+-- ctx: this frame's close-up (lens.update), or nil outside one.
+function hider.tick(ctx)
+    local on=enabled("WuWaControls_HideNearCharacters")
+    if on~=hider.was_on then hider.was_on=on; hider.next=0 end
+    if not on then hider.restore("off") end
+    if not ctx then hider.restore("close-up ended"); hider.next=0; return end
+    if not (on or enabled("WuWaControls_NearHint")) then return end
+    if ctx.cut then hider.next=0 end
+    if ctx.frames<hider.next then return end
+    -- At each cut; within a shot about once a second while hiding is on (the note needs only cuts).
+    hider.next=on and ctx.frames+32 or math.huge
+    local clock=os and os.clock
+    local t0=clock and clock() or 0
+    local hide,framed,bones=hider.find(ctx)
+    if on then
+        for key in pairs(hider.owners) do
+            if framed[key] or (ctx.cut and not hide[key]) then hider.show(key) end
+        end
+        for key,e in pairs(hide) do if not hider.owners[key] then hider.hide(key,e) end end
+    elseif next(hide)~=nil then
+        set("WuWaControls_NearSeen","1")
+    end
+    if ctx.cut or next(hide)~=nil then
+        functions.log_info(string.format("[WuWaHide] shot=%d %s at_eyes=%d in_frame=%d hidden=%d bones=%d %.1f ms",
+            lens.shot,on and "hiding" or "note",hcount(hide),hcount(framed),hcount(hider.owners),bones,
+            clock and (clock()-t0)*1000 or -1))
+    end
 end
 -- At a cut: the subject is the game's real focus, or nothing (the eye stays at
 -- the game camera). No guesses: the centre trace passes through characters and
@@ -1547,7 +1698,9 @@ function lens.update()
     local nearest=number("WuWaControls_LensNearest",10,5,150)
     local paused=mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre")
     local clipping=nearclip.setting()>10
-    if (strength<=0 and not clipping) or paused or not pcm then
+    local hiding=enabled("WuWaControls_HideNearCharacters") or enabled("WuWaControls_NearHint")
+    lens.ctx=nil
+    if (strength<=0 and not clipping and not hiding) or paused or not pcm then
         lens.dolly=0; lens.pos=nil; nearclip.publish(0)
         if pcm then dof.update(pcm,pcm:GetFOVAngle(),0) end
         if strength<=0 then lens.publish("Off"..dof.text())
@@ -1590,6 +1743,7 @@ function lens.update()
     end
     if not lens.subject then
         lens.dolly=0; lens.eased_at=nil; dof.update(pcm,fov,0)
+        lens.ctx={pos=pos,rot=rot,fov=fov,cut=cut,dolly=0,frames=lens.frames}
         local clip=nearclip.wanted(0)
         nearclip.publish(clip)
         if cut then
@@ -1630,6 +1784,7 @@ function lens.update()
     lens.eased_at=t
     local dolly=lens.dolly
     dof.update(pcm,fov,dolly)
+    lens.ctx={pos=pos,rot=rot,fov=fov,cut=cut,dolly=dolly,frames=lens.frames}
     local clip=nearclip.wanted(dolly)
     nearclip.publish(clip)
     local text=string.format("Close-up at %.0f degrees: %s %.1f m away, moved %.1f m nearer",
@@ -1697,7 +1852,12 @@ cb.on_pre_viewport_client_draw(function()
     -- The game camera is final for this frame here, so a cut is seen before either eye.
     local lens_ok,lens_err=pcall(lens.update)
     if not lens_ok then
-        lens.dolly=0; lens.pos=nil; pcall(nearclip.publish,0); lens.publish("Unavailable: "..tostring(lens_err):sub(1,120))
+        lens.dolly=0; lens.pos=nil; lens.ctx=nil; pcall(nearclip.publish,0); lens.publish("Unavailable: "..tostring(lens_err):sub(1,120))
+    end
+    local hide_ok,hide_err=pcall(hider.tick,lens.ctx)
+    if not hide_ok then
+        pcall(hider.restore,"error")
+        if hider.error~=tostring(hide_err) then hider.error=tostring(hide_err); functions.log_warn("[WuWaHide] "..hider.error:sub(1,200)) end
     end
     if not enabled("WuWaControls_Recording") then return end
     local ok,err=pcall(function()

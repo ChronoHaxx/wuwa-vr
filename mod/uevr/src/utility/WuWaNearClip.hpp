@@ -25,6 +25,9 @@ namespace wuwa_near_clip {
 // a second, so a stopped or failing script cannot leave the plane raised.
 inline std::atomic<float> wanted{0.0f};
 inline std::atomic<uint64_t> wanted_at{0};
+// Test 16: when the camera script last found a character it would hide (Hide characters at
+// your eyes is off), for the note that names the shortcut (WuWaControls_NearSeen).
+inline std::atomic<uint64_t> near_seen_ms{0};
 
 class Applier {
 public:

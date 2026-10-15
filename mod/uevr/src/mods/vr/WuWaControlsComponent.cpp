@@ -324,7 +324,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_closeup_near_clip, m_near_clip_now,
+        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
@@ -484,7 +484,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     if (ImGui::BeginTable("Everyday controller shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
         wuwa_ui::TableSetupColumn("Action");
-        for (const auto& row : std::array<std::array<const char*,2>,14>{{
+        for (const auto& row : std::array<std::array<const char*,2>,15>{{
             {{N_("L3 + R3"), N_("Open / close the WuWa VR menu")}},
             {{N_("L3 + B"), N_("Show / hide game HUD and menus")}},
             {{N_("L3 + A"), N_("Recenter headset / portal")}},
@@ -494,6 +494,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
             {{N_("LT + RT, then hold R3"), N_("Back to full VR (hold 0.8 s)")}},
             {{N_("LT + RT, then click L3"), N_("Blur (depth of field) on / off")}},
             {{N_("LT + RT, then hold L3"), N_("Stereo screen on / off (hold 0.8 s)")}},
+            {{N_("LT + RT, then Y"), N_("Hide characters at your eyes on / off")}},
             {{N_("L3 + Menu"), N_("Keep the controls card open")}},
             {{N_("L3 + LB, release"), N_("Toggle HUD / mouse adjustment")}},
             {{N_("L3 + View"), N_("First person on / off")}},
@@ -1243,6 +1244,7 @@ void WuWaControlsComponent::draw_passive_overlay() {
     state.vr_controllers=vr_controllers;
     state.view=view;
     state.blur=m_stereo_dof->value();
+    state.hide_near=m_hide_near->value();
     state.portal=setting_on("WindowMode_Enabled");
     state.diorama=vr->is_diorama_enabled();
     state.mouse_mode=m_adjust.value() || mode_warning_active();

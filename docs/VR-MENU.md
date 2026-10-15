@@ -227,17 +227,34 @@ since test 3f (closer than the 2D shot).
   unchanged.
 - **Where it applies:** only lenses of 60 degrees or less, in Game camera mode,
   in full VR.
-- **Hide what's at your eyes (test 15, `WuWaControls_CloseUpNearClip`, 10-50 cm,
-  default 20):** some close-ups put the game camera just behind a head, outside
-  the narrow 2D frame but inside the headset's wide view, so it filled one eye
-  (Rover on the Abby balcony: the head 10-20 cm from the right eye). In
-  close-ups the script raises the near clip plane to this distance, kept 10 cm
-  short of the game's focus, the centre trace and anyone found in the 2D frame
-  (after the close-up move), and never below the game's own 10 cm
-  (`utility/WuWaNearClip.hpp` applies it and restores the game's value when the
-  request stops or lapses after a second). The camera does not move. Logged as
-  `near_clip=` on each shot line and `[WuWaNearClip]` on changes; UEVR's own
-  Near Clip Plane option, when on, takes precedence.
+- **Hide characters at your eyes (test 16, `WuWaControls_HideNearCharacters`,
+  default off; LT + RT, then Y):** some close-ups put the game camera just
+  behind a head, outside the narrow 2D frame but inside the headset's wide view,
+  so it filled one eye (Rover on the Abby balcony: the head 10-20 cm from the
+  right eye). In close-ups, at each cut and about once a second while on, the
+  script reads up to 48 bones of each skeletal mesh drawn near the eyes. A
+  character with a bone within 30 cm of either eye (after the close-up move) and
+  no bone inside the 2D frame (16:9 at the game's FOV, 10 cm margin) leaves the
+  main pass whole: every primitive component of its actor, so held props go
+  too, while its shadow stays. Anything the game already hid is left alone. It
+  comes back when a bone enters the 2D frame, at a cut that no longer qualifies
+  it, when the close-up ends or when the option goes off. Props and scenery are
+  never hidden. Logged as `[WuWaHide] shot=... hiding|note at_eyes= in_frame=
+  hidden= bones= ms` and `[WuWaHide] shown again (why)`.
+- **The note (`WuWaControls_NearHint`, default on):** with hiding off, a
+  character found at your eyes at a cut sets `WuWaControls_NearSeen`, and the VR
+  menu shows "Someone at your eyes" with the shortcut for 7 seconds, once per
+  scene (again only after 2 minutes without one), after the cinematic-scene note
+  if both are due. Full VR only.
+- **Near clip in close-ups (test 15, `WuWaControls_CloseUpNearClip`, 10-50 cm,
+  default 10 = off):** the first fix raised the near clip plane in close-ups,
+  kept 10 cm short of the game's focus, the centre trace and anyone in the 2D
+  frame. Recorded on 15 Oct it sliced Rover's head, hands and the table open
+  (a cross-section, with the inside showing), so it is off by default and kept
+  for experiments. `utility/WuWaNearClip.hpp` applies it and restores the game's
+  10 cm when the request stops or lapses after a second. Logged as `near_clip=`
+  on each shot line and `[WuWaNearClip]` on changes; UEVR's own Near Clip Plane
+  option, when on, takes precedence.
 - **Diagnostics:** every shot is logged as `[WuWaLens] shot=... fov=...
   subject=... (kind) people=in-frame/all foreground=... focus=... trace=...
   dolly=...`, plus `people_error`/`trace_error` when a lookup fails. The menu

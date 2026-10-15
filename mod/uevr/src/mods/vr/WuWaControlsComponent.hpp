@@ -225,8 +225,22 @@ private:
     // Close-up near clip (utility/WuWaNearClip.hpp): in story close-ups nothing
     // nearer than this is drawn, in cm; 10 is the game's own value (off). The
     // camera script sends the per-shot value, already kept short of the person
-    // in focus, as a transient request.
-    const ModSlider::Ptr m_closeup_near_clip{ModSlider::create("WuWaControls_CloseUpNearClip", 10.0f, 50.0f, 20.0f)};
+    // in focus, as a transient request. Off by default since test 16: a plane
+    // slices characters and props open (recorded 15 Oct).
+    const ModSlider::Ptr m_closeup_near_clip{ModSlider::create("WuWaControls_CloseUpNearClip", 10.0f, 50.0f, 10.0f)};
+    // Test 16: in close-ups, a character within reach of an eye and with no bone in
+    // the 2D frame is hidden whole (camera script). Off by default; LT + RT, then Y.
+    const ModToggle::Ptr m_hide_near{ModToggle::create("WuWaControls_HideNearCharacters", false)};
+    // While hiding is off: a note naming the shortcut, once per scene, when the script
+    // finds such a character (transient WuWaControls_NearSeen).
+    const ModToggle::Ptr m_near_hint{ModToggle::create("WuWaControls_NearHint", true)};
+    struct NearSeen : ModString {
+        NearSeen() : ModString{"WuWaControls_NearSeen", ""} {}
+        std::string get() const override { return {}; }
+        void set(const std::string&) override { wuwa_near_clip::near_seen_ms.store(GetTickCount64()); }
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    } m_near_seen;
     struct NearClipNow : ModString {
         NearClipNow() : ModString{"WuWaControls_NearClipNow", "0"} {}
         mutable std::mutex mutex;

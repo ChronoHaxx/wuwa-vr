@@ -988,6 +988,12 @@
   "Hide character rim lighting (optional workaround)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Hide characters at your eyes": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Hide characters at your eyes on / off": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Hide head": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1006,11 +1012,14 @@
   "Hide player IDs": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Hide what's at your eyes": [
-    "mods/vr/WuWaVrMenuHost.cpp"
-  ],
   "Hides the captured HUD and menus together. UEVR settings stay available; individual HUD elements cannot yet be moved separately.": [
     "mods/vr/OverlayComponent.cpp"
+  ],
+  "Hiding off": [
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Hiding on": [
+    "utility/WuWaShortcutSheet.cpp"
   ],
   "Higher follows the game camera more closely.": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1030,10 +1039,13 @@
   "Hold L3: controls card": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Hold LT + RT, then press Y to hide characters right at your eyes. Anyone in the shot stays.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Hold LT + RT: click R3 for the next view (full VR, stereo screen, mono), hold R3 for full VR; hold L3 for 0.8 s to toggle the screen. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.": [
     "mods/VR.cpp"
   ],
-  "Hold LT + RT: click R3 for the next view (hold: full VR), click L3 for blur on / off (hold: stereo screen). Release controls before repeating.": [
+  "Hold LT + RT: click R3 for the next view (hold: full VR), click L3 for blur on / off (hold: stereo screen), press Y to hide characters at your eyes. Release controls before repeating.": [
     "mods/VR.cpp"
   ],
   "Hold LT + RT: views card": [
@@ -1140,6 +1152,12 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. Raise it if round icons still look like flat ovals. The stereo screen and mono theatre always keep the game's own shape.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "In story close-ups nothing nearer than this is drawn. It slices characters and props open, so it is off by default (10 cm, the game's own value); Hide characters at your eyes is the cleaner fix. Game camera in full VR only.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "In story close-ups, a character right at your eyes but outside the flat shot (VR shows more around it) is hidden whole while it is there. Anyone the flat shot shows stays. Shortcut: hold LT + RT, then press Y.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Include camera and controller data": [
@@ -1313,6 +1331,9 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "LT + RT, R3: next view (hold: full VR)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "LT + RT, then Y": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "LT + RT, then click L3": [
@@ -1537,6 +1558,9 @@
   "Navigate / activate / back": [
     "mod/controls.json"
   ],
+  "Near clip in close-ups": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "New:": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1560,6 +1584,9 @@
   ],
   "Not tested": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Note when someone is at your eyes": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Now: %s": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1723,6 +1750,9 @@
   ],
   "Preserves both deactivation and keyboard focus events, including while this overlay is open. It applies to future events: after enabling, Alt-Tab away and back once. It does not bring the game to the foreground automatically.": [
     "mods/VR.cpp"
+  ],
+  "Press: hide characters at your eyes": [
+    "utility/WuWaShortcutSheet.cpp"
   ],
   "Privacy box placement": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2116,6 +2146,9 @@
   "Soft contact shadows in corners and under objects. On by default. It keeps the game's own setting and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer. Off is a little faster.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Someone at your eyes": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Speed": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2238,9 +2271,6 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Stops the freecam at walls and the ground. Experimental.": [
-    "mods/vr/WuWaVrMenuHost.cpp"
-  ],
-  "Story close-ups can put the game's camera right behind someone's head, so in VR it fills one eye. In those shots nothing nearer than this is drawn. It stops short of the person the game focuses on. 10 cm is the game's own value (off). Game camera in full VR only.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Story cutscenes and dialogue": [
@@ -2539,6 +2569,9 @@
   ],
   "Whichever you used last controls the game; the other waits until you press or push something on it.": [
     "mods/VR.cpp"
+  ],
+  "While hiding is off: a short note with the shortcut, once per scene, when a character is right at your eyes.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "While playing in first person, hold L3 + Y to raise eye level or L3 + X to lower it. This lets you see the result with this menu closed.": [
     "mods/vr/WuWaControlsComponent.cpp"

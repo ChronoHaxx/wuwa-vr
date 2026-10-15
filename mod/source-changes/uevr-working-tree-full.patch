@@ -297661,10 +297661,10 @@ index 0000000000000000000000000000000000000000..b3887d9e24e00166919c3bd47e793a37
 +} // namespace wuwa_view_ub_trace
 diff --git a/src/utility/WuWaVrMenu.cpp b/src/utility/WuWaVrMenu.cpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..46f2a27f6c42d0ec5c312285bf8951a11262c430
+index 0000000000000000000000000000000000000000..e4c83d27a77a8bdb249b86c7421ed29c67ae8741
 --- /dev/null
 +++ b/src/utility/WuWaVrMenu.cpp
-@@ -0,0 +1,388 @@
+@@ -0,0 +1,393 @@
 +#include "WuWaVrMenu.hpp"
 +
 +#include <imgui.h>
@@ -297957,10 +297957,15 @@ index 0000000000000000000000000000000000000000..46f2a27f6c42d0ec5c312285bf8951a1
 +        if (item.session_only) {
 +            note = tr("This launch only: not saved.");
 +        } else if (item.default_text) {
++            // Format the logical text, then shape it once: right-to-left shaping reorders the
++            // characters, so a shaped format could move or break its %s. The loader keeps a
++            // translation only when its specifiers match the English (valid_translation).
 +            char text[256]{};
-+            std::snprintf(text, sizeof(text), tr("Default: %s. Saved for next time.").c_str(), tr(item.default_text()).c_str());
-+            note = text;
-+            if (item.is_default && !item.is_default() && !pointer) note += "  " + tr("X or Delete: back to the default.");
++            std::snprintf(text, sizeof(text), wuwa_l10n::translate("Default: %s. Saved for next time.").c_str(),
++                wuwa_l10n::translate(item.default_text()).c_str());
++            std::string logical = text;
++            if (item.is_default && !item.is_default() && !pointer) logical += "  " + wuwa_l10n::translate("X or Delete: back to the default.");
++            note = wuwa_l10n::visual(logical);
 +        }
 +        if (!note.empty()) write(at(left, strip + 80.0f), 21.0f, gold_dim, note, right - left);
 +    }

@@ -290,10 +290,15 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
         if (item.session_only) {
             note = tr("This launch only: not saved.");
         } else if (item.default_text) {
+            // Format the logical text, then shape it once: right-to-left shaping reorders the
+            // characters, so a shaped format could move or break its %s. The loader keeps a
+            // translation only when its specifiers match the English (valid_translation).
             char text[256]{};
-            std::snprintf(text, sizeof(text), tr("Default: %s. Saved for next time.").c_str(), tr(item.default_text()).c_str());
-            note = text;
-            if (item.is_default && !item.is_default() && !pointer) note += "  " + tr("X or Delete: back to the default.");
+            std::snprintf(text, sizeof(text), wuwa_l10n::translate("Default: %s. Saved for next time.").c_str(),
+                wuwa_l10n::translate(item.default_text()).c_str());
+            std::string logical = text;
+            if (item.is_default && !item.is_default() && !pointer) logical += "  " + wuwa_l10n::translate("X or Delete: back to the default.");
+            note = wuwa_l10n::visual(logical);
         }
         if (!note.empty()) write(at(left, strip + 80.0f), 21.0f, gold_dim, note, right - left);
     }

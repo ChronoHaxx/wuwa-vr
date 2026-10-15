@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-15T02:56:54.587562+00:00",
+  "updatedAt": "2026-10-15T04:34:03.197207+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -391,7 +391,7 @@
     "mod/notices/wuwa-fonts/sc-OFL.txt": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
     "mod/source-changes/openxr-simulator-working-tree.patch": "cc791e6233bda474ad971d4f8e05cbafd614551679862128bac371942a5cdfbe",
     "mod/source-changes/uesdk-working-tree.patch": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
-    "mod/source-changes/uevr-working-tree-full.patch": "6b04a05d0f43963ced5c3c009767c20d8d5be313f1994512f6cd2fa16e325ce7",
+    "mod/source-changes/uevr-working-tree-full.patch": "ee40047884f196f6306c42de9a2b0a390cc12de88df76c8ba6b96814be7d049f",
     "mod/tests/test_playstation_input.cpp": "1acd98023e380c9840771075f692f5161399fc1f68ba1321ac15c8d0e1bfb940",
     "mod/tests/test_playstation_input.ps1": "fad47cf89bd5f912ffeb5f7758eb602991c2151280fc1b617747ba573bb582c9",
     "mod/tests/test_playstation_shortcuts.lua": "50f45c75719203ea62b54cf0f88cd5ab199a3bab6731f35d7cb392b773f6786e",
@@ -543,7 +543,7 @@
     "mod/uevr/src/utility/WuWaTreadmillApp.hpp": "aea9df63f94066f506f2c9175235243124894675779e6c7fb1a8d0a627bb9ad2",
     "mod/uevr/src/utility/WuWaVideoBridge.hpp": "20df530581ab499f918b9c6c00e1cead188c9aed83eea532773fcc2fbf1c60c8",
     "mod/uevr/src/utility/WuWaViewUbTrace.hpp": "b1092e27d2b4ff341378da105811b0367d6922762413ce5c101020049971b067",
-    "mod/uevr/src/utility/WuWaVrMenu.cpp": "0d9ef8e39ac3275716748066c781ffb2378bda8ac59a74c243443b149b35d223",
+    "mod/uevr/src/utility/WuWaVrMenu.cpp": "5cd1eb4eb099a268efcef9c842fbb67297491c44bf168a6619d48b55d1af1dec",
     "mod/uevr/src/utility/WuWaVrMenu.hpp": "01e4f7c760b4f6076c13fb50560df37487fc20a17fadca02cfa649fd7c8230a6",
     "mod/uevr/src/utility/WuWaWaterObservation.hpp": "429c6402f23127a4c857f7a2529eb3e61ab66ab2c8386671e46ac10ea38e5306",
     "mod/uevr/src/utility/WuWaWaterStereoLoop.hpp": "5410f481199d9a451baf41e9aa951d9ab1aeb8443897728bb977139488a750c1",

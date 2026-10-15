@@ -359,7 +359,7 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
-    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_sync_eye_lod, *m_refill_far_lighting, *m_ambient_occlusion, *m_ambient_occlusion_default, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_keep_mouse, *m_sync_eye_lod, *m_refill_far_lighting, *m_ambient_occlusion, *m_ambient_occlusion_default, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
@@ -374,6 +374,8 @@ WuWaControlsComponent::WuWaControlsComponent() {
 }
 
 WuWaControlsComponent::~WuWaControlsComponent() {
+    // Not logged: the logger may already be gone at process exit.
+    (void)wuwa_cursor_clip::update(m_mouse_clip, false, nullptr);
     wuwa_ps_hid::release_on_process_exit(m_playstation,
         wuwa_lgui_probe::detail::process_exiting.load(std::memory_order_relaxed));
 }
@@ -771,6 +773,8 @@ void WuWaControlsComponent::on_draw_ui() {
     if (wuwa_ui::TreeNode("HUD and focus comfort")) {
         wuwa_ui::draw(*m_keep_camera,"Keep camera and head hiding during Alt-Tab / UEVR settings");
         wuwa_ui::TextWrapped("Input still pauses when WuWa loses focus. Real game menus temporarily restore the game camera and character visibility.");
+        wuwa_ui::draw(*m_keep_mouse,"Keep the mouse in the game window");
+        wuwa_ui::TextWrapped("On: while the game is in front, the mouse stops at the window's edges, as in the flat game, so it cannot slip onto another monitor. Alt-Tab frees it. Off: the mouse moves freely between monitors.");
         wuwa_ui::draw(*m_warn_hidden_ui,"Warn when a menu opens with game UI hidden");
         wuwa_ui::TextWrapped("Hidden UI stays quiet during normal gameplay. A recovery notice appears only when the game cursor or a known menu-rendering path indicates a menu. L3 + B restores UI. An unknown menu may not be detected; UEVR settings always retain the Show game UI button.");
         wuwa_ui::TextWrapped("Close UEVR, press L3 + LB once, then release the controller. Left stick moves the cursor; A clicks, B goes back, X + stick scrolls. LT/RT moves the HUD nearer/farther; LB/RB lowers/raises it. L3 + LB again returns to normal controls. Adjustment pauses freecam flight and starts off each launch.");
@@ -1529,8 +1533,25 @@ void WuWaControlsComponent::advance_playstation() {
     }
 }
 
+void WuWaControlsComponent::update_mouse_clip() {
+    if (!wuwa_test::is_wuwa()) return;
+    const auto action = wuwa_cursor_clip::update(m_mouse_clip, m_keep_mouse->value(), g_framework->get_window());
+    // Logged on the first clip and the release, not on every win-back.
+    static bool logged = false;
+    const auto& r = m_mouse_clip.clipped;
+    if (action == wuwa_cursor_clip::Action::clip && !logged) {
+        logged = true;
+        spdlog::info("[WuWaControls] Mouse kept in the game window ({},{} - {},{})", r.left, r.top, r.right, r.bottom);
+    } else if (action == wuwa_cursor_clip::Action::release) {
+        logged = false;
+        spdlog::info("[WuWaControls] Mouse released from the game window; clipped again {} times so far after something reset it",
+            m_mouse_clip.retaken);
+    }
+}
+
 void WuWaControlsComponent::on_frame() {
     advance_playstation();
+    update_mouse_clip();
     // Text drawn in another language without a translation, for test sessions and the
     // i18n check (dev/i18n/missing_report.py); written at most every 10 s, when it grew.
     static uint64_t missing_check = 0;

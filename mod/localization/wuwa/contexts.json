@@ -1277,6 +1277,10 @@
     "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Keep the mouse in the game window": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Keep this card open": [
     "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
@@ -1710,6 +1714,10 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "On: the HUD stays in front of your eyes. Off: it stays put in the world and you look at it.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "On: while the game is in front, the mouse stops at the window's edges, as in the flat game, so it cannot slip onto another monitor. Alt-Tab frees it. Off: the mouse moves freely between monitors.": [
+    "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "On: your settings are saved whenever this menu opens or closes. Off: try things freely; nothing is saved, and the game starts with your saved settings next time. Turning it back on saves what you have now. For each setting, the help at the bottom says whether it is saved and what its default is.": [

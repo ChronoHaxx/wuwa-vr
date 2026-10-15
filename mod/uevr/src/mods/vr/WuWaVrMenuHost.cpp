@@ -900,6 +900,10 @@ Page comfort_page() {
     page.items.push_back(setting_toggle("Walk by default", "Walk instead of run; hold RB for normal speed.", "WuWaControls_PolarWalk"));
     page.items.push_back(setting_toggle("L3 + A resets position too",
         "Recentering with L3 + A also moves your seated position back to the middle.", "WuWaControls_RecenterPosition"));
+    page.items.push_back(setting_toggle("Keep the mouse in the game window",
+        "On: while the game is in front, the mouse stops at the window's edges, as in the flat game, so it cannot slip "
+        "onto another monitor. Alt-Tab frees it. Off: the mouse moves freely between monitors.",
+        "WuWaControls_KeepMouseInWindow"));
     return page;
 }
 

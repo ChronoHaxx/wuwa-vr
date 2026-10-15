@@ -229,7 +229,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "VR_WuWaScreenLens", "VR_WuWaScreenDepth", "WuWaPrivacy_Mode", "WuWaControls_MeshMode", "WuWaControls_FirstForward",
                 "WuWaControls_FirstRight", "WuWaControls_FirstUp", "WuWaControls_FirstMotion", "WuWaControls_FullFollowLook", "WuWaControls_FollowHeadAnimation", "WuWaControls_LateHeadUpdate",
                 "VR_AimMethod", "VR_AimModifyPlayerControlRotation", "VR_DecoupledPitch",
-                "WuWaControls_KeepCameraOnFocusLoss", "WuWaControls_RecenterPosition", "WuWaControls_Cards",
+                "WuWaControls_KeepCameraOnFocusLoss", "WuWaControls_KeepMouseInWindow", "WuWaControls_RecenterPosition", "WuWaControls_Cards",
                 "WuWaControls_FreeStyle", "WuWaControls_DroneResponse", "WuWaControls_PlaneSpeed", "WuWaControls_FlightRoll",
                 "WuWaControls_AcroThrottle", "WuWaControls_AcroRate", "WuWaControls_AcroYawRate", "WuWaControls_AcroExpo",
                 "WuWaControls_AcroThrust", "WuWaControls_AcroDrag", "WuWaControls_AcroTilt", "WuWaControls_AcroInvertPitch",

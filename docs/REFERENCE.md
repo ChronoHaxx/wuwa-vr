@@ -468,6 +468,20 @@ Checking it:
   17o; 31 turns off the mouse's ray (before 17l); 127 is 17m (bits 5 and 6 give
   every ray and the controller conversions the window size).
 
+**The mouse slips onto another monitor while the game is in front.**
+**Fixed** in test 17p (15 Oct): Comfort > "Keep the mouse in the game window", on by default.
+
+In gameplay the game confines the cursor to its window itself (15 Oct: the system clip was
+the window rect with the cursor hidden), but with the mouse in menus it could leave the
+window (owner, three monitors). While the setting is on and the window is in front, the
+plugin clips the cursor to the window's client area every frame, so a clip something else
+reset is won back within a frame. When the window loses focus, or the setting goes off,
+it releases the clip only if it is still the one it set: another program's clip, or the
+game's own, is left alone. Log: `[WuWaControls] Mouse kept in the game window (...)` and
+`Mouse released ...; clipped again N times so far` (N counts resets by something else).
+Off restores the old free movement. If the cursor is ever stuck after a crash,
+Ctrl+Alt+Del then Cancel releases it.
+
 **A flat menu's background moves with your head.**
 **Open**. Mono theatre is the workaround.
 

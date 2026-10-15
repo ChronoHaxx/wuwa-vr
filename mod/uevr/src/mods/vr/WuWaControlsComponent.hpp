@@ -17,6 +17,7 @@
 #include "utility/WuWaNearClip.hpp"
 #include "utility/WuWaPlayStationHid.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
+#include "utility/WuWaCursorClip.hpp"
 
 namespace vrmod {
 
@@ -280,6 +281,10 @@ private:
     wuwa_video::Client m_video;
     const ModToggle::Ptr m_enabled{ModToggle::create("WuWaControls_Enabled", true)};
     const ModToggle::Ptr m_keep_camera{ModToggle::create("WuWaControls_KeepCameraOnFocusLoss", true)};
+    // The mouse stays inside the game window while it is in front, as in the flat game (WuWaCursorClip.hpp).
+    const ModToggle::Ptr m_keep_mouse{ModToggle::create("WuWaControls_KeepMouseInWindow", true)};
+    wuwa_cursor_clip::State m_mouse_clip{};
+    void update_mouse_clip();
     // Native stereo: give the second eye the first eye's LOD distance factor and FOV so
     // far foliage and props switch LOD together (the game builds the second eye with 90).
     const ModToggle::Ptr m_sync_eye_lod{ModToggle::create("WuWaStereo_SyncEyeLod", true)};

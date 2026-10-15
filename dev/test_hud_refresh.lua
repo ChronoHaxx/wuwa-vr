@@ -169,13 +169,13 @@ local function fixture(options)
 end
 local count = 0
 local function test(name, run) run(); count = count + 1; print("PASS: " .. name) end
-test("loading and idle ticks never mutate; idle full VR looks the scaler up once per world", function()
+test("loading and idle ticks never mutate; each idle view looks the scaler up once per world", function()
     local f = fixture(); for _ = 1, 9 do f:tick() end
     assert(f.queries == 0 and #f.writes == 0)
     for _ = 1, 40 do f:tick() end
     assert(f.queries == 1 and #f.writes == 0 and f.cache_writes == 0)
     f = fixture(); for _ = 1, 40 do f:tick(true) end
-    assert(f.queries == 0 and #f.writes == 0)
+    assert(f.queries == 1 and #f.writes == 0 and f.cache_writes == 0)
 end)
 test("manual request is deferred and preserves exact projection values", function()
     local f = fixture(); f.state:request(); assert(#f.writes == 0)
@@ -440,13 +440,29 @@ test("WuWa: in full VR a stale viewport cache is synced and the scaler re-lays o
     assert(synced(f) and table.concat(f.writes, ",") == "match,match" and f.cache_writes == 4, table.concat(f.writes, ","))
     assert(f.state.status:find("HUD viewport resynced 2560x1440 -> 3292x3292", 1, true), f.state.status)
 end)
-test("WuWa: returning to full VR syncs the cache; stereo screen and mono never touch it", function()
+-- Test 17k: a menu opened in the taller full VR layout (3292 eye) kept that layout
+-- after switching to the stereo screen or mono (2560 x 1440): the game sent no
+-- viewport event, so the cursor missed. The check now runs in every view.
+test("WuWa: a cache left at the full VR size on the stereo screen or mono is synced; full VR again too", function()
     local f = fixture({wuwa = true}); f:tick(false); f:tick(true)
     f.viewport_size = {X = 2560, Y = 1440}; f:game_viewport(3292, 3292)
     for _ = 1, 60 do f:tick(true) end
-    assert(f.cache_writes == 0 and f.scaler.mem[0x138] == 3292, "cache written outside full VR")
+    local m = f.scaler.mem
+    assert(m[0x138] == 2560 and m[0x13C] == 1440 and m[0x148] == 2560 and m[0x14C] == 1440, "screen cache left stale")
+    assert(f.cache_writes == 4, "synced by the switch follow-up")
+    -- Later, with no view switch, the game puts the full VR size back: the screen check fixes it.
+    f:game_viewport(3292, 3292)
+    for _ = 1, 40 do f:tick(true) end
+    assert(m[0x138] == 2560 and m[0x13C] == 1440 and f.cache_writes == 8, "screen check missed it")
+    assert(f.state.status:find("(screen check)", 1, true), f.state.status)
     stale(f); f:tick(false); f:tick(false)
-    assert(synced(f) and f.cache_writes == 4)
+    assert(synced(f) and f.cache_writes == 12)
+end)
+test("WuWa: a screen cache that already matches is never written", function()
+    local f = fixture({wuwa = true}); f:tick(false); f:tick(true)
+    f.viewport_size = {X = 2560, Y = 1440}; f:game_viewport(2560, 1440)
+    for _ = 1, 60 do f:tick(true) end
+    assert(f.cache_writes == 0, "matching cache written")
 end)
 test("WuWa: in dialogue (no view switch) the full VR check resyncs a cache the game left stale", function()
     local f = fixture({wuwa = true}); f.viewport_size = {X = 3292, Y = 3292}; f:game_viewport(3292, 3292)

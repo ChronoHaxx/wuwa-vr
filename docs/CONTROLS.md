@@ -124,8 +124,8 @@ is pending; simulated reports do not establish USB/Bluetooth device acceptance.
 | Input | Action |
 | --- | --- |
 | L3 + R3 | Open/close the WuWa VR menu |
-| Fully hold LT + RT first, then click R3 | Next view: full VR, stereo screen, mono theatre (one scene and HUD shown identically to both eyes), then full VR again. Release R3 before the triggers |
-| Fully hold LT + RT first, then hold R3 for 0.8 seconds | Back to full VR from any view |
+| Fully hold LT + RT first, then click R3 | Switch between full VR and the stereo screen. Keep the triggers held to click again (from mono theatre, a click goes to full VR) |
+| Fully hold LT + RT first, then hold R3 for 0.8 seconds | Mono theatre (one scene and HUD shown identically to both eyes); hold again to go back to the view you had |
 | Fully hold LT + RT first, then click L3 | Blur (depth of field) on / off; on by default, in both eyes |
 | Fully hold LT + RT first, then press Y | Hide characters at your eyes on / off (off by default): in story close-ups, a character right at your eyes but outside the flat shot is hidden whole; anyone the flat shot shows stays. Y does not reach the game while the triggers are held |
 | Fully hold LT + RT first, then hold L3 for 0.8 seconds | Toggle stereoscopic screen, retaining scene depth (also from mono theatre); release all controls before repeating. Works in dialogue, with UEVR and adjustment closed |

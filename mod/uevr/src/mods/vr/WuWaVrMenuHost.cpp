@@ -471,8 +471,8 @@ Item language_choice() {
 Item view_choice() {
     auto item = make(Kind::Choice, "View",
         "Full VR: the game all around you. Stereo screen: a big 3D screen, for menus and scenes that look wrong in full VR. "
-        "Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then click R3 for the next view "
-        "(hold R3: back to full VR).");
+        "Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then hold R3 "
+        "(hold again to go back).");
     item.get_int = [] {
         auto* vr = VR::get().get();
         return vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
@@ -1379,7 +1379,7 @@ void draw_hint(ImDrawList* list, const ImVec2& size) {
         return;
     }
     wuwa_menu::draw_note(list, size, font, "Cinematic scene",
-        "Looks wrong? Hold LT + RT, then click R3 for the next view (stereo screen, then mono).",
+        "Looks wrong? Hold LT + RT, then click R3 for the stereo screen (hold R3: mono).",
         "Turn this note off in the menu, Cinema page.");
 }
 }

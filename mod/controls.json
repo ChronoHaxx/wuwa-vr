@@ -25,8 +25,8 @@
       "id": "views",
       "title": "02  HOLD LT + RT",
       "rows": [
-        {"keys": "LT + RT → R3", "action": "Click: next view", "gesture": true},
-        {"keys": "LT + RT → R3 0.8 s", "action": "Hold: straight back to full VR", "gesture": true},
+        {"keys": "LT + RT → R3", "action": "Click: full VR / stereo screen", "gesture": true},
+        {"keys": "LT + RT → R3 0.8 s", "action": "Hold: mono theatre on / off", "gesture": true},
         {"keys": "LT + RT → L3", "action": "Click: blur on / off", "gesture": true},
         {"keys": "LT + RT → L3 0.8 s", "action": "Stereo screen on / off (hold 0.8 s)"}
       ]

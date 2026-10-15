@@ -430,15 +430,11 @@ void l3_card(const Canvas& c, const CardState& st) {
     rich(c, 1542, 830, 25, muted, "Everything else: {L3}+{R3} opens the WuWa VR menu", 1542 - x, 1.0f);
 }
 
-void arrow(const Canvas& c, float x, float y) {
-    c.list->AddLine(c.at(x - 18, y), c.at(x + 12, y), accent, 3.0f * c.s);
-    c.list->AddTriangleFilled(c.at(x + 20, y), c.at(x + 6, y - 11), c.at(x + 6, y + 11), accent);
-}
-void loop_arrow(const Canvas& c, float x, float y) {
-    c.list->PathArcTo(c.at(x, y), 18.0f * c.s, -1.2f, 4.1f, 24);
-    c.list->PathStroke(accent, 0, 3.0f * c.s);
-    const ImVec2 tip = c.at(x + 18.0f * std::cos(-1.2f), y + 18.0f * std::sin(-1.2f));
-    c.list->AddTriangleFilled({tip.x - 9.0f * c.s, tip.y - 6.0f * c.s}, {tip.x + 7.0f * c.s, tip.y - 9.0f * c.s}, {tip.x + 2.0f * c.s, tip.y + 8.0f * c.s}, accent);
+// Both ways: R3 switches between two views and back (test 17k).
+void arrow2(const Canvas& c, float x, float y) {
+    c.list->AddLine(c.at(x - 14, y), c.at(x + 14, y), accent, 3.0f * c.s);
+    c.list->AddTriangleFilled(c.at(x + 24, y), c.at(x + 10, y - 11), c.at(x + 10, y + 11), accent);
+    c.list->AddTriangleFilled(c.at(x - 24, y), c.at(x - 10, y + 11), c.at(x - 10, y - 11), accent);
 }
 // The view icons (viewBox 120 x 80) around a centre.
 void icon(const Canvas& c, int which, float cx, float cy) {
@@ -483,13 +479,20 @@ void views_card(const Canvas& c, const CardState& st) {
             pill(c, x0 + 165.0f - w * 0.5f, y0, 18.0f, "now", gold, true);
         }
     }
-    arrow(c, 563, 291);
-    arrow(c, 978, 291);
-    loop_arrow(c, 1390, 291);
+    // Click R3: full VR <-> stereo screen. Hold R3: mono theatre and back (from either view).
+    arrow2(c, 564, 291);
+    arrow2(c, 978, 291);
+    chip(c, 564.0f - chip_width(c, 20, "R3") * 0.5f, 252, 20, "R3");
+    {
+        const float w = chip_width(c, 20, "R3") + 8.0f + c.width(18, "0.8 s");
+        const float x = 978.0f - w * 0.5f;
+        chip(c, x, 252, 20, "R3");
+        c.text(x + chip_width(c, 20, "R3") + 8.0f, 252.0f - 18.0f * 0.56f, 18, accent, "0.8 s");
+    }
     const bool r3_held = (st.buttons & r3) != 0, l3_held = (st.buttons & l3) != 0, y_held = (st.buttons & button_y) != 0;
     const struct { const char* token; const char* extra; const char* english; bool lit; } moves[]{
-        {"R3", nullptr, N_("Click: next view"), r3_held},
-        {"R3", "0.8 s", N_("Hold: straight back to full VR"), r3_held},
+        {"R3", nullptr, N_("Click: full VR / stereo screen"), r3_held},
+        {"R3", "0.8 s", N_("Hold: mono theatre on / off"), r3_held},
         {"L3", nullptr, N_("Click: blur on / off"), l3_held},
         {"Y", nullptr, N_("Press: hide characters at your eyes"), y_held},
     };
@@ -510,7 +513,7 @@ void views_card(const Canvas& c, const CardState& st) {
         if (state) pill(c, 543.0f + c.width(f.px, f.lines[0]) + 20.0f, middle, 20.0f, state, on ? green : muted);
     }
     c.list->AddLine(c.at(58, 810), c.at(1542, 810), row_line, 1.2f * c.s);
-    const auto f = fit(c, "Let go of all buttons between switches.", 25, 1480, false);
+    const auto f = fit(c, "Keep both triggers held to click or hold R3 again.", 25, 1480, false);
     c.text(1542.0f - c.width(f.px, f.lines[0]), 832, f.px, muted, f.lines[0]);
 }
 

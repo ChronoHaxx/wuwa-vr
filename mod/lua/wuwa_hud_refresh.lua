@@ -1,6 +1,6 @@
 -- Explicit HUD refresh and bounded 2D-transition observer. Loading is inert.
 -- Calls reflected LGUI APIs on the game thread only; no setting writes. The one
--- offset write is the guarded scaler viewport cache below (full VR only).
+-- offset write is the guarded scaler viewport cache below (any view, only when it differs from the canvas).
 local M = {}
 local function finite(v) return type(v) == "number" and v == v and math.abs(v) < math.huge end
 local function address(o) return o and o:get_address() end
@@ -231,7 +231,7 @@ function M.new(env)
                         elseif address(item_canvas(item)) ~= address(canvas) then reason = "root item of another canvas"
                         elseif not vx then reason = "canvas viewport size unavailable"
                         else
-                            if context.full_vr then
+                            if context.sync then
                                 local synced, why = sync_cache(o, canvas, scaler_class, vx, vy)
                                 s.last_cache = synced or why
                                 if synced then
@@ -352,7 +352,9 @@ function M.new(env)
             self.status = self.status .. "; diagnostic saved / 已保存诊断"
         end
     end
-    -- Full VR watchdog. Dialogue has no ESC to make the game resend its
+    -- Layout watchdog, in every view (full VR only until test 17k: a menu opened in
+    -- the taller full VR layout kept that layout on the stereo screen and in mono, so
+    -- the cursor missed; the game sent no viewport event). Dialogue has no ESC to make the game resend its
     -- viewport, so a cache left stale there stayed stale. Once a second it reads
     -- the remembered scaler's cache (memory only) and compares it with the
     -- canvas viewport, asked again only when the player viewport changes. The
@@ -360,7 +362,7 @@ function M.new(env)
     -- world, or at most every 10 s after the game rebuilds its UI.
     -- The same mismatch on two checks in a row runs the refresh. Three resyncs
     -- within a minute mean something keeps undoing it: pause until a view switch.
-    local function watch(self, delta)
+    local function watch(self, delta, screen)
         local w = self.watch
         if not w then w = {syncs = {}, time = 0}; self.watch = w end
         w.time = w.time + (finite(delta) and math.max(0, math.min(delta, 0.25)) or 0)
@@ -408,9 +410,10 @@ function M.new(env)
             return
         end
         recent[#recent + 1] = now
-        context.full_vr = true
+        context.sync = true
         local ok, message = refresh(context)
-        self.status = (ok and message or ("HUD refresh unavailable: " .. message)) .. " (full VR check)"
+        self.status = (ok and message or ("HUD refresh unavailable: " .. message)) ..
+            (screen and " (screen check)" or " (full VR check)")
     end
     function s:request()
         self.pending = {manual = true, age = 0, ticks = 0, stable = 0}
@@ -453,7 +456,7 @@ function M.new(env)
                 else
                     local at = table.remove(self.followups, 1)
                     if #self.followups == 0 then self.followups = nil end
-                    if context then context.full_vr = mode == false end
+                    if context then context.sync = true end
                     local ok, message = refresh(context)
                     self.status = (ok and message or ("HUD refresh unavailable: " .. message)) .. " (follow-up at " .. at .. " s)"
                 end
@@ -461,7 +464,7 @@ function M.new(env)
         end
         local p = self.pending
         if not p then
-            if mode == false and not self.followups and not pcall(watch, self, delta) and self.watch then
+            if not self.followups and not pcall(watch, self, delta, mode) and self.watch then
                 self.watch.paused = true
                 self.status = "HUD full VR check stopped: reflection changed / HUD 全 VR 检查已停止：反射接口已改变"
             end
@@ -510,7 +513,7 @@ function M.new(env)
         if not p.clock_used then settled = p.age >= 0.2 or p.stable >= 12 or (not context.dimensions_available and p.manual and p.ticks >= 12) end
         if settled and ((dims and p.stable >= 2) or (not context.dimensions_available and p.manual)) then
             self.pending = nil
-            context.full_vr = mode == false
+            context.sync = true
             local ok, message = refresh(context)
             self.status = ok and message or ("HUD refresh unavailable: " .. message .. " / HUD 刷新未完成")
             if not ok and message == "No active HUD with the supported LGUI schema" then

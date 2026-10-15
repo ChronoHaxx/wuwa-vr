@@ -294,6 +294,16 @@ has no reflected `SetEnable(bool)` on the scaler, so nothing ran ("HUD refresh
 unavailable ... no SetEnable(bool)"). The release keeps the 3j nudge; ESC
 remains the fix.
 
+**Layout check in every view (test 17k).** The scaler re-lays out only from the
+viewport size it last heard about (`wuwa_hud_refresh.lua`, cache at +0x138 and
++0x148). A menu opened in the taller full VR layout (journey log, 15 Oct) kept
+that layout after switching to the stereo screen or mono, where the canvas is
+2560 x 1440: the game sent no viewport event, so the drawn menu and the cursor
+disagreed (mouse and controller). The once-a-second check (two mismatches in a
+row, at most three resyncs a minute) and the follow-ups after a view switch
+now compare the cache with the canvas in every view, not only full VR, and
+sync it only when they differ.
+
 **Close-up match** (Camera page in Game camera mode, and the Cinema page).
 Measured from the 10 Oct recordings: in full VR the eye sits exactly at the
 game camera (plus `VR_Camera*Offset`), and its angle matches too. What differs

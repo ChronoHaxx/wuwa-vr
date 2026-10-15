@@ -260,9 +260,6 @@
   "Back to 1.33, the full VR default.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Back to full VR (hold 0.8 s)": [
-    "mods/vr/WuWaControlsComponent.cpp"
-  ],
   "Back to the WuWa VR menu": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -424,7 +421,7 @@
     "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
-  "Click: next view": [
+  "Click: full VR / stereo screen": [
     "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -877,10 +874,13 @@
     "mods/vr/WuWaVrMenuHost.cpp",
     "utility/WuWaShortcutSheet.cpp"
   ],
+  "Full VR / stereo screen (click again to switch back)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Full VR draws two large eye images every frame, far more pixels than the stereo screen, so busy scenes such as dialogue run slower there. A lower resolution is smoother and a little softer.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Full VR: the game all around you. Stereo screen: a big 3D screen, for menus and scenes that look wrong in full VR. Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then click R3 for the next view (hold R3: back to full VR).": [
+  "Full VR: the game all around you. Stereo screen: a big 3D screen, for menus and scenes that look wrong in full VR. Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then hold R3 (hold again to go back).": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Full animation": [
@@ -907,7 +907,7 @@
   "Full-resolution translucent materials in stereo (candidate)": [
     "mods/VR.cpp"
   ],
-  "Fully hold both triggers first. R3: click for the next view (full VR, stereo screen, mono theatre), hold 0.8 seconds to go back to full VR. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen. Release the stick before the triggers; release all controls before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.": [
+  "Fully hold both triggers first. R3: click to switch between full VR and the stereo screen, hold 0.8 seconds for mono theatre (hold again to go back); with the triggers still held you can click or hold R3 again. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen; release all controls before repeating an L3 shortcut. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "GAME UI HIDDEN - MENUS ARE HIDDEN TOO": [
@@ -1109,10 +1109,10 @@
   "Hold L3: controls card": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Hold LT + RT: click R3 for the next view (full VR, stereo screen, mono), hold R3 for full VR; hold L3 for 0.8 s to toggle the screen. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.": [
+  "Hold LT + RT: click R3 for full VR / stereo screen (hold: mono theatre on / off), click L3 for blur on / off (hold: stereo screen), press Y to hide characters at your eyes. With the triggers held, R3 can be clicked again.": [
     "mods/VR.cpp"
   ],
-  "Hold LT + RT: click R3 for the next view (hold: full VR), click L3 for blur on / off (hold: stereo screen), press Y to hide characters at your eyes. Release controls before repeating.": [
+  "Hold LT + RT: click R3 for the next view (full VR, stereo screen, mono), hold R3 for full VR; hold L3 for 0.8 s to toggle the screen. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.": [
     "mods/VR.cpp"
   ],
   "Hold LT + RT: views card": [
@@ -1136,7 +1136,7 @@
   "Hold {LT}+{RT}, then": [
     "utility/WuWaShortcutSheet.cpp"
   ],
-  "Hold: straight back to full VR": [
+  "Hold: mono theatre on / off": [
     "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -1250,6 +1250,9 @@
   ],
   "Keep WuWa VR Launcher running to record from here. Its browser tab can be closed.": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Keep both triggers held to click or hold R3 again.": [
+    "utility/WuWaShortcutSheet.cpp"
   ],
   "Keep camera and head hiding during Alt-Tab / UEVR settings": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1404,7 +1407,7 @@
   "LT + RT, L3: blur (hold: stereo screen)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "LT + RT, R3: next view (hold: full VR)": [
+  "LT + RT, R3: full VR / stereo (hold: mono)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "LT + RT, then Y": [
@@ -1497,9 +1500,6 @@
   "Legacy stereo comparison bench (60-second tests)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Let go of all buttons between switches.": [
-    "utility/WuWaShortcutSheet.cpp"
-  ],
   "Level horizon": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1515,7 +1515,7 @@
   "Local controller and camera data only, about 30 samples/sec. The clean-video recorder starts this automatically. It never presses buttons. Video/sidecar alignment uses timestamps, not a claim of GPU-frame synchronization.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Looks wrong? Hold LT + RT, then click R3 for the next view (stereo screen, then mono).": [
+  "Looks wrong? Hold LT + RT, then click R3 for the stereo screen (hold R3: mono).": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Low": [
@@ -1583,6 +1583,9 @@
   ],
   "Mono theatre (no stereo)": [
     "mods/VR.cpp"
+  ],
+  "Mono theatre on / off (hold 0.8 s)": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Motion": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1652,9 +1655,6 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "New:": [
-    "mods/vr/WuWaControlsComponent.cpp"
-  ],
-  "Next view: full VR, stereo screen, mono theatre": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "No active playtest connection. Keep the launcher running and open Developer playtests to start or resume a session.": [
@@ -2810,10 +2810,13 @@
   "now": [
     "utility/WuWaShortcutSheet.cpp"
   ],
-  "{LT}+{RT}, click {R3} for the next view": [
+  "{LT}+{RT}, click {R3} for full VR": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "{LT}+{RT}, hold {R3} for full VR": [
+  "{LT}+{RT}, click {R3} for the stereo screen": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "{LT}+{RT}, hold {R3} to leave mono": [
     "mods/vr/WuWaControlsComponent.cpp"
   ]
 }

@@ -121,7 +121,7 @@ constexpr const char* sheet[][2] = {
     {N_("L3 + R3    WuWa VR menu"), N_("L3 + RB    Game / fixed camera")},
     {N_("L3 + A     Recenter view / portal"), N_("L3 + Y/X   Fixed / first-person height")},
     {N_("L3 + LT / F7   Portal on / off"), N_("L3 + RT    Diorama on / off")},
-    {N_("LT + RT, R3: next view (hold: full VR)"), N_("LT + RT, L3: blur (hold: stereo screen)")},
+    {N_("LT + RT, R3: full VR / stereo (hold: mono)"), N_("LT + RT, L3: blur (hold: stereo screen)")},
     {N_("Double L3  Windows screenshot"), N_("LB + LT/RT Fixed camera farther / closer")},
     {N_("Double R3  Freecam on / off"), N_("Freecam: left stick moves, right looks")},
     {N_("L3 + B     Show / hide game UI"), N_("Freecam: LT rises, RT boosts speed")},
@@ -538,8 +538,8 @@ void WuWaControlsComponent::on_draw_shortcuts() {
             {{N_("L3 + A"), N_("Recenter headset / portal")}},
             {{N_("L3 + LT / F7"), N_("Portal on / off")}},
             {{N_("L3 + RT"), N_("Diorama on / off")}},
-            {{N_("LT + RT, then click R3"), N_("Next view: full VR, stereo screen, mono theatre")}},
-            {{N_("LT + RT, then hold R3"), N_("Back to full VR (hold 0.8 s)")}},
+            {{N_("LT + RT, then click R3"), N_("Full VR / stereo screen (click again to switch back)")}},
+            {{N_("LT + RT, then hold R3"), N_("Mono theatre on / off (hold 0.8 s)")}},
             {{N_("LT + RT, then click L3"), N_("Blur (depth of field) on / off")}},
             {{N_("LT + RT, then hold L3"), N_("Stereo screen on / off (hold 0.8 s)")}},
             {{N_("LT + RT, then Y"), N_("Hide characters at your eyes on / off")}},
@@ -556,7 +556,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     }
     if (wuwa_ui::TreeNode("How to use view toggles")) {
         wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
-        wuwa_ui::TextWrapped("Fully hold both triggers first. R3: click for the next view (full VR, stereo screen, mono theatre), hold 0.8 seconds to go back to full VR. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen. Release the stick before the triggers; release all controls before repeating. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
+        wuwa_ui::TextWrapped("Fully hold both triggers first. R3: click to switch between full VR and the stereo screen, hold 0.8 seconds for mono theatre (hold again to go back); with the triggers still held you can click or hold R3 again. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen; release all controls before repeating an L3 shortcut. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
         wuwa_ui::TextWrapped("Mono preserves your saved stereo-screen choice; screen off exits both screen modes. Neither changes portal or normal world scale. Manual toggles take priority over automatic cinema for the current scene.");
         wuwa_ui::TextWrapped("Diorama uses a temporary miniature scale (Diorama scale on the WuWa VR menu's Quick page, 10x by default) with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
         ImGui::TreePop();
@@ -1272,7 +1272,8 @@ void WuWaControlsComponent::draw_passive_overlay() {
                 "Hint %d of %d. It then switches off; View hints on the WuWa VR menu's HUD page turns it back on.").c_str(),
                 m_view_hint,view_hint_count);
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),names[view],
-                view==0 ? "{LT}+{RT}, click {R3} for the next view" : "{LT}+{RT}, hold {R3} for full VR",vr_controllers,
+                view==0 ? "{LT}+{RT}, click {R3} for the stereo screen" : view==1 ? "{LT}+{RT}, click {R3} for full VR" :
+                "{LT}+{RT}, hold {R3} to leave mono",vr_controllers,
                 wuwa_l10n::visual(note));
         } else {
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",

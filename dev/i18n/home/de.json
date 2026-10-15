@@ -98,7 +98,7 @@
       "Der Start über Steam schlägt auf manchen PCs noch fehl; ein Fix wird getestet. Am besten getestet ist der Weg über den offiziellen Kuro-Launcher.",
       "Manche Szenen und Dialoge bleiben beim Laden hängen, und flache Menüs können einen bewegten Hintergrund zeigen.",
       "Die Aktualisierung des HUD-Seitenverhältnisses ist unzuverlässig; manche NPC-Beleuchtung, Spiegelungen und Nebel müssen noch getestet werden.",
-      "Der automatische Wechsel zu Zwischensequenzen ist experimentell und standardmäßig aus; mit einem vorgerenderten Video wurde er noch nicht getestet."
+      "Das automatische Kino ist standardmäßig an; die Erkennung von Story-Videos ist im Spiel 3.7 noch nicht bestätigt."
     ],
     "recovery": "Probleme und Schritte zur Fehlerbehebung"
   },

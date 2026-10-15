@@ -98,7 +98,7 @@
       "Le démarrage via Steam échoue encore sur certains PC ; un correctif est en test. Le passage par le launcher officiel de Kuro est le plus testé.",
       "Certains chargements de scènes et de dialogues peuvent se bloquer, et les menus plats peuvent afficher un arrière-plan en mouvement.",
       "L'actualisation du format du HUD n'est pas fiable ; une partie de l'éclairage des PNJ, des reflets et du brouillard reste à tester.",
-      "Le passage automatique aux cinématiques est expérimental et désactivé par défaut ; il n'a pas été testé avec une vidéo précalculée."
+      "Le cinéma automatique est activé par défaut ; la détection des vidéos de l'histoire n'est pas encore confirmée sur le jeu 3.7."
     ],
     "recovery": "Problèmes et étapes de dépannage"
   },

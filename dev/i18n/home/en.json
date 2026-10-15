@@ -162,7 +162,7 @@
       "Steam startup still fails on some PCs; a fix is in testing. The official Kuro launcher route is the most tested.",
       "Some scene and dialogue loads can stall, and flat menus may show a moving background.",
       "HUD-aspect refresh is unreliable; some NPC lighting, reflections and fog still need testing.",
-      "Automatic cinematic switching is experimental and off by default; a prerendered movie has not been tested."
+      "Automatic cinema is on by default; its story-video detection is not yet confirmed on game 3.7."
     ],
     "recovery": "Problems and recovery steps"
   },

@@ -42,8 +42,7 @@ const server = http.createServer((req, res) => {
         // Caveats can be collapsed for a quieter page; they must remain in the document.
         const text = await page.locator('main').textContent();
         assert(text.includes(release.appVersion) && text.includes(release.game));
-        assert(text.includes(name.includes('zh-Hans') ? '默认关闭' : 'off by default'));
-        assert(text.includes(name.includes('zh-Hans') ? '预渲染' : 'prerendered'));
+        assert(text.includes(name.includes('zh-Hans') ? '剧情视频检测尚未' : 'story-video detection'));
         // The deeper rendering caveat lives in the guide; home pages carry the short limits list.
         if (name === 'guide.html') assert(text.includes('underlying stereo rendering fault is unresolved'));
         else assert.equal(await page.locator('#limits li').count(), 4);

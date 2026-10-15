@@ -98,7 +98,7 @@
       "A inicialização pela Steam ainda falha em alguns PCs; há uma correção em teste. O caminho pelo launcher oficial da Kuro é o mais testado.",
       "Alguns carregamentos de cenas e diálogos podem travar, e menus planos podem mostrar um fundo em movimento.",
       "A atualização da proporção do HUD não é confiável; parte da iluminação de NPCs, reflexos e névoa ainda precisa de testes.",
-      "A troca automática para cinemáticas é experimental e vem desligada; ainda não foi testada com um vídeo pré-renderizado."
+      "O cinema automático vem ativado por padrão; a detecção de vídeos da história ainda não foi confirmada no jogo 3.7."
     ],
     "recovery": "Problemas e passos de recuperação"
   },

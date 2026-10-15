@@ -1,12 +1,12 @@
-WUWA VR — 1.2.2 BETA / GAME 3.7
-Release: beta-1-2-2 | VR build: steam-identity-1-2-2
+WUWA VR — 1.2.3 BETA / GAME 3.7
+Release: beta-1-2-3 | VR build: ui-layout-1-2-3
 
 Run WuWa-VR-Setup.exe, then open WuWa VR from the Start menu.
 First VR installation needs internet; no separate Python install is needed.
 
 01 Game: choose your Steam or Kuro installation. For Steam, select
    Wuthering Waves.exe if browsing and sign into Steam first.
-02 WuWa VR: accept the account-risk notice and install 1.2.2 beta.
+02 WuWa VR: accept the account-risk notice and install 1.2.3 beta.
 03 Headset or simulator: start your headset software and select a valid
    OpenXR runtime, or explicitly choose Use bundled simulator.
    Select Launch in VR. Steam opens through Steam; for Kuro, press Play.
@@ -35,7 +35,7 @@ launcher workers requires explicit selection and confirmation. Game, Steam,
 headset/runtime and injector processes are excluded. Close launcher only does
 not claim that background work stopped. Developer tools holds recording.
 
-The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill) and played 1.2.1 in the headset with the Kuro launcher copy of the game. 1.2.2 was checked on the OpenXR simulator with both the Steam copy and the Kuro launcher copy: on both, the UI redirect starts, the stereo fixes pass their code checks, and the HUD comes back at the right size after the stereo screen and mono theatre, in the open world and in dialogue (on the Kuro copy also across nine simulated headsets). 1.2.2 has not been played in a headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
+The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill), 1.2.1 in the headset with the Kuro launcher copy of the game, and an earlier 1.2.3 test build in the headset (SteamVR) with the Kuro launcher copy. The final 1.2.3 test builds were tested by the owner on the OpenXR simulator with both the Steam copy and the Kuro launcher copy: menus, the mouse and the controller cursor in the 16:9 and taller layouts, story pictures and story scenes, the character screen and the translations; on the Steam copy the UI redirect starts and the stereo fixes pass their code checks. The 1.2.3 release build has not been played in a headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
 
 The desktop launcher is MIT open source. Mod source changes are public;
 upstream and community components retain their own licences. Read LICENSE.txt
@@ -47,10 +47,10 @@ Not approved by Kuro Games. Do not disable security software.
 Website: https://chronohaxx.github.io/wuwa-vr/
 Source: https://github.com/ChronoHaxx/wuwa-vr
 
-鸣潮 VR — 1.2.2 测试版 / 游戏 3.7
+鸣潮 VR — 1.2.3 测试版 / 游戏 3.7
 
 运行安装程序后，从开始菜单打开 WuWa VR。首次安装 VR 包需要网络，无需另装 Python。
-01 选择 Steam 或库洛游戏；02 阅读风险提示并安装 1.2.2 beta；
+01 选择 Steam 或库洛游戏；02 阅读风险提示并安装 1.2.3 beta；
 03 启动头显软件并选择有效运行时，或明确选择内置模拟器，然后启动 VR。
 Steam 通过 Steam 启动；库洛用户还需在库洛启动器点击开始游戏。
 
@@ -70,7 +70,7 @@ L3 + R3 打开鸣潮 VR 菜单（激光、手柄或鼠标）；UEVR 完整设置
 注入器不在停止目标内。仅关闭启动器窗口不表示后台任务已停止。
 开发工具保存录像和高级诊断功能。
 
-开发者已在头显中（Valve Index 手柄配 Bigscreen Beyond；Meta Quest Pro 配 Reality Runner 跑步机）试玩 1.2.0，并用库洛官方启动器版本的游戏在头显中试玩了 1.2.1。1.2.2 已在 OpenXR 模拟器中分别用 Steam 版和库洛官方启动器版检查：两者的 UI 重定向均能启动，立体修复均通过代码校验，从立体屏幕和单眼影院切回后，HUD 在开放世界和对话中都恢复正确尺寸（库洛版还在九种模拟头显上检查过）。1.2.2 尚未在头显中试玩。“移动菜单”时 VR 摇杆暂时无法调节距离（请用“菜单距离”）。许多对话特写仍比 2D 镜头更远。
+开发者已在头显中（Valve Index 手柄配 Bigscreen Beyond；Meta Quest Pro 配 Reality Runner 跑步机）试玩 1.2.0，用库洛官方启动器版本的游戏在头显中试玩了 1.2.1，并用库洛版在头显（SteamVR）中试玩了较早的 1.2.3 测试版。最终的 1.2.3 测试版已由开发者在 OpenXR 模拟器中分别用 Steam 版和库洛官方启动器版测试：16:9 和较高布局下的菜单、鼠标和手柄光标，剧情图片和剧情场景，角色界面以及翻译；在 Steam 版上 UI 重定向能启动，立体修复通过代码校验。1.2.3 正式版尚未在头显中试玩。“移动菜单”时 VR 摇杆暂时无法调节距离（请用“菜单距离”）。许多对话特写仍比 2D 镜头更远。
 启动器采用 MIT 开源许可；模组改动源代码公开，上游组件保留各自许可。
 病毒扫描报告针对精确文件哈希，不保证安全或账号兼容性。
 非官方注入可能导致反作弊或账号限制，未经库洛批准。不要禁用安全软件。

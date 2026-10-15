@@ -1,18 +1,18 @@
-WUWA VR — 1.2.2 BETA / FOCUSED USER CHECKS
-App 1.2.2 | Package beta-1-2-2 | Build steam-identity-1-2-2 | Game 3.7 | 14 Oct 03:50 BST
+WUWA VR — 1.2.3 BETA / FOCUSED USER CHECKS
+App 1.2.3 | Package beta-1-2-3 | Build ui-layout-1-2-3 | Game 3.7 | 15 Oct 23:07 BST
 
 Record Pass / Fail / Blocked / Not tested. Automated checks are not user results.
 Close game and injector before updating package or changing runtime.
 
-[ ] Update app to 1.2.2 and restart it with the game closed: step 02 shows
-    VR package 1.2.2 beta, installed by itself, and offers Back to 1.2.1.
+[ ] Update app to 1.2.3 and restart it with the game closed: step 02 shows
+    VR package 1.2.3 beta, installed by itself, and offers Back to 1.2.2.
     If using simulator, explicitly choose Use bundled simulator. Confirm ready.
-[ ] Steam copy of the game: the HUD and menus sit on the VR panel, not on your eyes.
-[ ] Kuro launcher copy of the game: the same.
-[ ] Switch to the stereo screen, then back to full VR, in the open world and in a
-    dialogue: the HUD and subtitles are not squashed. Repeat with mono theatre.
-[ ] Ambient occlusion is on: rocks, hills and roofs shade the same in both eyes.
-[ ] Stereo screen, then L3 + B to hide the game UI: the picture stays in both panels.
+[ ] Steam copy and Kuro launcher copy: the HUD and menus sit on the VR panel.
+[ ] In full VR, ESC menu and the Terminal: the mouse arrow and the controller
+    cursor click what they point at; round icons are round.
+[ ] Story scene with 2D pictures: they switch to the stereo screen and back.
+[ ] Character screen: the floor reflection follows the current character.
+[ ] Mouse with the game in front: it stops at the game window's edges.
 
 PS4/PS5 hardware and physical-headset comfort remain separate pending checks.
 See PlayerGuide.html for controls, recovery and remaining rendering limitations.

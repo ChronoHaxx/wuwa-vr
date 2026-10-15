@@ -2,6 +2,18 @@
   "schema": 1,
   "releases": [
     {
+      "id": "beta-1-2-3",
+      "displayName": "1.2.3 beta · 15 Oct 23:07 BST",
+      "gameVersion": "3.7",
+      "buildId": "ui-layout-1-2-3",
+      "channel": "beta",
+      "published": "2026-10-15T22:08:34.313103+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-3/WuWa-VR-Launcher.zip",
+      "sha256": "188aef4a4ed157fac25f16540c91b354e20fde226d0b9c4c9c06cdd6fe30390f",
+      "size": 52897540,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-3"
+    },
+    {
       "id": "beta-1-2-2",
       "displayName": "1.2.2 beta · 14 Oct 03:50 BST",
       "gameVersion": "3.7",

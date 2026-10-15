@@ -1,5 +1,7 @@
 -- Optional read-only detection. Native owns the expiring display lease; this
 -- module never writes MonoTheatreMode, 2DScreenMode, portal or world scale.
+-- Runs for automatic cinema and for the HUD page's "Story scenes in 16:9"
+-- (native says so in WuWaControls_StoryLayoutDetect; older backends lack it).
 local M = {}
 local MOVIE = "MediaPlayer /Game/Aki/UI/UIResources/UiPlot/VideoPlayer/CommonVideoPlayer.CommonVideoPlayer"
 local STORY = "Class /Script/LGUI.UIExtendToggleSpriteTransition"
@@ -20,6 +22,9 @@ end
 
 function M.new(env)
     local s = {status = "Automatic mono off", token = nil, last_poll = nil, classes = nil}
+    local function wanted()
+        return env.get("VR_AutoCinema") == "true" or env.get("WuWaControls_StoryLayoutDetect") == "true"
+    end
     local api, hook = env.api, env.types and env.types.UObjectHook
     local function valid(o) return o ~= nil and api:to_uobject(o:get_address()) ~= nil end
     local function property(o, desc, name, wanted)
@@ -133,7 +138,7 @@ function M.new(env)
         self.token, self.classes, self.last_poll, self.class_attempts, self.class_retry = nil, nil, nil, nil, nil
     end
     local function tick()
-        if env.get("VR_AutoCinema") ~= "true" then s:reset(); s.status = "Automatic cinema off"; return end
+        if not wanted() then s:reset(); s.status = "Automatic cinema off"; return end
         if s.faulted then return end
         local now = tonumber(env.get("WuWaControls_Clock"))
         if not finite(now) or now < 0 then s:reset(); s.status = "Automatic mono clock unavailable"; return end
@@ -187,8 +192,8 @@ function M.new(env)
             self.status = "Automatic cinema reflection/bridge unavailable; previous view restored"
             if env.log then pcall(env.log, "WuWaCinema: " .. self.status) end
         end
-        local read_ok, enabled = pcall(env.get, "VR_AutoCinema")
-        if read_ok and enabled ~= "true" then self.superseded, self.faulted = nil, nil end
+        local read_ok, enabled = pcall(wanted)
+        if read_ok and not enabled then self.superseded, self.faulted = nil, nil end
     end
     return s
 end

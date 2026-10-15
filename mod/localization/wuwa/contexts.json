@@ -2384,6 +2384,9 @@
   "Story cutscenes and dialogue": [
     "mods/VR.cpp"
   ],
+  "Story scenes in 16:9": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Story scenes use": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2722,6 +2725,9 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. Your route is saved in the UEVR profile, wuwa-runs folder.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "With the 16:9 layout off: story dialogue and story videos switch to 16:9 while they play, so story pictures show whole, then the taller layout comes back. Uses the same detection as the automatic cinematic screen.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Within a shot": [

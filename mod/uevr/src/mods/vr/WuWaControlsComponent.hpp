@@ -83,7 +83,9 @@ public:
     static bool game_focused();
     bool auto_cinema_active() const;
     wuwa_auto_cinema::Presentation auto_cinema_presentation() const;
-    void advance_auto_cinema(bool runtime_ready);
+    void advance_auto_cinema(bool runtime_ready, bool story_ready);
+    // A story dialogue or video the detector sees (HUD page "Story scenes in 16:9").
+    bool story_scene_active() const { return m_story_scene.load(std::memory_order_relaxed); }
     std::string auto_cinema_status() const;
     void reset_auto_cinema();
     void override_auto_cinema();
@@ -109,6 +111,11 @@ private:
     std::atomic<wuwa_auto_cinema::Presentation> m_cinema_presentation{wuwa_auto_cinema::Presentation::none};
     std::string m_cinema_signal{"Detector has not reported"};
     double m_cinema_detection_ms{};
+    // The same detector samples, held with the cinema lease's timing, for the 16:9
+    // layout during story scenes. Never changes the view.
+    wuwa_auto_cinema::Lease m_story_lease;
+    std::atomic<bool> m_story_scene{false};
+    int8_t m_layout_seen{-1}; // the last full VR layout (game thread), -1 before the first tick
     // Transient protocol: generation fences old Lua callbacks; native expiry
     // restores the base view even if Lua stops running without reset callbacks.
     struct CinemaValue : ModString {
@@ -126,7 +133,8 @@ private:
       m_effective_mono{*this, 3, "WuWaControls_EffectiveMonoTheatre"},
       m_toggle_mono{*this, 4, "WuWaControls_ToggleMonoTheatre"},
       m_toggle_screen{*this, 5, "WuWaControls_ToggleStereoScreen"},
-      m_effective_screen{*this, 6, "WuWaControls_EffectiveScreen"};
+      m_effective_screen{*this, 6, "WuWaControls_EffectiveScreen"},
+      m_scene_detect{*this, 7, "WuWaControls_StoryLayoutDetect"};
     struct FocusValue : ModToggle {
         FocusValue() : ModToggle{"WuWaControls_Focused", false} {}
         std::string get() const override { return game_focused() ? "true" : "false"; }

@@ -152,7 +152,8 @@ REC badge with the elapsed time shows while recording.
    distance, **depth of field (experiment)**, the cinematic scene note,
    automatic cinematic screen and what story scenes use, matched framing.
 5. **HUD:** size, distance, **16:9 UI layout** (`VR_WuWaUiWindowSize`,
-   default on; see below), **HUD shape (full VR)** (`UI_WuWaHudShape`,
+   default on; see below), **Story scenes in 16:9** (`VR_WuWaUiStoryWindowSize`,
+   default on; only with the taller layout), **HUD shape (full VR)** (`UI_WuWaHudShape`,
    default 1.33; shown only while the taller layout is in use), up / down, left / right, follow head, refresh
    layout, controls cards (on / off, keep open, size, height, distance) and
    view hints.
@@ -211,6 +212,17 @@ floor reflection lines up in test 16's recordings). Switching moves the hooks
 and the panel at once and asks for a HUD layout refresh (as after a view
 switch), because the game's UI scaler keeps its old size until then. The
 taller layout brings back the flatter icons (HUD shape) and the mouse offset.
+Since test 17c the plugin asks for that refresh whenever the full VR layout in
+effect changes, whatever changed it (this switch, a story scene, a steps card).
+
+**Story scenes in 16:9** (on by default) applies only with the taller layout.
+Story dialogue and story videos then use 16:9 while they play, so story pictures
+show whole. It reuses the automatic cinematic screen's detector
+(`wuwa_auto_cinema.lua`: the active plot-skip widget, the story video player),
+which now also runs for this setting with automatic cinema off. The plugin
+holds the detector's samples in a second lease with the cinema lease's timing:
+100 ms to confirm a scene, and the taller layout returns 500 ms after a verified
+end. This lease never changes the view.
 
 **Why the HUD looked squashed in full VR only (before 1.2.3).** The log shows the UI pass
 drawn for the square eye (`stage3_fit original=0,0,3292,3292`) and fitted into

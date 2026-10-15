@@ -1738,7 +1738,8 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
 void VR::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
     ZoneScopedN(__FUNCTION__);
 
-    m_wuwa_controls.advance_auto_cinema(get_runtime()->loaded && is_hmd_active() && is_auto_cinema_enabled());
+    m_wuwa_controls.advance_auto_cinema(get_runtime()->loaded && is_hmd_active() && is_auto_cinema_enabled(),
+        get_runtime()->loaded && is_hmd_active() && wants_story_scene_layout());
     m_cvar_manager->on_pre_engine_tick(engine, delta);
     m_last_engine_tick = std::chrono::steady_clock::now();
 

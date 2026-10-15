@@ -52,6 +52,16 @@ int main() {
     assert(lease.sample(generation, "0", 0, 0, 0, Presentation::none, 5500));
     assert(!lease.active(5500)); // World loss immediately releases the view.
     lease.reset(); assert(!lease.active(5500));
+    // clear() (automatic cinema switched) ends the episode and a manual override
+    // but keeps the producer: the story-scene detector shares its generation.
+    generation = lease.generation();
+    assert(lease.sample(generation, "300", dialogue, 0, sources, Presentation::stereo_screen, 6000));
+    assert(lease.sample(generation, "300", dialogue, 0, sources, Presentation::stereo_screen, 6100));
+    lease.manual(); lease.clear();
+    assert(lease.generation() == generation && !lease.active(6100));
+    assert(lease.sample(generation, "300", dialogue, 0, sources, Presentation::stereo_screen, 6200));
+    assert(lease.sample(generation, "300", dialogue, 0, sources, Presentation::stereo_screen, 6300));
+    assert(lease.presentation(6300) == Presentation::stereo_screen); // Not suppressed after clear().
     assert(resolve(true, false, Presentation::none).screen);
     assert(resolve(false, true, Presentation::none).mono);
     std::cout << "PASS automatic cinematic lease, expiry, pause, manual precedence, world and producer fencing\n";

@@ -23,7 +23,10 @@ class Lease {
 public:
     uint64_t start() { ++generation_; clear_lease(); return generation_; }
     void stop(uint64_t generation) { if (generation == generation_) { ++generation_; clear_lease(); } }
-    void reset() { ++generation_; clear_lease(); world_.clear(); seen_ = 0; suppressed_ = false; }
+    void reset() { ++generation_; clear(); }
+    // As reset, but the running producer keeps its generation: the story-scene
+    // detector shares it and must survive a switch of automatic cinema.
+    void clear() { clear_lease(); world_.clear(); seen_ = 0; suppressed_ = false; }
     void invalidate() { clear_lease(); }
     uint64_t generation() const { return generation_; }
     uint8_t seen_sources() const { return seen_; }

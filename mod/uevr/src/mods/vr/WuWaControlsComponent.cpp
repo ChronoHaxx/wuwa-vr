@@ -232,13 +232,23 @@ bool WuWaControlsComponent::auto_cinema_active() const {
 wuwa_auto_cinema::Presentation WuWaControlsComponent::auto_cinema_presentation() const {
     return m_cinema_presentation.load();
 }
-void WuWaControlsComponent::advance_auto_cinema(bool runtime_ready) {
+void WuWaControlsComponent::advance_auto_cinema(bool runtime_ready, bool story_ready) {
     std::scoped_lock lock{m_cinema_mutex};
     // Apply expiry on a game-frame boundary, never independently between eye
     // getter calls. A fully stalled game thread holds its last presentation
     // until the next tick; that tick releases a stale producer before rendering.
+    const auto now = GetTickCount64();
     if (!runtime_ready) m_cinema_lease.invalidate();
-    m_cinema_presentation.store(m_cinema_lease.presentation(GetTickCount64()));
+    m_cinema_presentation.store(m_cinema_lease.presentation(now));
+    if (!story_ready) m_story_lease.invalidate();
+    m_story_scene.store(m_story_lease.presentation(now) != wuwa_auto_cinema::Presentation::none);
+    // Whatever changed the full VR layout (the HUD page, a story scene, a step's
+    // setting), the game's UI scaler keeps the old size until a layout refresh.
+    // The stereo screen and mono theatre refresh on their own way back.
+    const int8_t layout = VR::get()->is_wuwa_ui_window_size_active() ? 1 : 0;
+    if (m_layout_seen >= 0 && layout != m_layout_seen && !VR::get()->is_using_2d_screen() && !VR::get()->is_using_mono_theatre())
+        m_hud_aspect_request.set("true");
+    m_layout_seen = layout;
 }
 std::string WuWaControlsComponent::auto_cinema_status() const {
     std::scoped_lock lock{m_cinema_mutex};
@@ -250,7 +260,8 @@ std::string WuWaControlsComponent::auto_cinema_status() const {
 }
 void WuWaControlsComponent::reset_auto_cinema() {
     std::scoped_lock lock{m_cinema_mutex};
-    m_cinema_lease.reset();
+    // Keeps the producer generation: the story-scene detector may be running.
+    m_cinema_lease.clear();
     m_cinema_presentation.store(wuwa_auto_cinema::Presentation::none);
     m_cinema_signal = "Detector has not reported";
     m_cinema_detection_ms = 0;
@@ -267,6 +278,7 @@ std::string WuWaControlsComponent::CinemaValue::get() const {
     // v2 (test 3i): explicit "on" / "off" as well as "toggle", for the view cycle.
     if (kind == 4 || kind == 5) return "effective-v2";
     if (kind == 6) return VR::get()->is_using_2d_screen() ? "true" : "false";
+    if (kind == 7) return VR::get()->wants_story_scene_layout() ? "true" : "false";
     std::scoped_lock lock{owner.m_cinema_mutex};
     return std::to_string(owner.m_cinema_lease.generation());
 }
@@ -305,12 +317,26 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
             active < 0 || active > 3 || hold < 0 || hold > 3 || known < 0 || known > 3 ||
             detail.size() > 240 || !std::isfinite(elapsed) || elapsed < 0 || elapsed > 50) return;
         std::scoped_lock lock{owner.m_cinema_mutex};
-        if (!VR::get()->is_auto_cinema_enabled()) return;
-        const auto presentation = ((active & wuwa_auto_cinema::movie) ||
-                (hold & owner.m_cinema_lease.seen_sources() & wuwa_auto_cinema::movie)) ?
-            wuwa_auto_cinema::Presentation::mono_theatre : VR::get()->auto_story_presentation();
-        if (owner.m_cinema_lease.sample(generation, world, static_cast<uint8_t>(active),
-                static_cast<uint8_t>(hold), static_cast<uint8_t>(known), presentation, GetTickCount64())) {
+        const bool cinema = VR::get()->is_auto_cinema_enabled(), story = VR::get()->wants_story_scene_layout();
+        // The cinema lease's generation fences old producers for both leases.
+        if ((!cinema && !story) || generation != owner.m_cinema_lease.generation()) return;
+        const auto now = GetTickCount64();
+        bool accepted = false;
+        if (cinema) {
+            const auto presentation = ((active & wuwa_auto_cinema::movie) ||
+                    (hold & owner.m_cinema_lease.seen_sources() & wuwa_auto_cinema::movie)) ?
+                wuwa_auto_cinema::Presentation::mono_theatre : VR::get()->auto_story_presentation();
+            accepted = owner.m_cinema_lease.sample(generation, world, static_cast<uint8_t>(active),
+                static_cast<uint8_t>(hold), static_cast<uint8_t>(known), presentation, now);
+        }
+        if (story) {
+            // Any presentation marks the scene; only the layout reads this lease.
+            if (!owner.m_story_lease.generation()) owner.m_story_lease.start();
+            accepted = owner.m_story_lease.sample(owner.m_story_lease.generation(), world, static_cast<uint8_t>(active),
+                static_cast<uint8_t>(hold), static_cast<uint8_t>(known), wuwa_auto_cinema::Presentation::stereo_screen, now) ||
+                accepted;
+        }
+        if (accepted) {
             owner.m_cinema_signal = detail;
             owner.m_cinema_detection_ms = elapsed;
         }
@@ -326,7 +352,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
         *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
-        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen,
+        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};

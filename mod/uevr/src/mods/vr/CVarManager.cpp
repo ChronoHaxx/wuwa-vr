@@ -213,7 +213,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
         nlohmann::json options = nlohmann::json::object();
         for (const auto name : {"VR_WuWaForwardWindowFocus", "VR_WuWaGamepadPassthrough", "VR_WuWaGamepadSlot",
                 "VR_WuWaFocusedMotionInput", "VR_ControllersAllowed", "VR_FocusOnGamepadReconnect",
-                "VR_WuWaLguiRedirect", "VR_WuWaLguiMenuRedirect", "VR_WuWaUiWindowSize", "VR_WuWaNativeFrameTiming", "VR_WuWaWorldLabelsStereo",
+                "VR_WuWaLguiRedirect", "VR_WuWaLguiMenuRedirect", "VR_WuWaUiWindowSize", "VR_WuWaUiStoryWindowSize", "VR_WuWaNativeFrameTiming", "VR_WuWaWorldLabelsStereo",
                 "VR_WuWaDioramaScale", "VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset",
                 "VR_WuWaPlanarEyeParameters", "VR_WuWaStereoTranslucency",
                 "VR_WuWaHideKuroReflections", "VR_WuWaStereoBasePose", "WuWaStereo_SuppressNpcRim",

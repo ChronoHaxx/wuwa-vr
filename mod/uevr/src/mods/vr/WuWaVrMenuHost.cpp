@@ -178,7 +178,7 @@ nlohmann::json context() {
              "VR_MonoTheatreMode", "VR_HorizontalProjectionOverride", "VR_AutoCinema", "VR_DecoupledPitch",
              "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape", "WuWaControls_LensMatch",
              "WuWaControls_LensNearest", "WuWaControls_CloseUpNearClip", "WuWaControls_HideNearCharacters", "VR_WuWaDioramaScale",
-             "VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset", "VR_WuWaUiWindowSize",
+             "VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset", "VR_WuWaUiWindowSize", "VR_WuWaUiStoryWindowSize",
              "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
         if (auto* value = cached(key)) settings[key] = value->get();
     }
@@ -806,6 +806,14 @@ Page hud_page() {
             if (auto* request = cached("WuWaControls_ResetHudAspect")) request->set("true");
         };
         page.items.push_back(std::move(layout));
+        auto story = setting_toggle("Story scenes in 16:9",
+            "With the 16:9 layout off: story dialogue and story videos switch to 16:9 while they play, so story pictures "
+            "show whole, then the taller layout comes back. Uses the same detection as the automatic cinematic screen.",
+            "VR_WuWaUiStoryWindowSize");
+        story.enabled = [] {
+            return !VR::get()->is_wuwa_ui_window_size_enabled() && typed<bool>("VR_WuWaUiStoryWindowSize") != nullptr;
+        };
+        page.items.push_back(std::move(story));
     }
     // Only needed when the game lays out full VR's HUD at the eye's shape: with the
     // 16:9 layout the HUD is the flat game's 16:9 (WuWaLguiViewport.hpp).

@@ -170,9 +170,11 @@ end)
 -- Story pictures (lease-v3, automatic cinema only): the plot view's SprPhoto, found again per dialogue.
 local WIDGET = {displayName = "StrProperty", AttachParent = "ObjectProperty", Alpha = "FloatProperty",
     texture = "ObjectProperty", bIsUIActive = "BoolProperty"}
+-- As UEVR returns an FString: with its terminating NUL (ScriptUtility.cpp builds the
+-- string from the whole array; test 17h's exact match never found SprPhoto).
 local function widget(f, name, parent)
     local o = f.object(name, f.world)
-    o.displayName, o.AttachParent, o.Alpha, o.bIsUIActive = name, parent, 0, true
+    o.displayName, o.AttachParent, o.Alpha, o.bIsUIActive = name .. "\0", parent, 0, true
     o.get_class = function() return {find_property = function(_, key) return WIDGET[key] and prop(key, WIDGET[key]) or nil end} end
     return o
 end

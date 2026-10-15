@@ -134,9 +134,13 @@ function M.new(env)
         if performing == false then return "clear", "no plot" end
         return "unknown", "plot query returned no value"
     end
+    -- UEVR returns an FString with its terminating NUL ("SprPhoto\0"; test 17h never
+    -- matched), so the name ends at the first NUL.
     local function display_name(o)
         local name = property(o, o:get_class(), "displayName", "StrProperty")
-        return type(name) == "string" and name or nil
+        if type(name) ~= "string" then return nil end
+        local stop = name:find("\0", 1, true)
+        return stop and name:sub(1, stop - 1) or name
     end
     -- SprPhoto -> PnlAdjust -> PnlSafeZone -> UiView_Plot; other views may use the same name.
     local function in_plot_view(o)

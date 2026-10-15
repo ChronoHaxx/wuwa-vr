@@ -259,7 +259,8 @@ shown with alpha above zero and a `BgScene` texture, and back to alpha 0 with
 `T_CommonDefault_UI` afterwards (measured 15 Oct in main story 1-8). The view
 is rebuilt for every dialogue, so while the plot runs the detector looks for
 it again, 150 widgets per 100 ms tick (the game has about 900), and then reads
-only that widget. Sample bit 8, protocol `lease-v3`, automatic cinema only:
+only that widget. UEVR's Lua returns an FString with its terminating NUL, so
+the name is cut at the first NUL before comparing (17f to 17h never matched). Sample bit 8, protocol `lease-v3`, automatic cinema only:
 the story layout ignores it. A story video still wins (mono theatre). The
 choice is held for 1.2 s after a picture so the crossfade between two pictures
 does not flip the view.

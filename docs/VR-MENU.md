@@ -232,15 +232,21 @@ since test 3f (closer than the 2D shot).
   behind a head, outside the narrow 2D frame but inside the headset's wide view,
   so it filled one eye (Rover on the Abby balcony: the head 10-20 cm from the
   right eye). In close-ups, at each cut and about once a second while on, the
-  script reads up to 48 bones of each skeletal mesh drawn near the eyes. A
+  script reads up to 24 bones of up to 6 visible skeletal meshes of each
+  character near the eyes. Meshes are found by their world `Bounds` (a
+  background pass reads 64 a frame and keeps those within 8 m; hidden actors,
+  such as party members off the field, and zero-bounds templates are skipped):
+  `WasRecentlyRendered` was false for 425 of 428 meshes in a dialogue, people on
+  screen included, and reading all of them at once cost 14-18 ms. A
   character with a bone within 30 cm of either eye (after the close-up move) and
   no bone inside the 2D frame (16:9 at the game's FOV, 10 cm margin) leaves the
   main pass whole: every primitive component of its actor, so held props go
   too, while its shadow stays. Anything the game already hid is left alone. It
   comes back when a bone enters the 2D frame, at a cut that no longer qualifies
   it, when the close-up ends or when the option goes off. Props and scenery are
-  never hidden. Logged as `[WuWaHide] shot=... hiding|note at_eyes= in_frame=
-  hidden= bones= ms` and `[WuWaHide] shown again (why)`.
+  never hidden. Logged as `[WuWaHide] shot=... hiding|note [cut] at_eyes=
+  in_frame= hidden= meshes=near/kept bones= ms (pass n of listed meshes, ms)`
+  and `[WuWaHide] shown again (why)`.
 - **The note (`WuWaControls_NearHint`, default on):** with hiding off, a
   character found at your eyes at a cut sets `WuWaControls_NearSeen`, and the VR
   menu shows "Someone at your eyes" with the shortcut for 7 seconds, once per

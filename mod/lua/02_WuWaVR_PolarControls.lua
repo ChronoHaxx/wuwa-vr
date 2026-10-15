@@ -1514,9 +1514,52 @@ end
 -- longer qualifies it, when the close-up ends or when the option goes off.
 -- With the option off (the default), finding one asks the VR menu for a short
 -- note naming the shortcut (WuWaControls_NearSeen).
-local hider={owners={},next=0,reach=30,was_on=nil}
+--
+-- Which meshes: WasRecentlyRendered was false for 425 of 428 skeletal meshes in
+-- a dialogue (15 Oct sim), on-screen people included, so it is not used. The
+-- component's world Bounds (a plain property) finds those near the camera;
+-- hidden actors (the party members not on the field are parked hidden at the
+-- player) and hidden components are skipped. Bounds of blueprint templates are
+-- zero. Reading all ~400 meshes at once cost 14-18 ms, so a background pass reads
+-- 64 a frame and keeps those within 8 m; each judgement then reads only those.
+local hider={owners={},next=0,reach=30,was_on=nil,names={}}
+local nearby={set={},running=false,again=0,passes=0}
 local function hdist(a,b) return math.sqrt((a.x-b.x)^2+(a.y-b.y)^2+(a.z-b.z)^2) end
 local function hcount(set_) local n=0; for _ in pairs(set_) do n=n+1 end; return n end
+local function hclock() return os and os.clock and os.clock() or 0 end
+-- World bounds: centre and sphere radius, or nil (unreadable, or a template's zero bounds).
+function nearby.bounds(m)
+    local b=m.Bounds
+    if not b then return nil end
+    local c=b.Origin and point(b.Origin)
+    local r=b.SphereRadius
+    if not valid(c) or type(r)~="number" or not (r>0) then return nil end
+    return c,r
+end
+function nearby.start()
+    nearby.list=people.objects("Class /Script/Engine.SkeletalMeshComponent") or {}
+    nearby.i=1; nearby.found={}; nearby.running=true; nearby.pass_ms=0
+end
+function nearby.reset() nearby.set={}; nearby.list=nil; nearby.running=false; nearby.again=0 end
+-- Continue the pass by up to BUDGET meshes; true when it completes now.
+function nearby.step(pos,budget)
+    if not nearby.running then return false end
+    local t0=hclock()
+    local list,n=nearby.list,0
+    while nearby.i<=#list and n<budget do
+        local m=list[nearby.i]; nearby.i=nearby.i+1; n=n+1
+        pcall(function()
+            if not alive(m) then return end
+            local c,r=nearby.bounds(m)
+            if c and hdist(c,pos)-r<=800 then nearby.found[#nearby.found+1]=m end
+        end)
+    end
+    nearby.pass_ms=nearby.pass_ms+(hclock()-t0)*1000
+    if nearby.i<=#list then return false end
+    nearby.set,nearby.list,nearby.running=nearby.found,nil,false
+    nearby.listed=#list; nearby.passes=nearby.passes+1
+    return true
+end
 function hider.fname(name)
     if type(name)~="string" then return name end
     if hider.strlib==nil then
@@ -1534,9 +1577,18 @@ function hider.components(owner,path)
     local ok,list=pcall(function() return owner:K2_GetComponentsByClass(class) end)
     return ok and type(list)=="table" and #list>0 and list or nil
 end
-function hider.bone(m,i)
-    local p=point(m:GetSocketLocation(hider.fname(m:GetBoneName(i))))
-    return valid(p) and p or nil
+-- Up to 24 bone names per mesh, read once per mesh.
+function hider.bones(m)
+    local key=m:get_address()
+    local names=hider.names[key]
+    if names then return names end
+    names={}
+    local n=m:GetNumBones()
+    if type(n)=="number" and n>0 then
+        for i=0,n-1,math.max(1,math.floor(n/24)) do names[#names+1]=hider.fname(m:GetBoneName(i)) end
+    end
+    hider.names[key]=names
+    return names
 end
 -- The two eyes: the game camera, moved by Close-up match, 3.2 cm to each side.
 function hider.eyes(ctx,fr)
@@ -1544,16 +1596,19 @@ function hider.eyes(ctx,fr)
     local b={x=ctx.pos.x+f.x*ctx.dolly,y=ctx.pos.y+f.y*ctx.dolly,z=ctx.pos.z+f.z*ctx.dolly}
     return {{x=b.x-fr.right.x*3.2,y=b.y-fr.right.y*3.2,z=b.z},{x=b.x+fr.right.x*3.2,y=b.y+fr.right.y*3.2,z=b.z}}
 end
--- Near an eye, and inside the 2D frame, over every skeletal mesh of the character
--- (hair, clothes and body are separate meshes), up to 48 bones each.
+-- Near an eye, and inside the 2D frame, over the character's visible skeletal
+-- meshes (hair, clothes and body are separate meshes; at most 6).
 function hider.judge(e,fr,eyes)
     local list=hider.components(e.owner,"Class /Script/Engine.SkeletalMeshComponent") or e.meshes
-    local near,count=false,0
+    local near,count,used=false,0,0
     for _,m in ipairs(list) do
-        local okn,n=pcall(function() return m:GetNumBones() end)
-        if okn and type(n)=="number" and n>0 then
-            for i=0,n-1,math.max(1,math.floor(n/48)) do
-                local ok,pt=pcall(hider.bone,m,i)
+        if used>=6 then break end
+        local okv,shown=pcall(function() return m.bVisible~=false and m.bHiddenInGame~=true end)
+        if okv and shown then
+            used=used+1
+            local okn,names=pcall(hider.bones,m)
+            for _,name in ipairs(okn and names or {}) do
+                local ok,pt=pcall(function() local p=point(m:GetSocketLocation(name)); return valid(p) and p or nil end)
                 if ok and pt then
                     count=count+1
                     if hdist(pt,eyes[1])<hider.reach or hdist(pt,eyes[2])<hider.reach then near=true end
@@ -1567,20 +1622,22 @@ end
 function hider.find(ctx)
     local fr=people.frame(ctx.pos,ctx.rot,ctx.fov)
     local eyes=hider.eyes(ctx,fr)
-    local owners={}
-    for i,m in ipairs(people.objects("Class /Script/Engine.SkeletalMeshComponent") or {}) do
-        if i>1500 then break end
+    local owners,meshes={},0
+    for _,m in ipairs(nearby.set) do
         pcall(function()
-            if m:WasRecentlyRendered(0.25)~=true then return end
-            local c,r,h=people.body({object=m,source="mesh"})
-            if not c or math.min(hdist(c,eyes[1]),hdist(c,eyes[2]))-math.max(r,h)-20>hider.reach then return end
-            local owner=m:GetOwner()
+            if not alive(m) then return end
+            local c,r=nearby.bounds(m)
+            if not c or math.min(hdist(c,eyes[1]),hdist(c,eyes[2]))-r>hider.reach then return end
+            if m.bVisible==false or m.bHiddenInGame==true then return end
+            local owner=m:get_outer()
+            if owner and owner.bHidden==true then return end
+            meshes=meshes+1
             local key=owner and owner:get_address() or m:get_address()
             owners[key]=owners[key] or {owner=owner,meshes={}}
             table.insert(owners[key].meshes,m)
         end)
     end
-    -- Hidden characters are not drawn, so they are judged again from what was kept.
+    -- Hidden characters are judged again from what was kept.
     for key,e in pairs(hider.owners) do if not owners[key] then owners[key]={owner=e.owner,meshes=e.meshes} end end
     local hide,framed,bones={},{},0
     for key,e in pairs(owners) do
@@ -1588,7 +1645,7 @@ function hider.find(ctx)
         bones=bones+n
         if inside then framed[key]=true elseif near then hide[key]=e end
     end
-    return hide,framed,bones
+    return hide,framed,bones,meshes
 end
 function hider.hide(key,e)
     local done={}
@@ -1615,15 +1672,25 @@ function hider.tick(ctx)
     local on=enabled("WuWaControls_HideNearCharacters")
     if on~=hider.was_on then hider.was_on=on; hider.next=0 end
     if not on then hider.restore("off") end
-    if not ctx then hider.restore("close-up ended"); hider.next=0; return end
+    if not ctx then
+        hider.restore("close-up ended"); hider.next=0
+        if nearby.running or #nearby.set>0 then nearby.reset(); hider.names={} end
+        return
+    end
     if not (on or enabled("WuWaControls_NearHint")) then return end
+    -- A new pass at each cut and about every 2 s; judged again when one ends.
+    if ctx.cut or (not nearby.running and ctx.frames>=nearby.again) then nearby.start() end
     if ctx.cut then hider.next=0 end
+    if nearby.step(ctx.pos,64) then
+        nearby.again=ctx.frames+64
+        if hider.pending then hider.pending=false; hider.next=0 end
+    end
     if ctx.frames<hider.next then return end
-    -- At each cut; within a shot about once a second while hiding is on (the note needs only cuts).
+    -- At each cut and the pass after it; within a shot about once a second while hiding is on.
     hider.next=on and ctx.frames+32 or math.huge
-    local clock=os and os.clock
-    local t0=clock and clock() or 0
-    local hide,framed,bones=hider.find(ctx)
+    hider.pending=nearby.running
+    local t0=hclock()
+    local hide,framed,bones,meshes=hider.find(ctx)
     if on then
         for key in pairs(hider.owners) do
             if framed[key] or (ctx.cut and not hide[key]) then hider.show(key) end
@@ -1632,10 +1699,11 @@ function hider.tick(ctx)
     elseif next(hide)~=nil then
         set("WuWaControls_NearSeen","1")
     end
-    if ctx.cut or next(hide)~=nil then
-        functions.log_info(string.format("[WuWaHide] shot=%d %s at_eyes=%d in_frame=%d hidden=%d bones=%d %.1f ms",
-            lens.shot,on and "hiding" or "note",hcount(hide),hcount(framed),hcount(hider.owners),bones,
-            clock and (clock()-t0)*1000 or -1))
+    if ctx.cut or next(hide)~=nil or next(hider.owners)~=nil then
+        functions.log_info(string.format(
+            "[WuWaHide] shot=%d %s%s at_eyes=%d in_frame=%d hidden=%d meshes=%d/%d bones=%d %.1f ms (pass %d of %s meshes, %.1f ms)",
+            lens.shot,on and "hiding" or "note",ctx.cut and " cut" or "",hcount(hide),hcount(framed),hcount(hider.owners),
+            meshes,#nearby.set,bones,(hclock()-t0)*1000,nearby.passes,tostring(nearby.listed or "-"),nearby.pass_ms or 0))
     end
 end
 -- At a cut: the subject is the game's real focus, or nothing (the eye stays at

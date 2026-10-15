@@ -81,9 +81,12 @@ local function world(f)
         return c.path:find('Skeletal') and meshes or {}
     end}}
     local next_address=1000
-    function f:person(name,bones)
+    -- opts.parked: the actor is hidden (a party member off the field); opts.template:
+    -- zero bounds, like a blueprint's component template.
+    function f:person(name,bones,opts)
+        opts=opts or {}
         next_address=next_address+10
-        local owner={name=name,address=next_address}
+        local owner={name=name,address=next_address,bHidden=opts.parked==true}
         function owner:get_address() return self.address end
         local function prim(main)
             local c={bRenderInMainPass=main,calls=0,address=next_address+#meshes+1}
@@ -91,10 +94,16 @@ local function world(f)
             function c:SetRenderInMainPass(v) self.bRenderInMainPass=v; self.calls=self.calls+1 end
             return c
         end
-        local m=prim(true); m.bones=bones
-        function m:WasRecentlyRendered() return self.bRenderInMainPass end
-        function m:K2_GetComponentLocation() local b=self.bones[1]; return {X=b.x,Y=b.y,Z=b.z-85} end
-        function m:GetOwner() return owner end
+        local m=prim(true); m.bones=bones; m.bVisible=true; m.bHiddenInGame=false
+        -- World bounds follow the first bone, 60 cm around it.
+        setmetatable(m,{__index=function(self,k)
+            if k=='Bounds' then
+                local b=self.bones[1]
+                if opts.template then return {Origin={X=0,Y=0,Z=0},SphereRadius=0} end
+                return {Origin={X=b.x,Y=b.y,Z=b.z},SphereRadius=60}
+            end
+        end})
+        function m:get_outer() return owner end
         function m:GetNumBones() return #self.bones end
         function m:GetBoneName(i) return 'b'..i end
         function m:GetSocketLocation(n) local b=self.bones[tonumber(n:sub(2))+1]; return {X=b.x,Y=b.y,Z=b.z} end
@@ -175,7 +184,7 @@ test('with hiding on, only a character at the eyes and out of the flat shot is h
     eq(intruder.off.calls,0,'calls on a part the game itself hides')
     eq(intruder.mesh.calls,1,'calls to hide the mesh')
     local logged=false
-    for _,line in ipairs(f.logs) do if line:find('%[WuWaHide%] shot=1 hiding at_eyes=1 in_frame=1 hidden=1') then logged=true end end
+    for _,line in ipairs(f.logs) do if line:find('%[WuWaHide%] shot=1 hiding cut at_eyes=1 in_frame=1 hidden=1') then logged=true end end
     assert(logged,'no hide log line for the shot')
     eq(f.values[SEEN],nil,'note request while hiding is on')
 end)
@@ -210,6 +219,22 @@ test('with hiding off (the default) nothing is hidden and the menu is asked for 
     eq(f.values[SEEN],nil,'note request for a framed character')
     f=world(fixture()); f.values.WuWaControls_NearHint='false'; f:person('intruder',AT_EYE); f:frames(3)
     eq(f.values[SEEN],nil,'note request with the note switched off')
+end)
+test('a parked party member and a blueprint template at the eye are left alone',function()
+    local f=world(fixture()); f.values[HIDE]='true'
+    local parked=f:person('parked',AT_EYE,{parked=true})
+    local template=f:person('template',AT_EYE,{template=true})
+    f:frames(3)
+    eq(parked.mesh.calls+template.mesh.calls,0,'calls on a hidden actor or a template')
+    f.values[HIDE]='false'; f.values.WuWaControls_NearHint='true'; f:frames(3)
+    eq(f.values[SEEN],nil,'note request for a hidden actor or a template')
+end)
+test('meshes are read 64 a frame: a character is judged once the pass reaches it, crowd or not',function()
+    local f=world(fixture()); f.values[HIDE]='true'
+    for i=1,150 do f:person('far'..i,{{x=400+i,y=0,z=0}}) end
+    local a=f:person('intruder',AT_EYE)
+    f:frames(1); assert(shown(a),'judged before its mesh was read')   -- first pass: 64 of 151 meshes
+    f:frames(2); assert(hidden(a),'not hidden once the pass reached it')
 end)
 test('LT + RT, then Y switches hiding; a Y meant for the game is left alone',function()
     local f=fixture()

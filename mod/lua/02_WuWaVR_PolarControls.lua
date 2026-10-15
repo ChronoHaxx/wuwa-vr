@@ -16,6 +16,7 @@ local card_sent = ""
 local status, last_error = "Polar controls ready; game camera unchanged.", nil
 local mesh_mode, camera_mode, last_pawn, mesh_revision = -1, -1, nil, -1
 local camera_late=false
+local height_reset_held=false -- L3 + Y + X is down (resets the camera height once)
 local camera_motion=-1
 local prior_motion=2
 local stick_view_until=-100
@@ -1155,12 +1156,17 @@ local function tick(_,delta)
             set("UI_Y_Offset",math.max(-10,math.min(10,number("UI_Y_Offset",0,-10,10)+(has(p.wButtons,B.RB) and 1 or -1)*delta*0.5)))
         end
     elseif p and not menu and not adjust and (mode==1 or mode==3) then
+        local key=mode==3 and "WuWaControls_FirstUp" or "WuWaControls_FixedHeight"
+        local default=mode==3 and 0 or 30
         if has(p.wButtons,B.L3) and has(p.wButtons,B.Y)~=has(p.wButtons,B.X) then
-            local key=mode==3 and "WuWaControls_FirstUp" or "WuWaControls_FixedHeight"
             local maximum=mode==3 and 100 or 400
             local speed=mode==3 and 15 or 60
-            set(key,math.max(-100,math.min(maximum,number(key,mode==3 and 0 or 30,-100,maximum)+(has(p.wButtons,B.Y) and 1 or -1)*delta*speed)))
+            set(key,math.max(-100,math.min(maximum,number(key,default,-100,maximum)+(has(p.wButtons,B.Y) and 1 or -1)*delta*speed)))
         end
+        -- L3 + Y + X together: this camera's height back to its default, once per press.
+        local both=has(p.wButtons,B.L3) and has(p.wButtons,B.Y) and has(p.wButtons,B.X)
+        if both and not height_reset_held then set(key,default) end
+        height_reset_held=both
         if mode==1 and has(p.wButtons,B.LB) and (p.bLeftTrigger>=30 or p.bRightTrigger>=30) then
             set("WuWaControls_FixedDistance",math.max(-100,math.min(1500,number("WuWaControls_FixedDistance",150,-100,1500)+(p.bLeftTrigger-p.bRightTrigger)/255*delta*120)))
         end

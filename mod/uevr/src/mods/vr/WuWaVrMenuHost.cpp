@@ -645,7 +645,8 @@ Page camera_page() {
         page.items.push_back(paragraph("Fixed third person", true));
         page.items.push_back(setting_slider("Distance", "How far behind your character the camera stays, in game units (centimetres).",
             "WuWaControls_FixedDistance", 0.0f, 1000.0f, 10.0f, "%.0f"));
-        page.items.push_back(setting_slider("Height", "How high above your character the camera sits, in game units.",
+        page.items.push_back(setting_slider("Height", "How high above your character the camera sits, in game units. "
+            "In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.",
             "WuWaControls_FixedHeight", -100.0f, 400.0f, 5.0f, "%.0f"));
         break;
     case 2:
@@ -670,6 +671,9 @@ Page camera_page() {
         page.items.push_back(setting_choice("Your body",
             "What you see of your own character. Hiding the head stops it from blocking the view.",
             "WuWaControls_MeshMode", {"Show all", "Hide body", "Hide head", "Hide body, keep shadow", "Hide head, full shadow"}));
+        page.items.push_back(setting_slider("Height", "How far above or below your character's eyes your view sits. "
+            "In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.",
+            "WuWaControls_FirstUp", -100.0f, 100.0f, 1.0f, "%+.0f cm"));
         auto level = setting_toggle("Level horizon", "Keeps the horizon level in first person. Custom motion only.", "WuWaControls_LevelFirstPerson");
         level.enabled = [] {
             auto* motion = typed<int32_t>("WuWaControls_FirstMotion");

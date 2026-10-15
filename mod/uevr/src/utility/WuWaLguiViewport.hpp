@@ -16,6 +16,7 @@
 // player camera, sized by the window, independent of the canvas; left alone.
 // Test 12 (14 Oct 2026) hooked only the first three: controller buttons in the
 // Terminal clicked at eye-sized pixel positions and missed.
+#include <array>
 #include <atomic>
 #include <cstdint>
 
@@ -29,9 +30,25 @@ struct State {
     // Diagnostics only (VR_WuWaUiWindowSizeSites, never saved): finds which reader a game
     // system depends on (15 Oct: the Resonators floor reflection froze in 16:9 only).
     std::atomic<uint32_t> sites{0x1f};
+    // GetViewportSize (site 2) by caller, for the same test: calls per caller (the direct calls
+    // below, then any other) and bit n lets caller n have the window size (VR_WuWaUiViewportCallers,
+    // never saved). Without site 2 the reflection is live but the layout breaks, so one caller is it.
+    std::array<std::atomic<uint32_t>, 9> callers{};
+    std::atomic<uint32_t> caller_mask{0x1ff};
 };
 // Read by hook stubs until process exit; never destroyed.
 inline State& state() { static auto* value = new State{}; return *value; }
+// Return addresses (RVA) of the eight direct calls to GetViewportSize (0xc668c0) in the 3.7 client.
+inline constexpr std::array<uintptr_t, 8> viewport_size_returns{
+    0xccd90c, 0xdbb1cf, 0xdd2cb5, 0xdd2d08, 0xdd461f, 0xe0d438, 0x2261c1e, 0x2860cdd};
+// Counts the call and says whether this caller gets the window size.
+inline bool allow_caller(uintptr_t return_rva) noexcept {
+    uint32_t caller = 8;
+    for (uint32_t i = 0; i < viewport_size_returns.size(); ++i) if (viewport_size_returns[i] == return_rva) caller = i;
+    auto& s = state();
+    s.callers[caller].fetch_add(1, std::memory_order_relaxed);
+    return (s.caller_mask.load(std::memory_order_relaxed) >> caller) & 1u;
+}
 
 inline bool installed() noexcept { return state().installed.load(std::memory_order_acquire); }
 // True while full VR's screen UI is laid out at the window size.

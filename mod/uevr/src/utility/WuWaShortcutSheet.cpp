@@ -343,6 +343,7 @@ struct Row {
     const char* state;
     ImU32 state_color;
     bool dim = false;       // does nothing in the current camera
+    const char* note = nullptr; // a smaller second line under the label
 };
 void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, const Row& row) {
     constexpr float w = 440.0f, h = 62.0f, key_px = 26.0f;
@@ -363,7 +364,12 @@ void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, con
     const float state_w = row.state ? pill_width(c, row.state, 18.0f) + 12.0f : 0.0f;
     const float text_w = w - 32.0f - keys - 16.0f - state_w;
     const float text_x = left ? x + 16.0f + state_w : x + 16.0f + keys + 16.0f;
-    draw_fit(c, fit(c, row.english, 27.0f, text_w), text_x, middle, row.dim ? muted : ink, left ? 1.0f : 0.0f, text_w);
+    if (row.note) {
+        draw_fit(c, fit(c, row.english, 25.0f, text_w, false), text_x, middle - 12.0f, row.dim ? muted : ink, left ? 1.0f : 0.0f, text_w);
+        draw_fit(c, fit(c, row.note, 19.0f, text_w, false), text_x, middle + 14.0f, row.dim ? muted : accent, left ? 1.0f : 0.0f, text_w);
+    } else {
+        draw_fit(c, fit(c, row.english, 27.0f, text_w), text_x, middle, row.dim ? muted : ink, left ? 1.0f : 0.0f, text_w);
+    }
     if (row.state) pill(c, left ? x + 16.0f : x + w - 16.0f - state_w + 12.0f, middle, 18.0f, row.state, row.state_color);
     // Leader: out from the box, then straight to the button's edge.
     const ImVec2 start = c.at(left ? x + w : x, middle), bend = c.at(left ? x + w + 16.0f : x - 16.0f, middle);
@@ -396,9 +402,9 @@ void l3_card(const Canvas& c, const CardState& st) {
         {"RT", N_("Diorama (10\xC3\x97)"), st.rt, 458, 39, 17, st.diorama ? N_("On") : nullptr, green},
         {"RB", N_("Game / fixed camera"), held(rb), 458, 74, 12, st.fixed_camera ? N_("Fixed") : nullptr, green},
         {"Menu", N_("Keep this card open"), held(menu), 357, 158.5f, 9, st.pinned ? N_("Pinned") : nullptr, green},
-        // Y / X only move the camera in first person and the fixed camera.
-        {"YX", camera_moves ? N_("Camera up / down") : N_("Camera up / down: first person, fixed camera"),
-            held(button_x | button_y), 439, 151, 0, nullptr, 0, !camera_moves},
+        // Y / X only move the camera in first person and the fixed camera; both together reset it.
+        {"YX", N_("Camera up / down"), held(button_x | button_y), 439, 151, 0, nullptr, 0, !camera_moves,
+            camera_moves ? N_("Y + X together: back to default") : N_("Only in first person and the fixed camera")},
         {"B", N_("Show / hide game UI"), held(button_b), 490, 168, 17, st.ui_hidden ? N_("Hidden") : nullptr, red},
         {"A", N_("Recenter view"), held(button_a), 456, 202, 17, nullptr, 0},
         {"R3", N_("WuWa VR menu"), held(r3), 388, 244, 25, nullptr, 0},

@@ -392,6 +392,9 @@ public:
     uint32_t wuwa_ui_window_size_sites() const {
         return static_cast<uint32_t>(m_wuwa_ui_window_size_sites->value()) & 0x1fu;
     }
+    uint32_t wuwa_ui_viewport_callers() const {
+        return static_cast<uint32_t>(m_wuwa_ui_viewport_callers->value()) & 0x1ffu;
+    }
 
     bool is_wuwa_lgui_menu_redirect_enabled() const {
         return m_wuwa_lgui_menu_redirect->value();
@@ -1308,6 +1311,7 @@ public:
             *m_wuwa_ui_window_size,
             *m_wuwa_ui_story_window_size,
             *m_wuwa_ui_window_size_sites,
+            *m_wuwa_ui_viewport_callers,
             *m_wuwa_lgui_menu_redirect,
             *m_wuwa_world_labels,
             *m_wuwa_planar_eye_parameters,
@@ -1394,6 +1398,9 @@ private:
     };
     const std::unique_ptr<TransientInt32> m_wuwa_ui_window_size_sites{
         std::make_unique<TransientInt32>(generate_name("WuWaUiWindowSizeSites"), 31) };
+    // Diagnostics, never saved: bit n lets GetViewportSize caller n have the window size.
+    const std::unique_ptr<TransientInt32> m_wuwa_ui_viewport_callers{
+        std::make_unique<TransientInt32>(generate_name("WuWaUiViewportCallers"), 511) };
     const ModToggle::Ptr m_wuwa_lgui_menu_redirect{ ModToggle::create(generate_name("WuWaLguiMenuRedirect"), false) };
     const ModToggle::Ptr m_wuwa_world_labels{ ModToggle::create(generate_name("WuWaWorldLabelsStereo"), false) };
     const ModToggle::Ptr m_wuwa_planar_eye_parameters{ ModToggle::create(generate_name("WuWaPlanarEyeParameters"), false) };

@@ -71,9 +71,11 @@ nothing.
 - The WuWa VR menu's **HUD** page has **Controls cards** (on / off), **Keep the
   controls card open**, **Card size**, **Card height** (degrees below your line
   of sight; more is lower) and **Card distance**.
-- **Y / X** move the camera up and down in first person and the fixed camera.
-  In the game camera they do nothing (the card greys that row out), and with L3
-  held they never reach the game.
+- **Y / X** move the camera up and down in first person and the fixed camera;
+  **Y + X together** put that camera's height back to its default (first
+  person 0, fixed camera 30). In the game camera they do nothing (the card greys
+  that row out and says where they work), and with L3 held they never reach the
+  game. The heights are also on the Camera page (Height), where X resets them.
 - On the first three launches, a one-line tip below your view says how to find
   the cards. After a view switch, a line shows for 3 seconds with how to go on
   or come back. It shows for the first 5 switches and then turns itself off;
@@ -267,6 +269,7 @@ cursor flag, so the smaller hint remains available. **L3 + B** restores the UI.
 | Input | Action |
 | --- | --- |
 | L3 + Y / X | Raise/lower the first-person or fixed camera |
+| L3 + Y + X | That camera's height back to its default |
 | LB + LT / RT | Fixed camera farther/closer |
 | L3 + View | Leave/enter first person |
 | L3 + RB | Leave/enter fixed camera |

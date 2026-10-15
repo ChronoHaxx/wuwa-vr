@@ -838,6 +838,12 @@ inline constexpr std::array<ViewportSite, 5> viewport_sites{{
 }};
 template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
     constexpr auto site = viewport_sites[I];
+    if constexpr (I == 2) {
+        // GetViewportSize pushes r14 and reserves 0x130 (fingerprinted with the function), so its
+        // return address is at rsp + 0x138 here.
+        const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
+        if (!wuwa_lgui_viewport::allow_caller(ret - state().base)) return;
+    }
     wuwa_lgui_viewport::rewrite(site.rbp ? c.rbp : c.rsp, site.offset, static_cast<uint32_t>(I));
 }
 
@@ -992,8 +998,11 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
             {
                 const auto& v = wuwa_lgui_viewport::state();
                 const auto size = v.size.load(std::memory_order_relaxed);
-                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={}", v.installed.load(),
-                    size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed));
+                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} sites={:x} callers={:x} "
+                    "by_caller={},{},{},{},{},{},{},{},{}", v.installed.load(),
+                    size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed), v.sites.load(),
+                    v.caller_mask.load(), v.callers[0].load(), v.callers[1].load(), v.callers[2].load(), v.callers[3].load(),
+                    v.callers[4].load(), v.callers[5].load(), v.callers[6].load(), v.callers[7].load(), v.callers[8].load());
             }
             spdlog::info("[WuWaLguiRedirect] stage3 ready={} calls={} empty={} redirected={} fitted={} capture_suppressed={} capture_pending={}",
                 s.menu_ready.load(), s.stage3_calls.load(), s.stage3_empty.load(), s.stage3_redirected.load(), s.stage3_fitted.load(),

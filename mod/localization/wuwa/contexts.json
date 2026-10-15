@@ -361,9 +361,6 @@
     "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
-  "Camera up / down: first person, fixed camera": [
-    "utility/WuWaShortcutSheet.cpp"
-  ],
   "Camera view": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1158,6 +1155,9 @@
   "How big the world feels. Above 1 makes you smaller. Diorama uses its own scale and leaves this alone.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "How far above or below your character's eyes your view sits. In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "How far away the HUD sits. Its stereo depth follows this distance.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1176,7 +1176,7 @@
   "How fast the freecam turns.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "How high above your character the camera sits, in game units.": [
+  "How high above your character the camera sits, in game units. In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "How large the game's HUD and menus appear.": [
@@ -1713,6 +1713,9 @@
   ],
   "On: your settings are saved whenever this menu opens or closes. Off: try things freely; nothing is saved, and the game starts with your saved settings next time. Turning it back on saves what you have now. For each setting, the help at the bottom says whether it is saved and what its default is.": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Only in first person and the fixed camera": [
+    "utility/WuWaShortcutSheet.cpp"
   ],
   "Only slot 0": [
     "mods/VR.hpp"
@@ -2763,6 +2766,9 @@
   ],
   "Xbox / Steam Input has priority; direct PlayStation shortcuts are waiting": [
     "utility/WuWaPlayStationHid.hpp"
+  ],
+  "Y + X together: back to default": [
+    "utility/WuWaShortcutSheet.cpp"
   ],
   "Yaw rate (degrees / second)": [
     "mods/vr/WuWaControlsComponent.cpp"

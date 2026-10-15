@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <cstring>
 #include <set>
 #include <unordered_map>
 
@@ -223,14 +224,29 @@ namespace {
 std::set<std::string> missing;
 size_t missing_written=SIZE_MAX;
 std::string missing_language;
+// Text a translator would change: a letter outside printf specifiers ("%.2f" alone is a
+// number), and not a language's own name (the picker shows each language in itself).
+bool needs_words(std::string_view english) {
+    for(const auto& n : natives) if(english==n.name) return false;
+    for(size_t i=0;i<english.size();++i) {
+        const char c=english[i];
+        if(c=='%') {
+            if(i+1<english.size() && english[i+1]=='%') { ++i; continue; }
+            while(i+1<english.size() && std::strchr("-+ #0123456789.*hlLzjt",english[i+1])) ++i;
+            ++i; // the conversion letter
+            continue;
+        }
+        if((c>='A'&&c<='Z')||(c>='a'&&c<='z')) return true;
+    }
+    return false;
+}
 std::string lookup(std::string_view english,bool record) {
     std::scoped_lock lock{mutex};
     const auto found=strings.find(std::string(english));
     if(found!=strings.end()) return found->second;
     if(record && active!="en") {
         if(missing_language!=active) { missing.clear(); missing_language=active; missing_written=SIZE_MAX; }
-        const bool letters=std::any_of(english.begin(),english.end(),[](char c){return (c>='A'&&c<='Z')||(c>='a'&&c<='z');});
-        if(letters && missing.size()<4000 && english.size()<=600) missing.emplace(english);
+        if(needs_words(english) && missing.size()<4000 && english.size()<=600) missing.emplace(english);
     }
     return std::string(english);
 }

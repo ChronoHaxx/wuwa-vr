@@ -41,7 +41,7 @@ CALLS = {
     'tr': [0], 'text': [0], 'label': [0], 'translate': [0],
     'TextWrapped': [0], 'Text': [0], 'TextColored': [1], 'TextUnformatted': [0], 'Button': [0],
     'TreeNode': [0], 'CollapsingHeader': [0], 'TableSetupColumn': [0], 'Combo': [0], 'draw': [1],
-    'setting_toggle': [0, 1], 'setting_slider': [0, 1], 'setting_int_slider': [0, 1], 'setting_choice': [0, 1, 3],
+    'setting_toggle': [0, 1], 'setting_slider': [0, 1, 6], 'setting_int_slider': [0, 1, 6], 'setting_choice': [0, 1, 3],
     'action': [0, 1], 'paragraph': [0], 'menu_angle_slider': [0, 1], 'make': [1, 2],
     'header': [1, 2], 'rich': [5], 'pieces': [0], 'fit': [1], 'pill': [4], 'pill_width': [1], 'centered': [5],
     'draw_tip': [3, 4], 'draw_note': [3, 4, 5], 'N_': [0], 'format': [0],
@@ -269,6 +269,22 @@ def extract():
                 args = arguments(toks, i + 1)
                 if member and len(args) > 1:
                     combos.setdefault(member, []).append(([t[1] for t in args[1] if t[0] == 'str'], rel))
+                continue
+            # VR menu rows built by hand: item.choices = {"Front", ...}, choices.push_back("Done")
+            # and item.format = "%.0f deg" (units are translated with their number).
+            if value == 'choices' and nxt == ('p', '=') and i + 2 < len(toks) and toks[i + 2] == ('p', '{'):
+                for arg in arguments(toks, i + 2):
+                    for kind2, text in arg:
+                        if kind2 == 'str':
+                            add(text)
+                continue
+            if value == 'push_back' and nxt == ('p', '(') and i >= 2 and toks[i - 2] == ('id', 'choices'):
+                for kind2, text in (arguments(toks, i + 1) or [[]])[0]:
+                    if kind2 == 'str':
+                        add(text)
+                continue
+            if value == 'format' and nxt == ('p', '=') and i >= 1 and toks[i - 1] == ('p', '.') and                     i + 2 < len(toks) and toks[i + 2][0] == 'str':
+                add(toks[i + 2][1])
                 continue
             qualifier = toks[i - 3][1] if i >= 3 and toks[i - 2] == ('p', ':') and toks[i - 1] == ('p', ':') else None
             if value == 'draw' and qualifier == 'wuwa_ui' and nxt == ('p', '('):

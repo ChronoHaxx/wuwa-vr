@@ -30,6 +30,14 @@ std::vector<Language> languages();
 // A language's own name (日本語, Deutsch...), ready to draw in the current menu.
 std::string native_name(std::string_view id);
 std::string translate(std::string_view english);
+// Like translate, but never recorded as missing: text built at run time (status lines
+// with values) that may or may not be a catalog entry.
+std::string translate_quiet(std::string_view english);
+// Text with letters that reached translate() in a non-English language and had no
+// translation, since the language loaded (at most 4000). For test sessions and checks:
+// write_missing() saves them to a file when the set changed; true when it wrote.
+std::vector<std::string> missing_strings();
+bool write_missing(const std::filesystem::path& file);
 std::string visual(std::string_view logical);
 std::string text(std::string_view english);
 std::string label(std::string_view english);

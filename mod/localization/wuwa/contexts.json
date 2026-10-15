@@ -1,4 +1,34 @@
 {
+  "%+.0f cm": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%+.2f m": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%.0f cm": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%.0f deg": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%.0fx": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%.1f m": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%.1fx": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%.2f m": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%.2fx": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "%.3fx": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "%s: %u samples": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -188,7 +218,8 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Automatic": [
-    "mods/VR.hpp"
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Automatic cinematic screen": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -242,6 +273,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Back to the game camera.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Black bars": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Black bars in cutscenes? In WuWa's graphics settings, change Cinematic from Cutscene to Fullscreen. The bars go and cutscenes fill your view.": [
@@ -319,6 +353,9 @@
   ],
   "Camera customization": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Camera position": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Camera up / down": [
     "mod/controls.json",
@@ -435,6 +472,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Controllers": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Controls": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Controls cards": [
@@ -565,6 +605,9 @@
   "Do: ": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Done": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Double L3  Windows screenshot": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -642,6 +685,9 @@
   ],
   "Extract game HUD into the VR panel": [
     "mods/VR.cpp"
+  ],
+  "Eyes don't match": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "FPV camera upward tilt (degrees)": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -826,6 +872,9 @@
   "Freecam: rise / descend": [
     "mod/controls.json"
   ],
+  "Front": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Full VR": [
     "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp",
@@ -951,6 +1000,9 @@
   ],
   "HUD nearer / farther": [
     "mod/controls.json"
+  ],
+  "HUD or menu": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "HUD placement and visibility": [
     "mods/VR.cpp"
@@ -1193,6 +1245,9 @@
   "Joint inspector (left-eye preview)": [
     "mods/vr/runtimes/OpenXR.cpp"
   ],
+  "Just mark the moment": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Keep WuWa VR Launcher running to record from here. Its browser tab can be closed.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1408,6 +1463,9 @@
     "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Left": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Left / right": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1457,6 +1515,9 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Looks wrong? Hold LT + RT, then click R3 for the next view (stereo screen, then mono).": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Low": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Lower eye level by 5": [
@@ -1991,6 +2052,9 @@
   "Returns Windows XInput unchanged, bypassing VR and Lua gamepad processing. Use Insert and the mouse for this settings panel; gamepad shortcuts and VR controller mapping are unavailable in this mode.": [
     "mods/VR.cpp"
   ],
+  "Right": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Right / left": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2145,16 +2209,20 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Slot 0": [
-    "mods/VR.hpp"
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Slot 1": [
-    "mods/VR.hpp"
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Slot 2": [
-    "mods/VR.hpp"
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Slot 3": [
-    "mods/VR.hpp"
+    "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Smooth camera tilt": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -2184,6 +2252,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Soft contact shadows in corners and under objects. On by default. It keeps the game's own setting and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer. Off is a little faster.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Something else": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Speed": [
@@ -2318,6 +2389,9 @@
   ],
   "Streamer privacy: cover player IDs": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Stutter or freeze": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Swap the eyes' poses and projections (stereo looks inverted)": [
     "mods/vr/WuWaControlsComponent.cpp"

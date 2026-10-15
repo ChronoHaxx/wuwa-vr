@@ -25,6 +25,10 @@ struct State {
     // Window size as (width << 32 | height); 0 leaves the game's rect alone.
     std::atomic<uint64_t> size{0};
     std::atomic<uint64_t> rewrites{0};
+    // Bit n lets site n rewrite (WuWaLguiRedirect.hpp viewport_sites); all five by default.
+    // Diagnostics only (VR_WuWaUiWindowSizeSites, never saved): finds which reader a game
+    // system depends on (15 Oct: the Resonators floor reflection froze in 16:9 only).
+    std::atomic<uint32_t> sites{0x1f};
 };
 // Read by hook stubs until process exit; never destroyed.
 inline State& state() { static auto* value = new State{}; return *value; }
@@ -39,10 +43,10 @@ inline void update(bool enable, uint32_t width, uint32_t height) noexcept {
 }
 
 // The engine call filled a local FIntRect {min x, min y, max x, max y} at frame + offset.
-inline void rewrite(uintptr_t frame, uint32_t offset) noexcept {
+inline void rewrite(uintptr_t frame, uint32_t offset, uint32_t site) noexcept {
     auto& s = state();
     const auto size = s.size.load(std::memory_order_acquire);
-    if (!size) return;
+    if (!size || !((s.sites.load(std::memory_order_relaxed) >> site) & 1u)) return;
     auto* rect = reinterpret_cast<int32_t*>(frame + offset);
     if (rect[2] <= rect[0] || rect[3] <= rect[1]) return; // no projection data: keep the game's fallback
     rect[0] = 0;

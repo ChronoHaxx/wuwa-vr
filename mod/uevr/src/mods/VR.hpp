@@ -381,6 +381,9 @@ public:
     bool is_wuwa_ui_window_size_enabled() const {
         return m_wuwa_ui_window_size->value();
     }
+    uint32_t wuwa_ui_window_size_sites() const {
+        return static_cast<uint32_t>(m_wuwa_ui_window_size_sites->value()) & 0x1fu;
+    }
 
     bool is_wuwa_lgui_menu_redirect_enabled() const {
         return m_wuwa_lgui_menu_redirect->value();
@@ -1295,6 +1298,7 @@ public:
             *m_wuwa_focused_motion,
             *m_wuwa_lgui_redirect,
             *m_wuwa_ui_window_size,
+            *m_wuwa_ui_window_size_sites,
             *m_wuwa_lgui_menu_redirect,
             *m_wuwa_world_labels,
             *m_wuwa_planar_eye_parameters,
@@ -1372,6 +1376,14 @@ private:
     const ModToggle::Ptr m_wuwa_lgui_redirect{ ModToggle::create(generate_name("WuWaLguiRedirect"), true) };
     // HUD page "16:9 UI layout": off restores 1.2.2's taller, eye-shaped full VR UI.
     const ModToggle::Ptr m_wuwa_ui_window_size{ ModToggle::create(generate_name("WuWaUiWindowSize"), true) };
+    // Diagnostics, never saved: bit n lets 16:9 rect hook n apply (WuWaLguiViewport.hpp).
+    struct TransientInt32 : ModInt32 {
+        using ModInt32::ModInt32;
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    };
+    const std::unique_ptr<TransientInt32> m_wuwa_ui_window_size_sites{
+        std::make_unique<TransientInt32>(generate_name("WuWaUiWindowSizeSites"), 31) };
     const ModToggle::Ptr m_wuwa_lgui_menu_redirect{ ModToggle::create(generate_name("WuWaLguiMenuRedirect"), false) };
     const ModToggle::Ptr m_wuwa_world_labels{ ModToggle::create(generate_name("WuWaWorldLabelsStereo"), false) };
     const ModToggle::Ptr m_wuwa_planar_eye_parameters{ ModToggle::create(generate_name("WuWaPlanarEyeParameters"), false) };

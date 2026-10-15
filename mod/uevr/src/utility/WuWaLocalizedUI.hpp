@@ -18,7 +18,7 @@ inline std::string formatted(const char* fmt,va_list args) {
     if(count<0 || count>32768) return fmt;
     std::string result(static_cast<size_t>(count)+1,'\0');
     std::vsnprintf(result.data(),result.size(),translated.c_str(),args); result.resize(count);
-    return wuwa_l10n::translate(result);
+    return wuwa_l10n::translate_quiet(result); // built at run time: not a missing catalog entry
 }
 // Wrap logical Arabic first, then shape/reorder each visible line. Letting
 // ImGui wrap an already-reordered paragraph would reverse the line order.

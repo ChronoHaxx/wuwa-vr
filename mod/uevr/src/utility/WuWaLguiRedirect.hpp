@@ -838,7 +838,7 @@ inline constexpr std::array<ViewportSite, 5> viewport_sites{{
 }};
 template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
     constexpr auto site = viewport_sites[I];
-    wuwa_lgui_viewport::rewrite(site.rbp ? c.rbp : c.rsp, site.offset);
+    wuwa_lgui_viewport::rewrite(site.rbp ? c.rbp : c.rsp, site.offset, static_cast<uint32_t>(I));
 }
 
 inline void disable_viewport(State& s) noexcept {

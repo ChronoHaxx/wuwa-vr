@@ -40,8 +40,10 @@ std::string value_of(const Item& item) {
         }
         return {};
     case Kind::Slider:
-        if (item.get_float) std::snprintf(buffer, sizeof(buffer), item.format, item.get_float());
-        return buffer;
+        // The unit (cm, m, deg, x) is translated with its format; the loader keeps only
+        // translations whose specifiers match. Format the logical text, then shape it.
+        if (item.get_float) std::snprintf(buffer, sizeof(buffer), wuwa_l10n::translate(item.format).c_str(), item.get_float());
+        return wuwa_l10n::visual(buffer);
     default:
         return item.value_text ? item.value_text() : std::string{};
     }
@@ -295,7 +297,7 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
             // translation only when its specifiers match the English (valid_translation).
             char text[256]{};
             std::snprintf(text, sizeof(text), wuwa_l10n::translate("Default: %s. Saved for next time.").c_str(),
-                wuwa_l10n::translate(item.default_text()).c_str());
+                wuwa_l10n::translate_quiet(item.default_text()).c_str());
             std::string logical = text;
             if (item.is_default && !item.is_default() && !pointer) logical += "  " + wuwa_l10n::translate("X or Delete: back to the default.");
             note = wuwa_l10n::visual(logical);

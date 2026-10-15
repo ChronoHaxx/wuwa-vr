@@ -1488,6 +1488,13 @@ void WuWaControlsComponent::advance_playstation() {
 
 void WuWaControlsComponent::on_frame() {
     advance_playstation();
+    // Text drawn in another language without a translation, for test sessions and the
+    // i18n check (dev/i18n/missing_report.py); written at most every 10 s, when it grew.
+    static uint64_t missing_check = 0;
+    if (wuwa_test::is_wuwa() && GetTickCount64() - missing_check >= 10000) {
+        missing_check = GetTickCount64();
+        wuwa_l10n::write_missing(Framework::get_persistent_dir("wuwa-l10n-missing.txt"));
+    }
     if (wuwa_motion::active()) wuwa_test::input_watch_until=GetTickCount64()+1000;
     const auto now = std::chrono::steady_clock::now();
     const float delta = std::clamp(std::chrono::duration<float>(now - m_last_frame).count(), 0.0f, 0.05f);

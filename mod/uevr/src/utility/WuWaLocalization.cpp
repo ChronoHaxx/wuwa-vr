@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <unordered_map>
 
 namespace wuwa_l10n {
@@ -218,10 +219,46 @@ std::string native_name(std::string_view id) {
 }
 bool rtl_available() { return icu().ready(); }
 bool right_to_left() { std::scoped_lock lock{mutex}; return rtl; }
-std::string translate(std::string_view english) {
+namespace {
+std::set<std::string> missing;
+size_t missing_written=SIZE_MAX;
+std::string missing_language;
+std::string lookup(std::string_view english,bool record) {
     std::scoped_lock lock{mutex};
     const auto found=strings.find(std::string(english));
-    return found!=strings.end() ? found->second : std::string(english);
+    if(found!=strings.end()) return found->second;
+    if(record && active!="en") {
+        if(missing_language!=active) { missing.clear(); missing_language=active; missing_written=SIZE_MAX; }
+        const bool letters=std::any_of(english.begin(),english.end(),[](char c){return (c>='A'&&c<='Z')||(c>='a'&&c<='z');});
+        if(letters && missing.size()<4000 && english.size()<=600) missing.emplace(english);
+    }
+    return std::string(english);
+}
+}
+std::string translate(std::string_view english) { return lookup(english,true); }
+std::string translate_quiet(std::string_view english) { return lookup(english,false); }
+std::vector<std::string> missing_strings() {
+    std::scoped_lock lock{mutex};
+    return {missing.begin(),missing.end()};
+}
+bool write_missing(const std::filesystem::path& file) {
+    std::string body;
+    {
+        std::scoped_lock lock{mutex};
+        if(missing.size()==missing_written) return false;
+        missing_written=missing.size();
+        body="language "+missing_language+"\n";
+        for(const auto& line : missing) {
+            std::string one=line;
+            std::replace(one.begin(),one.end(),'\n',' ');
+            body+=one+"\n";
+        }
+    }
+    std::error_code error;
+    std::filesystem::create_directories(file.parent_path(),error);
+    std::ofstream out{file,std::ios::binary|std::ios::trunc};
+    out<<body;
+    return static_cast<bool>(out);
 }
 std::string visual(std::string_view logical) {
     std::scoped_lock lock{mutex};

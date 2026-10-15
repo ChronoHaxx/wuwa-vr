@@ -679,6 +679,7 @@ void FFakeStereoRenderingHook::on_frame() {
             VR::get()->is_wuwa_ui_window_size_enabled() && !VR::get()->is_using_2d_screen() &&
                 !VR::get()->is_using_mono_theatre()};
     };
+    wuwa_lgui_viewport::state().sites.store(VR::get()->wuwa_ui_window_size_sites(), std::memory_order_relaxed);
     wuwa_lgui_route::tick(g_framework->get_framework_module(), lgui_targets);
     wuwa_lgui_redirect::tick(g_framework->get_framework_module(), lgui_targets);
     attempt_hook_game_engine_tick();

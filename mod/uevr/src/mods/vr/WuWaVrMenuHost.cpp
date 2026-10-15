@@ -224,7 +224,8 @@ void number_default(Item& item, const char* key, const char* format, float step)
     item.default_text = [key, format] {
         auto* v = typed<T>(key);
         char text[64]{};
-        if (v) std::snprintf(text, sizeof(text), format, static_cast<float>(v->default_value()));
+        // The unit translated with its format, as on the row itself (logical text).
+        if (v) std::snprintf(text, sizeof(text), wuwa_l10n::translate(format).c_str(), static_cast<float>(v->default_value()));
         return std::string{text};
     };
     item.is_default = [key, step] {

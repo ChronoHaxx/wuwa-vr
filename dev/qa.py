@@ -145,7 +145,8 @@ LINE = re.compile(r'^\[(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d)\.\d+\] \[[^\]]*\] \[(\
 def session(text: str, known_off: list[dict] = ()) -> dict:
     pinned = [re.compile(k['match']) for k in known_off]
     s = {'runtime': None, 'copy': None, 'game_build': None, 'routes': {}, 'refused': [], 'known_off': [],
-         'stereo_base': Counter(), 'hud': [], 'cinema': [], 'errors': Counter(), 'first': None, 'last': None}
+         'stereo_base': Counter(), 'hud': [], 'cinema': [], 'errors': Counter(), 'first': None, 'last': None,
+         'pointer_rewrites': 0, 'pointer_layout': False}
     for raw in text.splitlines():
         m = LINE.match(raw)
         if not m:
@@ -166,6 +167,10 @@ def session(text: str, known_off: list[dict] = ()) -> dict:
                 and 'WuWaCinema' not in msg and 'HUD refresh unavailable' not in msg:
             text_ = re.sub(r'^\[[^\]]*\] ', '', msg)[:160]
             (s['known_off'] if any(k.search(msg) for k in pinned) else s['refused']).append(f'{clock} {text_}')
+        v = re.search(r'\[WuWaLguiViewport\] .*pointer=(\d+)x\d+ pointer_rewrites=(\d+)', msg)
+        if v:
+            s['pointer_layout'] |= v.group(1) != '0'
+            s['pointer_rewrites'] = max(s['pointer_rewrites'], int(v.group(2)))
         b = re.search(r'\[WuWaStereoBase\] action=(\w+) reason=(\w+)', msg)
         if b:
             s['stereo_base'][f'{b.group(1)}/{b.group(2)}'] += 1
@@ -201,6 +206,9 @@ def invariants(s: dict, baseline: dict | None = None) -> list[tuple[str, str, st
     checks = [h for h in s['hud'] if '(screen check)' in h or '(full VR check)' in h]
     out.append(('layout-resyncs', 'fail' if loops else 'pass',
                 f"{len(checks)} resyncs by the layout check; {len(loops)} 'keeps changing' stops"))
+    out.append(('mouse-ray', 'pass' if s['pointer_rewrites'] else 'unknown',
+                f"{s['pointer_rewrites']} mouse rays given the window size in the taller layout" if s['pointer_layout']
+                else 'taller layout not used in this session'))
     auto = [c for c in s['cinema'] if c[1].startswith('Automatic')]
     out.append(('cinema-events', 'pass' if auto else 'unknown',
                 '; '.join(f'{t} {h}' for t, h in auto[:8]) or 'no automatic switch in this session'))

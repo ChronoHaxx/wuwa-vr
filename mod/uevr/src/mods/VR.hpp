@@ -398,7 +398,7 @@ public:
         return m_wuwa_ui_window_size->value() || (wants_story_scene_layout() && m_wuwa_controls.story_scene_active());
     }
     uint32_t wuwa_ui_window_size_sites() const {
-        return static_cast<uint32_t>(m_wuwa_ui_window_size_sites->value()) & 0x1fu;
+        return static_cast<uint32_t>(m_wuwa_ui_window_size_sites->value()) & 0x3fu;
     }
     uint32_t wuwa_ui_viewport_callers() const {
         return static_cast<uint32_t>(m_wuwa_ui_viewport_callers->value()) & 0x1ffu;
@@ -1409,14 +1409,15 @@ private:
     const ModToggle::Ptr m_wuwa_ui_window_size{ ModToggle::create(generate_name("WuWaUiWindowSize"), true) };
     const ModToggle::Ptr m_wuwa_ui_story_window_size{ ModToggle::create(generate_name("WuWaUiStoryWindowSize"), true) };
     const ModToggle::Ptr m_wuwa_ui_character_tall{ ModToggle::create(generate_name("WuWaUiCharacterTall"), true) };
-    // Diagnostics, never saved: bit n lets 16:9 rect hook n apply (WuWaLguiViewport.hpp).
+    // Diagnostics, never saved: bit n lets 16:9 rect hook n apply, bit 5 the mouse ray in the
+    // taller layout (WuWaLguiViewport.hpp).
     struct TransientInt32 : ModInt32 {
         using ModInt32::ModInt32;
         void config_load(const utility::Config&, bool) override {}
         void config_save(utility::Config&) override {}
     };
     const std::unique_ptr<TransientInt32> m_wuwa_ui_window_size_sites{
-        std::make_unique<TransientInt32>(generate_name("WuWaUiWindowSizeSites"), 31) };
+        std::make_unique<TransientInt32>(generate_name("WuWaUiWindowSizeSites"), 63) };
     // Diagnostics, never saved: bit n lets GetViewportSize caller n have the window size.
     const std::unique_ptr<TransientInt32> m_wuwa_ui_viewport_callers{
         std::make_unique<TransientInt32>(generate_name("WuWaUiViewportCallers"), 511) };

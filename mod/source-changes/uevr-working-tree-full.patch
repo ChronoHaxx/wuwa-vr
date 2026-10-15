@@ -272366,7 +272366,7 @@ index 0b5c53defe5c0c253235e8a4bc038e51c2e96cdc..5d89cdb47ce7752ceeb0252f1c0548b0
      ZoneScopedN(__FUNCTION__);
  
 diff --git a/src/mods/VR.hpp b/src/mods/VR.hpp
-index 941840c7f61a353fab6a22452267ba259608a81f..b6b93d9cd4ec501f0396a57391abbde4701b4732 100644
+index 941840c7f61a353fab6a22452267ba259608a81f..63b5305fdef6ec812e0d921db4d3df2e196b8eeb 100644
 --- a/src/mods/VR.hpp
 +++ b/src/mods/VR.hpp
 @@ -13,12 +13,16 @@
@@ -272522,7 +272522,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..b6b93d9cd4ec501f0396a57391abbde4
 +        return m_wuwa_ui_window_size->value() || (wants_story_scene_layout() && m_wuwa_controls.story_scene_active());
 +    }
 +    uint32_t wuwa_ui_window_size_sites() const {
-+        return static_cast<uint32_t>(m_wuwa_ui_window_size_sites->value()) & 0x1fu;
++        return static_cast<uint32_t>(m_wuwa_ui_window_size_sites->value()) & 0x3fu;
 +    }
 +    uint32_t wuwa_ui_viewport_callers() const {
 +        return static_cast<uint32_t>(m_wuwa_ui_viewport_callers->value()) & 0x1ffu;
@@ -272814,7 +272814,7 @@ index 941840c7f61a353fab6a22452267ba259608a81f..b6b93d9cd4ec501f0396a57391abbde4
              *m_lerp_camera_pitch,
              *m_lerp_camera_yaw,
              *m_lerp_camera_roll,
-@@ -1105,6 +1356,86 @@ private:
+@@ -1105,6 +1356,87 @@ private:
      bool m_stereo_emulation_mode{false}; // not a good config option, just for debugging
      bool m_wait_for_present{true};
      const ModToggle::Ptr m_controllers_allowed{ ModToggle::create(generate_name("ControllersAllowed"), true) };
@@ -272871,14 +272871,15 @@ index 941840c7f61a353fab6a22452267ba259608a81f..b6b93d9cd4ec501f0396a57391abbde4
 +    const ModToggle::Ptr m_wuwa_ui_window_size{ ModToggle::create(generate_name("WuWaUiWindowSize"), true) };
 +    const ModToggle::Ptr m_wuwa_ui_story_window_size{ ModToggle::create(generate_name("WuWaUiStoryWindowSize"), true) };
 +    const ModToggle::Ptr m_wuwa_ui_character_tall{ ModToggle::create(generate_name("WuWaUiCharacterTall"), true) };
-+    // Diagnostics, never saved: bit n lets 16:9 rect hook n apply (WuWaLguiViewport.hpp).
++    // Diagnostics, never saved: bit n lets 16:9 rect hook n apply, bit 5 the mouse ray in the
++    // taller layout (WuWaLguiViewport.hpp).
 +    struct TransientInt32 : ModInt32 {
 +        using ModInt32::ModInt32;
 +        void config_load(const utility::Config&, bool) override {}
 +        void config_save(utility::Config&) override {}
 +    };
 +    const std::unique_ptr<TransientInt32> m_wuwa_ui_window_size_sites{
-+        std::make_unique<TransientInt32>(generate_name("WuWaUiWindowSizeSites"), 31) };
++        std::make_unique<TransientInt32>(generate_name("WuWaUiWindowSizeSites"), 63) };
 +    // Diagnostics, never saved: bit n lets GetViewportSize caller n have the window size.
 +    const std::unique_ptr<TransientInt32> m_wuwa_ui_viewport_callers{
 +        std::make_unique<TransientInt32>(generate_name("WuWaUiViewportCallers"), 511) };
@@ -275722,7 +275723,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..4e2353d010ecbce03f27f4f787dbb73c
 \ No newline at end of file
 +} // namespace vrmod
 diff --git a/src/mods/vr/FFakeStereoRenderingHook.cpp b/src/mods/vr/FFakeStereoRenderingHook.cpp
-index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6c1d78f31 100644
+index 148f14391b004cdefc4389c529c329c967a1aaf5..a55be3acf373141899fba7625d81f2f796932430 100644
 --- a/src/mods/vr/FFakeStereoRenderingHook.cpp
 +++ b/src/mods/vr/FFakeStereoRenderingHook.cpp
 @@ -4,7 +4,9 @@
@@ -276313,7 +276314,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  // Scan through function instructions to detect usage of double
  // floating point precision instructions.
  bool is_using_double_precision(uintptr_t addr) {
-@@ -101,6 +667,22 @@ FFakeStereoRenderingHook::FFakeStereoRenderingHook() {
+@@ -101,6 +667,24 @@ FFakeStereoRenderingHook::FFakeStereoRenderingHook() {
  }
  
  void FFakeStereoRenderingHook::on_frame() {
@@ -276327,6 +276328,8 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
 +            VR::get()->is_wuwa_lgui_menu_redirect_enabled(), VR::get()->is_native_stereo_fix_enabled(),
 +            VR::get()->is_using_afr(), VR::get()->is_wuwa_world_labels_enabled(),
 +            VR::get()->is_wuwa_ui_window_size_active() && !VR::get()->is_using_2d_screen() &&
++                !VR::get()->is_using_mono_theatre(),
++            !VR::get()->is_wuwa_ui_window_size_active() && !VR::get()->is_using_2d_screen() &&
 +                !VR::get()->is_using_mono_theatre()};
 +    };
 +    wuwa_lgui_viewport::state().sites.store(VR::get()->wuwa_ui_window_size_sites(), std::memory_order_relaxed);
@@ -276336,7 +276339,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      attempt_hook_game_engine_tick();
      attempt_hook_slate_thread();
      attempt_hook_fsceneview_constructor();
-@@ -2365,6 +2947,9 @@ FRHITexture2D** FFakeStereoRenderingHook::viewport_get_render_target_texture_hoo
+@@ -2365,6 +2949,9 @@ FRHITexture2D** FFakeStereoRenderingHook::viewport_get_render_target_texture_hoo
  
  void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewportClient* viewport_client, sdk::FViewport* viewport, sdk::FCanvas* canvas, void* a4) {
      ZoneScopedN(__FUNCTION__);
@@ -276346,7 +276349,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      // UI compatibility mode
      // Tries to redirect calls to GetRenderTargetTexture to point towards our UI
-@@ -2410,9 +2995,29 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
+@@ -2410,9 +2997,29 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
          return;
      }
  
@@ -276376,7 +276379,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      if (hook_attempts < 100 && !g_hook->m_hooked_game_engine_tick && g_hook->m_attempted_hook_game_engine_tick) {
          ZoneScopedN("UGameViewportClient::Draw (hook UGameEngine::Tick)");
          SPDLOG_INFO("Performing alternative UGameEngine::Tick hook for synced AFR.");
-@@ -2454,6 +3059,19 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
+@@ -2454,6 +3061,19 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
          }
      }
  
@@ -276396,7 +276399,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      const auto& mods = g_framework->get_mods()->get_mods();
  
      for (const auto& mod : mods) {
-@@ -3016,6 +3634,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3016,6 +3636,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
      SPDLOG_INFO_ONCE("Called FSceneView constructor for the first time");
  
      auto& vr = VR::get();
@@ -276404,7 +276407,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      if (!g_hook->is_in_viewport_client_draw() || !vr->is_hmd_active()) {
          return g_hook->m_sceneview_data.constructor_hook.unsafe_call<sdk::FSceneView*>(view, init_options, a3, a4);
-@@ -3046,7 +3665,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3046,7 +3667,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      const auto init_options_scene_state = init_options->get_scene_state();
  
@@ -276418,7 +276421,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          if (is_ue5) {
              auto& vio_entry = g_hook->m_sceneview_data.view_init_options_ue5[init_options_scene_state];
              memcpy(&vio_entry, init_options, sizeof(sdk::FSceneViewInitOptionsUE5));
-@@ -3054,6 +3678,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3054,6 +3680,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
              auto& vio_entry = g_hook->m_sceneview_data.view_init_options_ue4[init_options_scene_state];
              memcpy(&vio_entry, init_options, sizeof(sdk::FSceneViewInitOptionsUE4));
          }
@@ -276433,7 +276436,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      }
  
      auto& known_scene_states = g_hook->m_sceneview_data.known_scene_states;
-@@ -3068,7 +3700,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3068,7 +3702,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      const auto true_index = vr->is_using_afr() ? (g_frame_count + last_index) % 2 : last_index;
  
@@ -276448,7 +276451,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          int32_t w = vr->get_hmd_width();
          int32_t h = vr->get_hmd_height();
  
-@@ -3142,11 +3780,78 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3142,11 +3782,78 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
          }
      }
  
@@ -276528,7 +276531,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          if (g_hook->get_render_target_manager()->get_scene_capture_render_target() != nullptr) {
              init_options->set_stereo_pass(EStereoscopicPass::eSSP_PRIMARY);
  
-@@ -3165,7 +3870,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3165,7 +3872,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      bool new_scene_state_inserted_this_frame = false;
  
@@ -276542,7 +276545,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          SPDLOG_INFO("Inserting new scene state {:x}", (uintptr_t)init_options_scene_state);
          known_scene_states.insert(init_options_scene_state);
          new_scene_state_inserted_this_frame = true;
-@@ -3177,7 +3887,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3177,7 +3889,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
          }
      }
  
@@ -276551,7 +276554,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          init_options->set_stereo_pass(EStereoscopicPass::eSSP_PRIMARY);
  
          // Set the scene state to the one that isn't the current one
-@@ -3192,7 +3902,105 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3192,7 +3904,105 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      last_index++;
  
@@ -276657,7 +276660,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      // Reset the view count back to what it was.
      if (views_original_count.has_value()) {
-@@ -3305,6 +4113,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3305,6 +4115,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
      auto& vr = VR::get();
      auto rtm = g_hook->get_render_target_manager();
@@ -276666,7 +276669,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      if (!vr->is_hmd_active() || !vr->is_native_stereo_fix_enabled()) {
          rtm->destroy_scene_capture();
-@@ -3342,6 +4152,16 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3342,6 +4154,16 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      const auto rtrsrc = rt != nullptr ? (sdk::FTextureRenderTargetResource*)rt->get_resource() : nullptr;
      const auto rtfrt = rtrsrc != nullptr ? rtrsrc->as_render_target() : nullptr;
  
@@ -276683,7 +276686,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      if (rtfrt == nullptr) {
          // This is fine to call constantly because we use an in-flight render target
          // that gets unset after the texture is fully created. This function exits early otherwise.
-@@ -3359,6 +4179,37 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3359,6 +4181,37 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          return;
      }
  
@@ -276721,7 +276724,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      bool wants_swap = false;
      if (views.count > 1) {
          views.count = 1;
-@@ -3374,8 +4225,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3374,8 +4227,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
              const auto last_frame = (frame_count) % runtimes::OpenXR::QUEUE_SIZE;
              const auto now_frame = (frame_count + 1) % runtimes::OpenXR::QUEUE_SIZE;
@@ -276742,7 +276745,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          } else {
              auto openvr = (runtimes::OpenVR*)runtime;
              std::unique_lock __{ openvr->pose_mtx };
-@@ -3401,7 +4263,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3401,7 +4265,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          view_family.views.data[1]->constructor((sdk::FSceneViewInitOptions*)init_options_copy2.data());*/
      }
  
@@ -276822,7 +276825,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      if (wants_swap) {
          // Swap out the existing render target for our custom one
-@@ -3410,11 +4343,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3410,11 +4345,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          // because the engine is still working on the old render target
          const auto original_target = view_family_target;
  
@@ -276851,7 +276854,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
              // We decrement the frame count because it fixes motion vectors in the right eye.
              scene->decrement_frame_count();
          }
-@@ -3422,7 +4369,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3422,7 +4371,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          std::swap(views[0], views[1]);
  
          // Call it again
@@ -276871,7 +276874,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
          std::swap(views[0], views[1]);
  
-@@ -3430,6 +4388,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3430,6 +4390,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      }
  
      views.count = prev_count;
@@ -276880,7 +276883,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  }
  
  void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* extension, sdk::FSceneViewFamily& view_family) {
-@@ -3444,7 +4404,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
+@@ -3444,7 +4406,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
      sdk::FSceneViewFamily::update_offsets(&view_family, g_hook->get_render_target_manager()->get_viewport());
      auto si = view_family.get_scene_interface();
  
@@ -276889,7 +276892,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          sdk::FScene::update_offsets((sdk::FScene*)si);
      }
  
-@@ -4092,6 +5052,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
+@@ -4092,6 +5054,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
      SPDLOG_INFO("Current ext count: {}", view_extensions.extensions.count);
      SPDLOG_INFO("Current ext capacity: {}", view_extensions.extensions.capacity);
  
@@ -276959,7 +276962,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      // Verifications on the current memory of the FSceneViewExtensions, because pre-4.10 (?) the view extensions array did not actually exist
      if (m_rendertarget_manager_embedded_in_stereo_device) {
          SPDLOG_INFO("Performing verifications on the current memory of the FSceneViewExtensions...");
-@@ -4621,6 +5644,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
+@@ -4621,6 +5646,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
          g_hook->set_should_recreate_textures(true);
          return true;
      }
@@ -276969,7 +276972,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      
      /*if (g_hook->m_analyzing_view_extensions) {
          const auto now = std::chrono::high_resolution_clock::now();
-@@ -4696,13 +5722,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4696,13 +5724,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -276988,7 +276991,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      // The purpose of this is to prevent the game from crashing in IDirect3D12CommandList::Close
      // Because the game will try to copy a texture region that is out of bounds.
-@@ -4725,6 +5750,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4725,6 +5752,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -277001,7 +277004,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      if (VR::get()->is_stereo_emulation_enabled()) {
          *w *= 2;
      } else {
-@@ -4735,7 +5766,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4735,7 +5768,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
  
      *w = *w / 2;
  
@@ -277010,7 +277013,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      if (!VR::get()->is_native_stereo_fix_enabled()) {
          *x += *w * true_index;
-@@ -4756,6 +5787,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4756,6 +5789,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          return;
      }
  
@@ -277022,7 +277025,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      auto vr = VR::get();
      //std::scoped_lock _{vr->get_vr_mutex()};
  
-@@ -4787,8 +5823,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4787,8 +5825,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto is_full_pass = view_index == 0 && !index_was_ever_two && !index_was_ever_negative && !g_hook->m_has_double_precision;
  
      auto true_index = index_starts_from_one ? ((view_index + 1) % 2) : (view_index % 2);
@@ -277080,7 +277083,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      if (vr->is_using_afr() && !is_full_pass) {
          true_index = g_frame_count % 2;
-@@ -4815,6 +5900,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4815,6 +5902,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
              g_hook->m_last_pre_rotation_double = *rot_d;
          } else {
              g_hook->m_last_pre_rotation = *view_rotation;
@@ -277088,7 +277091,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          }
  
          //vr->wait_for_present();
-@@ -4852,6 +5938,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4852,6 +5940,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -277097,7 +277100,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
      const auto view_d = (Vector3d*)view_location;
  
      const auto view_mat = !has_double_precision ? 
-@@ -4905,6 +5993,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4905,6 +5995,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto camera_up = quat_converter * (vqi_norm * glm::vec3{0, -camera_up_offset, 0});
  
      const auto world_scale = world_to_meters * vr->get_world_scale();
@@ -277105,7 +277108,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      if (has_double_precision) {
          *view_d += camera_forward;
-@@ -4924,6 +6013,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4924,6 +6015,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto rotation_offset = vr->get_rotation_offset();
          const auto current_hmd_rotation = glm::normalize(rotation_offset * glm::quat{vr->get_rotation(0)});
@@ -277119,7 +277122,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
          const auto current_eye_rotation_offset = glm::normalize(glm::quat{vr->get_eye_transform(true_index)});
  
          const auto new_rotation = glm::normalize(vqi_norm * current_hmd_rotation * current_eye_rotation_offset);
-@@ -4938,7 +6034,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4938,7 +6036,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto head_offset = quat_converter * (vqi_norm * (pos * world_scale));
          const auto head_offset_flat = quat_converter * (vqi_norm * (pos_flat * world_scale));
@@ -277138,7 +277141,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
          if (!has_double_precision) {
              if (!is_2d_screen) {
-@@ -5047,6 +6153,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -5047,6 +6155,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -277148,7 +277151,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  #ifdef FFAKE_STEREO_RENDERING_LOG_ALL_CALLS
      SPDLOG_INFO("Finished calculating stereo view offset!");
  #else
-@@ -5103,22 +6212,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5103,22 +6214,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          return out;
      }
  
@@ -277175,7 +277178,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
      // Can happen if we hooked this differently.
      if (g_hook->m_calculate_stereo_projection_matrix_hook) {
-@@ -5131,8 +6228,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5131,8 +6230,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          }
      }
  
@@ -277193,7 +277196,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
          const float width = VR::get()->get_hmd_width();
          const float height = VR::get()->get_hmd_height();
-@@ -5163,11 +6268,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5163,11 +6270,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
      // SPDLOG_INFO("NearZ: {}", old_znear);
  
      if (out != nullptr) {
@@ -277212,7 +277215,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
          auto& double_matrix = *(Matrix4x4d*)out;
  
-@@ -5500,6 +6611,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
+@@ -5500,6 +6613,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
  
              if (get_projection_data) {
                  SPDLOG_INFO("Successfully found GetProjectionData at {:x}", *get_projection_data);
@@ -277220,7 +277223,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
                  g_hook->m_hooked_alternative_localplayer_scan = true;
  
-@@ -5682,11 +6794,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5682,11 +6796,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
      if (idx) {
          SPDLOG_INFO("Calling PostInitProperties on local player!");
  
@@ -277248,7 +277251,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..6b6eadef5af678c716a1da29b33130e6
  
          // If the exception count exceeds a certain amount, we need to un-nop the function call because it was supposed to return a pointer.
          static auto exception_count = 0;
-@@ -5804,7 +6927,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5804,7 +6929,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
  
          // remove the handler
          RemoveVectoredExceptionHandler(exception_handler);
@@ -286711,10 +286714,10 @@ index 0000000000000000000000000000000000000000..5455c019a6f31bfdc1273e72f35c0223
 +} // namespace wuwa_lgui_probe
 diff --git a/src/utility/WuWaLguiRedirect.hpp b/src/utility/WuWaLguiRedirect.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..d60bd38bdc4ad42f18091310d126f16d7e231ef5
+index 0000000000000000000000000000000000000000..b5da55d5b7b13934e6d9c282cc1941b776bddfa2
 --- /dev/null
 +++ b/src/utility/WuWaLguiRedirect.hpp
-@@ -0,0 +1,1035 @@
+@@ -0,0 +1,1046 @@
 +#pragma once
 +
 +// Opt-in experiment pinned to the inspected September 8 WuWa code. See
@@ -287555,6 +287558,15 @@ index 0000000000000000000000000000000000000000..d60bd38bdc4ad42f18091310d126f16d
 +}};
 +template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
 +    constexpr auto site = viewport_sites[I];
++    if constexpr (I == 1) {
++        // The view-rect getter pushes rdi and reserves 0x130 (fingerprinted with the function), so
++        // its return address is at rsp + 0x138 here too.
++        const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
++        if (ret - state().base == wuwa_lgui_viewport::pointer_ray_return) {
++            wuwa_lgui_viewport::rewrite_pointer(c.rsp, site.offset);
++            return;
++        }
++    }
 +    if constexpr (I == 2) {
 +        // GetViewportSize pushes r14 and reserves 0x130 (fingerprinted with the function), so its
 +        // return address is at rsp + 0x138 here.
@@ -287566,7 +287578,7 @@ index 0000000000000000000000000000000000000000..d60bd38bdc4ad42f18091310d126f16d
 +
 +inline void disable_viewport(State& s) noexcept {
 +    wuwa_lgui_viewport::state().installed.store(false, std::memory_order_release);
-+    wuwa_lgui_viewport::update(false, 0, 0);
++    wuwa_lgui_viewport::update(false, false, 0, 0);
 +    for (auto& hook : s.viewport) {
 +        try { if (hook && !hook.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
 +    }
@@ -287691,8 +287703,8 @@ index 0000000000000000000000000000000000000000..d60bd38bdc4ad42f18091310d126f16d
 +        {
 +            // Full VR only: the stereo screen and mono theatre already see the window size.
 +            const auto target = s.provider ? s.provider() : wuwa_lgui_route::Target{};
-+            wuwa_lgui_viewport::update(s.active.load(std::memory_order_acquire) && s.mode == Mode::redirect &&
-+                target.redirect_enabled && target.full_vr_ui, target.width, target.height);
++            const bool route = s.active.load(std::memory_order_acquire) && s.mode == Mode::redirect && target.redirect_enabled;
++            wuwa_lgui_viewport::update(route && target.full_vr_ui, route && target.full_vr_tall_ui, target.width, target.height);
 +        }
 +        const auto now = GetTickCount64();
 +        if (now - s.last_summary >= 5000) {
@@ -287715,9 +287727,11 @@ index 0000000000000000000000000000000000000000..d60bd38bdc4ad42f18091310d126f16d
 +            {
 +                const auto& v = wuwa_lgui_viewport::state();
 +                const auto size = v.size.load(std::memory_order_relaxed);
-+                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} sites={:x} callers={:x} "
++                const auto pointer = v.pointer_size.load(std::memory_order_relaxed);
++                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} pointer={}x{} pointer_rewrites={} sites={:x} callers={:x} "
 +                    "by_caller={},{},{},{},{},{},{},{},{}", v.installed.load(),
-+                    size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed), v.sites.load(),
++                    size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed),
++                    pointer >> 32, pointer & 0xffffffffu, v.pointer_rewrites.load(std::memory_order_relaxed), v.sites.load(),
 +                    v.caller_mask.load(), v.callers[0].load(), v.callers[1].load(), v.callers[2].load(), v.callers[3].load(),
 +                    v.callers[4].load(), v.callers[5].load(), v.callers[6].load(), v.callers[7].load(), v.callers[8].load());
 +            }
@@ -287752,10 +287766,10 @@ index 0000000000000000000000000000000000000000..d60bd38bdc4ad42f18091310d126f16d
 +} // namespace wuwa_lgui_redirect
 diff --git a/src/utility/WuWaLguiRoute.hpp b/src/utility/WuWaLguiRoute.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..fca0984100de499a7940186abb92a393e155dfd4
+index 0000000000000000000000000000000000000000..843f13c26cf32cca01fa60716b79ca03e10dc3d4
 --- /dev/null
 +++ b/src/utility/WuWaLguiRoute.hpp
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,233 @@
 +#pragma once
 +
 +// Focused compatibility capture for the live vtable sites demonstrated by the
@@ -287781,6 +287795,7 @@ index 0000000000000000000000000000000000000000..fca0984100de499a7940186abb92a393
 +    bool independent_eyes{};
 +    bool world_labels_enabled{};
 +    bool full_vr_ui{}; // neither the stereo screen nor the mono theatre
++    bool full_vr_tall_ui{}; // full VR with the taller layout (16:9 off, or the character screen)
 +};
 +using Provider = Target (*)();
 +struct Sample {
@@ -288102,10 +288117,10 @@ index 0000000000000000000000000000000000000000..114cd315c3078f9ddcc05efdb05f2d79
 +} // namespace wuwa_lgui_redirect
 diff --git a/src/utility/WuWaLguiViewport.hpp b/src/utility/WuWaLguiViewport.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..29a4e9dc4f7aa4e82980a0b39eb80a4cfb20e895
+index 0000000000000000000000000000000000000000..ebfa355b74640c602ed1ef4d65f7cf45e3335430
 --- /dev/null
 +++ b/src/utility/WuWaLguiViewport.hpp
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,105 @@
 +#pragma once
 +
 +// Full VR shows the flat game's 16:9 screen UI.
@@ -288124,6 +288139,13 @@ index 0000000000000000000000000000000000000000..29a4e9dc4f7aa4e82980a0b39eb80a4c
 +// player camera, sized by the window, independent of the canvas; left alone.
 +// Test 12 (14 Oct 2026) hooked only the first three: controller buttons in the
 +// Terminal clicked at eye-sized pixel positions and missed.
++// The taller layout (16:9 off, or the character screen) keeps the eye rect for
++// the layout, but the mouse still moves over the window and our VR cursor is
++// drawn at its window position. The view-rect getter's three callers (3.7) are
++// the mouse ray (0xd58550: cursor pixels / rect size -> 0..1 -> ray), the
++// scaler's viewport check (0xdd3a80) and a centre-of-screen ray (0xdd94b0), so
++// there only the mouse ray gets the window size (test 17l, 15 Oct 2026: the
++// mouse divided window pixels by the eye rect and missed in the taller layout).
 +#include <array>
 +#include <atomic>
 +#include <cstdint>
@@ -288134,10 +288156,14 @@ index 0000000000000000000000000000000000000000..29a4e9dc4f7aa4e82980a0b39eb80a4c
 +    // Window size as (width << 32 | height); 0 leaves the game's rect alone.
 +    std::atomic<uint64_t> size{0};
 +    std::atomic<uint64_t> rewrites{0};
++    // Window size for the mouse ray while full VR shows the taller layout; 0 otherwise.
++    std::atomic<uint64_t> pointer_size{0};
++    std::atomic<uint64_t> pointer_rewrites{0};
 +    // Bit n lets site n rewrite (WuWaLguiRedirect.hpp viewport_sites); all five by default.
++    // Bit 5 lets the mouse ray have the window size in the taller layout.
 +    // Diagnostics only (VR_WuWaUiWindowSizeSites, never saved): finds which reader a game
 +    // system depends on (15 Oct: the Resonators floor reflection froze in 16:9 only).
-+    std::atomic<uint32_t> sites{0x1f};
++    std::atomic<uint32_t> sites{0x3f};
 +    // GetViewportSize (site 2) by caller, for the same test: calls per caller (the direct calls
 +    // below, then any other) and bit n lets caller n have the window size (VR_WuWaUiViewportCallers,
 +    // never saved). Without site 2 the reflection is live but the layout breaks, so one caller is it.
@@ -288149,6 +288175,8 @@ index 0000000000000000000000000000000000000000..29a4e9dc4f7aa4e82980a0b39eb80a4c
 +// Return addresses (RVA) of the eight direct calls to GetViewportSize (0xc668c0) in the 3.7 client.
 +inline constexpr std::array<uintptr_t, 8> viewport_size_returns{
 +    0xccd90c, 0xdbb1cf, 0xdd2cb5, 0xdd2d08, 0xdd461f, 0xe0d438, 0x2261c1e, 0x2860cdd};
++// Return address (RVA) of the mouse ray's call to the view-rect getter (0xc667c0) in the 3.7 client.
++inline constexpr uintptr_t pointer_ray_return = 0xd58615;
 +// Counts the call and says whether this caller gets the window size.
 +inline bool allow_caller(uintptr_t return_rva) noexcept {
 +    uint32_t caller = 8;
@@ -288162,23 +288190,40 @@ index 0000000000000000000000000000000000000000..29a4e9dc4f7aa4e82980a0b39eb80a4c
 +// True while full VR's screen UI is laid out at the window size.
 +inline bool active() noexcept { return installed() && state().size.load(std::memory_order_acquire) != 0; }
 +
-+inline void update(bool enable, uint32_t width, uint32_t height) noexcept {
++// enable: full VR lays the screen UI out at the window size (16:9). pointer: full VR shows the
++// screen UI in the taller layout, so only the mouse ray takes the window size.
++inline void update(bool enable, bool pointer, uint32_t width, uint32_t height) noexcept {
 +    const bool sane = width >= 64 && height >= 64 && width <= 32768 && height <= 32768;
-+    state().size.store(enable && sane ? (uint64_t{width} << 32) | height : 0, std::memory_order_release);
++    const auto size = sane ? (uint64_t{width} << 32) | height : 0;
++    state().size.store(enable ? size : 0, std::memory_order_release);
++    state().pointer_size.store(!enable && pointer ? size : 0, std::memory_order_release);
 +}
 +
-+// The engine call filled a local FIntRect {min x, min y, max x, max y} at frame + offset.
-+inline void rewrite(uintptr_t frame, uint32_t offset, uint32_t site) noexcept {
-+    auto& s = state();
-+    const auto size = s.size.load(std::memory_order_acquire);
-+    if (!size || !((s.sites.load(std::memory_order_relaxed) >> site) & 1u)) return;
-+    auto* rect = reinterpret_cast<int32_t*>(frame + offset);
-+    if (rect[2] <= rect[0] || rect[3] <= rect[1]) return; // no projection data: keep the game's fallback
++// The engine call filled a local FIntRect {min x, min y, max x, max y} at rect.
++inline bool apply(int32_t* rect, uint64_t size) noexcept {
++    if (rect[2] <= rect[0] || rect[3] <= rect[1]) return false; // no projection data: keep the game's fallback
 +    rect[0] = 0;
 +    rect[1] = 0;
 +    rect[2] = static_cast<int32_t>(size >> 32);
 +    rect[3] = static_cast<int32_t>(size & 0xffffffffu);
-+    s.rewrites.fetch_add(1, std::memory_order_relaxed);
++    return true;
++}
++
++inline void rewrite(uintptr_t frame, uint32_t offset, uint32_t site) noexcept {
++    auto& s = state();
++    const auto size = s.size.load(std::memory_order_acquire);
++    if (!size || !((s.sites.load(std::memory_order_relaxed) >> site) & 1u)) return;
++    if (apply(reinterpret_cast<int32_t*>(frame + offset), size)) s.rewrites.fetch_add(1, std::memory_order_relaxed);
++}
++
++// The view-rect getter (site 1) called by the mouse ray: the window size in 16:9 as for every
++// caller, and in the taller layout too, where the other callers keep the eye rect.
++inline void rewrite_pointer(uintptr_t frame, uint32_t offset) noexcept {
++    auto& s = state();
++    if (s.size.load(std::memory_order_acquire)) return rewrite(frame, offset, 1);
++    const auto size = s.pointer_size.load(std::memory_order_acquire);
++    if (!size || !((s.sites.load(std::memory_order_relaxed) >> 5) & 1u)) return;
++    if (apply(reinterpret_cast<int32_t*>(frame + offset), size)) s.pointer_rewrites.fetch_add(1, std::memory_order_relaxed);
 +}
 +} // namespace wuwa_lgui_viewport
 diff --git a/src/utility/WuWaLocalization.cpp b/src/utility/WuWaLocalization.cpp

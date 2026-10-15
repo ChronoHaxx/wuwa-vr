@@ -838,6 +838,15 @@ inline constexpr std::array<ViewportSite, 5> viewport_sites{{
 }};
 template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
     constexpr auto site = viewport_sites[I];
+    if constexpr (I == 1) {
+        // The view-rect getter pushes rdi and reserves 0x130 (fingerprinted with the function), so
+        // its return address is at rsp + 0x138 here too.
+        const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
+        if (ret - state().base == wuwa_lgui_viewport::pointer_ray_return) {
+            wuwa_lgui_viewport::rewrite_pointer(c.rsp, site.offset);
+            return;
+        }
+    }
     if constexpr (I == 2) {
         // GetViewportSize pushes r14 and reserves 0x130 (fingerprinted with the function), so its
         // return address is at rsp + 0x138 here.
@@ -849,7 +858,7 @@ template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
 
 inline void disable_viewport(State& s) noexcept {
     wuwa_lgui_viewport::state().installed.store(false, std::memory_order_release);
-    wuwa_lgui_viewport::update(false, 0, 0);
+    wuwa_lgui_viewport::update(false, false, 0, 0);
     for (auto& hook : s.viewport) {
         try { if (hook && !hook.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
     }
@@ -974,8 +983,8 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
         {
             // Full VR only: the stereo screen and mono theatre already see the window size.
             const auto target = s.provider ? s.provider() : wuwa_lgui_route::Target{};
-            wuwa_lgui_viewport::update(s.active.load(std::memory_order_acquire) && s.mode == Mode::redirect &&
-                target.redirect_enabled && target.full_vr_ui, target.width, target.height);
+            const bool route = s.active.load(std::memory_order_acquire) && s.mode == Mode::redirect && target.redirect_enabled;
+            wuwa_lgui_viewport::update(route && target.full_vr_ui, route && target.full_vr_tall_ui, target.width, target.height);
         }
         const auto now = GetTickCount64();
         if (now - s.last_summary >= 5000) {
@@ -998,9 +1007,11 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
             {
                 const auto& v = wuwa_lgui_viewport::state();
                 const auto size = v.size.load(std::memory_order_relaxed);
-                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} sites={:x} callers={:x} "
+                const auto pointer = v.pointer_size.load(std::memory_order_relaxed);
+                spdlog::info("[WuWaLguiViewport] installed={} size={}x{} rewrites={} pointer={}x{} pointer_rewrites={} sites={:x} callers={:x} "
                     "by_caller={},{},{},{},{},{},{},{},{}", v.installed.load(),
-                    size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed), v.sites.load(),
+                    size >> 32, size & 0xffffffffu, v.rewrites.load(std::memory_order_relaxed),
+                    pointer >> 32, pointer & 0xffffffffu, v.pointer_rewrites.load(std::memory_order_relaxed), v.sites.load(),
                     v.caller_mask.load(), v.callers[0].load(), v.callers[1].load(), v.callers[2].load(), v.callers[3].load(),
                     v.callers[4].load(), v.callers[5].load(), v.callers[6].load(), v.callers[7].load(), v.callers[8].load());
             }

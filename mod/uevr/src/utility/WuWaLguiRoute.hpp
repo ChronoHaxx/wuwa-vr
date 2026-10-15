@@ -23,6 +23,7 @@ struct Target {
     bool independent_eyes{};
     bool world_labels_enabled{};
     bool full_vr_ui{}; // neither the stereo screen nor the mono theatre
+    bool full_vr_tall_ui{}; // full VR with the taller layout (16:9 off, or the character screen)
 };
 using Provider = Target (*)();
 struct Sample {

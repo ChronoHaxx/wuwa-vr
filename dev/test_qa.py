@@ -83,6 +83,15 @@ class QaTests(unittest.TestCase):
         self.assertEqual(inv["cinema-events"][0], "pass")
         self.assertEqual(inv["errors"][0], "unknown")
 
+    def test_the_mouse_ray_invariant_needs_the_taller_layout_and_a_rewrite(self):
+        quiet = line("10:03:00", "info", "[WuWaLguiViewport] installed=true size=1920x1080 rewrites=50 pointer=0x0 pointer_rewrites=0 sites=3f callers=1ff by_caller=1,2,3,4,5,6,7,8,9")
+        inv = {n: (r, d) for n, r, d in qa.invariants(qa.session(LOG + "\n" + quiet))}
+        self.assertEqual(inv["mouse-ray"], ("unknown", "taller layout not used in this session"))
+        tall = quiet.replace("size=1920x1080", "size=0x0").replace("pointer=0x0 pointer_rewrites=0", "pointer=1920x1080 pointer_rewrites=12")
+        inv = {n: (r, d) for n, r, d in qa.invariants(qa.session(LOG + "\n" + tall))}
+        self.assertEqual(inv["mouse-ray"][0], "pass")
+        self.assertIn("12 mouse rays", inv["mouse-ray"][1])
+
     def test_a_layout_loop_or_an_unshared_camera_fails(self):
         log = LOG + "\n" + line("10:01:00", "info", "[Plugin] WuWaHud: Layout keeps changing; stopped checking") + "\n" + \
             line("10:01:01", "info", "[WuWaStereoBase] action=ignored reason=disabled caller_rva=0 verified_site=false source_call=0")

@@ -421,6 +421,18 @@ So the fix is probably the LGUI canvas size, not the panel shape.
 - **Not verified:** whether WuWa Controls → Reset HUD aspect works. Do not suggest
   it to players until it is.
 
+**The mouse misses in the taller layout or on the character screen.**
+**Fixed** in test 17l (15 Oct). Needs a headset check. The mouse ray (game function
+`0xd58550` in 3.7) divides the cursor's window pixels by the view rect. Our VR cursor
+is drawn at the same window pixels. In 16:9 the rect is the window, so both agree.
+The taller layout keeps the eye rect (2064 x 2208 and so on) for its layout, so
+clicks landed up and to the left of the cursor. Now only the mouse ray gets the
+window size there. The scaler and the centre-of-screen ray keep the eye rect. Found
+offline in the 3.7 capture: the view-rect getter `0xc667c0` has exactly three
+callers. The log line `[WuWaLguiViewport] ... pointer=WxH pointer_rewrites=N` shows
+it working. `VR_WuWaUiWindowSizeSites` bit 5 (value 31 instead of 63) turns it off
+for comparison.
+
 **A flat menu's background moves with your head.**
 **Open**. Mono theatre is the workaround.
 

@@ -48,15 +48,15 @@ The 3.7 update (30 Sep to 1 Oct 2026) is the worked example used below:
 ## Day 1: port (no headset needed until the end)
 
 1. **Capture the new game.** Write
-   `{"output": "E:/Coding/wuwa-vr/extracted/lgui-live/client-<version>-<date>.bin", "any_build": true}`
+   `{"output": "E:/Coding/wuwa-vr/data/game-<version>/client-<version>-<date>.bin", "any_build": true}`
    as `wuwa-module-capture.request.json` beside the backend, launch, and wait for the
    capture to finish. Remove the request file afterwards. The capture is read-only. The
    exe on disk is encrypted, so only an in-memory capture works.
    `launcher\dev\wuwa_merge_captures.py` joins interrupted captures.
 2. **Map every pinned address.**
    ```powershell
-   python launcher\dev\wuwa_port_offsets.py --old <current capture> --new <new capture> --report extracted\port-<version>.json
-   python launcher\dev\wuwa_offset_table.py --report extracted\port-<version>.json --old <current> --new <new> --out extracted\port-<version>\offset-table.json
+   python launcher\dev\wuwa_port_offsets.py --old <current capture> --new <new capture> --report ..\data\game-<version>\port-<version>.json
+   python launcher\dev\wuwa_offset_table.py --report ..\data\game-<version>\port-<version>.json --old <current> --new <new> --out ..\data\game-<version>\port-<version>-offset-table.json
    ```
    - `ok` sites have identical surrounding bytes.
    - Function ranges are re-hashed only when relocated displacements are the only difference.
@@ -101,7 +101,8 @@ The 3.7 update (30 Sep to 1 Oct 2026) is the worked example used below:
   - range hashes and a log line on success and on refusal;
   - a matrix row naming its source file in `code`;
   - for diagnostics, an entry in `known_off` once they stop being ported.
-- Keep the current capture in `extracted/lgui-live/`. The next port needs it as `--old`. For
-  3.7 that is `client-3-7-merged.bin`; never move it aside in a clean-up.
+- Keep the current capture in the workspace's `data\game-<version>\` folder (outside the
+  repository). The next port needs it as `--old`. For 3.7 that is
+  `data\game-3.7\client-3-7-merged.bin`; never move it aside in a clean-up.
 - Prefer reflection (names) to raw offsets in Lua. Guard any raw offset with a size or layout
   check that switches the feature off.

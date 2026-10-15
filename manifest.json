@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-15T16:54:59.143392+00:00",
+  "updatedAt": "2026-10-15T17:17:48.380323+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -149,7 +149,7 @@
     "docs/DEVELOPING.md": "427e94ce86bdbda0e42a33567029ad03a6506b034dfa5fa15b7038bb2fa23393",
     "docs/DISTRIBUTION-PLAN.md": "5c9c919a75ce7323dda4e93b50cf5063dd74ce3d58e24f6d6980d8f621c5e438",
     "docs/EYE-DIFF-HANDOFF.md": "f1e9f4e105b7a6401b867562767a796cdef390a6f713ff68770de54540e746ce",
-    "docs/GAME-UPDATE.md": "63c028b0c33c373561be78df8329bc3517f616a54ce9205a8eec796b3f265c02",
+    "docs/GAME-UPDATE.md": "7e0bd7354863adc07f206730fdace683a9fbc139b1e89bfde0abd86484677a9c",
     "docs/LAUNCHER-RELEASE-20261004.md": "69901b1445645408463d6b9998c1a306198ede954e3b8ccf1c7d1e3d26885a12",
     "docs/NEXT-SESSION-3.7.md": "cdf36fea44b63c9e15108c35683dfbb038deee579fac71687cca76e565216206",
     "docs/NEXT-SESSION.md": "33796f6e472075f8e1a7c6e1d8388aec1bd6eb4ceb4bfda0dabea78056aeba0e",

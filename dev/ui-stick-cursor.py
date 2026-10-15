@@ -10,7 +10,8 @@ This drives the left stick through a loop (gamepad only, never the mouse) and af
 measures three positions in canvas pixels: the pointer LGUI holds, the ring the game draws (found
 in a backbuffer shot) and where the pointer's ray meets the canvas. Ring vs pointer catches a stale
 script size (the layout or view changed while the screen was open: reopen it); ray vs pointer
-catches a rect mismatch in our viewport hooks. Both must stay under --tolerance (default 12 px).
+catches a rect mismatch in our viewport hooks. Both must stay under --tolerance (default 12 px);
+without rays for most steps the verdict is INCOMPLETE (exit 2), not PASS.
 
 Start with such a screen open, the game in front and the controller untouched. Changes nothing.
     python dev/ui-stick-cursor.py OUT_DIR [--tolerance PX]        (Python with OpenCV and numpy)
@@ -156,13 +157,20 @@ def main():
         print(f"  {i:2d} pointer ({p['x']:7.1f},{p['y']:7.1f}) ring {row['ring']} (match {score:.2f}) "
               f"ray {row['ray']} errors ring {row.get('ring_error')} ray {row.get('ray_error')}", flush=True)
     measured = [r for r in rows if r['ring']]
+    rays = [r for r in rows if r['ray'] is not None]
     ok = len(measured) >= len(rows) // 2 and worst_ring <= tolerance and worst_ray <= tolerance
+    # Without rays the ray check proves nothing: LGUI casts none for the pointer while the game keeps it in
+    # mouse mode (15 Oct: after mouse use, injected stick input left inputType 0 until the cursor was re-centred).
+    verdict = 'FAIL' if not ok else ('PASS' if len(rays) >= len(rows) // 2 else 'INCOMPLETE')
     report = {'canvas': canvas, 'window': window, 'tolerance': tolerance, 'worst_ring_error': worst_ring,
-              'worst_ray_error': worst_ray, 'rings_found': len(measured), 'steps': rows, 'pass': ok}
+              'worst_ray_error': worst_ray, 'rings_found': len(measured), 'rays_found': len(rays), 'steps': rows,
+              'verdict': verdict}
     (out / 'report.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
-    print(f"{'PASS' if ok else 'FAIL'}: ring vs pointer max {worst_ring} px ({len(measured)}/{len(rows)} rings found), "
-          f"ray vs pointer max {worst_ray} px; frames and report.json in {out}")
-    return 0 if ok else 1
+    print(f"{verdict}: ring vs pointer max {worst_ring} px ({len(measured)}/{len(rows)} rings found), "
+          f"ray vs pointer max {worst_ray} px ({len(rays)}/{len(rows)} rays found); frames and report.json in {out}")
+    if verdict == 'INCOMPLETE':
+        print('No ray for the pointer: the game kept it in mouse mode. Reopen the screen with the controller and rerun.')
+    return {'PASS': 0, 'FAIL': 1, 'INCOMPLETE': 2}[verdict]
 
 
 if __name__ == '__main__':

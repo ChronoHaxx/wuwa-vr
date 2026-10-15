@@ -93,6 +93,10 @@ If it stays with the same physical eye, it follows that eye's projection or data
 causes 5 or 6. This is an inference from how the passes work, not a test we have
 run on every bug.
 
+[QA.md](QA.md#fixing-any-different-in-one-eye-problem) has the full method. It covers
+measuring, the input diff, the standard fix for each cause, and how to lock a fix in
+with a log invariant and a matrix row.
+
 ### 1.5 Projection, field of view and distance
 
 - **Eye frustums are asymmetric**, wider towards the outside. UEVR passes each

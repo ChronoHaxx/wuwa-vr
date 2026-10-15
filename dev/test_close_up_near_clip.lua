@@ -99,8 +99,8 @@ local function world(f)
         setmetatable(m,{__index=function(self,k)
             if k=='Bounds' then
                 local b=self.bones[1]
-                if opts.template then return {Origin={X=0,Y=0,Z=0},SphereRadius=0} end
-                return {Origin={X=b.x,Y=b.y,Z=b.z},SphereRadius=60}
+                if opts.template then return {Origin={X=0,Y=0,Z=0},BoxExtent={X=0,Y=0,Z=0},SphereRadius=0} end
+                return {Origin={X=b.x,Y=b.y,Z=b.z},BoxExtent={X=30,Y=30,Z=90},SphereRadius=60}
             end
         end})
         function m:get_outer() return owner end
@@ -232,6 +232,26 @@ test('a hand in the flat shot keeps the character, head at the eye or not',funct
     local f=world(fixture()); f.values[HIDE]='true'
     local reaching=f:person('reaching',{{x=8,y=-12,z=10},{x=0,y=-20,z=-15},{x=60,y=10,z=-5}})
     f:frames(3); assert(shown(reaching),'a character with a hand in the flat shot was hidden')
+end)
+test('the close-up move stops behind a performer in front of the person in focus',function()
+    -- Story performers are not Engine.Character actors; the mesh source found nobody while it
+    -- asked WasRecentlyRendered (false for 425 of 428 meshes), so the eye went into them.
+    local function shot(with_performer)
+        local f=world(fixture()); f.pp.bOverride_DepthOfFieldFocalDistance=true; f.pp.DepthOfFieldFocalDistance=300
+        if with_performer then f:person('performer',{{x=150,y=0,z=0}}) end
+        f:person('parked',{{x=150,y=5,z=0}},{parked=true})
+        f:frames(3)
+        for _,line in ipairs(f.logs) do
+            local fg,dolly=line:match('%[WuWaLens%] shot=1 .-foreground=(%S+) .-dolly=(%d+)')
+            if fg then return fg,tonumber(dolly) end
+        end
+    end
+    local fg,dolly=shot(false)
+    eq(fg,'none','foreground without a performer (a parked party member does not count)')
+    eq(dolly,167,'close-up move without a performer')
+    fg,dolly=shot(true)
+    eq(fg,'120','foreground: the performer\'s near side')
+    eq(dolly,90,'close-up move held 30 cm behind the performer')
 end)
 test('a parked party member and a blueprint template at the eye are left alone',function()
     local f=world(fixture()); f.values[HIDE]='true'

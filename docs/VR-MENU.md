@@ -210,7 +210,12 @@ since test 3f (closer than the 2D shot).
   hidden actors are skipped. The subject is the person at the game's focus
   distance, else the one nearest the middle of the frame; anyone whose near
   side is 30 cm or more in front of the subject's is foreground, and the eye
-  stays at least max(closest distance, 30 cm) behind them.
+  stays at least max(closest distance, 30 cm) behind them. Story performers
+  are usually not `Engine.Character`, so with none in frame the skeletal meshes
+  are placed by their world `Bounds` (body sized, visible, actor not hidden),
+  one per owning actor. Until 16c this source asked `WasRecentlyRendered`,
+  which was false for nearly every mesh, so it found nobody and the eye could
+  go into a performer (test 15, shot 21).
 - **Why:** in test 3f every shot logged `focus=348 trace=none`. The trace
   (Visibility channel) does not hit characters, so in over-the-shoulder shots
   the eye moved 2.6-3 m along the view, through the person at the frame's

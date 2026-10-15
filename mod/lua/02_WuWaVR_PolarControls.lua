@@ -1256,8 +1256,8 @@ end
 -- centre trace misses them (it does not hit characters at all), so in test 3f
 -- the eye passed straight through her. In test 3g all 20 Engine.Character
 -- actors were outside every story shot (the performers are other actors), so
--- skeletal meshes drawn in the last 0.25 s, one per owning actor, are the
--- second source. Bodies are tested against the 2D frustum (16:9 at the game's FOV).
+-- visible skeletal meshes placed by their world Bounds, one per owning actor, are
+-- the second source (people.scan). Bodies are tested against the 2D frustum (16:9 at the game's FOV).
 local people={}
 function people.frame(pos,rot,fov)
     local yaw,pitch=math.rad(rot.y),math.rad(rot.x)
@@ -1360,17 +1360,25 @@ function people.scan(pos,rot,fov)
         local by_owner={}
         for i,m in ipairs(meshes or {}) do
             if i>1500 then tally(stats,"m_capped"); break end
+            -- WasRecentlyRendered was false for 425 of 428 meshes in a dialogue (15 Oct),
+            -- people on screen included, so this source found nobody and the close-up
+            -- move went into performers. The component's world Bounds (a property)
+            -- place it; hidden components and hidden actors (party members off the
+            -- field, parked at the player) are skipped; templates have zero bounds.
             local ok,info,reason=pcall(function()
-                if m:WasRecentlyRendered(0.25)~=true then return nil,"unseen" end
-                local entry={object=m,source="mesh"}
-                local centre,r,h=people.body(entry)
-                if not centre then return nil,"no location" end
+                local b=m.Bounds
+                local centre=b and b.Origin and point(b.Origin)
+                local e=b and b.BoxExtent and point(b.BoxExtent)
+                if not valid(centre) or not valid(e) or not (b.SphereRadius>0) then return nil,"no bounds" end
+                local r,h=math.max(10,math.min(80,math.max(e.x,e.y))),math.max(5,e.z)
                 if h<30 or h>300 then return nil,"not body sized" end
                 local placed,why=people.place(fr,centre,r,h)
                 if not placed then return nil,why end
-                entry.r,entry.h=r,h
+                if m.bVisible==false or m.bHiddenInGame==true then return nil,"hidden" end
+                local owner=m:get_outer()
+                if owner and owner.bHidden==true then return nil,"hidden actor" end
+                local entry={object=m,source="mesh",r=r,h=h}
                 for k,v in pairs(entry) do placed[k]=v end
-                local owner=m:GetOwner()
                 placed.owner=owner and owner:get_address() or m:get_address()
                 return placed
             end)

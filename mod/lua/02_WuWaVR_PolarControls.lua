@@ -1800,7 +1800,10 @@ function lens.update()
     -- the effect at about 40% for the game's usual 1-2 m focus distances; in
     -- the headset 10 cm suited best (test 3d).
     local nearest=number("WuWaControls_LensNearest",10,5,150)
-    local paused=mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre")
+    -- The diorama multiplies eye separation, so a cm move would cross the eyes there;
+    -- it has its own camera offsets instead (VR_WuWaDiorama*Offset).
+    local paused=mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre") or
+        enabled("WuWaDiorama_Enabled")
     local clipping=nearclip.setting()>10
     local hiding=enabled("WuWaControls_HideNearCharacters") or enabled("WuWaControls_NearHint")
     lens.ctx=nil
@@ -1808,7 +1811,8 @@ function lens.update()
         lens.dolly=0; lens.pos=nil; nearclip.publish(0)
         if pcm then dof.update(pcm,pcm:GetFOVAngle(),0) end
         if strength<=0 then lens.publish("Off"..dof.text())
-        elseif paused then lens.publish("Paused: game camera in full VR only"..dof.text()) end
+        elseif paused then lens.publish((enabled("WuWaDiorama_Enabled") and "Paused in the diorama" or
+            "Paused: game camera in full VR only")..dof.text()) end
         return
     end
     local fov=pcm:GetFOVAngle()

@@ -28,10 +28,11 @@ public:
         Draw(Scale& owner, float normal) noexcept : owner_{owner}, previous_{current_} {
             if (previous_ && &previous_->owner_ == &owner) {
                 value_ = previous_->value_;
+                active_ = previous_->active_;
             } else {
-                const bool active = owner.requested();
-                owner.active_.store(active);
-                value_ = active ? owner.miniature() : normal;
+                active_ = owner.requested();
+                owner.active_.store(active_);
+                value_ = active_ ? owner.miniature() : normal;
             }
             current_ = this;
         }
@@ -46,6 +47,7 @@ public:
         Scale& owner_;
         const Draw* previous_;
         float value_{};
+        bool active_{};
         static inline thread_local const Draw* current_{};
     };
 
@@ -53,6 +55,13 @@ public:
         if (Draw::current_ && &Draw::current_->owner_ == this)
             return Draw::current_->value_;
         return active_.load() ? miniature() : normal;
+    }
+    // Whether this draw is the diorama: chooses the diorama camera's offsets
+    // (the same choice as the scale, so both eyes and nested passes agree).
+    bool shown() const noexcept {
+        if (Draw::current_ && &Draw::current_->owner_ == this)
+            return Draw::current_->active_;
+        return active_.load();
     }
 
 private:

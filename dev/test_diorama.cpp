@@ -75,6 +75,26 @@ int main() {
     gentle.set_miniature(std::nanf("")); assert(gentle.miniature() == 10.0f);
     gentle.request(false);
     { Scale::Draw off{gentle, 1.0f}; assert(gentle.effective(1.0f) == 1.0f); }
+    // The diorama camera follows the same per-draw choice as the scale: a toggle
+    // between the eyes never gives one eye the diorama offsets and the other not.
+    Scale camera;
+    assert(!camera.shown());
+    {
+        Scale::Draw draw{camera, 1.0f};
+        assert(!camera.shown());
+        camera.request(true);
+        Scale::Draw second_eye{camera, 1.0f};
+        assert(!camera.shown() && camera.effective(1.0f) == 1.0f);
+    }
+    { Scale::Draw next{camera, 1.0f}; assert(camera.shown() && camera.effective(1.0f) == 10.0f); }
+    assert(camera.shown()); // outside a draw: the last draw's choice
+    camera.request(false);
+    {
+        Scale::Draw draw{camera, 1.0f};
+        assert(!camera.shown());
+        Scale::Draw nested{camera, 1.0f};
+        assert(!camera.shown());
+    }
     std::cout << "PASS: five normal scales, mid-pair toggles, nested captures, reset, manual edit, exception unwind, restart, "
-                 "player diorama scale per draw and clamped\n";
+                 "player diorama scale per draw and clamped, diorama camera per draw\n";
 }

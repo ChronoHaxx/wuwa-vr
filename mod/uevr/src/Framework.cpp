@@ -21,6 +21,7 @@
 #include "utility/WuWaModuleCapture.hpp"
 #include "utility/WuWaLguiProbe.hpp"
 #include "utility/WuWaPlanarProbe.hpp"
+#include "utility/WuWaConfigSave.hpp"
 #include "utility/WuWaLodProbe.hpp"
 #include "utility/WuWaTranslucencyStereo.hpp"
 #include "utility/WuWaKuroReflection.hpp"
@@ -1090,6 +1091,11 @@ std::filesystem::path Framework::get_persistent_dir() {
 
 void Framework::save_config() {
     std::scoped_lock _{m_config_mtx};
+
+    if (wuwa_config_save::paused.load()) {
+        spdlog::info("Not saving config.txt: Save changes for next time is off");
+        return;
+    }
 
     spdlog::info("Saving config config.txt");
 

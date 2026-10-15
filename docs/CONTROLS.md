@@ -41,7 +41,9 @@ window.
 
 **Mouse cursor:** in the headset the game's mouse cursor is drawn on the game's
 UI panel while the game shows it (menus, Alt), until 10 seconds after the mouse
-last moved, so keyboard-and-mouse players can see what they point at.
+last moved, so keyboard-and-mouse players can see what they point at. A pinned
+controls card (or a test's step card) sinks while you use the mouse and comes
+back when the cursor hides; a card you hold up keeps its place.
 
 **Move the menu:** press **Y** (gamepad) or choose **Move menu** on the Menu
 page. Gamepad: left stick moves it, right stick changes the distance, A puts it
@@ -347,17 +349,22 @@ Physical gamepad passthrough bypasses these controller shortcuts.
 The menu control remains **VR → WuWa Controls → Diorama mode (optional) →
 Miniature world (this launch only)**. Diorama temporarily uses the **Diorama scale**
 (WuWa VR menu, Quick page; `VR_WuWaDioramaScale`, 2-10×, default 10×) for a
-miniature view, with the portal on or off. 10× is the action-figure view; with
-a close game camera it can cross your eyes, so 3-5× is gentler. The scale is
-saved; the diorama switch itself is not. It requires Native Stereo; AFR
+miniature view, with the portal on or off. 10× is the action-figure view. The
+diorama has its own camera offsets (WuWa VR menu, Camera page, **Diorama
+camera**; `VR_WuWaDioramaForwardOffset` / `RightOffset` / `UpOffset`, default
+5 m back, centred): it multiplies how far apart your eyes are, so the offsets of
+a close game camera put the miniature character inside your eyes. They apply only
+while the diorama is on, never change your normal offsets, and close-up match
+pauses meanwhile. The scale and the diorama camera are saved; the diorama switch
+itself is not. It requires Native Stereo; AFR
 disables it. No new keyboard binding is added.
 
 Turning it off returns to the current normal `VR_WorldScale`. The toggle never
 overwrites that value; intentional normal-scale slider or preset edits remain
 when you turn it off. It starts off each launch, configuration reload and runtime
 reinitialization. Head translations also scale up; use existing **Recenter
-(L3 + A)** if displaced. Camera offsets, portal dimensions, HUD and renderer
-settings are unchanged. Physical stereo, comfort and return-to-normal acceptance
+(L3 + A)** if displaced. Your normal camera offsets, portal dimensions, HUD and
+renderer settings are unchanged. Physical stereo, comfort and return-to-normal acceptance
 remain pending.
 
 ## Optional optical hand demo

@@ -58,6 +58,7 @@ navigation. That keeps every input behaving the same:
 | Change a choice or slider | Click the arrows, drag the bar | Left / right | Left / right |
 | Switch page | Click the tab | LB / RB (VR: grips) | Tab / Shift+Tab |
 | Back / close | Close button | B (VR: B or Y) | Esc |
+| Back to the setting's default | | X (Xbox, or VR controllers mode) | Delete / Backspace |
 
 **Sticks give one direction at a time.** A push counts only when it is well
 past centre and mostly along one axis (`StickReader`), so a slightly diagonal
@@ -85,6 +86,27 @@ is open.
 Labels are short, and each item's longer explanation sits in a help strip at the
 bottom for the focused item. The theme is black and gold, matching the launcher
 and the site.
+
+**Every setting says whether it is kept and what its default is (1.2.3).** A
+second line in the help strip reads "Default: On. Saved for next time." (the
+default in the row's own format: On / Off, the choice's name, or the number
+with its unit), adding "X or Delete: back to the default." when the value
+differs and the laser is not in use. Rows that last only this launch (diorama,
+VR controllers, record video, treadmill run, what happened, Save changes for
+next time) read "This launch only: not saved." The `setting_*` helpers fill
+`default_text`, `is_default` and `reset` from the setting's own
+`default_value()` (UEVR's accessor returned a non-const reference to a const
+member and failed to compile once called; `mod/uevr/src/Mod.hpp` carries the
+const fix). Custom rows (view, camera, slot, language, menu place) show no
+default line.
+
+**Save changes for next time** (Menu page, this launch only, default on).
+UEVR saves `config.txt` whenever a menu opens or closes. Off,
+`Framework::save_config` writes nothing (`WuWaConfigSave.hpp`, logged "Not
+saving config.txt"), so settings can be tried freely and the next launch starts
+from the saved ones; the header shows a red NOT SAVING badge (REC takes its
+place while recording). Turning it back on saves the current settings at the
+next open or close.
 
 **The laser works for everyone.** While the menu is open and an OpenXR
 controller is tracked, the pointer and trigger drive the menu, whether or not
@@ -117,13 +139,21 @@ REC badge with the elapsed time shows while recording.
    distance and height; freecam style, speed, turn speed and collision; first
    person motion, body visibility and level horizon. Then, for every mode:
    world scale, the camera offset (forward / back, right / left, up / down in
-   cm, and reset), and recenter.
+   cm, and reset), the **diorama camera** (its own forward / back, right /
+   left and up / down, default 5 m back and centred, and reset), and recenter.
+   The diorama multiplies eye separation by its scale, so a camera that suits
+   normal play puts the character too close and crosses the eyes there; while
+   the diorama is shown (per draw, `Scale::shown()`), `VR::get_camera_*_offset`
+   returns `VR_WuWaDioramaForwardOffset` / `RightOffset` / `UpOffset` instead of
+   the normal offsets, which stay as they were. Holding RT in the classic menu
+   nudges the diorama set while the diorama is on, and RT + B resets it.
 4. **Cinema:** view, the game's own fix for cutscene black bars (Cinematic:
    Fullscreen in WuWa's graphics settings), close-up match and its closest
    distance, **depth of field (experiment)**, the cinematic scene note,
    automatic cinematic screen and what story scenes use, matched framing.
-5. **HUD:** size, distance, **HUD shape (full VR)** (`UI_WuWaHudShape`,
-   default 1.33; shown only when the window-size UI below cannot install), up / down, left / right, follow head, refresh
+5. **HUD:** size, distance, **16:9 UI layout** (`VR_WuWaUiWindowSize`,
+   default on; see below), **HUD shape (full VR)** (`UI_WuWaHudShape`,
+   default 1.33; shown only while the taller layout is in use), up / down, left / right, follow head, refresh
    layout, controls cards (on / off, keep open, size, height, distance) and
    view hints.
 6. **Controllers:** VR controllers on / off with a live status line (which
@@ -154,8 +184,9 @@ REC badge with the elapsed time shows while recording.
    once when this menu or the classic one sends the start request) or a
    treadmill run is on; OBS at other times needs Always. A profile that had test 2's
    `WuWaPrivacy_Enabled=true` and no mode yet starts on Always.
-10. **Menu:** language, menu size and distance, laser status, how each input works,
-   the classic menu, and the switch back to UEVR's window.
+10. **Menu:** language, **Save changes for next time**, menu size and
+   distance, laser status, how each input works, the classic menu, and the
+   switch back to UEVR's window.
 
 Pages rebuild when a plan step, the camera mode or the language changes; the
 same page and, where it still exists, the same row stay selected. Live rows
@@ -167,11 +198,19 @@ screen canvas from the local player's left-eye projection data, where stock
 LGUI asks for the window size, so in full VR the layout, the UI projection and
 the mouse ray took the eye's shape: cropped story pictures, the squash below,
 and a cursor that picked the wrong item. `WuWaLguiViewport.hpp` replaces that
-rect with the window size in its three readers (canvas size, the projection's
-inlined copy, the view-rect getter), only in full VR with the UI redirect on.
-The HUD is then the flat game's 16:9 layout and the slate keeps 1.0; the HUD
-shape row is hidden. If the code fingerprints differ (a game update), the hooks
-stay off and the behaviour below applies.
+rect with the window size in its five readers (canvas size, the projection's
+inlined copy, the view-rect getter, and the two UI point conversions that
+controller presses use), only in full VR with the UI redirect on. The HUD is
+then the flat game's 16:9 layout and the slate keeps 1.0; the HUD shape row is
+hidden. If the code fingerprints differ (a game update), the hooks stay off and
+the behaviour below applies.
+
+The HUD page's **16:9 UI layout** switch turns this off for players who prefer
+1.2.2's taller layout (the Terminal fits on one page; the character screen's
+floor reflection lines up in test 16's recordings). Switching moves the hooks
+and the panel at once and asks for a HUD layout refresh (as after a view
+switch), because the game's UI scaler keeps its old size until then. The
+taller layout brings back the flatter icons (HUD shape) and the mouse offset.
 
 **Why the HUD looked squashed in full VR only (before 1.2.3).** The log shows the UI pass
 drawn for the square eye (`stage3_fit original=0,0,3292,3292`) and fitted into
@@ -254,9 +293,12 @@ since test 3f (closer than the 2D shot).
   and `[WuWaHide] shown again (why)`.
 - **The note (`WuWaControls_NearHint`, default on):** with hiding off, a
   character found at your eyes at a cut sets `WuWaControls_NearSeen`, and the VR
-  menu shows "Someone at your eyes" with the shortcut for 7 seconds, once per
-  scene (again only after 2 minutes without one), after the cinematic-scene note
-  if both are due. Full VR only.
+  menu shows a short note at the top of the view ("Hide characters at your
+  eyes", "LT + RT, then Y") for 5 seconds, once per scene (again only after 2
+  minutes without one), after the cinematic-scene note if both are due. Full VR
+  only. Test 16's note was the low, wide cinematic-note panel and sat in the way
+  of the dialogue; the compact one keeps its lines at 24 px or more (head-locked
+  at 2 m, 1 px is about 1 mm).
 - **Near clip in close-ups (test 15, `WuWaControls_CloseUpNearClip`, 10-50 cm,
   default 10 = off):** the first fix raised the near clip plane in close-ups,
   kept 10 cm short of the game's focus, the centre trace and anyone in the 2D
@@ -329,7 +371,7 @@ final settings exist:
 - **Log:** `[WuWaDoF] copy blur|all 1 -> 2 (auto): focus a / b cm, f-stop,
   sensor, blades` every 5 s, or `copy skipped: ...` with the values.
 
-**Depth of field** (`WuWaStereo_DepthOfField`, default off). Mono theatre is
+**Depth of field** (`WuWaStereo_DepthOfField`, default on). Mono theatre is
 a single view and keeps the blur. The camera script sets the engine's
 `ShowFlag.DepthOfField` console variable to 1 (force on) and back to 2 (the
 game decides), logging `[WuWaDoF]`. If the variable is missing from this build

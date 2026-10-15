@@ -358,7 +358,15 @@ void WuWaControlsComponent::on_config_load(const utility::Config& cfg, bool set_
         wuwa_l10n::request(m_language->value(), Framework::get_persistent_dir("wuwa-languages"));
     if (!wuwa_test::is_wuwa() || set_defaults || !m_recovery.launch().empty()) return;
     auto launch=cfg.get_key_values();
-    for (const IModValue& value : m_options) launch[value.get_config_name()]=value.get();
+    // Settings only: live status and request values (auto cinema, PlayStation state, the
+    // controls card...) save nothing, and their text failed valid_value_like, so every
+    // "Restore controls from this launch" and its Undo threw.
+    for (IModValue& value : m_options) {
+        utility::Config saved;
+        value.config_save(saved);
+        if (saved.get(value.get_config_name())) launch[value.get_config_name()]=value.get();
+        else launch.erase(value.get_config_name());
+    }
     m_recovery.remember_launch(launch);
     try {
         utility::Config supplied;
@@ -968,12 +976,9 @@ void draw_vr_cursor(ImDrawList* list, ImVec2 tip, float scale) {
 }
 }
 
-bool WuWaControlsComponent::cursor_visible() const {
-    // Only over the game UI panel: never with a menu, warning or card using the overlay, and
-    // only while the game itself shows its cursor (menus, Alt) and the mouse moved lately.
-    if (!wuwa_test::is_wuwa() || g_framework->get_window() == nullptr || g_framework->is_drawing_ui()) return false;
-    auto& vr = VR::get();
-    if (!vr->is_hmd_active() || !vr->is_gui_enabled() || status_warning_visible() || floor_visible()) return false;
+bool WuWaControlsComponent::mouse_in_use() const {
+    // The game itself shows its cursor (menus, Alt) and the mouse moved lately.
+    if (!wuwa_test::is_wuwa() || g_framework->get_window() == nullptr) return false;
     if (!fresh_menu_cursor() || !vr_cursor_moved_recently()) return false;
     DWORD process{};
     GetWindowThreadProcessId(GetForegroundWindow(), &process);
@@ -981,10 +986,20 @@ bool WuWaControlsComponent::cursor_visible() const {
     return process == GetCurrentProcessId() && vr_cursor_position(position);
 }
 
+bool WuWaControlsComponent::cursor_visible() const {
+    // Only over the game UI panel: never with a menu, warning or held card using the overlay.
+    if (!wuwa_test::is_wuwa() || g_framework->get_window() == nullptr || g_framework->is_drawing_ui()) return false;
+    auto& vr = VR::get();
+    if (!vr->is_hmd_active() || !vr->is_gui_enabled() || status_warning_visible() || floor_visible()) return false;
+    return mouse_in_use();
+}
+
 bool WuWaControlsComponent::floor_visible() const {
-    // A guided test plan uses the card's place for its current step.
+    // A guided test plan uses the card's place for its current step. The overlay is one panel, so
+    // the step card, like the pinned card, steps aside while the mouse is in use (test 16: with
+    // either one up the VR cursor never showed).
     return wuwa_test::is_wuwa() && !g_framework->is_drawing_ui() && VR::get()->is_hmd_active() &&
-        (card_visible() || wuwa_menu_host::overlay_wanted());
+        (card_visible() || (wuwa_menu_host::overlay_wanted() && !mouse_in_use()));
 }
 
 namespace {
@@ -1015,9 +1030,11 @@ constexpr int view_hint_count = 5;
 bool WuWaControlsComponent::card_visible() const {
     const bool eligible = wuwa_test::is_wuwa() && m_cards->value() && !g_framework->is_drawing_ui() && VR::get()->is_hmd_active();
     wuwa_sheet::CardState state;
-    // A loaded test plan's step keeps the card's place unless you hold a card up.
+    // A loaded test plan's step keeps the card's place unless you hold a card up. A pinned
+    // card sinks while the mouse is in use, so the VR cursor can use the overlay, and rises
+    // again 10 s after the mouse stops.
     const bool holding = eligible && held_card(state);
-    const bool wanted = eligible && (holding || (m_pin_card->value() && !wuwa_menu_host::overlay_wanted()));
+    const bool wanted = eligible && (holding || (m_pin_card->value() && !wuwa_menu_host::overlay_wanted() && !mouse_in_use()));
     const auto now = GetTickCount64();
     std::scoped_lock lock{m_card_mutex};
     if (!eligible) {

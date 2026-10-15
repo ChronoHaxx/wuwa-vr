@@ -39,6 +39,12 @@ struct Item {
     std::function<std::string()> value_text; // live text for Action and Text rows
     bool wrap{};     // Text: a paragraph, as tall as it needs
     bool emphasis{}; // Text: a heading in gold
+    // Settings: the default as shown (English or a number), whether the value is the
+    // default, and a reset (X / Delete). Rows without them show no default line.
+    std::function<std::string()> default_text;
+    std::function<bool()> is_default;
+    std::function<void()> reset;
+    bool session_only{}; // this launch only: never saved
 };
 
 inline Item make(Kind kind, std::string label, std::string help = {}) {
@@ -57,9 +63,9 @@ struct Page {
 // Discrete moves from a gamepad or keyboard, gathered by the host each frame as
 // new presses (or key repeats), never as held state.
 struct Moves {
-    bool up{}, down{}, left{}, right{}, accept{}, back{}, prev_page{}, next_page{};
+    bool up{}, down{}, left{}, right{}, accept{}, back{}, prev_page{}, next_page{}, reset{};
     int scale{1}; // steps per left / right move on a slider; grows while held
-    bool any() const { return up || down || left || right || accept || back || prev_page || next_page; }
+    bool any() const { return up || down || left || right || accept || back || prev_page || next_page || reset; }
 };
 
 // Turns a held direction into moves: one when pressed, then, after a pause,
@@ -290,6 +296,7 @@ inline void apply_moves(std::vector<Page>& pages, State& state, const Moves& mov
     if (moves.left) nudge(item, -1, moves.scale);
     if (moves.right) nudge(item, +1, moves.scale);
     if (moves.accept) activate(item);
+    if (moves.reset && item.reset && (!item.enabled || item.enabled())) item.reset();
 }
 
 struct Look {
@@ -309,7 +316,8 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
 void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wuwa_steps::Plan& plan, int index,
     const std::string& recording, const std::string& error);
 
-// A short note in view: a title and up to two lines, on a 1600 x 900 design.
+// A short note in view: a title and up to two lines, on a 1600 x 900 design. Low in view by
+// default; compact is a smaller one at the top, clear of dialogue lines and choices.
 void draw_note(ImDrawList* list, const ImVec2& size, ImFont* font, const std::string& title, const std::string& line1,
-    const std::string& line2);
+    const std::string& line2, bool compact = false);
 }

@@ -253,6 +253,14 @@ test('the close-up move stops behind a performer in front of the person in focus
     eq(fg,'120','foreground: the performer\'s near side')
     eq(dolly,90,'close-up move held 30 cm behind the performer')
 end)
+test('the diorama pauses the close-up move and hiding (it has its own camera)',function()
+    local f=world(fixture()); f.values[HIDE]='true'; f.pp.bOverride_DepthOfFieldFocalDistance=true
+    local a=f:person('intruder',AT_EYE)
+    f:frames(3); assert(hidden(a),'not hidden before the diorama')
+    f.values.WuWaDiorama_Enabled='true'; f:frame()
+    assert(shown(a),'still hidden in the diorama')
+    assert(f.values.WuWaControls_LensStatus:find('Paused in the diorama',1,true),f.values.WuWaControls_LensStatus)
+end)
 test('a parked party member and a blueprint template at the eye are left alone',function()
     local f=world(fixture()); f.values[HIDE]='true'
     local parked=f:person('parked',AT_EYE,{parked=true})

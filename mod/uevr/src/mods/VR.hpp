@@ -450,16 +450,18 @@ public:
         return m_enable_gui->value();
     }
 
+    // The diorama has its own camera offsets (saved; Camera page), used while it is
+    // shown; the normal offsets are never written by it.
     auto get_camera_forward_offset() const {
-        return m_camera_forward_offset->value();
+        return m_diorama.shown() ? m_diorama_forward_offset->value() : m_camera_forward_offset->value();
     }
 
     auto get_camera_right_offset() const {
-        return m_camera_right_offset->value();
+        return m_diorama.shown() ? m_diorama_right_offset->value() : m_camera_right_offset->value();
     }
 
     auto get_camera_up_offset() const {
-        return m_camera_up_offset->value();
+        return m_diorama.shown() ? m_diorama_up_offset->value() : m_camera_up_offset->value();
     }
 
     auto get_world_scale() const {
@@ -1113,6 +1115,13 @@ private:
     const ModSlider::Ptr m_world_scale{ ModSlider::create(generate_name("WorldScale"), 0.01f, 10.0f, 1.0f) };
     // Diorama's miniature scale (utility/WuWaDiorama.hpp); saved, unlike the diorama switch.
     const ModSlider::Ptr m_diorama_scale{ ModSlider::create(generate_name("WuWaDioramaScale"), 2.0f, 10.0f, 10.0f) };
+    // Diorama camera (Lelouche, 9 Oct: close camera for play, distant for the diorama).
+    // Offsets are cm and are not scaled, while the diorama multiplies the eye
+    // separation: at 10x a game camera ~3.5 m behind the character shows it ~35 cm
+    // away and crossed the eyes. -500 cm puts it ~85 cm away at 10x.
+    const ModSlider::Ptr m_diorama_forward_offset{ ModSlider::create(generate_name("WuWaDioramaForwardOffset"), -4000.0f, 4000.0f, -500.0f) };
+    const ModSlider::Ptr m_diorama_right_offset{ ModSlider::create(generate_name("WuWaDioramaRightOffset"), -4000.0f, 4000.0f, 0.0f) };
+    const ModSlider::Ptr m_diorama_up_offset{ ModSlider::create(generate_name("WuWaDioramaUpOffset"), -4000.0f, 4000.0f, 0.0f) };
     wuwa_diorama::Scale m_diorama; // Session-only; deliberately absent from m_options.
     const ModSlider::Ptr m_depth_scale{ ModSlider::create(generate_name("DepthScale"), 0.01f, 1.0f, 1.0f) };
 
@@ -1247,6 +1256,9 @@ public:
             *m_camera_up_offset,
             *m_world_scale,
             *m_diorama_scale,
+            *m_diorama_forward_offset,
+            *m_diorama_right_offset,
+            *m_diorama_up_offset,
             *m_depth_scale,
             *m_custom_z_near,
             *m_custom_z_near_enabled,
@@ -1358,7 +1370,7 @@ private:
         {"All slots (unchanged)", "Only slot 0", "Only slot 1", "Only slot 2", "Only slot 3"}, 0) };
     const ModToggle::Ptr m_wuwa_focused_motion{ ModToggle::create(generate_name("WuWaFocusedMotionInput"), false) };
     const ModToggle::Ptr m_wuwa_lgui_redirect{ ModToggle::create(generate_name("WuWaLguiRedirect"), true) };
-    // Hidden: off restores 1.2.2's eye-shaped full VR UI, for A/B checks.
+    // HUD page "16:9 UI layout": off restores 1.2.2's taller, eye-shaped full VR UI.
     const ModToggle::Ptr m_wuwa_ui_window_size{ ModToggle::create(generate_name("WuWaUiWindowSize"), true) };
     const ModToggle::Ptr m_wuwa_lgui_menu_redirect{ ModToggle::create(generate_name("WuWaLguiMenuRedirect"), false) };
     const ModToggle::Ptr m_wuwa_world_labels{ ModToggle::create(generate_name("WuWaWorldLabelsStereo"), false) };

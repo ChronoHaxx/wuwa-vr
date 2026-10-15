@@ -75,6 +75,7 @@ public:
     bool status_warning_visible() const;
     // The game's mouse cursor drawn over its UI in the headset (the system cursor never reaches it).
     bool cursor_visible() const;
+    bool mouse_in_use() const; // a game menu's cursor, moved in the last 10 s, over the game window in front
     bool passive_overlay_visible() const { return status_warning_visible() || floor_visible() || cursor_visible(); }
     void draw_passive_overlay();
     Matrix4x4f floor_transform() const;
@@ -202,7 +203,7 @@ private:
     // plain post-process value (grading, vignette, exposure...) as well (test 3g).
     const ModCombo::Ptr m_stereo_effects{ModCombo::create("WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}, 1)};
     // Close-up subject: characters inside the 2D frame (3g) or the game's focus distance (3f).
-    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"}, 0)};
+    const ModCombo::Ptr m_lens_subject{ModCombo::create("WuWaControls_LensSubject", {"Characters in the shot", "Game focus only"}, 0)};
     const ModSlider::Ptr m_stereo_dof_strength{ModSlider::create("WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 1.0f)};
     // Full VR has its own strength (test 3h: half looked right in full VR; since the
     // close-up camera changes, 3m: 1x looks best there too, as on the screens).
@@ -212,7 +213,7 @@ private:
     // The test plan's step card takes the controls card's place below you; off
     // shows the controls card as a public release does (no plan there).
     const ModToggle::Ptr m_show_step_card{ModToggle::create("WuWaSteps_ShowCard", true)};
-    const ModCombo::Ptr m_lens_follow{ModCombo::create("WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"}, 0)};
+    const ModCombo::Ptr m_lens_follow{ModCombo::create("WuWaControls_LensFollow", {"Track the camera", "Fixed per shot", "Follow the focus"}, 0)};
     struct LensStatus : ModString {
         LensStatus() : ModString{"WuWaControls_LensStatus", ""} {}
         mutable std::mutex mutex;

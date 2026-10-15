@@ -1547,24 +1547,28 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
 
         // If user holding down RT with menu open...
         if (m_rt_modifier.draw) {
-            // Camera offset modification
+            // Camera offset modification (the diorama camera's own offsets while it is on)
+            const bool diorama = m_diorama.requested();
+            const auto& right_setting = diorama ? m_diorama_right_offset : m_camera_right_offset;
+            const auto& forward_setting = diorama ? m_diorama_forward_offset : m_camera_forward_offset;
+            const auto& up_setting = diorama ? m_diorama_up_offset : m_camera_up_offset;
             const auto right_ratio = (float)gamepad.sThumbLX / 32767.0f;
             const auto forward_ratio = (float)gamepad.sThumbLY / 32767.0f;
             const auto up_ratio = (float)gamepad.sThumbRY / 32767.0f;
 
             if (right_ratio <= -0.25f || right_ratio >= 0.25f) {
                 const auto right_offset = right_ratio * delta * 150.0f;
-                m_camera_right_offset->value() += right_offset;
+                right_setting->value() += right_offset;
             }
 
             if (forward_ratio <= -0.25f || forward_ratio >= 0.25f) {
                 const auto forward_offset = forward_ratio * delta * 150.0f;
-                m_camera_forward_offset->value() += forward_offset;
+                forward_setting->value() += forward_offset;
             }
 
             if (up_ratio <= -0.25f || up_ratio >= 0.25f) {
                 const auto up_offset = up_ratio * delta * 150.0f;
-                m_camera_up_offset->value() += up_offset;
+                up_setting->value() += up_offset;
             }
 
             if (gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) {
@@ -1632,9 +1636,16 @@ void VR::update_imgui_state_from_xinput_state(XINPUT_STATE& state, bool is_vr_co
             case 0:
             default:
                 if (gamepad.wButtons & XINPUT_GAMEPAD_B) {
-                    m_camera_right_offset->value() = 0.0f;
-                    m_camera_forward_offset->value() = 0.0f;
-                    m_camera_up_offset->value() = 0.0f;
+                    if (m_diorama.requested()) {
+                        // In the diorama: back to the diorama camera's defaults; the normal offsets stay.
+                        m_diorama_right_offset->value() = m_diorama_right_offset->default_value();
+                        m_diorama_forward_offset->value() = m_diorama_forward_offset->default_value();
+                        m_diorama_up_offset->value() = m_diorama_up_offset->default_value();
+                    } else {
+                        m_camera_right_offset->value() = 0.0f;
+                        m_camera_forward_offset->value() = 0.0f;
+                        m_camera_up_offset->value() = 0.0f;
+                    }
                 }
 
                 // Recenter
@@ -2859,7 +2870,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             ImGui::EndDisabled();
             if (is_using_afr())
                 wuwa_ui::TextWrapped("Diorama needs Native Stereo. Choose it under Stereo rendering compatibility.");
-            wuwa_ui::TextWrapped("Shrinks the world by the Diorama scale (%.0fx, set on the WuWa VR menu's Quick page) for an action-figure view. Turn off to return to your normal scale. Works with or without the portal window.", m_diorama_scale->value());
+            wuwa_ui::TextWrapped("Shrinks the world by the Diorama scale (%.0fx, set on the WuWa VR menu's Quick page) for an action-figure view, seen from the diorama camera (Camera page). Turn off to return to your normal scale. Works with or without the portal window.", m_diorama_scale->value());
             wuwa_ui::TextWrapped("Normal scale: %.3fx. Your saved scale and camera presets stay unchanged; intentional scale edits become the new normal value.", m_world_scale->value());
             wuwa_ui::TextWrapped("Head movement also scales up. Use Recenter if the view feels displaced. Starts off each launch and after reloading settings.");
         }

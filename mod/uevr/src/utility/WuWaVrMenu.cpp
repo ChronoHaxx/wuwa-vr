@@ -25,7 +25,7 @@ constexpr ImU32 faint = IM_COL32(104, 99, 90, 255);
 constexpr ImU32 track = IM_COL32(64, 61, 56, 255);
 
 // Design space: 1200 wide. Rows are 68 tall with an 8 gap.
-constexpr float width = 1200.0f, header_h = 84.0f, help_h = 116.0f, row_h = 68.0f, row_gap = 8.0f;
+constexpr float width = 1200.0f, header_h = 84.0f, help_h = 146.0f, row_h = 68.0f, row_gap = 8.0f;
 constexpr float left = 28.0f, right = 1172.0f, widget_left = 768.0f, widget_right = 1148.0f;
 
 std::string tr(const std::string& english) { return wuwa_l10n::text(english); }
@@ -283,6 +283,20 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
     if (state.focus >= 0 && state.focus < static_cast<int>(page.items.size()) && !page.items[state.focus].help.empty()) {
         write(at(left, strip + 14.0f), 24.0f, IM_COL32(214, 204, 184, 255), tr(page.items[state.focus].help), right - left);
     }
+    // Whether the focused setting is saved for next time, and its default.
+    if (state.focus >= 0 && state.focus < static_cast<int>(page.items.size())) {
+        const auto& item = page.items[state.focus];
+        std::string note;
+        if (item.session_only) {
+            note = tr("This launch only: not saved.");
+        } else if (item.default_text) {
+            char text[256]{};
+            std::snprintf(text, sizeof(text), tr("Default: %s. Saved for next time.").c_str(), tr(item.default_text()).c_str());
+            note = text;
+            if (item.is_default && !item.is_default() && !pointer) note += "  " + tr("X or Delete: back to the default.");
+        }
+        if (!note.empty()) write(at(left, strip + 80.0f), 21.0f, gold_dim, note, right - left);
+    }
     const auto hint = tr(pointer ? "Point and pull the trigger, or click. Scroll to see more."
                                  : "A select  ·  Left / right change  ·  LB / RB pages  ·  B close");
     write(at(left, height - 36.0f), 22.0f, gold_dim, hint);
@@ -341,19 +355,30 @@ void draw_step_card(ImDrawList* list, const ImVec2& size, ImFont* font, const wu
 }
 
 void draw_note(ImDrawList* list, const ImVec2& size, ImFont* font, const std::string& title, const std::string& line1,
-    const std::string& line2) {
+    const std::string& line2, bool compact) {
     if (!list || !font) return;
-    // Low in view, so the scene behind it stays visible.
+    // Low in view, so the scene behind it stays visible. Compact: short lines at the top edge,
+    // about 10-12 degrees above the line of sight (test 16: the low note was in the way of a
+    // dialogue). Head-locked at 2 m, 1 px is about 1 mm: under 24 px is hard to read.
     const float s = (std::min)(size.x / 1600.0f, size.y / 900.0f);
     const ImVec2 origin{(size.x - 1600.0f * s) * 0.5f, (size.y - 900.0f * s) * 0.5f};
     const auto at = [&](float x, float y) { return ImVec2{origin.x + x * s, origin.y + y * s}; };
+    const float room = compact ? 820.0f : 1300.0f;
     const auto centered = [&](float y, float px, ImU32 color, const std::string& english) {
         const auto text = tr(english);
         const float natural = font->CalcTextSizeA(px * s, FLT_MAX, 0.0f, text.c_str()).x;
-        const float fitted = px * s * (std::min)(1.0f, 1300.0f * s / (std::max)(natural, 1.0f));
+        const float fitted = px * s * (std::min)(1.0f, room * s / (std::max)(natural, 1.0f));
         const float w = font->CalcTextSizeA(fitted, FLT_MAX, 0.0f, text.c_str()).x;
         list->AddText(font, fitted, ImVec2{size.x * 0.5f - w * 0.5f, origin.y + y * s}, color, text.c_str());
     };
+    if (compact) {
+        list->AddRectFilled(at(370, 12), at(1230, 136), IM_COL32(10, 10, 14, 220), 16 * s);
+        list->AddRect(at(370, 12), at(1230, 136), gold, 16 * s, 0, 2 * s);
+        centered(20, 32, gold, title);
+        if (!line1.empty()) centered(60, 28, ink, line1);
+        if (!line2.empty()) centered(98, 24, muted, line2);
+        return;
+    }
     list->AddRectFilled(at(120, 560), at(1480, 790), IM_COL32(10, 10, 14, 236), 22 * s);
     list->AddRect(at(120, 560), at(1480, 790), gold, 22 * s, 0, 3 * s);
     centered(584, 46, gold, title);

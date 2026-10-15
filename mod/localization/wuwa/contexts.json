@@ -26,6 +26,9 @@
   "1280 px": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "16:9 UI layout": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "30 fps": [
     "mods/vr/WuWaControlsComponent.hpp",
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -235,6 +238,9 @@
   "Back to the WuWa VR menu": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Back to the diorama defaults: 5 m back, centred. The normal offsets stay as they are.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Back to the game camera.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -353,7 +359,7 @@
   "Characters in the shot": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: the test 3f behaviour.": [
+  "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: aims by the game's focus distance alone and does not look for people.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Checklist item": [
@@ -477,6 +483,9 @@
   "Decoupled pitch": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Default: %s. Saved for next time.": [
+    "utility/WuWaVrMenu.cpp"
+  ],
   "Default: F7. Xbox: hold L3, then squeeze LT. Release both before repeating. Portal size and curvature are preserved; enabling anchors it in front of you.": [
     "mods/WindowMode.cpp"
   ],
@@ -514,6 +523,9 @@
   "Diorama (miniature world)": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Diorama camera": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Diorama is on at %.0fx. This slider edits the normal scale restored when you turn it off in WuWa Controls.": [
     "mods/VR.cpp"
   ],
@@ -531,6 +543,15 @@
   ],
   "Diorama uses a temporary miniature scale (Diorama scale on the WuWa VR menu's Quick page, 10x by default) with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Diorama: forward / back": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Diorama: right / left": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Diorama: up / down": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Direct PlayStation shortcuts are experimental. The game still receives their buttons. Steam Input is preferred when available; release all controls after changing input sources.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -696,7 +717,7 @@
   "Fixed camera height above pawn (game units)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Fixed per shot (3g)": [
+  "Fixed per shot": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Fixed third person": [
@@ -721,7 +742,7 @@
   "Follow animated head / neck position (Custom)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Follow the focus (3h)": [
+  "Follow the focus": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Follow view keeps the HUD with your head. Distance still sets its stereo depth; choose a comfortable size and distance in the headset.": [
@@ -870,13 +891,13 @@
   "Game camera: WuWa's own camera. Fixed third person: a steady camera behind you. Freecam: fly the camera anywhere, for cutscenes and photos. First person: through your character's eyes. Options for each are on the Camera page.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Game focus only (3f)": [
+  "Game focus only": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Game lens": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Game lens: the stereo screen frames every shot exactly like the 2D view, in 3D. Wide: the fixed 90 degree view used before test 3f.": [
+  "Game lens: the stereo screen frames every shot exactly like the 2D view, in 3D. Wide: the fixed 90 degree view used in older versions.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Game-view override shows the game's camera direction while either stick is used, then returns to animation 0.4 seconds after release. Full animation and headset view can still disagree with movement or target selection; aim alignment remains under investigation. These options never rotate or move the character for you.": [
@@ -1039,9 +1060,6 @@
   "Hold L3: controls card": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Hold LT + RT, then press Y to hide characters right at your eyes. Anyone in the shot stays.": [
-    "mods/vr/WuWaVrMenuHost.cpp"
-  ],
   "Hold LT + RT: click R3 for the next view (full VR, stereo screen, mono), hold R3 for full VR; hold L3 for 0.8 s to toggle the screen. Screen off also exits mono. Mono keeps flat menu backgrounds and controls together.": [
     "mods/VR.cpp"
   ],
@@ -1121,7 +1139,7 @@
   "How near Close-up match may bring you to the person in the shot. Lower comes closer. Close-up match at 100 already gives the 2D size; this only stops it short when the shot is very tight.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "How small the world gets in diorama. 10x is an action-figure view. If a close game camera crosses your eyes, try 3x to 5x.": [
+  "How small the world gets in diorama. 10x is an action-figure view. The diorama has its own camera distance (Camera page).": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "How strong the 3D is on the stereo screen. 1x matches the headset's eye distance to the lens; 0 is flat.": [
@@ -1334,7 +1352,8 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "LT + RT, then Y": [
-    "mods/vr/WuWaControlsComponent.cpp"
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "LT + RT, then click L3": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1525,6 +1544,12 @@
   "Moves the HUD up or down.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Moves your diorama viewpoint sideways.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Moves your diorama viewpoint up, to look down on the miniature, or down.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Moves your viewpoint forward from the game camera. Forward brings dialogue close-ups nearer, closer to how the 2D shot frames them. Applies in normal play too.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1544,6 +1569,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Multiplies the blur on the stereo screen and mono theatre. 1x is the 2D view's look.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "NOT SAVING": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Native Stereo Fix frame timing (experimental)": [
@@ -1616,7 +1644,13 @@
   "On uses our LGUI capture. Off shows the game's original HUD in the eye images. This does not hide the UEVR settings panel.": [
     "mods/VR.cpp"
   ],
+  "On: full VR lays out the HUD and menus like the flat game (16:9): round icons, story pictures whole, and the mouse hits what it points at. Off: 1.2.2's taller layout, where the Terminal fits on one page and the character screen's floor reflection lines up, but icons look flatter (HUD shape) and the mouse can miss.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "On: the HUD stays in front of your eyes. Off: it stays put in the world and you look at it.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "On: your settings are saved whenever this menu opens or closes. Off: try things freely; nothing is saved, and the game starts with your saved settings next time. Turning it back on saves what you have now. For each setting, the help at the bottom says whether it is saved and what its default is.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Only slot 0": [
@@ -1924,6 +1958,9 @@
   "Reset camera offset": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Reset diorama camera": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Reset headset position and direction now": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1986,6 +2023,9 @@
   ],
   "Safe fit inside rounded edges": [
     "mods/vr/OverlayComponent.hpp"
+  ],
+  "Save changes for next time": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Save observation": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2095,7 +2135,7 @@
   "Shows the world as a miniature around you, with the portal on or off. Needs Native Stereo. This launch only.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Shrinks the world by the Diorama scale (%.0fx, set on the WuWa VR menu's Quick page) for an action-figure view. Turn off to return to your normal scale. Works with or without the portal window.": [
+  "Shrinks the world by the Diorama scale (%.0fx, set on the WuWa VR menu's Quick page) for an action-figure view, seen from the diorama camera (Camera page). Turn off to return to your normal scale. Works with or without the portal window.": [
     "mods/VR.cpp"
   ],
   "Simulator: keep its preview open, choose Both eyes / side-by-side, and turn Full render off. Recording uses the preview size.": [
@@ -2144,9 +2184,6 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Soft contact shadows in corners and under objects. On by default. It keeps the game's own setting and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer. Off is a little faster.": [
-    "mods/vr/WuWaVrMenuHost.cpp"
-  ],
-  "Someone at your eyes": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Speed": [
@@ -2369,6 +2406,9 @@
   "This is a flat rectangular HUD: corners can extend over rounded/feathered edges. Use Safe fit to keep every corner inside, or use a rectangular portal for exact alignment.": [
     "mods/vr/OverlayComponent.cpp"
   ],
+  "This launch only: not saved.": [
+    "utility/WuWaVrMenu.cpp"
+  ],
   "This older profile has no supplied-defaults file. Reset this build in the launcher while the game is closed, or use this launch's settings below.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -2387,7 +2427,7 @@
   "Track the camera": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Track the camera: the distance is measured at each cut, then follows only the game camera's own moves, so a focus change cannot move you. Fixed per shot: test 3g. Follow the focus: test 3h (moved with focus changes).": [
+  "Track the camera: the distance is measured at each cut, then follows only the game camera's own moves, so a focus change cannot move you. Fixed per shot: the distance stays as it was at the cut. Follow the focus: it also moves when the game changes focus.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Transition duration (seconds)": [
@@ -2469,6 +2509,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Use this menu when opening UEVR": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Used instead of the offsets above while the diorama is on. The diorama makes your eyes far apart, so a camera that suits normal play puts the character too close and crosses your eyes. The default, 5 m back, shows it about an arm's length away at 10x.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Uses one game camera pose for both eyes during the same frame, while preserving headset movement and eye separation. Requires Native Stereo Fix. The owner confirmed the ultimate return-to-gameplay fix. Other scene transitions remain under test; this does not repair foliage.": [
@@ -2561,6 +2604,9 @@
   "Where this menu floats around you. Full VR and the screen views each keep their own place; on a screen view Low sits just under the picture, whatever its size and distance, and the menu always stays in front of it.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Where your viewpoint sits in the diorama, from the game camera. Back (minus) moves the miniature farther away.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Where: ": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2628,6 +2674,9 @@
   ],
   "X + stick  Scroll    D-pad Move map": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "X or Delete: back to the default.": [
+    "utility/WuWaVrMenu.cpp"
   ],
   "XInput controller slot (test)": [
     "mods/VR.cpp"

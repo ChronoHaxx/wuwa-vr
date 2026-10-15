@@ -27,6 +27,7 @@
 #include "mods/VR.hpp"
 #include "utility/WuWaDofSync.hpp"
 #include "utility/WuWaNearClip.hpp"
+#include "utility/WuWaConfigSave.hpp"
 #include "utility/WuWaLocalization.hpp"
 #include "utility/WuWaLocalizedUI.hpp"
 #include "utility/WuWaRunMarker.hpp"
@@ -68,7 +69,7 @@ std::mutex hint_mutex{};
 CinemaHint hint{};
 // Test 16: "someone at your eyes" uses the same once-per-episode timing; an episode
 // ends after two minutes without such a character.
-CinemaHint near_hint{300, 7000, 120000};
+CinemaHint near_hint{300, 5000, 120000};
 int hint_kind{}; // 1 cinematic scene, 2 someone at your eyes
 
 std::int64_t unix_ms() {
@@ -176,7 +177,9 @@ nlohmann::json context() {
     for (const char* key : {"VR_RenderingMethod", "VR_NativeStereoFix", "VR_ExtremeCompatibilityMode", "VR_2DScreenMode",
              "VR_MonoTheatreMode", "VR_HorizontalProjectionOverride", "VR_AutoCinema", "VR_DecoupledPitch",
              "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape", "WuWaControls_LensMatch",
-             "WuWaControls_LensNearest", "WuWaControls_CloseUpNearClip", "WuWaControls_HideNearCharacters", "VR_WuWaDioramaScale", "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
+             "WuWaControls_LensNearest", "WuWaControls_CloseUpNearClip", "WuWaControls_HideNearCharacters", "VR_WuWaDioramaScale",
+             "VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset", "VR_WuWaUiWindowSize",
+             "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
         if (auto* value = cached(key)) settings[key] = value->get();
     }
     if (auto* scale = resolution_scale()) settings["OpenXR_ResolutionScale"] = scale->get();
@@ -209,7 +212,26 @@ Item setting_toggle(const char* label, const char* help, const char* key) {
     item.enabled = [key] { return typed<bool>(key) != nullptr; };
     item.get_bool = [key] { auto* v = typed<bool>(key); return v && v->value(); };
     item.set_bool = [key](bool on) { if (auto* v = typed<bool>(key)) v->value() = on; };
+    item.default_text = [key] { auto* v = typed<bool>(key); return std::string{v && v->default_value() ? "On" : "Off"}; };
+    item.is_default = [key] { auto* v = typed<bool>(key); return !v || v->value() == v->default_value(); };
+    item.reset = [key] { if (auto* v = typed<bool>(key)) v->value() = v->default_value(); };
     return item;
+}
+
+// Default line and reset for number rows: the default in the row's own format.
+template <typename T>
+void number_default(Item& item, const char* key, const char* format, float step) {
+    item.default_text = [key, format] {
+        auto* v = typed<T>(key);
+        char text[64]{};
+        if (v) std::snprintf(text, sizeof(text), format, static_cast<float>(v->default_value()));
+        return std::string{text};
+    };
+    item.is_default = [key, step] {
+        auto* v = typed<T>(key);
+        return !v || std::fabs(static_cast<float>(v->value()) - static_cast<float>(v->default_value())) < step * 0.5f;
+    };
+    item.reset = [key] { if (auto* v = typed<T>(key)) v->value() = v->default_value(); };
 }
 
 Item setting_slider(const char* label, const char* help, const char* key, float min, float max, float step, const char* format) {
@@ -218,6 +240,7 @@ Item setting_slider(const char* label, const char* help, const char* key, float 
     item.get_float = [key, min] { auto* v = typed<float>(key); return v ? v->value() : min; };
     item.set_float = [key](float value) { if (auto* v = typed<float>(key)) v->value() = value; };
     item.min = min; item.max = max; item.step = step; item.format = format;
+    number_default<float>(item, key, format, step);
     return item;
 }
 
@@ -227,6 +250,7 @@ Item setting_int_slider(const char* label, const char* help, const char* key, in
     item.get_float = [key, min] { auto* v = typed<int32_t>(key); return static_cast<float>(v ? v->value() : min); };
     item.set_float = [key](float value) { if (auto* v = typed<int32_t>(key)) v->value() = static_cast<int32_t>(std::lround(value)); };
     item.min = static_cast<float>(min); item.max = static_cast<float>(max); item.step = static_cast<float>(step); item.format = format;
+    number_default<int32_t>(item, key, format, static_cast<float>(step));
     return item;
 }
 
@@ -237,6 +261,13 @@ Item setting_choice(const char* label, const char* help, const char* key, std::v
     item.get_int = [key] { auto* v = typed<int32_t>(key); return v ? static_cast<int>(v->value()) : 0; };
     item.set_int = [key](int value) { if (auto* v = typed<int32_t>(key)) v->value() = value; };
     item.choices = std::move(choices);
+    item.default_text = [key, names = item.choices] {
+        auto* v = typed<int32_t>(key);
+        const int index = v ? static_cast<int>(v->default_value()) : 0;
+        return index >= 0 && index < static_cast<int>(names.size()) ? names[index] : std::string{};
+    };
+    item.is_default = [key] { auto* v = typed<int32_t>(key); return !v || v->value() == v->default_value(); };
+    item.reset = [key] { if (auto* v = typed<int32_t>(key)) v->value() = v->default_value(); };
     return item;
 }
 
@@ -351,15 +382,17 @@ Item lens_nearest_slider() {
 Item lens_subject_choice() {
     return setting_choice("Close-up aims at",
         "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match "
-        "stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: the test 3f behaviour.",
-        "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only (3f)"});
+        "stops behind anyone in front of them, as in over-the-shoulder shots. Game focus only: aims by the game's focus "
+        "distance alone and does not look for people.",
+        "WuWaControls_LensSubject", {"Characters in the shot", "Game focus only"});
 }
 
 Item lens_follow_choice() {
     return setting_choice("Within a shot",
         "Track the camera: the distance is measured at each cut, then follows only the game camera's own moves, so a focus "
-        "change cannot move you. Fixed per shot: test 3g. Follow the focus: test 3h (moved with focus changes).",
-        "WuWaControls_LensFollow", {"Track the camera", "Fixed per shot (3g)", "Follow the focus (3h)"});
+        "change cannot move you. Fixed per shot: the distance stays as it was at the cut. Follow the focus: it also moves "
+        "when the game changes focus.",
+        "WuWaControls_LensFollow", {"Track the camera", "Fixed per shot", "Follow the focus"});
 }
 
 Item near_hide_toggle() {
@@ -471,6 +504,7 @@ Item record_toggle() {
         return rec_state != "offline" && rec_state != "unavailable" && rec_state != "waiting" && rec_state != "finishing" &&
             rec_state != "busy";
     };
+    record.session_only = true;
     record.get_bool = [] { return recording(); };
     record.set_bool = [](bool on) {
         if (on != recording()) VR::get()->get_wuwa_controls().menu_recording_toggle();
@@ -529,6 +563,7 @@ Item controllers_toggle(VR* vr) {
         "Use the VR controllers as an Xbox pad for walking and sightseeing. Holding the left Menu button for 1 second also turns them on or off.");
     controllers.get_bool = [vr] { return vr->sightseeing_on(); };
     controllers.set_bool = [vr](bool on) { vr->set_sightseeing_on(on, "VR menu"); };
+    controllers.session_only = true;
     return controllers;
 }
 
@@ -537,6 +572,7 @@ Item run_toggle() {
     auto run = make(Kind::Toggle, "Treadmill run",
         "Times your run and saves your route in the game once a second, with a sync flash for OBS videos. With Reality "
         "Runner open, walking starts a run by itself (Controllers page).");
+    run.session_only = true;
     run.get_bool = [] { return wuwa_run::active(); };
     run.set_bool = [](bool on) {
         const auto profile = Framework::get_persistent_dir();
@@ -585,9 +621,10 @@ Page quick_page() {
     diorama.enabled = [vr] { return !vr->physical_gamepad_passthrough(); };
     diorama.get_bool = [vr] { return vr->is_diorama_enabled(); };
     diorama.set_bool = [vr](bool on) { vr->set_diorama_enabled(on); };
+    diorama.session_only = true;
     page.items.push_back(std::move(diorama));
     page.items.push_back(setting_slider("Diorama scale",
-        "How small the world gets in diorama. 10x is an action-figure view. If a close game camera crosses your eyes, try 3x to 5x.",
+        "How small the world gets in diorama. 10x is an action-figure view. The diorama has its own camera distance (Camera page).",
         "VR_WuWaDioramaScale", 2.0f, 10.0f, 1.0f, "%.0fx"));
     page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear. More HUD options are on the HUD page.",
         "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
@@ -669,6 +706,23 @@ Page camera_page() {
             if (auto* v = typed<float>(key)) v->value() = 0.0f;
         }
     }));
+    // The diorama keeps its own offsets (VR::get_camera_*_offset); these never touch the ones above.
+    page.items.push_back(paragraph("Diorama camera", true));
+    page.items.push_back(paragraph("Used instead of the offsets above while the diorama is on. The diorama makes your eyes "
+        "far apart, so a camera that suits normal play puts the character too close and crosses your eyes. "
+        "The default, 5 m back, shows it about an arm's length away at 10x."));
+    page.items.push_back(setting_slider("Diorama: forward / back",
+        "Where your viewpoint sits in the diorama, from the game camera. Back (minus) moves the miniature farther away.",
+        "VR_WuWaDioramaForwardOffset", -1500.0f, 300.0f, 10.0f, "%+.0f cm"));
+    page.items.push_back(setting_slider("Diorama: right / left", "Moves your diorama viewpoint sideways.",
+        "VR_WuWaDioramaRightOffset", -300.0f, 300.0f, 5.0f, "%+.0f cm"));
+    page.items.push_back(setting_slider("Diorama: up / down", "Moves your diorama viewpoint up, to look down on the miniature, or down.",
+        "VR_WuWaDioramaUpOffset", -300.0f, 600.0f, 5.0f, "%+.0f cm"));
+    page.items.push_back(action("Reset diorama camera", "Back to the diorama defaults: 5 m back, centred. The normal offsets stay as they are.", [] {
+        for (const char* key : {"VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset"}) {
+            if (auto* v = typed<float>(key)) v->value() = v->default_value();
+        }
+    }));
     page.items.push_back(action("Recenter view", "Faces the view forward from where you are now.", [] { VR::get()->recenter_view(); }));
     return page;
 }
@@ -678,7 +732,7 @@ Page cinema_page() {
     page.items.push_back(view_choice());
     page.items.push_back(setting_choice("Screen lens",
         "Game lens: the stereo screen frames every shot exactly like the 2D view, in 3D. Wide: the fixed 90 degree view used "
-        "before test 3f.", "VR_WuWaScreenLens", {"Game lens", "Wide 90 degrees"}));
+        "in older versions.", "VR_WuWaScreenLens", {"Game lens", "Wide 90 degrees"}));
     page.items.push_back(setting_slider("3D depth",
         "How strong the 3D is on the stereo screen. 1x matches the headset's eye distance to the lens; 0 is flat.",
         "VR_WuWaScreenDepth", 0.0f, 3.0f, 0.1f, "%.1fx"));
@@ -737,9 +791,24 @@ Page hud_page() {
     page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear.", "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
     page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
         "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
+    // 16:9 (default) or the taller 1.2.2 layout. A switch moves the hooks and the panel
+    // at once; the game's UI scaler keeps its old size until a layout refresh, so one is
+    // asked for right away (Comfort.lua hud_refresh, as after a view change).
+    if (wuwa_lgui_viewport::installed()) {
+        auto layout = make(Kind::Toggle, "16:9 UI layout",
+            "On: full VR lays out the HUD and menus like the flat game (16:9): round icons, story pictures whole, and the "
+            "mouse hits what it points at. Off: 1.2.2's taller layout, where the Terminal fits on one page and the "
+            "character screen's floor reflection lines up, but icons look flatter (HUD shape) and the mouse can miss.");
+        layout.get_bool = [] { return VR::get()->is_wuwa_ui_window_size_enabled(); };
+        layout.set_bool = [](bool on) {
+            if (auto* value = typed<bool>("VR_WuWaUiWindowSize")) value->value() = on;
+            if (auto* request = cached("WuWaControls_ResetHudAspect")) request->set("true");
+        };
+        page.items.push_back(std::move(layout));
+    }
     // Only needed when the game lays out full VR's HUD at the eye's shape: with the
-    // window-size layout installed the HUD is the flat game's 16:9 (WuWaLguiViewport.hpp).
-    if (!wuwa_lgui_viewport::installed()) {
+    // 16:9 layout the HUD is the flat game's 16:9 (WuWaLguiViewport.hpp).
+    if (!wuwa_lgui_viewport::installed() || !VR::get()->is_wuwa_ui_window_size_enabled()) {
         page.items.push_back(setting_slider("HUD shape (full VR)",
             "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. Raise it if round "
             "icons still look like flat ovals. The stereo screen and mono theatre always keep the game's own shape.",
@@ -855,6 +924,7 @@ Page record_page() {
         "Pick what went wrong and save. The time, the video position and your settings go into the wuwa-reports "
         "folder of the UEVR profile. Share it together with the video."));
     auto kind = make(Kind::Choice, "What happened", "Left / right picks the kind of problem.");
+    kind.session_only = true;
     kind.get_int = [] { return report_kind; };
     kind.set_int = [](int value) { report_kind = value; };
     kind.choices = {"Just mark the moment", "Black bars", "Eyes don't match", "HUD or menu", "Camera position",
@@ -919,6 +989,15 @@ Page menu_page() {
     auto* vr = VR::get().get();
     Page page{"Menu"};
     page.items.push_back(language_choice());
+    // Off: nothing is written to config.txt this launch (WuWaConfigSave.hpp); the header shows NOT SAVING.
+    auto saving = make(Kind::Toggle, "Save changes for next time",
+        "On: your settings are saved whenever this menu opens or closes. Off: try things freely; nothing is saved, and the "
+        "game starts with your saved settings next time. Turning it back on saves what you have now. For each setting, "
+        "the help at the bottom says whether it is saved and what its default is.");
+    saving.get_bool = [] { return !wuwa_config_save::paused.load(); };
+    saving.set_bool = [](bool on) { wuwa_config_save::paused.store(!on); };
+    saving.session_only = true;
+    page.items.push_back(std::move(saving));
     page.items.push_back(setting_slider("Menu size", "How much of its layer this menu fills. Smaller also reads as further away.",
         "VR_WuWaVrMenuSize", 0.4f, 1.0f, 0.05f, "%.2f"));
     page.items.push_back(setting_slider("Menu distance", "How far away this menu floats. UEVR's classic window uses the same distance.",
@@ -952,7 +1031,7 @@ std::string layout_key() {
     // The language picker lists names drawn for the current language.
     return (steps.loaded() ? "plan " + std::to_string(steps.revision()) : std::string{"no plan"}) + ", camera " +
         std::to_string(camera_mode()) + ", language " + wuwa_l10n::language() +
-        (wuwa_lgui_viewport::installed() ? ", window-size UI" : "");
+        (wuwa_lgui_viewport::installed() ? (VR::get()->is_wuwa_ui_window_size_enabled() ? ", window-size UI" : ", tall UI") : "");
 }
 
 void refresh_pages() {
@@ -1042,6 +1121,7 @@ Moves read_moves() {
     const bool back = once(ImGuiKey_GamepadFaceRight) || once(ImGuiKey_Escape) || pad_back;
     const bool prev_page = once(ImGuiKey_GamepadL1) || (once(ImGuiKey_Tab) && io.KeyShift) || pad_prev;
     const bool next_page = once(ImGuiKey_GamepadR1) || (once(ImGuiKey_Tab) && !io.KeyShift) || pad_next;
+    const bool reset = once(ImGuiKey_GamepadFaceLeft) || once(ImGuiKey_Delete) || once(ImGuiKey_Backspace);
     if (once(ImGuiKey_GamepadFaceUp) || once(ImGuiKey_M)) start_moving_menu();
     // A gamepad or the keyboard ends the laser at once (otherwise it waits for a
     // controller that was put down or switched off to go quiet).
@@ -1049,7 +1129,9 @@ Moves read_moves() {
     if (used && !pad_accept && !pad_back && !pad_prev && !pad_next && VR::get()->menu_pointer_active()) {
         VR::get()->menu_pointer_yield();
     }
-    return mover.read(held, accept, back, prev_page, next_page, seconds());
+    auto moves = mover.read(held, accept, back, prev_page, next_page, seconds());
+    moves.reset = reset;
+    return moves;
 }
 
 // Move menu: sticks, D-pad, arrow keys or WASD turn the menu around you (a
@@ -1152,6 +1234,7 @@ bool draw(const ImVec2& target_size) {
         ImGuiWindowFlags_NoBringToFrontOnFocus);
     Look look{1.0f, wuwa_l10n::sheet_font()};
     if (rec_since >= 0.0) look.badge = "REC " + rec_clock();
+    else if (wuwa_config_save::paused.load()) look.badge = wuwa_l10n::text("NOT SAVING");
     // Move menu: a click (the laser's trigger or the mouse) puts the menu down
     // and is kept from the rows under it until the button is released.
     auto& io = ImGui::GetIO();
@@ -1258,9 +1341,9 @@ void draw_hint(ImDrawList* list, const ImVec2& size) {
         kind = hint_kind;
     }
     if (kind == 2) {
-        wuwa_menu::draw_note(list, size, font, "Someone at your eyes",
-            "Hold LT + RT, then press Y to hide characters right at your eyes. Anyone in the shot stays.",
-            "Turn this note off in the menu, Cinema page.");
+        // Short and high: it shows during dialogue (test 16: the full note was in the way).
+        wuwa_menu::draw_note(list, size, font, "Hide characters at your eyes", "LT + RT, then Y",
+            "Turn this note off in the menu, Cinema page.", true);
         return;
     }
     wuwa_menu::draw_note(list, size, font, "Cinematic scene",

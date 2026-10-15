@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-15T01:40:15.085976+00:00",
+  "updatedAt": "2026-10-15T01:53:44.068897+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -85,7 +85,7 @@
     "dev/test_auto_cinema.cpp": "8df222acd95a1488fabd29f966a2afd53288c3aec761339cf244c2626b1044b0",
     "dev/test_auto_cinema.lua": "10aa4f6dd5dd489b0c3d51208767b04cf4f8ed3257f687fda15733280a92fd88",
     "dev/test_cinematic_metadata.cpp": "150d2cbef14ca2d688910076925b7200934761578f57c2f8aec569cd5496c307",
-    "dev/test_close_up_near_clip.lua": "923cee21bdd78f12d7a6074ef656546e115c032ab0a2dd1e7a8f4e39405d3acf",
+    "dev/test_close_up_near_clip.lua": "0f15386db7ff2f2784adf95f630734476ae955828b814d41f0ddf14013835bab",
     "dev/test_clv_refresh.cpp": "ea7b28afe4b980f9f00ccedf9bff603c561883a619a89bb84293e5eb7c1bbdae",
     "dev/test_configure_sharing.py": "8c5e42443e9461c224d35cb2b4b05977b3dd2892121ce6cbc09e15135f3a481c",
     "dev/test_console_read_policy.cpp": "70c484e4e60b8b27aa39829132c5e1afd62eb055d2425152782bfedb4fbf6d73",
@@ -367,7 +367,7 @@
     "mod/localization/wuwa/zh-Hans.json": "e6883e08c7890aee7eb1696748ca957de83b9373e0ba927e8f7867da15e1fb4e",
     "mod/lua/00_WuWaVR_DevPanel.lua": "4329848fd7e2a156ec5a918fcb31bcef1822ba308acf0102089071ec8e28f659",
     "mod/lua/01_WuWaVR_Comfort.lua": "f2196afa242c172eac3a43c3ec38ba94ba0f5a9f600b7e4d90c17340b5865148",
-    "mod/lua/02_WuWaVR_PolarControls.lua": "2b9cfe1d927d53ce9e54ea14651f0f62068f8b743bd77d69e6fd012247530162",
+    "mod/lua/02_WuWaVR_PolarControls.lua": "c4ae443a3b4e105405869055ed21e36ffce43529397e5911d2c4c847d3c09c82",
     "mod/lua/inventory-nearby-static-meshes-request.lua": "3d89c426b358733d12c0a3b8cb631e0820940d79dfaf80a19579ee3ea91f8524",
     "mod/lua/wuwa_auto_cinema.lua": "6d9138ec47d60ab6fd470d2fbb857086e6a98ef700ef214e180a8fbf955059d1",
     "mod/lua/wuwa_hud_refresh.lua": "5a593315d7135b393eca053e96bbcae92a16df09d7d87f3c212030349b22ebb7",

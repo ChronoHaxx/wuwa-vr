@@ -106,6 +106,7 @@ local function world(f)
         function m:get_outer() return owner end
         function m:GetNumBones() return #self.bones end
         function m:GetBoneName(i) return 'b'..i end
+        function m:GetBoneIndex(n) local i=tonumber(tostring(n):match('^b(%d+)$')); return i and i<#self.bones and i or -1 end
         function m:GetSocketLocation(n) local b=self.bones[tonumber(n:sub(2))+1]; return {X=b.x,Y=b.y,Z=b.z} end
         owner.mesh,owner.prop,owner.off=m,prim(true),prim(false)   -- off: hidden by the game itself
         function owner:K2_GetComponentsByClass(c)
@@ -193,9 +194,9 @@ test('a hidden character comes back in the flat shot, when switched off and when
     local a=f:person('intruder',AT_EYE)
     f:frames(3); assert(hidden(a),'not hidden')
     a.mesh.bones={{x=5,y=-25,z=0},{x=40,y=0,z=0}}   -- steps into the shot
-    f:frames(40); assert(shown(a),'still hidden after entering the flat shot')
+    f:frames(60); assert(shown(a),'still hidden after entering the flat shot')
     eq(a.off.calls,0,'calls on a part the game itself hides')
-    a.mesh.bones=AT_EYE; f:frames(40); assert(hidden(a),'not hidden again at the eye')
+    a.mesh.bones=AT_EYE; f:frames(60); assert(hidden(a),'not hidden again at the eye')
     f.values[HIDE]='false'; f:frame(); assert(shown(a),'still hidden with the option off')
     f.values[HIDE]='true'; f:frames(2); assert(hidden(a),'not hidden with the option back on')
     f.pcm.fov=75; f:frame(); assert(shown(a),'still hidden after the close-up ended')
@@ -219,6 +220,18 @@ test('with hiding off (the default) nothing is hidden and the menu is asked for 
     eq(f.values[SEEN],nil,'note request for a framed character')
     f=world(fixture()); f.values.WuWaControls_NearHint='false'; f:person('intruder',AT_EYE); f:frames(3)
     eq(f.values[SEEN],nil,'note request with the note switched off')
+end)
+test('with the camera inside a character, bones under 10 cm deep do not count as in the flat shot',function()
+    -- 15 Oct shot 9: a head filled the top of the right eye; its neck, 6 cm deep and 5 cm under
+    -- the camera, counted as in the shot with the old fixed 10 cm margin, so it stayed.
+    local f=world(fixture()); f.values[HIDE]='true'
+    local inside=f:person('inside',{{x=12,y=2,z=14},{x=6,y=1,z=5},{x=-8,y=0,z=-20}})
+    f:frames(3); assert(hidden(inside),'a character around the camera was kept')
+end)
+test('a hand in the flat shot keeps the character, head at the eye or not',function()
+    local f=world(fixture()); f.values[HIDE]='true'
+    local reaching=f:person('reaching',{{x=8,y=-12,z=10},{x=0,y=-20,z=-15},{x=60,y=10,z=-5}})
+    f:frames(3); assert(shown(reaching),'a character with a hand in the flat shot was hidden')
 end)
 test('a parked party member and a blueprint template at the eye are left alone',function()
     local f=world(fixture()); f.values[HIDE]='true'

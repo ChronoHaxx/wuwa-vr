@@ -1509,7 +1509,7 @@ end
 -- (recorded 15 Oct: Rover's head cut, the inside of the face showing), so a
 -- character is hidden whole instead: one whose bones come within REACH of an
 -- eye while none of its bones is inside the 2D frame (the game camera's 16:9
--- frustum, what the flat shot shows). Its primitives leave the main pass, so
+-- frustum, what the flat shot shows; hider.inside). Its primitives leave the main pass, so
 -- its shadow stays. It comes back when it enters the frame, at a cut that no
 -- longer qualifies it, when the close-up ends or when the option goes off.
 -- With the option off (the default), finding one asks the VR menu for a short
@@ -1577,18 +1577,46 @@ function hider.components(owner,path)
     local ok,list=pcall(function() return owner:K2_GetComponentsByClass(class) end)
     return ok and type(list)=="table" and #list>0 and list or nil
 end
--- Up to 24 bone names per mesh, read once per mesh.
+-- WuWa's character rigs (15 Oct, 254 bones): ~25 biped joints named Bip001...,
+-- fingers, and ~150 hair and cloth bones (Bone_Hair..., Bone_Piao...), so bones
+-- sampled by index were mostly hair and missed hands. Body joints by name, finger
+-- tips included; then a few sampled bones for hair and cloth. Rigs without them
+-- (the companion) are sampled. Read once per mesh.
+local joint_names={"Bip001Pelvis","Bip001Spine","Bip001Spine1","Bip001Spine2","Bip001Neck","Bip001Head"}
+for _,side in ipairs({"L","R"}) do
+    for _,part in ipairs({"Clavicle","UpperArm","Forearm","Hand","Finger02","Finger12","Finger22","Finger32","Finger42",
+        "Thigh","Calf","Foot","Toe0"}) do joint_names[#joint_names+1]="Bip001"..side..part end
+end
 function hider.bones(m)
     local key=m:get_address()
     local names=hider.names[key]
     if names then return names end
     names={}
+    for _,joint in ipairs(joint_names) do
+        local name=hider.fname(joint)
+        if m:GetBoneIndex(name)>=0 then names[#names+1]=name end
+    end
     local n=m:GetNumBones()
     if type(n)=="number" and n>0 then
-        for i=0,n-1,math.max(1,math.floor(n/24)) do names[#names+1]=hider.fname(m:GetBoneName(i)) end
+        local extra=#names>=8 and 8 or 24
+        for i=0,n-1,math.max(1,math.floor(n/extra)) do names[#names+1]=m:GetBoneName(i) end
     end
+    hider.cached=(hider.cached or 0)+1
+    if hider.cached>256 then hider.names={}; hider.cached=1 end
     hider.names[key]=names
     return names
+end
+-- In the flat shot: inside the game camera's 16:9 frustum with a 1.7 degree
+-- margin, and at least 10 cm deep (the game's own near clip draws nothing
+-- nearer). A fixed 10 cm margin (test 16) counted a neck 5 cm under the
+-- camera as in the shot, so a head filling one eye was kept (15 Oct, shot 9).
+function hider.inside(fr,p)
+    local v={x=p.x-fr.pos.x,y=p.y-fr.pos.y,z=p.z-fr.pos.z}
+    local d=v.x*fr.f.x+v.y*fr.f.y+v.z*fr.f.z
+    if d<10 or d>3000 then return false end
+    local x=v.x*fr.right.x+v.y*fr.right.y
+    local z=v.x*fr.up.x+v.y*fr.up.y+v.z*fr.up.z
+    return math.abs(x)<=d*(fr.th+0.03) and math.abs(z)<=d*(fr.tv+0.03)
 end
 -- The two eyes: the game camera, moved by Close-up match, 3.2 cm to each side.
 function hider.eyes(ctx,fr)
@@ -1597,12 +1625,12 @@ function hider.eyes(ctx,fr)
     return {{x=b.x-fr.right.x*3.2,y=b.y-fr.right.y*3.2,z=b.z},{x=b.x+fr.right.x*3.2,y=b.y+fr.right.y*3.2,z=b.z}}
 end
 -- Near an eye, and inside the 2D frame, over the character's visible skeletal
--- meshes (hair, clothes and body are separate meshes; at most 6).
+-- meshes (face, body and props can be separate meshes; at most 4).
 function hider.judge(e,fr,eyes)
     local list=hider.components(e.owner,"Class /Script/Engine.SkeletalMeshComponent") or e.meshes
     local near,count,used=false,0,0
     for _,m in ipairs(list) do
-        if used>=6 then break end
+        if used>=4 then break end
         local okv,shown=pcall(function() return m.bVisible~=false and m.bHiddenInGame~=true end)
         if okv and shown then
             used=used+1
@@ -1612,7 +1640,7 @@ function hider.judge(e,fr,eyes)
                 if ok and pt then
                     count=count+1
                     if hdist(pt,eyes[1])<hider.reach or hdist(pt,eyes[2])<hider.reach then near=true end
-                    if people.place(fr,pt,10,10) then return near,true,count end
+                    if hider.inside(fr,pt) then return near,true,count end
                 end
             end
         end
@@ -1674,7 +1702,7 @@ function hider.tick(ctx)
     if not on then hider.restore("off") end
     if not ctx then
         hider.restore("close-up ended"); hider.next=0
-        if nearby.running or #nearby.set>0 then nearby.reset(); hider.names={} end
+        if nearby.running or #nearby.set>0 then nearby.reset() end
         return
     end
     if not (on or enabled("WuWaControls_NearHint")) then return end
@@ -1686,8 +1714,8 @@ function hider.tick(ctx)
         if hider.pending then hider.pending=false; hider.next=0 end
     end
     if ctx.frames<hider.next then return end
-    -- At each cut and the pass after it; within a shot about once a second while hiding is on.
-    hider.next=on and ctx.frames+32 or math.huge
+    -- At each cut and the pass after it; within a shot about every 1.5 s while hiding is on.
+    hider.next=on and ctx.frames+48 or math.huge
     hider.pending=nearby.running
     local t0=hclock()
     local hide,framed,bones,meshes=hider.find(ctx)

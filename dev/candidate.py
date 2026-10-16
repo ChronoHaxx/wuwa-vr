@@ -3,6 +3,7 @@
 
     python dev/candidate.py NAME "TITLE" --notes NOTES.txt [--receipt RECEIPT.json] [--plan PLAN.json]
                             [--base "builds/<release>/portable/WuWa VR <version> beta"] [--skip-unit]
+                            [--recorder builds/next-release-<version>/recorder/wuwa-recorder.exe]
 
 NAME is the test name (17r). TITLE is what the launcher's version list shows, at most 100 characters,
 for example "Test 17r: steadier desktop view (1.2.4, private)". NOTES is the player-facing TEST THIS.txt
@@ -21,6 +22,8 @@ Steps, each one refusing rather than guessing:
     launcher dev scripts, and the uevr-mcp test plugin in the profile seed (private packages only).
  7. A Test Launcher with the package bundled is built, and an isolated install of the package is checked.
  8. With --plan, the steps card's plan is checked and installed (dev/steps-plan.py).
+With --recorder (from dev/build-recorder.py --out), that SteamVR recorder replaces the base package's, after
+its self-tests pass.
 
 Never touches installed packages, the public catalog or feed, the game or OpenXR.
 """
@@ -104,6 +107,7 @@ def main() -> None:
     p.add_argument('--base', type=Path)
     p.add_argument('--plan', type=Path)
     p.add_argument('--skip-unit', action='store_true')
+    p.add_argument('--recorder', type=Path, help='a rebuilt wuwa-recorder.exe (dev/build-recorder.py --out)')
     a = p.parse_args()
 
     if len(a.title) > 100:
@@ -153,6 +157,13 @@ def main() -> None:
     pdb = matching_pdb(dll)
     if not MCP.exists():
         sys.exit(f'missing the test plugin {MCP}')
+    if a.recorder:
+        # Refuse before anything is written: the recorder must pass its own GPU and encoder self-tests.
+        if a.recorder.name != 'wuwa-recorder.exe' or not a.recorder.is_file():
+            sys.exit(f'--recorder must be a wuwa-recorder.exe: {a.recorder}')
+        test = subprocess.run([str(a.recorder), '--self-test-showcase'], capture_output=True, text=True)
+        if test.returncode:
+            sys.exit(f'the recorder failed its showcase self-test: {test.stderr.strip() or test.stdout.strip()}')
     base = a.base or newest_base()
     manifest = read(base / 'manifest.json')
     actual = {f.relative_to(base).as_posix() for f in base.rglob('*') if f.is_file()}
@@ -192,6 +203,9 @@ def main() -> None:
         if branch_copy.exists() and sha(branch_copy) != sha(script):
             shutil.copy2(branch_copy, script)
             print('launcher script from branch:', script.name, flush=True)
+    if a.recorder:
+        shutil.copy2(a.recorder, out / 'app/dev-tools/wuwa-recorder.exe')
+        print('recorder from', a.recorder, flush=True)
     entry = dict(old, id=build, name=label, runtime=runtime, seed=seed, sha256=sha(backend / 'UEVRBackend.dll'),
                  savedAt=datetime.now(timezone.utc).isoformat(), description=a.title, summary=a.title, known=scope,
                  settingsFrom=[{k: old[k] for k in ('id', 'sha256', 'graphicsPolicy') if k in old}] + old.get('settingsFrom', []))

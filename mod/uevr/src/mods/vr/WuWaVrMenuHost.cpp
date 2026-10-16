@@ -181,7 +181,7 @@ nlohmann::json context() {
              "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape", "WuWaControls_LensMatch",
              "WuWaControls_LensNearest", "WuWaControls_CloseUpNearClip", "WuWaControls_HideNearCharacters", "VR_WuWaDioramaScale",
              "VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset", "VR_WuWaUiWindowSize", "VR_WuWaUiStoryWindowSize",
-             "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode"}) {
+             "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode", "WuWaControls_StoryNudge", "WuWaControls_StoryNudgeKeep"}) {
         if (auto* value = cached(key)) settings[key] = value->get();
     }
     if (auto* scale = resolution_scale()) settings["OpenXR_ResolutionScale"] = scale->get();
@@ -380,6 +380,34 @@ Item lens_nearest_slider() {
     return setting_slider("Closest distance",
         "How near Close-up match may bring you to the person in the shot. Lower comes closer. Close-up match at 100 "
         "already gives the 2D size; this only stops it short when the shot is very tight.", "WuWaControls_LensNearest", 5.0f, 150.0f, 5.0f, "%.0f cm");
+}
+
+// Story camera nudge (02_WuWaVR_PolarControls.lua).
+Item story_nudge_toggle() {
+    return setting_toggle("Story camera nudge",
+        "In story and dialogue shots, hold L3 and press Y to move nearer or X to move back; L3 + Y + X goes back to "
+        "the game's spot. Keyboard: Page Up, Page Down and Home. It moves along the game camera's view and keeps "
+        "following the shot's own camera moves. Game camera in full VR only.",
+        "WuWaControls_StoryNudge");
+}
+
+Item story_nudge_keep_choice() {
+    auto item = setting_choice("Keep the nudge",
+        "Until the next cut: each shot starts at the game's spot again. For the whole scene: your nudge stays until "
+        "the story shots end.",
+        "WuWaControls_StoryNudgeKeep", {"Until the next cut", "For the whole scene"});
+    item.enabled = [] { auto* on = typed<bool>("WuWaControls_StoryNudge"); return on && on->value(); };
+    return item;
+}
+
+Item story_nudge_status() {
+    return live_text([] {
+        auto* on = typed<bool>("WuWaControls_StoryNudge");
+        if (!on || !on->value()) return std::string{};
+        const auto now = VR::get()->get_wuwa_controls().story_nudge_now();
+        if (now.empty()) return wuwa_ui::format("Story camera nudge: waiting for a story shot");
+        return wuwa_ui::format("Story camera nudge now: %s cm", now.c_str());
+    });
 }
 
 Item lens_subject_choice() {
@@ -694,6 +722,8 @@ Page camera_page() {
             "in zoomed-in shots, so they frame people like the 2D view does."));
         page.items.push_back(lens_slider());
         page.items.push_back(lens_nearest_slider());
+        page.items.push_back(story_nudge_toggle());
+        page.items.push_back(story_nudge_status());
         page.items.push_back(near_hide_toggle());
         page.items.push_back(near_hint_toggle());
         page.items.push_back(near_clip_slider());
@@ -754,6 +784,9 @@ Page cinema_page() {
     page.items.push_back(lens_nearest_slider());
     page.items.push_back(lens_subject_choice());
     page.items.push_back(lens_follow_choice());
+    page.items.push_back(story_nudge_toggle());
+    page.items.push_back(story_nudge_keep_choice());
+    page.items.push_back(story_nudge_status());
     page.items.push_back(near_hide_toggle());
     page.items.push_back(near_hint_toggle());
     page.items.push_back(near_clip_slider());
@@ -956,11 +989,29 @@ Page record_page() {
     };
     page.items.push_back(std::move(profile));
     page.items.push_back(live_text([] { return recorder_line(); }));
+    page.items.push_back(setting_choice("Video style",
+        "Showcase: the left eye as a normal 16:9 video, steadied, with the HUD where you see it, at the game's own "
+        "frame rate. Picture size 720, 1024 or 1280 px gives 720p, 1080p or 1440p. Needs SteamVR. Side by side: "
+        "both eyes, to help find what went wrong.",
+        "WuWaRecording_Style", {"Both eyes, side by side", "Showcase: one eye, steady, 16:9"}));
     page.items.push_back(setting_choice("Frame rate", "Frames per second in the video.", "WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}));
     page.items.push_back(setting_choice("Picture size", "Width per eye. Larger is sharper and makes bigger files.",
         "WuWaRecording_Width", {"720 px", "1024 px", "1280 px"}));
     page.items.push_back(setting_toggle("Camera and controller data",
         "Saves the camera and controller movement next to the video, to help find what went wrong.", "WuWaRecording_Telemetry"));
+    page.items.push_back(paragraph("Desktop window", true));
+    page.items.push_back(setting_choice("HUD in the desktop window",
+        "As in the headset: the HUD sits where you see it in VR, at its distance and size. Flat: the HUD fills the "
+        "window like on a monitor, a steady reference while you play. Full VR only; the stereo screen and mono theatre "
+        "always show it flat.",
+        "WuWaRecording_DesktopHud", {"As in the headset", "Flat, like a monitor"}));
+    page.items.push_back(setting_toggle("Steady desktop window",
+        "Smooths head shake out of the game window for OBS recordings. The window then trails quick head turns a "
+        "little, so leave it off while you play. The headset image is not changed.", "WuWaRecording_SteadyWindow"));
+    auto steadiness = setting_slider("Steadiness", "Seconds of smoothing in the steady desktop window. More is calmer "
+        "and trails turns more.", "WuWaRecording_SteadySeconds", 0.05f, 1.0f, 0.05f, "%.2f s");
+    steadiness.enabled = [] { auto* on = typed<bool>("WuWaRecording_SteadyWindow"); return on && on->value(); };
+    page.items.push_back(std::move(steadiness));
     page.items.push_back(paragraph("Report a problem", true));
     page.items.push_back(paragraph(
         "Pick what went wrong and save. The time, the video position and your settings go into the wuwa-reports "

@@ -262,5 +262,7 @@ private:
     bool m_submitted_left_eye{false};
     // OpenXR: the world was ready on the previous submitted frame (see on_frame).
     bool m_world_was_ready{false};
+    uint64_t m_pair_pending_since{}; // WuWa: VR start, before the second eye's scene capture exists
+    uint32_t m_pair_pending_frames{};
 };
 } // namespace vrmod

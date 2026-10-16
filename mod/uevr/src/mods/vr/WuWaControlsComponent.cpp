@@ -121,7 +121,7 @@ namespace {
 constexpr const char* sheet[][2] = {
     {N_("GENERAL"), N_("CAMERA")},
     {N_("L3 + R3    WuWa VR menu"), N_("L3 + RB    Game / fixed camera")},
-    {N_("L3 + A     Recenter view / portal"), N_("L3 + Y/X   Fixed / first-person height")},
+    {N_("L3 + A     Recenter view / portal"), N_("L3 + Y/X   Height; in story: nearer / back")},
     {N_("L3 + LT / F7   Portal on / off"), N_("L3 + RT    Diorama on / off")},
     {N_("LT + RT, R3: full VR / stereo (hold: mono)"), N_("LT + RT, L3: blur (hold: stereo screen)")},
     {N_("Double L3  Windows screenshot"), N_("LB + LT/RT Fixed camera farther / closer")},
@@ -328,6 +328,8 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
         // The cinema lease's generation fences old producers for all three leases.
         if ((!cinema && !story && !character) || generation != owner.m_cinema_lease.generation()) return;
         const auto now = GetTickCount64();
+        // The plot flag alone, for the story camera nudge.
+        if (known & wuwa_auto_cinema::plot) owner.m_plot_seen_ms.store((active & wuwa_auto_cinema::plot) ? now : 0);
         bool accepted = false;
         const wuwa_auto_cinema::Bits bits{static_cast<uint8_t>(active), static_cast<uint8_t>(hold), static_cast<uint8_t>(known)};
         if (cinema) {
@@ -359,6 +361,23 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
     } catch (const std::exception&) { /* malformed or obsolete producer: expire naturally */ }
 }
 
+std::string WuWaControlsComponent::StoryValue::get() const {
+    if (kind == 0) {
+        // Read only while the game has focus and UEVR is closed; the keys still reach the game.
+        if (!game_focused()) return "0";
+        if (GetAsyncKeyState(VK_HOME) & 0x8000) return "2";
+        const bool nearer = (GetAsyncKeyState(VK_PRIOR) & 0x8000) != 0, back = (GetAsyncKeyState(VK_NEXT) & 0x8000) != 0;
+        return nearer == back ? "0" : nearer ? "1" : "-1";
+    }
+    if (kind == 1) {
+        // The detector samples ten times a second; a second and a half without one is no plot.
+        const auto seen = owner.m_plot_seen_ms.load();
+        return seen && GetTickCount64() - seen < 1500 ? "true" : "false";
+    }
+    std::scoped_lock lock{mutex};
+    return now_text;
+}
+
 WuWaControlsComponent::WuWaControlsComponent() {
     m_options = {*m_language, *m_enabled, *m_keep_camera, *m_keep_mouse, *m_sync_eye_lod, *m_refill_far_lighting, *m_ambient_occlusion, *m_ambient_occlusion_default, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
@@ -366,10 +385,10 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
+        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect,
-        *m_video_fps, *m_video_width, *m_video_telemetry, *m_steady_desktop, *m_steady_desktop_seconds,
+        *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_style, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom};
 }
@@ -538,7 +557,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     if (ImGui::BeginTable("Everyday controller shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         wuwa_ui::TableSetupColumn("Buttons", ImGuiTableColumnFlags_WidthFixed, 140.0f);
         wuwa_ui::TableSetupColumn("Action");
-        for (const auto& row : std::array<std::array<const char*,2>,15>{{
+        for (const auto& row : std::array<std::array<const char*,2>,16>{{
             {{N_("L3 + R3"), N_("Open / close the WuWa VR menu")}},
             {{N_("L3 + B"), N_("Show / hide game HUD and menus")}},
             {{N_("L3 + A"), N_("Recenter headset / portal")}},
@@ -554,6 +573,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
             {{N_("L3 + View"), N_("First person on / off")}},
             {{N_("Double R3"), N_("Freecam on / off")}},
             {{N_("L3 + RB"), N_("Game / fixed camera")}},
+            {{N_("L3 + Y / X"), N_("Story shots: camera nearer / back (L3 + Y + X resets; keyboard Page Up / Page Down / Home)")}},
         }}) {
             ImGui::TableNextRow(); ImGui::TableNextColumn(); wuwa_ui::TextUnformatted(row[0]);
             ImGui::TableNextColumn(); wuwa_ui::TextWrapped("%s", row[1]);
@@ -711,12 +731,14 @@ void WuWaControlsComponent::on_draw_recording() {
     wuwa_ui::draw(*m_video_fps,"Target recording rate");
     wuwa_ui::draw(*m_video_width,"Maximum pixels per eye");
     wuwa_ui::draw(*m_video_telemetry,"Include camera and controller data");
+    wuwa_ui::draw(*m_video_style,"Video style");
     ImGui::EndDisabled();
     ImGui::BeginDisabled(!m_video.available() || busy || m_video.pending());
     if (wuwa_ui::Button("Start video recording")) {
         constexpr int rates[]{30,45,60},widths[]{720,1024,1280};
         if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
-                      widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value()))
+                      widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value(),
+                      m_video_style->value()==1))
             m_recording_live.store(true,std::memory_order_relaxed);
     }
     ImGui::EndDisabled();
@@ -730,6 +752,7 @@ void WuWaControlsComponent::on_draw_recording() {
     wuwa_ui::TextWrapped("SteamVR and the updated OpenXR Simulator are supported. VDXR capture is not available yet. Video has no audio and stops after five minutes. Actual frame rate depends on the game.");
     wuwa_ui::TextWrapped("Simulator: keep its preview open, choose Both eyes / side-by-side, and turn Full render off. Recording uses the preview size.");
     ImGui::Separator();
+    wuwa_ui::draw(*m_desktop_hud,"HUD in the desktop window");
     wuwa_ui::draw(*m_steady_desktop,"Steady desktop view (for OBS and streaming)");
     ImGui::BeginDisabled(!m_steady_desktop->value());
     wuwa_ui::draw(*m_steady_desktop_seconds,"Steadiness (seconds of smoothing)");
@@ -1215,7 +1238,8 @@ void WuWaControlsComponent::menu_recording_toggle() {
     constexpr int rates[]{30,45,60},widths[]{720,1024,1280};
     // Cover the IDs from the request on, before the launcher reports "starting".
     if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
-                  widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value()))
+                  widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value(),
+                  m_video_style->value()==1))
         m_recording_live.store(true,std::memory_order_relaxed);
 }
 

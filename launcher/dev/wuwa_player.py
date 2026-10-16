@@ -1091,8 +1091,9 @@ def recording_target(pid=None):
                 id=secrets.token_hex(16), pid=pid, stopping=False)
 
 
-def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None, source='auto'):
+def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None, source='auto', style='sbs'):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
+    if style not in ('sbs','showcase'): raise ValueError('Choose the side-by-side or the showcase video.')
     if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
     if type(eye_width) is not int or eye_width not in (720,1024,1280): raise ValueError('Choose 720, 1024 or 1280 pixels per eye.')
     games=[p for p in processes() if p['name'].lower() in ('client-win64-shipping','client-win64-shipping.exe')]
@@ -1101,8 +1102,9 @@ def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None,
     if expected_pid is not None and expected_pid!=pid: raise ValueError('Game process changed before recording.')
     if not any((config().app/'dev-tools'/name).is_file() for name in
                ('wuwa-recorder.exe','wuwa-simulator-recorder.exe')): raise ValueError('Recorder is not included in this package.')
-    begin_job('recording',f'Recording stereo video at a target of {fps} fps (5-minute parts until you stop it, up to an hour)',
-              lambda: record_playtest(video_only,fps,eye_width,source),
+    what='showcase video (one eye, steadied, 16:9)' if style=='showcase' else 'stereo video'
+    begin_job('recording',f'Recording {what} at a target of {fps} fps (5-minute parts until you stop it, up to an hour)',
+              lambda: record_playtest(video_only,fps,eye_width,source,style),
               prepare=lambda: RECORDING.update(recording_target(pid)))
 
 
@@ -1114,8 +1116,9 @@ def stop_recording(expected_id=None):
         RECORDING['stopping']=True
 
 
-def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto'):
+def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', style='sbs'):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
+    if style not in ('sbs','showcase'): raise ValueError('Choose the side-by-side or the showcase video.')
     if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
     if type(eye_width) is not int or eye_width not in (720,1024,1280): raise ValueError('Choose 720, 1024 or 1280 pixels per eye.')
     if not RECORDING['running']:
@@ -1136,7 +1139,7 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto'):
             args=argparse.Namespace(output=folder,seconds=300,stop_file=stop_file,video_only=video_only,
                 recorder=config().app/'dev-tools/wuwa-recorder.exe',openvr=config().app/'dev-tools/openvr_api.dll',
                 simulator_recorder=config().app/'dev-tools/wuwa-simulator-recorder.exe',source=source,
-                pid=RECORDING.get('pid'),fps=fps,eye_width=eye_width,profile=config().profile)
+                pid=RECORDING.get('pid'),fps=fps,eye_width=eye_width,profile=config().profile,style=style)
             try:
                 module.record(args)
             except Exception:
@@ -1150,6 +1153,8 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto'):
             if ended!='time_limit' or stop_file.exists() or RECORDING.get('stopping') or len(parts)>=12:
                 break
         where=str(first) if len(parts)==1 else f'{first} (+{len(parts)-1} more parts beside it)'
+        if style=='showcase':
+            return 'Showcase video saved: showcase.mp4 in '+where
         return 'Recording saved. Open recordings, then replay.html for controller/camera annotations or clean-sbs.mp4 for clean footage. '+where
     finally:
         RECORDING.update(running=False,stopFile='')
@@ -1403,7 +1408,8 @@ class Handler(BaseHTTPRequestHandler):
             return True
         if path == "/api/record-start":
             fps,eye_width=body.get('fps',30),body.get('eyeWidth',1024)
-            start_recording(body.get('videoOnly') is True,fps,eye_width,source=body.get('source','auto'))
+            start_recording(body.get('videoOnly') is True,fps,eye_width,source=body.get('source','auto'),
+                            style=body.get('style','sbs'))
             return True
         if path == "/api/record-stop":
             stop_recording()

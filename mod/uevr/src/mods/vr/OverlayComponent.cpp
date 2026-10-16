@@ -12,6 +12,7 @@
 #include "OverlayComponent.hpp"
 #include "WuWaVrMenuHost.hpp"
 #include "utility/WuWaInputTrace.hpp"
+#include "utility/WuWaDesktopHud.hpp"
 
 namespace vrmod {
 void OverlayComponent::on_reset() {
@@ -1000,6 +1001,8 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
     const auto interaction_matrix = layer.space == vr->m_openxr->view_space
         ? vr->get_hmd_transform(static_cast<uint32_t>(std::max(vr->get_frame_count(), 0))) * glm_matrix
         : glm_matrix;
+    // The desktop window can draw the HUD where this panel is (utility/WuWaDesktopHud.hpp).
+    if (is_left_eye) wuwa_desktop_hud::publish(interaction_matrix, meters_w, meters_h, GetTickCount64());
     m_parent->m_intersect_state.intersecting = false;
     // Check if the controller pointer intersects with the quad, and we can use this to emulate the mouse
     if (vr->is_using_controllers()) {

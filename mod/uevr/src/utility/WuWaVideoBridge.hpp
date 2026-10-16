@@ -86,7 +86,9 @@ public:
         return m_connected ? m_status.value("message",std::string{}) : "";
     }
     std::string folder() const { return m_connected ? m_status.value("folder",std::string{}) : ""; }
-    bool submit(const std::filesystem::path& profile,bool start,int fps=30,int width=1024,bool telemetry=true) noexcept {
+    // showcase: the launcher records the left eye as a steadied 16:9 video instead of both eyes side by side.
+    bool submit(const std::filesystem::path& profile,bool start,int fps=30,int width=1024,bool telemetry=true,
+                bool showcase=false) noexcept {
         poll(profile,true);
         try {
             if (!available() || pending()) throw std::runtime_error("Wait for the recording launcher.");
@@ -100,7 +102,8 @@ public:
             nlohmann::json request{{"version",1},{"session",m_status.at("session")},{"id",id},
                 {"pid",GetCurrentProcessId()},{"created_ms",process_created_ms()},
                 {"expires_ms",unix_ms()+4000},{"action",start?"start":"stop"}};
-            if (start) { request["fps"]=fps;request["eye_width"]=width;request["telemetry"]=telemetry; }
+            if (start) { request["fps"]=fps;request["eye_width"]=width;request["telemetry"]=telemetry;
+                         if (showcase) request["style"]="showcase"; }
             else request["recording_id"]=m_status.at("recording_id");
             const auto target=m_directory/("request-"+std::to_string(GetCurrentProcessId())+".json");
             const auto temporary=m_directory/(id+".tmp");

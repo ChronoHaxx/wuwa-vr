@@ -17,6 +17,8 @@ local status, last_error = "Polar controls ready; game camera unchanged.", nil
 local mesh_mode, camera_mode, last_pawn, mesh_revision = -1, -1, nil, -1
 local camera_late=false
 local height_reset_held=false -- L3 + Y + X is down (resets the camera height once)
+-- Story camera nudge: the player's offset (cm), the part applied, and whether a story shot is on.
+local story={offset=0,applied=0,active=false,shot=0}
 local camera_motion=-1
 local prior_motion=2
 local mono_return=nil -- the view a held R3 entered mono theatre from ("full" or "stereo")
@@ -636,7 +638,8 @@ local function process_pad(index,state,result)
         -- Y / X move the camera up / down in first person and the fixed camera.
         -- In the game camera they do nothing, but L3 + Y / X still never reach the game.
         if (mode==1 or mode==3) and not context_mouse then consumed=consumed|(b&(B.L3|B.Y|B.X))
-        elseif not context_mouse and has(b,B.Y|B.X) then consumed=consumed|B.L3|(b&(B.Y|B.X)) end
+        -- In story shots they nudge the camera (story.input), cursor shown or not.
+        elseif (not context_mouse or story.active) and has(b,B.Y|B.X) then consumed=consumed|B.L3|(b&(B.Y|B.X)) end
         if mode==3 and not context_mouse and not adjust and has(b,B.DOWN) then
             consumed=consumed|B.L3|B.DOWN
             if (previous&(B.L3|B.DOWN))~=(B.L3|B.DOWN) then actions.motion=true end
@@ -1183,6 +1186,8 @@ local function tick(_,delta)
         if mode==1 and has(p.wButtons,B.LB) and (p.bLeftTrigger>=30 or p.bRightTrigger>=30) then
             set("WuWaControls_FixedDistance",math.max(-100,math.min(1500,number("WuWaControls_FixedDistance",150,-100,1500)+(p.bLeftTrigger-p.bRightTrigger)/255*delta*120)))
         end
+    elseif mode==0 then
+        if adjust then story.held_since=nil else story.input(p,delta) end
     end
     frame=nil
     if pawn and pc and not menu and mode~=0 and base then
@@ -1941,6 +1946,87 @@ function lens.update()
     end
     lens.publish(text,stop,nearclip.text(clip),dof.text())
 end
+-- Story camera nudge (1.2.4). In full VR no single distance suits every story shot, so the
+-- player moves the eye along the game camera's own view for the shot: L3 + Y nearer, L3 + X
+-- back, L3 + Y + X back to zero (keyboard Page Up / Page Down / Home). It rides on the game
+-- camera and Close-up match like the close-up move does, so it keeps following the shot's own
+-- camera work (freecam does not), and goes back to zero at the next cut unless the player keeps
+-- it for the whole scene. A story shot: the plot is running (wuwa_auto_cinema.lua, through
+-- WuWaControls_StoryScene) or the game uses a close-up lens (60 degrees or less).
+function story.input(p,delta)
+    local keys=number("WuWaControls_StoryNudgeKeys",0,-1,2)
+    local l3=p and has(p.wButtons,B.L3)
+    local y,x=l3 and has(p.wButtons,B.Y),l3 and has(p.wButtons,B.X)
+    local reset=(y and x) or keys==2
+    local dir=0
+    if y~=x then dir=y and 1 or -1 elseif keys==1 or keys==-1 then dir=keys end
+    if not story.active then story.held_since=nil; story.reset_held=reset; return end
+    if reset and not story.reset_held and story.offset~=0 then
+        functions.log_info(string.format("[WuWaStory] nudge reset by the player (was %+.0f cm)",story.applied))
+        story.offset=0
+    end
+    story.reset_held=reset
+    if reset or dir==0 then
+        if story.held_since then
+            story.held_since=nil
+            functions.log_info(string.format("[WuWaStory] nudge %+.0f cm (shot %d, lens %.0f degrees)",story.applied,story.shot,story.fov or 0))
+        end
+        return
+    end
+    local t=now(); story.held_since=story.held_since or t
+    -- Fine for the first half second (a tap is a couple of cm), then quicker.
+    local speed=t-story.held_since<0.5 and 15 or 45
+    story.offset=math.max(-150,math.min(story.reach or 100,story.offset+dir*speed*delta))
+end
+function story.update()
+    story.active=false
+    local paused=mode~=0 or enabled("WuWaControls_EffectiveScreen") or enabled("WuWaControls_EffectiveMonoTheatre") or
+        enabled("WuWaDiorama_Enabled")
+    local pc=api:get_player_controller(0)
+    local pcm=pc and pc.PlayerCameraManager
+    local fov,pos,rot
+    if enabled("WuWaControls_StoryNudge") and not paused and pcm then
+        fov=pcm:GetFOVAngle()
+        pos,rot=point(pcm:GetCameraLocation()),rotator(pcm:GetCameraRotation())
+    end
+    if type(fov)~="number" or fov~=fov or not valid(pos) or not rot then
+        story.offset=0; story.applied=0; story.pos=nil
+    else
+        local scene=enabled("WuWaControls_StoryScene") or (fov>=5 and fov<=60)
+        -- A cut is a jump of the game camera (the same test as Close-up match).
+        local cut=not story.pos
+        if not cut then
+            local d=math.sqrt((pos.x-story.pos.x)^2+(pos.y-story.pos.y)^2+(pos.z-story.pos.z)^2)
+            local a,b=lens.forward(rot),lens.forward(story.rot)
+            cut=d>50 or a.x*b.x+a.y*b.y+a.z*b.z<math.cos(math.rad(10))
+        end
+        story.pos,story.rot,story.fov=pos,rot,fov
+        if cut then story.shot=story.shot+1 end
+        local t=now()
+        if scene then story.left_at=nil elseif not story.left_at then story.left_at=t end
+        -- Half a second outside story shots ends the scene (a wide shot for a moment does not).
+        if story.left_at and t-story.left_at>=0.5 then
+            if story.offset~=0 then functions.log_info(string.format("[WuWaStory] story shots ended: nudge %+.0f cm back to 0",story.applied)) end
+            story.offset=0
+        else
+            if cut and story.offset~=0 and number("WuWaControls_StoryNudgeKeep",0,0,1)==0 then
+                functions.log_info(string.format("[WuWaStory] cut (shot %d): nudge %+.0f cm back to 0",story.shot,story.applied))
+                story.offset=0
+            end
+            story.active=scene
+        end
+        -- Never through the person Close-up match aims at.
+        story.reach=100
+        if lens.ctx and lens.subject then
+            story.reach=math.max(0,math.min(100,lens.subject-lens.dolly-number("WuWaControls_LensNearest",10,5,150)))
+        end
+        story.applied=math.max(-150,math.min(story.reach,story.offset))
+        -- The hider places the eyes from the close-up move: include the nudge.
+        if lens.ctx then lens.ctx.dolly=lens.ctx.dolly+story.applied end
+    end
+    local text=story.active and string.format("%+.0f",story.applied) or ""
+    if text~=story.sent then story.sent=text; set("WuWaControls_StoryNudgeNow",text) end
+end
 local function update_camera_before_draw()
     -- UGameViewportClient::Draw runs on the game thread after world simulation,
     -- before either eye. Calibrate BEFORE hiding a new head, then refresh its
@@ -1994,6 +2080,11 @@ cb.on_pre_viewport_client_draw(function()
     if not lens_ok then
         lens.dolly=0; lens.pos=nil; lens.ctx=nil; pcall(nearclip.publish,0); lens.publish(lens.part("Unavailable: %s",tostring(lens_err):sub(1,120)))
     end
+    local story_ok,story_err=pcall(story.update)
+    if not story_ok then
+        story.active=false; story.offset=0; story.applied=0
+        if story.error~=tostring(story_err) then story.error=tostring(story_err); functions.log_warn("[WuWaStory] "..story.error:sub(1,200)) end
+    end
     local hide_ok,hide_err=pcall(hider.tick,lens.ctx)
     if not hide_ok then
         pcall(hider.restore,"error")
@@ -2041,10 +2132,11 @@ cb.on_pre_calculate_stereo_view_offset(function(_,_,_,position,rotation)
         else
             rotation.x=frame.rot.x; rotation.y=frame.rot.y; rotation.z=frame.rot.z
         end
-    elseif mode==0 and lens.dolly>0 and valid(r) then
-        -- Close-up match: along this frame's game camera view, same for both eyes.
+    elseif mode==0 and (lens.dolly>0 or story.applied~=0) and valid(r) then
+        -- Close-up match and the story nudge: along this frame's game camera view, same for both eyes.
         local f=lens.forward(r)
-        position.x=position.x+f.x*lens.dolly; position.y=position.y+f.y*lens.dolly; position.z=position.z+f.z*lens.dolly
+        local move=lens.dolly+story.applied
+        position.x=position.x+f.x*move; position.y=position.y+f.y*move; position.z=position.z+f.z*move
     end
 end)
 cb.on_script_reset(function()
@@ -2052,5 +2144,6 @@ cb.on_script_reset(function()
     game_menu=false
     if mesh_cache then mesh_cache.look_blend=nil end
     restore_mesh(); frame=nil; input=nil; slots={}; actions={}; focused=false; camera_active=false; camera_late=false
+    story.offset=0; story.applied=0; story.active=false; set("WuWaControls_StoryNudgeNow","")
     status="Polar controls stopped; camera and owned visibility released."; emit(nil,false)
 end)

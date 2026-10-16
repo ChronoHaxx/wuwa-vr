@@ -41,6 +41,7 @@ public:
     bool suppress_npc_rim() const { return m_suppress_npc_rim.requested.load(); }
     bool steady_desktop_view() const { return m_steady_desktop->value(); }
     float steady_desktop_seconds() const { return m_steady_desktop_seconds->value(); }
+    bool desktop_hud_as_headset() const { return m_desktop_hud->value() == 0; }
     WuWaControlsComponent();
     ~WuWaControlsComponent() override;
     std::string_view get_name() const override { return "WuWaControls"; }
@@ -89,6 +90,8 @@ public:
     bool story_scene_active() const { return m_story_scene.load(std::memory_order_relaxed); }
     // The camera at the character screen's showroom (HUD page "Character screen in the taller layout").
     bool character_screen_active() const { return m_character_screen.load(std::memory_order_relaxed); }
+    // The story camera nudge the camera script applies now, in cm ("+4"), or empty outside story shots.
+    std::string story_nudge_now() const { return m_story_nudge_now.get(); }
     std::string auto_cinema_status() const;
     void reset_auto_cinema();
     void override_auto_cinema();
@@ -239,6 +242,29 @@ private:
         void config_load(const utility::Config&, bool) override { set(""); }
         void config_save(utility::Config&) override {}
     } m_lens_status;
+    // Story camera nudge (02_WuWaVR_PolarControls.lua, 1.2.4): in story and dialogue shots in full VR,
+    // L3 + Y / X (keyboard Page Up / Page Down) moves the eye along the game camera's view, on top of the
+    // game camera and Close-up match; L3 + Y + X (Home) resets it. Back to zero at the next cut by default.
+    const ModToggle::Ptr m_story_nudge{ModToggle::create("WuWaControls_StoryNudge", true)};
+    const ModCombo::Ptr m_story_nudge_keep{ModCombo::create("WuWaControls_StoryNudgeKeep",
+        {"Until the next cut", "For the whole scene"}, 0)};
+    // Transient: 0 the keyboard keys held (1 nearer, -1 back, 2 reset, 0 none, game focused only),
+    // 1 the plot is running (the detector's plot flag, whatever view or layout it serves), 2 the nudge now.
+    struct StoryValue : ModString {
+        WuWaControlsComponent& owner;
+        int kind;
+        mutable std::mutex mutex;
+        std::string now_text;
+        StoryValue(WuWaControlsComponent& o, int k, const char* name) : ModString{name, ""}, owner{o}, kind{k} {}
+        std::string get() const override;
+        void set(const std::string& text) override {
+            if (kind == 2) { std::scoped_lock lock{mutex}; now_text = text.substr(0, 16); }
+        }
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    } m_story_keys{*this, 0, "WuWaControls_StoryNudgeKeys"}, m_story_scene_value{*this, 1, "WuWaControls_StoryScene"},
+      m_story_nudge_now{*this, 2, "WuWaControls_StoryNudgeNow"};
+    std::atomic<uint64_t> m_plot_seen_ms{}; // the last detector sample with the plot running; 0: none
     // Close-up near clip (utility/WuWaNearClip.hpp): in story close-ups nothing
     // nearer than this is drawn, in cm; 10 is the game's own value (off). The
     // camera script sends the per-shot value, already kept short of the person
@@ -278,8 +304,16 @@ private:
     const ModCombo::Ptr m_video_fps{ModCombo::create("WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}, 0)};
     const ModCombo::Ptr m_video_width{ModCombo::create("WuWaRecording_Width", {"720", "1024", "1280"}, 1)};
     const ModToggle::Ptr m_video_telemetry{ModToggle::create("WuWaRecording_Telemetry", true)};
-    const ModToggle::Ptr m_steady_desktop{ModToggle::create("WuWaRecording_SteadyDesktop", true)};
+    // Side by side (both eyes, for finding problems) or showcase (the left eye as a steadied 16:9 video).
+    const ModCombo::Ptr m_video_style{ModCombo::create("WuWaRecording_Style",
+        {"Both eyes, side by side", "Showcase: one eye, steady, 16:9"}, 0)};
+    // 1.2.4: a new key, off by default. The old one was on for everyone, and in live play the smoothing made
+    // the window trail head turns ("lead-lag"); OBS users switch it on for recordings.
+    const ModToggle::Ptr m_steady_desktop{ModToggle::create("WuWaRecording_SteadyWindow", false)};
     const ModSlider::Ptr m_steady_desktop_seconds{ModSlider::create("WuWaRecording_SteadySeconds", 0.05f, 1.0f, 0.35f)};
+    // The HUD in the desktop window: where the headset shows it (utility/WuWaDesktopHud.hpp), or over the whole
+    // window like a flat monitor (UEVR's spectator view).
+    const ModCombo::Ptr m_desktop_hud{ModCombo::create("WuWaRecording_DesktopHud", {"As in the headset", "Flat, like a monitor"}, 0)};
     wuwa_video::Client m_video;
     const ModToggle::Ptr m_enabled{ModToggle::create("WuWaControls_Enabled", true)};
     const ModToggle::Ptr m_keep_camera{ModToggle::create("WuWaControls_KeepCameraOnFocusLoss", true)};

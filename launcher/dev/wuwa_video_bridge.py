@@ -45,7 +45,7 @@ class Bridge:
 
     def validate(self, request, game):
         allowed = {'version', 'session', 'id', 'pid', 'created_ms', 'expires_ms',
-                   'action', 'fps', 'eye_width', 'telemetry', 'recording_id'}
+                   'action', 'fps', 'eye_width', 'telemetry', 'recording_id', 'style'}
         if set(request) - allowed:
             raise ValueError('Unknown recording request field')
         if type(request.get('version')) is not int or request['version'] != 1 or request.get('session') != self.session:
@@ -69,6 +69,9 @@ class Bridge:
                     raise ValueError('Unsupported recording ' + name)
             if type(request.get('telemetry')) is not bool:
                 raise ValueError('Choose whether to include camera/controller data')
+            # Absent from older plugins: the side-by-side recording.
+            if request.get('style', 'sbs') not in ('sbs', 'showcase'):
+                raise ValueError('Unsupported recording style')
         elif action == 'stop':
             if not isinstance(request.get('recording_id'), str) or not request['recording_id']:
                 raise ValueError('Missing recording identity')
@@ -107,8 +110,12 @@ class Bridge:
                         self.seen.clear()
                     self.seen.add(identity)
                     if request['action'] == 'start':
-                        self.start(not request['telemetry'], request['fps'],
-                                   request['eye_width'], game['pid'])
+                        if request.get('style', 'sbs') == 'showcase':
+                            self.start(not request['telemetry'], request['fps'],
+                                       request['eye_width'], game['pid'], style='showcase')
+                        else:
+                            self.start(not request['telemetry'], request['fps'],
+                                       request['eye_width'], game['pid'])
                         message = 'Starting recording'
                     else:
                         self.stop(request['recording_id'])

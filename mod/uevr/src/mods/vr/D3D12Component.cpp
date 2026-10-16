@@ -6,6 +6,7 @@
 #include <utility/Logging.hpp>
 #include <utility/WuWaLguiProbe.hpp>
 #include <utility/WuWaRunMarker.hpp>
+#include <utility/WuWaDesktopHud.hpp>
 
 #include "Framework.hpp"
 #include "../VR.hpp"
@@ -836,10 +837,34 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
                 }
             }
 
-            const bool world_ready = is_actually_afr ?
+            // WuWa: at VR start the native stereo fix draws one view until its scene capture exists (about
+            // 9 s, FFakeStereoRenderingHook get_desired_number_of_views_hook); the double-wide's right half is
+            // unrendered, so the left eye showed the world and the right eye black. Hold the world in both
+            // eyes until the pair can exist, at most 20 s in case the capture never comes.
+            const bool capture_missing = !is_actually_afr && vr->is_native_stereo_fix_enabled() &&
+                m_scene_capture_tex.texture.Get() == nullptr;
+            const auto pair_now = GetTickCount64();
+            if (capture_missing && m_pair_pending_since == 0) {
+                m_pair_pending_since = pair_now;
+                m_pair_pending_frames = 0;
+                spdlog::info("[WuWaFrame] world held: the second eye has no scene capture yet");
+            }
+            const bool pair_pending = capture_missing && pair_now - m_pair_pending_since < 20000;
+            if (pair_pending) {
+                ++m_pair_pending_frames;
+            } else if (m_pair_pending_since != 0 && !capture_missing) {
+                spdlog::info("[WuWaFrame] world released after {} held frames ({} ms)", m_pair_pending_frames,
+                    pair_now - m_pair_pending_since);
+                m_pair_pending_since = 0;
+            } else if (capture_missing && m_pair_pending_frames != 0) {
+                spdlog::warn("[WuWaFrame] no scene capture after 20 s; showing the world without its second eye");
+                m_pair_pending_frames = 0;
+            }
+            const bool world_acquired = is_actually_afr ?
                 m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::AFR_LEFT_EYE) &&
                 m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::AFR_RIGHT_EYE) :
                 m_openxr.ever_acquired((uint32_t)runtimes::OpenXR::SwapchainIndex::DOUBLE_WIDE);
+            const bool world_ready = !pair_pending && world_acquired;
             // WuWa: after frames without the world (story transitions, view switches) the first
             // copy back showed a black left eye and a stale, offset right eye for one frame (the
             // second eye's capture is recreated black). Show the world from the second ready frame.
@@ -1099,6 +1124,20 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
     ID3D12DescriptorHeap* game_heaps[] = { m_game_tex.srv_heap->Heap() };
     command_list->SetDescriptorHeaps(1, game_heaps);
 
+    // Where a point of the shown eye (0..1 of its texture) lands in the window, the same mapping as the eye
+    // image below, for the HUD "as in the headset" (utility/WuWaDesktopHud.hpp).
+    struct EyeToWindow {
+        bool steady{};
+        float scale{}, turn{};
+        glm::vec2 eye{}, origin{}, centre{}, offset{}, stretch{};
+        glm::vec2 operator()(glm::vec2 uv) const {
+            if (!steady) return (uv * eye - offset) * stretch;
+            const glm::vec2 p = (uv * eye - origin) * scale;
+            return centre + glm::vec2{p.x * std::cos(turn) - p.y * std::sin(turn), p.x * std::sin(turn) + p.y * std::cos(turn)};
+        }
+    } to_window{};
+    to_window.eye = {eye_width, eye_height};
+
     const auto& wuwa = vr->get_wuwa_controls();
     if (wuwa.steady_desktop_view() && !wuwa_steady_view::bypassed() && eye_aspect_ratio <= aspect_ratio) {
         // WuWa: steady desktop view (utility/WuWaSteadyView.hpp). A slightly narrower crop leaves
@@ -1126,12 +1165,20 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
         const DirectX::XMFLOAT2 origin{
             original_centerw + std::clamp(crop.dx, -eye_width * margin, eye_width * margin),
             original_centerh + std::clamp(crop.dy, -margin_y, margin_y) };
+        to_window.steady = true;
+        to_window.scale = (float)desc.Width / crop_width;
+        to_window.turn = -crop.roll;
+        to_window.origin = {origin.x, origin.y};
+        to_window.centre = {(float)desc.Width / 2.0f, (float)desc.Height / 2.0f};
         batch->Draw(m_game_tex.get_srv_gpu(),
             DirectX::XMUINT2{ (uint32_t)m_backbuffer_size[0], (uint32_t)m_backbuffer_size[1] },
             DirectX::XMFLOAT2{ (float)desc.Width / 2.0f, (float)desc.Height / 2.0f },
             &eye_rect, DirectX::Colors::White, -crop.roll, origin, (float)desc.Width / crop_width);
     } else {
         m_steady_view.reset();
+        to_window.offset = {(float)source_rect.left, (float)source_rect.top};
+        to_window.stretch = {(float)desc.Width / (float)(std::max)(1L, source_rect.right - source_rect.left),
+                             (float)desc.Height / (float)(std::max)(1L, source_rect.bottom - source_rect.top)};
         batch->Draw(m_game_tex.get_srv_gpu(), 
             DirectX::XMUINT2{ (uint32_t)m_backbuffer_size[0], (uint32_t)m_backbuffer_size[1] },
             dest_rect,
@@ -1146,10 +1193,40 @@ void D3D12Component::draw_spectator_view(ID3D12GraphicsCommandList* command_list
     ID3D12DescriptorHeap* ui_heaps[] = { m_game_ui_tex.srv_heap->Heap() };
     command_list->SetDescriptorHeaps(1, ui_heaps);
 
-    batch->Draw(m_game_ui_tex.get_srv_gpu(), 
-        DirectX::XMUINT2{ (uint32_t)desc.Width, (uint32_t)desc.Height },
-        dest_rect, 
-        DirectX::Colors::White);
+    // WuWa: in full VR the HUD can sit where the headset shows it: the overlay's HUD panel projected into
+    // the shown (left) eye. Otherwise, and whenever that cannot be worked out, it fills the window as before.
+    bool hud_placed = false;
+    const auto runtime = vr->get_runtime();
+    if (wuwa.desktop_hud_as_headset() && vr->is_native_stereo_fix_enabled() && !vr->is_using_afr() &&
+        !vr->is_using_2d_screen() && runtime->is_openxr()) {
+        if (const auto panel = wuwa_desktop_hud::latest(GetTickCount64())) {
+            wuwa_desktop_hud::EyeImage eye{};
+            {
+                std::shared_lock _{ runtime->projections_mtx };
+                for (int i = 0; i < 4; ++i) {
+                    eye.tangents[i] = runtime->raw_projections[0][i];
+                    eye.bounds[i] = runtime->view_bounds[0][i];
+                }
+            }
+            const auto frame = static_cast<uint32_t>(vr->m_render_frame_count);
+            const auto eye_tracking = vr->get_hmd_transform(frame) * vr->get_eye_transform(0);
+            if (const auto corners = wuwa_desktop_hud::project(*panel, eye_tracking, eye)) {
+                if (const auto at = wuwa_desktop_hud::place(*corners, to_window)) {
+                    const float w = (float)desc.Width, h = (float)desc.Height;
+                    batch->Draw(m_game_ui_tex.get_srv_gpu(), DirectX::XMUINT2{ (uint32_t)desc.Width, (uint32_t)desc.Height },
+                        DirectX::XMFLOAT2{ at->centre.x, at->centre.y }, nullptr, DirectX::Colors::White, at->rotation,
+                        DirectX::XMFLOAT2{ w / 2.0f, h / 2.0f }, DirectX::XMFLOAT2{ at->size.x / w, at->size.y / h });
+                    hud_placed = true;
+                }
+            }
+        }
+    }
+    if (!hud_placed) {
+        batch->Draw(m_game_ui_tex.get_srv_gpu(), 
+            DirectX::XMUINT2{ (uint32_t)desc.Width, (uint32_t)desc.Height },
+            dest_rect, 
+            DirectX::Colors::White);
+    }
 
     batch->End();
 

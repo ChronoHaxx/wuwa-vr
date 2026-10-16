@@ -54,9 +54,13 @@ public:
             const float follow = 1.0f - static_cast<float>(std::exp(-dt / (std::max)(0.01f, tau)));
             m_smooth = glm::normalize(glm::slerp(m_smooth, actual, follow));
         }
+        // The crop margin holds max_angle of lag. A hard stop there pinned the view to the head mid-turn and
+        // read as a jolt; past a knee the lag eases towards the margin instead and never reaches it.
         const float lag = angle_between(m_smooth, actual);
-        if (lag > max_angle && lag > 0.0f) {
-            m_smooth = glm::normalize(glm::slerp(actual, m_smooth, max_angle / lag));
+        const float knee = 0.6f * max_angle;
+        if (lag > knee && max_angle > knee) {
+            const float held = knee + (max_angle - knee) * std::tanh((lag - knee) / (max_angle - knee));
+            m_smooth = glm::normalize(glm::slerp(actual, m_smooth, held / lag));
         }
         return crop(actual, m_smooth, fx, fy);
     }

@@ -23,6 +23,9 @@
   "%.2f m": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "%.2f s": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "%.2fx": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -211,6 +214,13 @@
   "Answer in the menu: L3 + R3 (or Insert), Test page.": [
     "utility/WuWaVrMenu.cpp"
   ],
+  "As in the headset": [
+    "mods/vr/WuWaControlsComponent.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "As in the headset: the HUD sits where you see it in VR, at its distance and size. Flat: the HUD fills the window like on a monitor, a steady reference while you play. Full VR only; the stereo screen and mono theatre always show it flat.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Asks the game to lay out its HUD again. Try it if the HUD looks stretched or cut off after switching views.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -315,6 +325,10 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Both eyes get": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Both eyes, side by side": [
+    "mods/vr/WuWaControlsComponent.hpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Both eyes: %s": [
@@ -565,6 +579,9 @@
   "Depth-of-field fields not found": [
     "utility/WuWaDofSync.hpp"
   ],
+  "Desktop window": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Detection details": [
     "mods/VR.cpp"
   ],
@@ -797,6 +814,10 @@
   "Flat screen; easiest on the eyes": [
     "utility/WuWaShortcutSheet.cpp"
   ],
+  "Flat, like a monitor": [
+    "mods/vr/WuWaControlsComponent.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Flying style": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -816,6 +837,9 @@
     "mods/vr/OverlayComponent.cpp"
   ],
   "For the WuWa VR menu, the controls cards and notices. The game's own language is set in the game.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "For the whole scene": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "For troubleshooting and comparisons. Leave these alone for everyday play; opening this section changes nothing.": [
@@ -1018,6 +1042,10 @@
   ],
   "HUD height (meters)": [
     "mods/vr/OverlayComponent.cpp"
+  ],
+  "HUD in the desktop window": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "HUD nearer / farther": [
     "mod/controls.json"
@@ -1263,6 +1291,9 @@
   "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. Raise it if round icons still look like flat ovals. The stereo screen and mono theatre always keep the game's own shape.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "In story and dialogue shots, hold L3 and press Y to move nearer or X to move back; L3 + Y + X goes back to the game's spot. Keyboard: Page Up, Page Down and Home. It moves along the game camera's view and keeps following the shot's own camera moves. Game camera in full VR only.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "In story close-ups nothing nearer than this is drawn. It slices characters and props open, so it is off by default (10 cm, the game's own value); Hide characters at your eyes is the cleaner fix. Game camera in full VR only.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1318,6 +1349,9 @@
   ],
   "Keep the mouse in the game window": [
     "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Keep the nudge": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Keep this card open": [
@@ -1429,7 +1463,10 @@
   "L3 + View toggles first person. These settings apply when first person is active.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "L3 + Y/X   Fixed / first-person height": [
+  "L3 + Y / X": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "L3 + Y/X   Height; in story: nearer / back": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "L3 means click and hold the left stick, then press B.": [
@@ -2215,6 +2252,9 @@
   "Second view not writable; copy skipped": [
     "utility/WuWaDofSync.hpp"
   ],
+  "Seconds of smoothing in the steady desktop window. More is calmer and trails turns more.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Selected build: %s": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -2264,6 +2304,13 @@
   ],
   "Show optical hands (this launch only)": [
     "mods/vr/runtimes/OpenXR.cpp"
+  ],
+  "Showcase: one eye, steady, 16:9": [
+    "mods/vr/WuWaControlsComponent.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Showcase: the left eye as a normal 16:9 video, steadied, with the HUD where you see it, at the game's own frame rate. Picture size 720, 1024 or 1280 px gives 720p, 1080p or 1440p. Needs SteamVR. Side by side: both eyes, to help find what went wrong.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Shows 3 times, then turns itself off (Cinema page).": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -2318,6 +2365,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Smoothness": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Smooths head shake out of the game window for OBS recordings. The window then trails quick head turns a little, so leave it off while you play. The headset image is not changed.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Smooths head shake out of the game window, so OBS records a calm, full-resolution view with game audio. The headset image is not changed. The window shows a slightly narrower view so the picture can move inside it.": [
@@ -2410,11 +2460,17 @@
   "Status: paused by the diagnostic motion-input mute.": [
     "mods/VR.cpp"
   ],
+  "Steadiness": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Steadiness (seconds of smoothing)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Steady desktop view (for OBS and streaming)": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Steady desktop window": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "SteamVR and the updated OpenXR Simulator are supported. VDXR capture is not available yet. Video has no audio and stops after five minutes. Actual frame rate depends on the game.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2459,6 +2515,15 @@
   "Stops the freecam at walls and the ground. Experimental.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Story camera nudge": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Story camera nudge now: %s cm": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Story camera nudge: waiting for a story shot": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Story cutscenes and dialogue": [
     "mods/VR.cpp"
   ],
@@ -2473,6 +2538,9 @@
   ],
   "Story scenes use": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Story shots: camera nearer / back (L3 + Y + X resets; keyboard Page Up / Page Down / Home)": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Streamer privacy: cover player IDs": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2648,6 +2716,12 @@
   "Unoccluded hand skeleton demo: hands draw over the game. No grabbing, collisions or gesture controls. Xbox remains gameplay.": [
     "mods/vr/runtimes/OpenXR.cpp"
   ],
+  "Until the next cut": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Until the next cut: each shot starts at the game's spot again. For the whole scene: your nudge stays until the story shots end.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Up / down": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2701,6 +2775,10 @@
   ],
   "VR only (Xbox ignored)": [
     "mods/VR.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Video style": [
+    "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "View": [

@@ -181,6 +181,8 @@ def make_replay(folder: Path):
 def recorder_command(args, client):
     source=getattr(args,'source','auto')
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording')
+    style=getattr(args,'style','sbs')
+    if style not in ('sbs','showcase'): raise ValueError('Choose the sbs or showcase recording style')
     runtime=None
     legacy_simulator=False
     if source != 'steamvr':
@@ -204,6 +206,8 @@ def recorder_command(args, client):
             'Updating the WuWa backend alone does not update the active simulator. No runtime was changed.')
     if source=='simulator' or (source=='auto' and runtime is not None):
         if runtime is None: raise RuntimeError('No current simulator status for this game process')
+        # The showcase view steadies with the headset pose each frame was rendered with: SteamVR only.
+        if style=='showcase': raise RuntimeError('The showcase video needs SteamVR; the OpenXR Simulator records side by side only')
         if runtime.get('video_stream_version') != 1:
             raise RuntimeError('This simulator needs the recording update; no runtime was changed')
         exe=Path(getattr(args,'simulator_recorder',ROOT/'dev-tools/wuwa-simulator-recorder.exe')).resolve()
@@ -213,7 +217,7 @@ def recorder_command(args, client):
         exe=args.recorder.resolve(); openvr=args.openvr.resolve()
         if not exe.is_file(): raise ValueError('wuwa-recorder.exe is missing')
         if not openvr.is_file(): raise ValueError('openvr_api.dll is missing')
-        prefix=[str(exe),str(openvr)]; source='steamvr'
+        prefix=[str(exe)]+(['--showcase'] if style=='showcase' else [])+[str(openvr)]; source='steamvr'
     return source, prefix+[str(client.pid),str(args.output.resolve()),str(args.seconds),
         str(args.fps),str(args.eye_width),str(args.stop_file.resolve())]
 
@@ -278,11 +282,16 @@ def record(args):
                     expected=(client.profile/"recordings").resolve()
                     if source.parent!=expected or source.suffix!=".jsonl": raise RuntimeError("Unexpected sidecar path")
                     if source.is_file(): shutil.copyfile(source,args.output/"motion.jsonl")
-                report=make_replay(args.output)
+                if getattr(args,'style','sbs')=='showcase':
+                    # The replay page reads a side-by-side video; a showcase recording is the video itself.
+                    report={'style':'showcase','video':'showcase.mp4','motion_sidecar':(args.output/'motion.jsonl').is_file(),
+                            'purpose':purpose,'input_context':input_context}
+                else:
+                    report=make_replay(args.output)
                 report["error"]=error
                 (args.output/"replay.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
         if error: raise RuntimeError(error)
-    return args.output/"replay.html"
+    return args.output/('showcase.mp4' if getattr(args,'style','sbs')=='showcase' else 'replay.html')
 
 
 def main(argv=None):
@@ -292,6 +301,8 @@ def main(argv=None):
     p.add_argument("--fps",type=int,choices=(30,45,60),default=30)
     p.add_argument("--eye-width",type=int,choices=(720,1024,1280),default=1024)
     p.add_argument("--source",choices=('auto','steamvr','simulator'),default='auto')
+    p.add_argument("--style",choices=('sbs','showcase'),default='sbs',
+                   help="showcase: the left eye as a steadied 16:9 video (SteamVR only) instead of both eyes side by side")
     p.add_argument("--pid",type=int)
     p.add_argument("--profile",type=Path)
     p.add_argument("--stop-file",type=Path)

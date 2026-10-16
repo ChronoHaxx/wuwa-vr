@@ -295,6 +295,16 @@ except lupa.LuaError as e:
     print("LUA ERROR:", e); sys.exit(1)
 '''
 VCVARS = Path(r'C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvars64.bat')
+# Third-party headers some tested headers use (glm, OpenXR, ImGui, JSON): the UEVR checkout beside the
+# repository and its build's fetched dependencies.
+UEVR = ROOT.parent / 'upstream/UEVR'
+GLM = UEVR / 'dependencies/submodules/glm'
+INCLUDES = [GLM, UEVR / 'out/build/x64-RelWithDebInfo/_deps/openxr-src/include',
+            UEVR / 'dependencies/submodules/imgui', UEVR / 'out/build/x64-RelWithDebInfo/_deps/json-src/include',
+            UEVR / 'dependencies/submodules/spdlog/include', UEVR / 'dependencies/sol2/single/single/include',
+            UEVR / 'dependencies/lua/src']
+# Lua itself, for tests that run scripts through sol (the UEVR build's lua.lib).
+LUA_LIB = UEVR / 'out/build/x64-RelWithDebInfo/RelWithDebInfo/lua.lib'
 
 
 def lua_python() -> str | None:
@@ -344,12 +354,21 @@ def run_unit(cpp: bool, only: str | None) -> int:
         if cmd == 'cpp':
             exe = work / (Path(name).stem + '.exe')
             script = work / (Path(name).stem + '.cmd')
-            script.write_text(f'@call "{VCVARS}" >nul\r\n@cl /nologo /utf-8 /std:c++latest /EHsc /MT /Od '
-                              f'"{ROOT / "dev" / name}" /Fo"{work}\\" /Fe"{exe}" >"{exe}.log" 2>&1 || exit /b 9\r\n'
+            glm = ''.join(f'/I"{d}" ' for d in INCLUDES if d.is_dir())
+            uses_lua = 'sol/sol.hpp' in (ROOT / 'dev' / name).read_text(encoding='utf-8', errors='replace') or \
+                'WuWaLuaEnum.hpp' in (ROOT / 'dev' / name).read_text(encoding='utf-8', errors='replace')
+            # System graphics libraries, for tests of renderers (unused ones cost nothing).
+            lib = (f' "{LUA_LIB}"' if uses_lua and LUA_LIB.exists() else '') + ' d3d12.lib d3d11.lib dxgi.lib d3dcompiler.lib'
+            script.write_text(f'@call "{VCVARS}" >nul\r\n@cl /nologo /utf-8 /std:c++latest /EHsc /MT /Od {glm}'
+                              f'"{ROOT / "dev" / name}" /Fo"{work / (Path(name).stem + ".obj")}" /Fe"{exe}"{lib} >"{exe}.log" 2>&1 || exit /b 9\r\n'
                               f'@"{exe}"\r\n', encoding='utf-8')
             cmd = ['cmd', '/c', str(script)]
         r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=600)
         text = (r.stdout + r.stderr).strip().splitlines()
+        if name.endswith('.cpp') and r.returncode == 9:
+            # Exit 9 is the compile step: show the compiler's errors, not vcvars' noise.
+            log = Path(f'{exe}.log').read_text(encoding='utf-8', errors='replace').splitlines() if Path(f'{exe}.log').exists() else []
+            text = ['FAIL compile: ' + l.strip() for l in log if ' error ' in l or 'fatal error' in l][:6] or text
         bad = r.returncode != 0 or any(l.startswith(('FAIL', 'LUA ERROR')) for l in text)
         missing = sorted(set(re.findall(r"ModuleNotFoundError: No module named '([\w.]+)'", '\n'.join(text))))
         if bad and missing:

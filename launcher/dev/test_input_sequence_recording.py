@@ -44,7 +44,7 @@ class SequenceTests(unittest.TestCase):
             self.assertEqual([(s.get('lt'),s.get('rt')) for s in plan['segments']],
                              [(None,255),(None,0),(1,254),(0,None),(None,None)])
             self.assertEqual(plan['segments'][-1],dict(duration_ms=100,lx=0,ly=0,rx=0,ry=0))
-            client=Mock();lease=m.Lease(client,plan)
+            client=Mock(unsafe=True);lease=m.Lease(client,plan)
             client.request.return_value={'input_sequence':dict(id=lease.id,active=True,phase='lead',
                 generated_polls=0,context='gameplay',trigger_axes=True,synthetic_lt=0,synthetic_rt=0)}
             lease.begin()
@@ -87,7 +87,7 @@ class SequenceTests(unittest.TestCase):
                     for version in [None,True,False,0,2,'1',1.0]:
                         state=dict(protocol_version=1,active=False,button_context_version=1)
                         if version is not None:state['trigger_axis_version']=version
-                        client=Mock(spec=r.live.LiveTest,pid=42)
+                        client=Mock(spec=r.live.LiveTest,unsafe=True,pid=42)
                         client.assert_live.return_value={'input_sequence':state}
                         with self.subTest(axis=axis,value=value,version=version), \
                                 patch.object(r.live,'LiveTest',return_value=client), \
@@ -106,14 +106,14 @@ class SequenceTests(unittest.TestCase):
             dict(duration_ms=100,lx=0,ly=0,rx=0,ry=0,rt=255),
             dict(duration_ms=100,lx=0,ly=0,rx=0,ry=0,rt=0)])
         for context in [None,'game-menu']:
-            lease=m.Lease(Mock(),plan)
+            lease=m.Lease(Mock(unsafe=True),plan)
             state=dict(id=lease.id,active=False,phase='completed',tail_neutral_observed=True,
                        generated_polls=10,segment_mask=3,trigger_axes=True,synthetic_lt=0,synthetic_rt=0)
             if context is not None:state['context']=context
             with self.subTest(context=context),self.assertRaisesRegex(RuntimeError,'input context'):
                 lease.observe('heartbeat',{'input_sequence':state})
             self.assertFalse(lease.done);self.assertTrue(lease.report(None)['input_sent'])
-        lease=m.Lease(Mock(),plan)
+        lease=m.Lease(Mock(unsafe=True),plan)
         for rt,done in [(255,False),(0,True)]:
             poll=dict(raw={'buttons':0,'lt':9,'rt':12},synthetic={'buttons':0,'lt':0,'rt':rt},
                       delivered={'buttons':0,'lt':0,'rt':0},generated=True)
@@ -141,7 +141,7 @@ class SequenceTests(unittest.TestCase):
             self.assertEqual(plan['segments'][0]['buttons'],['a','right_shoulder'])
             self.assertEqual(plan['segments'][1],dict(duration_ms=200,lx=0,ly=0,rx=0,ry=0))
             self.assertTrue(all(not s[axis] for s in plan['segments'] for axis in m.AXES))
-            client=Mock();lease=m.Lease(client,plan)
+            client=Mock(unsafe=True);lease=m.Lease(client,plan)
             client.request.return_value={'input_sequence':dict(id=lease.id,active=True,phase='lead',generated_polls=0,
                                                                context='game-menu',synthetic_buttons=0)}
             lease.begin()
@@ -182,7 +182,7 @@ class SequenceTests(unittest.TestCase):
 
     def test_wrong_context_in_button_lease_response_cannot_complete(self):
         for context in [None,'gameplay']:
-            lease=m.Lease(Mock(),dict(version=1,user_index=0,context='game-menu',segments=[dict(duration_ms=100,buttons=['a'])]))
+            lease=m.Lease(Mock(unsafe=True),dict(version=1,user_index=0,context='game-menu',segments=[dict(duration_ms=100,buttons=['a'])]))
             state=dict(id=lease.id,active=False,phase='completed',tail_neutral_observed=True,
                        generated_polls=10,segment_mask=1)
             if context is not None:state['context']=context
@@ -198,7 +198,7 @@ class SequenceTests(unittest.TestCase):
             path.write_text(json.dumps(dict(version=1,segments=[dict(duration_ms=100,buttons=['a'])])))
             args=argparse.Namespace(seconds=30,fps=30,eye_width=720,output=folder/'video',
                 input_plan=path,user_index=0,pid=42,stop_file=folder/'stop',video_only=False,profile=folder/'profile')
-            client=Mock(spec=r.live.LiveTest,pid=42)
+            client=Mock(spec=r.live.LiveTest,unsafe=True,pid=42)
             client.assert_live.return_value={'input_sequence':{'protocol_version':1,'active':False}}
             with patch.object(r.live,'LiveTest',return_value=client),patch.object(r,'recorder_command') as command, \
                     patch.object(r.subprocess,'run') as run:
@@ -211,7 +211,7 @@ class SequenceTests(unittest.TestCase):
                 folder=Path(d)
                 args=argparse.Namespace(seconds=30,fps=30,eye_width=720,output=folder/'video',
                     input_plan=None,user_index=None,pid=42,stop_file=folder/'stop',video_only=video_only,profile=folder/'profile')
-                client=Mock(spec=r.live.LiveTest,pid=42,profile=args.profile)
+                client=Mock(spec=r.live.LiveTest,unsafe=True,pid=42,profile=args.profile)
                 client.assert_live.return_value={}
                 client.exclusive.return_value=contextlib.nullcontext()
                 client.request.return_value={'recording':{'id':'owned','path':str(args.profile/'recordings/owned.jsonl')}}
@@ -265,7 +265,7 @@ class SequenceTests(unittest.TestCase):
         m.check_backend({'input_sequence':{'protocol_version':1,'active':False}})
 
     def test_begin_timeout_still_stops_exact_owned_id(self):
-        client=Mock(); lease=m.Lease(client,dict(PLAN,user_index=2))
+        client=Mock(unsafe=True); lease=m.Lease(client,dict(PLAN,user_index=2))
         client.request.side_effect=[TimeoutError('lost response'), {'input_sequence':{'id':lease.id}}]
         with self.assertRaises(TimeoutError): lease.begin()
         lease.stop()
@@ -278,14 +278,14 @@ class SequenceTests(unittest.TestCase):
     def test_completed_requires_neutral_tail_and_every_segment_observed(self):
         for change in [{'tail_neutral_observed':False},{'segment_mask':0},{'id':'other'},
                        {'phase':'cancelled','reason':'physical_buttons'}]:
-            lease=m.Lease(Mock(),dict(PLAN,user_index=0))
+            lease=m.Lease(Mock(unsafe=True),dict(PLAN,user_index=0))
             state=dict(id=lease.id, active=False, phase='completed', tail_neutral_observed=True,
                        segment_mask=1, generated_polls=20)
             state.update(change)
             with self.subTest(change=change),self.assertRaises(RuntimeError):
                 lease.observe('heartbeat',{'input_sequence':state})
             self.assertFalse(lease.done)
-        lease=m.Lease(Mock(),dict(PLAN,user_index=0))
+        lease=m.Lease(Mock(unsafe=True),dict(PLAN,user_index=0))
         lease.observe('heartbeat', {'input_sequence':dict(id=lease.id,active=False,phase='completed',
             tail_neutral_observed=True,segment_mask=1,generated_polls=20)})
         self.assertTrue(lease.done)
@@ -302,7 +302,7 @@ class SequenceTests(unittest.TestCase):
 
     def fixture(self,d):
         p=Path(d); output=p/'video';output.mkdir()
-        return SimpleNamespace(output=output,stop_file=p/'stop',seconds=30),Mock(spec=r.live.LiveTest)
+        return SimpleNamespace(output=output,stop_file=p/'stop',seconds=30),Mock(spec=r.live.LiveTest,unsafe=True)
 
     def test_video_failure_before_first_frame_never_begins(self):
         with tempfile.TemporaryDirectory() as d:
@@ -348,7 +348,7 @@ class SequenceTests(unittest.TestCase):
             self.assertEqual(meta['input_context'],'gameplay')
 
     def test_button_polls_do_not_relabel_synthetic_as_raw_or_game_action(self):
-        client=Mock();plan=dict(version=1,user_index=0,context='game-menu',segments=[
+        client=Mock(unsafe=True);plan=dict(version=1,user_index=0,context='game-menu',segments=[
             dict(duration_ms=100,lx=0,ly=0,rx=0,ry=0,buttons=['a']),
             dict(duration_ms=100,lx=0,ly=0,rx=0,ry=0)])
         lease=m.Lease(client,plan)

@@ -17,7 +17,13 @@ local function fixture()
             return f.pc
         end,get_local_pawn=function() end},
         params={vr={
-            get_mod_value=function(_,key) return f.values[key] or 'false' end,
+            get_mod_value=function(_,key)
+                if key=='WuWaControls_EffectiveMonoTheatre' then return f.values.VR_MonoTheatreMode or 'false' end
+                if key=='WuWaControls_EffectiveScreen' then
+                    return tostring(f.values.VR_2DScreenMode=='true' or f.values.VR_MonoTheatreMode=='true')
+                end
+                return f.values[key] or 'false'
+            end,
             set_mod_value=function(key,value)
                 assert(key~='VR_WorldScale','Shortcut wrote normal VR_WorldScale')
                 f.values[key]=value; f.writes[key]=(f.writes[key] or 0)+1

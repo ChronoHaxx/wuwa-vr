@@ -26,8 +26,12 @@ def run(*args, input_text=None):
 
 
 def digest(path):
+    # Chunked rather than hashlib.file_digest, which needs Python 3.11.
+    h = hashlib.sha256()
     with path.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
+        for chunk in iter(lambda: stream.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def read(path):

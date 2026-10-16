@@ -17,11 +17,11 @@ inline constexpr uint32_t payload_size = 0x1740;
 // Native metadata initializer 20205660 registers its 0x1200-byte layout.
 inline constexpr uint32_t instanced_payload_size = 0x1200;
 inline constexpr std::array<wuwa_code_compatibility::Range, 2> code_ranges{{
-    {0x3f970c0, 546, 0x55662f443a9bf45fULL},
-    {0x3faf5e0, 920, 0x956cb697ba839be3ULL}}};
+    {0x3f97800, 546, 0x5aae77ec38e15092ULL},
+    {0x3fafd20, 920, 0xacebf4517c2fb945ULL}}};
 
 enum class Stage : uint8_t { cache_decision, shared_update_returned_before_cache_store, own_update_returned };
-inline constexpr std::array<uint32_t, 3> site_rvas{0x3f97251, 0x3f972bf, 0x3faf856};
+inline constexpr std::array<uint32_t, 3> site_rvas{0x3f97991, 0x3f979ff, 0x3faff96};
 enum class Decision : uint8_t { unknown, would_skip, would_update };
 enum class Result : uint8_t { recorded, filtered, invalid, busy, watch_full, sink_full, exception, stopped };
 struct Registers { uintptr_t rbp{}, rbx{}, rdi{}, r14{}; };

@@ -15,17 +15,17 @@ using wuwa_lod::Field;
 // Do not hook the three-byte call at b35: a five-byte jump there overwrites
 // b38, which is an incoming branch target for both native null checks.
 // This single five-byte store ends before the call and that shared join.
-constexpr uint32_t site_rva=0x400edc0, hook_revision=2;
+constexpr uint32_t site_rva=0x400f500, hook_revision=2;
 constexpr std::array<uint8_t,5> site_bytes{0x4c,0x89,0x6c,0x24,0x20};
 inline bool valid_hook_span(std::span<const uint8_t> bytes) noexcept {
     return bytes.size()==site_bytes.size() && std::equal(bytes.begin(),bytes.end(),site_bytes.begin());
 }
 constexpr size_t max_resources=32, capacity=2048;
 constexpr std::array<wuwa_code_compatibility::Range,4> code_ranges{{
-    {0x400ed00,1308,0x4de252864e0381c6ULL},
-    {0x115dd30,564,0x753322f75cf58070ULL},
-    {0x3c3d0c0,741,0xc5f5b5b0f1d79611ULL},
-    {0x486a520,610,0x5f5e712754fe83f3ULL}}};
+    {0x400f440,1308,0xe5338d5dd278d9caULL},
+    {0x115e230,564,0x5e3a311fd9e90108ULL},
+    {0x3c3d800,741,0x03db77bd7343ba0dULL},
+    {0x486ac30,610,0x565afbb21eb2285eULL}}};
 struct Registers {uintptr_t rsp{},rcx{},rdx{},r8{},r9{},r10{},r13{},r14{},rdi{},rsi{};};
 struct Resource {
     Field<uint16_t> slot{},parameter_size{};

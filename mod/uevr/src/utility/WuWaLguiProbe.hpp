@@ -35,10 +35,10 @@ inline Probe* active{}; // Access only while holding active_lock.
 inline std::atomic<bool> attempted{false};
 inline std::atomic<bool> process_exiting{false};
 static_assert(std::atomic<bool>::is_always_lock_free);
-constexpr uintptr_t setup_rva = 0x4115e10;
+constexpr uintptr_t setup_rva = 0x4116550;
 constexpr uintptr_t execute_rva = 0x23782760;
-constexpr uint32_t image_size = 181538816;
-constexpr uint32_t timestamp = 0x6aa96d2d;
+constexpr uint32_t image_size = 181526528;
+constexpr uint32_t timestamp = 0x6ace6377;
 constexpr std::array<uint8_t, 32> setup_signature{
     0x4c,0x89,0x4c,0x24,0x20,0x4c,0x89,0x44,0x24,0x18,0x48,0x89,0x4c,0x24,0x08,0x55,0x56,0x48,0x8d,0xac,0x24,0x78,0xfe,0xff,0xff,0x48,0x81,0xec,0x88,0x02,0x00,0x00};
 constexpr std::array<uint8_t, 32> execute_signature{

@@ -21,21 +21,21 @@ using Provider = wuwa_lgui_route::Provider;
 enum class Mode { register_only, redirect };
 enum class ViewContext : size_t { hud, tonemap, capture, count };
 
-constexpr uintptr_t setup_rva = 0x4117a20;
-constexpr uintptr_t pass_rva = 0x40f76b0;
-constexpr uintptr_t menu_setup_rva = 0x4115e10;
-constexpr uintptr_t menu_pass_rva = 0x40f7780;
-constexpr uintptr_t wrap_rva = 0x484d640;
-constexpr uintptr_t register_rva = 0x4826e60;
-constexpr uintptr_t graph_vtable_rva = 0x7d81540;
-constexpr uintptr_t pooled_vtable_rva = 0x80b76c0;
-constexpr uintptr_t release_rva = 0x485c140;
-constexpr uintptr_t addref_rva = 0x4848bc0;
+constexpr uintptr_t setup_rva = 0x4118160;
+constexpr uintptr_t pass_rva = 0x40f7df0;
+constexpr uintptr_t menu_setup_rva = 0x4116550;
+constexpr uintptr_t menu_pass_rva = 0x40f7ec0;
+constexpr uintptr_t wrap_rva = 0x484dd50;
+constexpr uintptr_t register_rva = 0x4827570;
+constexpr uintptr_t graph_vtable_rva = 0x7d81640;
+constexpr uintptr_t pooled_vtable_rva = 0x80b77c0;
+constexpr uintptr_t release_rva = 0x485c850;
+constexpr uintptr_t addref_rva = 0x48492d0;
 constexpr std::array<std::array<uint8_t, 32>, 4> signatures{{
     {0x4c,0x8b,0xdc,0x4d,0x89,0x4b,0x20,0x4d,0x89,0x43,0x18,0x55,0x41,0x55,0x41,0x56,0x49,0x8d,0xab,0x68,0xfe,0xff,0xff,0x48,0x81,0xec,0x80,0x02,0x00,0x00,0x48,0x8b},
     {0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57,0x48,0x83,0xec,0x30,0x41,0x0f,0xb7,0xd9,0x4c,0x89,0x44,0x24,0x20,0x48,0x8b,0xfa,0x48,0x8b,0xf1,0xe8,0x6d},
     {0x48,0x89,0x5c,0x24,0x10,0x48,0x89,0x74,0x24,0x18,0x55,0x57,0x41,0x54,0x41,0x56,0x41,0x57,0x48,0x8b,0xec,0x48,0x81,0xec,0x80,0x00,0x00,0x00,0x48,0x8b,0x02,0x48},
-    {0x40,0x53,0x55,0x57,0x41,0x55,0x41,0x56,0x41,0x57,0x48,0x81,0xec,0xc8,0x00,0x00,0x00,0x48,0x8b,0x05,0x70,0xda,0xdc,0x04,0x48,0x33,0xc4,0x48,0x89,0x84,0x24,0xb0}
+    {0x40,0x53,0x55,0x57,0x41,0x55,0x41,0x56,0x41,0x57,0x48,0x81,0xec,0xc8,0x00,0x00,0x00,0x48,0x8b,0x05,0x60,0xd3,0xdc,0x04,0x48,0x33,0xc4,0x48,0x89,0x84,0x24,0xb0}
 }};
 
 // Hidden return storage, bare FRHITexture*, persistent name. The wrapped target
@@ -156,8 +156,8 @@ inline bool graph_resource(uintptr_t graph, uintptr_t& rhi,
 
 // Describe a rejected colour without trusting it: guarded reads only, nothing is
 // written or called. Offsets are verified in the Sep 8 capture: the RDG
-// resource base constructor 0x4810760 stores the debug name at +0x8, type at
-// +0x18 and flag bits at +0x19; texture constructor 0xf095f0 copies the
+// resource base constructor 0x4810e70 stores the debug name at +0x8, type at
+// +0x18 and flag bits at +0x19; texture constructor 0xf09af0 copies the
 // descriptor extent to +0x54/+0x58 and the pixel format to +0x68. Do not follow
 // these offsets on another class. Repeated rejects need no string allocation.
 inline RejectedDescription read_rejected(uintptr_t color, uintptr_t vtable, GraphStatus status) noexcept {
@@ -190,7 +190,7 @@ inline std::string describe_rejected(const RejectedDescription& value) {
 }
 
 inline nlohmann::json sample_view_gate(uintptr_t view) {
-    // Raw inputs to the shipped 0x3825130 eligibility helper, inspected in
+    // Raw inputs to the shipped 0x3825870 eligibility helper, inspected in
     // _docs/lgui-menu-stage0-contract-2026-09-24.md. No predicate is bypassed
     // and no helper is called. Unknown reads stay unknown, never "false".
     // These observations distinguish the main view from the native capture;
@@ -629,7 +629,7 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
     ++s.world_calls;
     try {
         const auto target = s.provider ? s.provider() : wuwa_lgui_route::Target{};
-        if (caller != s.base + 0x4115de3) { ++s.world_caller_skips; return result; }
+        if (caller != s.base + 0x4116523) { ++s.world_caller_skips; return result; }
         if (!target.world_labels_enabled) { ++s.world_disabled_skips; return result; }
         if (target.native_stereo_fix || target.independent_eyes) { ++s.world_mode_skips; return result; }
         // Only the verified last-view caller is expanded. Do not replay a pass
@@ -717,7 +717,7 @@ inline void install_world_labels(State& s, HMODULE executable, uint32_t image_si
     try {
         checked::require(verify_code(executable, image_size, compatibility::world_label_code_ranges,
             "world-labels"), "World-label route code mismatch");
-        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + 0x4116330),
+        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + 0x4116a70),
             &world_setup_callback, safetyhook::InlineHook::StartDisabled);
         checked::require(hook.has_value(), "Cannot create world-label setup hook");
         s.world_setup = std::move(*hook);
@@ -783,8 +783,8 @@ inline void disable_stage0_probe(State& s) noexcept {
 inline void install_stage0_probe(State& s,HMODULE executable,uint32_t image_size) noexcept {
     try {
         checked::require(verify_code(executable,image_size,compatibility::stage0_probe_code_ranges,"stage0-recording"),"Stage-0 probe code mismatch");
-        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40f74a0),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
-        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40faf0c),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
+        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40f7be0),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
+        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40fb64c),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
         checked::require(constructor.has_value() && dispatch.has_value(),"Cannot create stage-0 recording probe");
         s.stage0_construct=std::move(*constructor);s.stage0_dispatch=std::move(*dispatch);
         checked::require(s.stage0_construct.enable().has_value() && s.stage0_dispatch.enable().has_value(),"Cannot enable stage-0 recording probe");
@@ -806,8 +806,8 @@ inline void install_menu(State& s, HMODULE executable, uint32_t image_size) noex
         checked::require(verify_code(executable, image_size, compatibility::menu_code_ranges, "menu-stage3"),
             "Menu stage code changed; preserving HUD-only hooks");
         uintptr_t thunk{};
-        checked::require(checked::read(s.base + 0x7feaca8 + sizeof(uintptr_t), thunk) &&
-            thunk == s.base + 0x410b880, "Menu execute vtable changed; preserving HUD-only hooks");
+        checked::require(checked::read(s.base + 0x7feada8 + sizeof(uintptr_t), thunk) &&
+            thunk == s.base + 0x410bfc0, "Menu execute vtable changed; preserving HUD-only hooks");
         auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + menu_setup_rva),
             &menu_setup_callback, safetyhook::InlineHook::StartDisabled);
         checked::require(setup.has_value(), "Cannot create menu setup hook");
@@ -830,11 +830,11 @@ inline void install_menu(State& s, HMODULE executable, uint32_t image_size) noex
 // where the function starts reading the constrained view rect at rsp/rbp + offset.
 struct ViewportSite { uintptr_t rva; uint32_t offset; bool rbp; };
 inline constexpr std::array<ViewportSite, 5> viewport_sites{{
-    {0xc63849, 0xe0, false}, // GetProjectionMatrix: inlined canvas size
-    {0xc66881, 0xd0, false}, // view-rect getter: mouse ray, scaler
-    {0xc66986, 0xd0, false}, // GetViewportSize: scaler layout, Project3DToScreen
-    {0xc94363, 0x40, true},  // UI point -> viewport pixels (controller button presses)
-    {0xc9482e, 0x30, true},  // UI point -> normalised viewport point
+    {0xc63d49, 0xe0, false}, // GetProjectionMatrix: inlined canvas size
+    {0xc66d81, 0xd0, false}, // view-rect getter: mouse ray, scaler
+    {0xc66e86, 0xd0, false}, // GetViewportSize: scaler layout, Project3DToScreen
+    {0xc94863, 0x40, true},  // UI point -> viewport pixels (controller button presses)
+    {0xc94d2e, 0x30, true},  // UI point -> normalised viewport point
 }};
 template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
     constexpr auto site = viewport_sites[I];
@@ -844,7 +844,7 @@ template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
         // its return address is at rsp + 0x138 here too.
         const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
         if (ret - state().base == wuwa_lgui_viewport::pointer_ray_return) {
-            // The pointer ray (0xd58550) keeps its event data in rbp across the call.
+            // The pointer ray (0xd58a50) keeps its event data in rbp across the call.
             wuwa_lgui_viewport::rewrite_pointer_ray(c.rsp, site.offset, reinterpret_cast<const uint8_t*>(c.rbp));
             return;
         }

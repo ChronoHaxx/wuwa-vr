@@ -7,11 +7,13 @@
 namespace wuwa_code_compatibility {
 // The PE timestamp names the game build. Its image size is not part of the
 // identity: one build ships in packagings whose protector sections differ in size
-// (Kuro launcher 0xad21000, Steam 0xad1c000 on 13 Oct 2026, the September 19 disk
-// variant 0x3d625000), and requiring one size turned every fix off on Steam. A
+// (3.7: Kuro launcher 0xad21000, Steam 0xad1c000 on 13 Oct 2026, the September 19
+// disk variant 0x3d625000), and requiring one size turned every fix off on Steam. A
 // matching timestamp is only a prerequisite: every requested code range must lie
 // inside the loaded image and match its fingerprint.
-constexpr uint32_t timestamp = 0x6aa96d2d;
+// Build 0x6ace6377 is the 16 Oct 2026 hotfix of 3.7 (Kuro launcher 0xad1e000): every
+// pinned code range was unchanged and only moved (port-6ace6377.json, 211 sites).
+constexpr uint32_t timestamp = 0x6ace6377;
 struct Identity { uint16_t machine, magic; uint32_t timestamp, size; };
 struct Range { uint32_t rva, size; uint64_t hash; };
 enum class Failure { none, machine, magic, timestamp, image_size, range, unreadable, code };

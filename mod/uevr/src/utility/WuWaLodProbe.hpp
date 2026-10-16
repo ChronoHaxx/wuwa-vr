@@ -15,8 +15,8 @@
 namespace wuwa_lod_probe {
 using Json = nlohmann::json;
 namespace memory = wuwa_lgui_probe::detail;
-constexpr uintptr_t site_rva = 0x51c6e43;
-constexpr uintptr_t uniform_site_rva = 0x54e775d;
+constexpr uintptr_t site_rva = 0x51c73c3;
+constexpr uintptr_t uniform_site_rva = 0x54e7cdd;
 constexpr size_t capacity = 8192;
 inline SRWLOCK callbacks = SRWLOCK_INIT;
 inline std::mutex control;
@@ -452,10 +452,10 @@ inline void install() {
     if (retired) throw std::runtime_error("LOD trace is shut down");
     if (installed) return;
     constexpr std::array<wuwa_code_compatibility::Range, 4> ranges{{
-        {0x51c67a0, 2858, 0x675bb01c74b175e5ULL},
-        {0x54d5ec0, 108, 0x76401d3e4ea2cf1aULL},
-        {0x54d0850, 55, 0x0d64fd0e7b954aeaULL},
-        {0x54e5c80, 7113, 0x4c349782a6fcaae3ULL}}};
+        {0x51c6d20, 2858, 0x015992b281566bc0ULL},
+        {0x54d6440, 108, 0x76401d3e4ea2cf1aULL},
+        {0x54d0dd0, 55, 0x9ce1f91d6e6a7672ULL},
+        {0x54e6200, 7113, 0xdb7c95f469ab5974ULL}}};
     try {
         const auto base = wuwa_code_check::verify("Read-only instanced LOD inputs", ranges);
         if (!owner) owner = new Probe;

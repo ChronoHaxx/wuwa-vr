@@ -1,7 +1,7 @@
 #pragma once
 // Diagnostic K5 (fix bench, timed, off by default): build WuWa's second eye view
 // exactly like the first from the very start. The game's LocalPlayer::CalcSceneView
-// (3.7 RVA 0x5266fd0) takes the stereo pass (2/3) and a per-eye index (0/1) and uses
+// (3.7 RVA 0x5267550) takes the stereo pass (2/3) and a per-eye index (0/1) and uses
 // them before the view exists: camera view point, projection data, the view-state
 // slot. During a window the second call (pass 3, index 1) is made with pass 2 and
 // index 0. A thread-local flag keeps UEVR's eye offset and projection on the left eye,
@@ -19,7 +19,7 @@
 #include <spdlog/spdlog.h>
 
 namespace wuwa_second_eye {
-inline constexpr uintptr_t calc_scene_view_rva = 0x5266fd0;
+inline constexpr uintptr_t calc_scene_view_rva = 0x5267550;
 inline constexpr std::array<uint8_t, 16> entry_bytes{
     0x40,0x55,0x53,0x56,0x57,0x41,0x54,0x41,0x55,0x41,0x56,0x41,0x57,0x48,0x8d,0xac};
 

@@ -1,18 +1,17 @@
-WUWA VR — 1.2.3 BETA / FOCUSED USER CHECKS
-App 1.2.3 | Package beta-1-2-3 | Build ui-layout-1-2-3 | Game 3.7 | 15 Oct 23:07 BST
+WUWA VR — 1.2.4 BETA / FOCUSED USER CHECKS
+App 1.2.4 | Package beta-1-2-4 | Build game-hotfix-1-2-4 | Game 3.7 (16 Oct update) | 17 Oct 00:04 BST
 
 Record Pass / Fail / Blocked / Not tested. Automated checks are not user results.
 Close game and injector before updating package or changing runtime.
 
-[ ] Update app to 1.2.3 and restart it with the game closed: step 02 shows
-    VR package 1.2.3 beta, installed by itself, and offers Back to 1.2.2.
+[ ] Update app to 1.2.4 and restart it with the game closed: step 02 shows
+    VR package 1.2.4 beta, installed by itself, and offers Back to 1.2.3.
     If using simulator, explicitly choose Use bundled simulator. Confirm ready.
-[ ] Steam copy and Kuro launcher copy: the HUD and menus sit on the VR panel.
+[ ] Steam copy and Kuro launcher copy, game updated on 16 Oct: the HUD and
+    menus sit on the VR panel in the 16:9 layout.
 [ ] In full VR, ESC menu and the Terminal: the mouse arrow and the controller
     cursor click what they point at; round icons are round.
-[ ] Story scene with 2D pictures: they switch to the stereo screen and back.
 [ ] Character screen: the floor reflection follows the current character.
-[ ] Mouse with the game in front: it stops at the game window's edges.
 
 PS4/PS5 hardware and physical-headset comfort remain separate pending checks.
 See PlayerGuide.html for controls, recovery and remaining rendering limitations.

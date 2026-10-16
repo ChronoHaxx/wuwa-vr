@@ -1,10 +1,10 @@
 # Start playing
 
-**1.2.3 beta · Wuthering Waves 3.7 · Windows x64.**
-[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-3/WuWa-VR-Setup.exe), install it for your Windows user, then open **WuWa VR** from the Start menu. The first VR package installation needs internet. No separate Python installation is needed.
+**1.2.4 beta · Wuthering Waves 3.7 · Windows x64.**
+[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-4/WuWa-VR-Setup.exe), install it for your Windows user, then open **WuWa VR** from the Start menu. The first VR package installation needs internet. No separate Python installation is needed.
 
 1. **01 · Game.** Choose your Steam or Kuro installation. For Steam, browse to **Wuthering Waves.exe** if necessary; sign into Steam first.
-2. **02 · Install VR.** Read and accept the account-risk notice, then install **1.2.3 beta**. This is the VR package; the launcher app has its own version shown separately.
+2. **02 · Install VR.** Read and accept the account-risk notice, then install **1.2.4 beta**. This is the VR package; the launcher app has its own version shown separately.
 3. **03 · Headset or simulator.** Start your headset software and choose its valid OpenXR runtime, or explicitly select **Use bundled simulator**. Select **Launch in VR** and accept Windows permission. Steam starts through Steam; Kuro users press **Play** in its launcher.
 
 Your choices are saved, so later sessions can go straight to **Launch in VR** when ready. A simulator from an older package or an invalid/missing runtime blocks launch and shows what to fix. Close the game and injector before switching runtimes. Updating the app never changes the system runtime automatically.
@@ -18,11 +18,11 @@ The simulator lets you inspect the view without a headset. It does not establish
 **Launcher app** is the installed desktop application. **VR package** contains the game integration, scripts and bundled simulator. The two statuses are separate: an up-to-date app can still be using an older VR package.
 
 - **Update launcher:** download and verify the app update. When game, injector, recording and other operations are idle, select **Restart to update** and confirm.
-- **VR package update:** use the package update option or **02 → Versions & updates**, deliberately choose **1.2.3 beta**, then install it. Checking for updates preserves your current choice, including rollback.
+- **VR package update:** use the package update option or **02 → Versions & updates**, deliberately choose **1.2.4 beta**, then install it. Checking for updates preserves your current choice, including rollback.
 - **Rollback:** when idle, use **Troubleshooting → Repair & recovery → Use previous installed version**. This changes the VR package, not the app. If using the simulator, select the restored package's simulator before launching.
 - If the app cannot update, close it and run the latest installer from the website. Reinstallation preserves settings and does not stop existing workers.
 
-Older date-and-fix-name packages are historical builds. New releases use a readable version such as **1.2.3 beta**; exact package IDs remain in diagnostics for bug reports.
+Older date-and-fix-name packages are historical builds. New releases use a readable version such as **1.2.4 beta**; exact package IDs remain in diagnostics for bug reports.
 
 ## Controls and current limits
 
@@ -38,7 +38,7 @@ Cinematic framing is on by default and was accepted in a simulator replay. Autom
 
 The optional NPC rim-light suppression starts off and also removes intended rim lighting nearby; the **underlying stereo rendering fault is unresolved**. Scene/dialogue stalls, HUD-aspect refresh failures, some reflections/fog and moving flat-menu backgrounds remain open. Manual mono theatre can help with menus. See [troubleshooting](TROUBLESHOOTING.md).
 
-The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill), 1.2.1 in the headset with the Kuro launcher copy of the game, and an earlier 1.2.3 test build in the headset (SteamVR) with the Kuro launcher copy. The final 1.2.3 test builds were tested by the owner on the OpenXR simulator with both the Steam copy and the Kuro launcher copy: menus, the mouse and the controller cursor in the 16:9 and taller layouts, story pictures and story scenes, the character screen and the translations; on the Steam copy the UI redirect starts and the stereo fixes pass their code checks. The 1.2.3 release build has not been played in a headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
+The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill), 1.2.1 in the headset with the Kuro launcher copy of the game, and an earlier 1.2.3 test build in the headset (SteamVR) with the Kuro launcher copy. 1.2.4 is 1.2.3 moved to the game update of 16 October. It was tested on the OpenXR simulator with the updated game: on the Kuro launcher copy the HUD and menus in full VR, on the stereo screen and in mono theatre, the mouse, the controller and stick cursors and the character screen; on the Steam copy the UI redirect starts and the stereo fixes pass their code checks. The 1.2.4 release build has not been played in a headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
 
 ## Recovery, recording and uninstall
 
@@ -52,8 +52,8 @@ Use **Troubleshooting → Copy diagnostics** when launch stalls. **Stop waiting*
 
 ## Portable fallback and source
 
-The [portable ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-3/WuWa-VR-Launcher.zip) uses the older browser interface and does not self-update the desktop app. Extract the whole archive and keep its folders together.
+The [portable ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-4/WuWa-VR-Launcher.zip) uses the older browser interface and does not self-update the desktop app. Extract the whole archive and keep its folders together.
 
 The launcher is MIT open source. The mod's source changes and build instructions are public; upstream components retain their own licences. [Source repository](https://github.com/ChronoHaxx/wuwa-vr) · [component licences](../LICENSE.md).
 
-[Previous 1.2.2 beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-2) is available for rollback.
+[Previous 1.2.3 beta](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-3) is available for rollback.

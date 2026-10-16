@@ -12,15 +12,15 @@
 // used by the mouse ray and the scaler, and two UI-point <-> pixel conversions
 // that controller button presses use); the redirect hooks each one just after
 // the engine call and replaces the rect with the window size. The binary has
-// two more left-eye readers (0xd56ec0, 0xd577e0): world positions through the
+// two more left-eye readers (0xd573c0, 0xd57ce0): world positions through the
 // player camera, sized by the window, independent of the canvas; left alone.
 // Test 12 (14 Oct 2026) hooked only the first three: controller buttons in the
 // Terminal clicked at eye-sized pixel positions and missed.
 // The taller layout (16:9 off, or the character screen) keeps the eye rect for
 // the layout, but the mouse still moves over the window and our VR cursor is
 // drawn at its window position. The view-rect getter's three callers (3.7) are
-// the mouse ray (0xd58550: cursor pixels / rect size -> 0..1 -> ray), the
-// scaler's viewport check (0xdd3a80) and a centre-of-screen ray (0xdd94b0), so
+// the mouse ray (0xd58a50: cursor pixels / rect size -> 0..1 -> ray), the
+// scaler's viewport check (0xdd3f80) and a centre-of-screen ray (0xdd99b0), so
 // there only the mouse ray gets the window size (test 17l, 15 Oct 2026: the
 // mouse divided window pixels by the eye rect and missed in the taller layout).
 // Controller presses reach the same ray: the game turns the button's UI point
@@ -76,11 +76,11 @@ struct State {
 };
 // Read by hook stubs until process exit; never destroyed.
 inline State& state() { static auto* value = new State{}; return *value; }
-// Return addresses (RVA) of the eight direct calls to GetViewportSize (0xc668c0) in the 3.7 client.
+// Return addresses (RVA) of the eight direct calls to GetViewportSize (0xc66dc0) in the 3.7 client.
 inline constexpr std::array<uintptr_t, 8> viewport_size_returns{
-    0xccd90c, 0xdbb1cf, 0xdd2cb5, 0xdd2d08, 0xdd461f, 0xe0d438, 0x2261c1e, 0x2860cdd};
-// Return address (RVA) of the pointer ray's call to the view-rect getter (0xc667c0) in the 3.7 client.
-inline constexpr uintptr_t pointer_ray_return = 0xd58615;
+    0xccde0c, 0xdbb6cf, 0xdd31b5, 0xdd3208, 0xdd4b1f, 0xe0d938, 0x22620ae, 0x285c43d};
+// Return address (RVA) of the pointer ray's call to the view-rect getter (0xc66cc0) in the 3.7 client.
+inline constexpr uintptr_t pointer_ray_return = 0xd58b15;
 // LGUIPointerEventData (3.7 reflection): inputType (byte; 0 pointer, 1 navigation) and pointerID.
 inline constexpr uint32_t event_input_type = 0x40, event_pointer_id = 0x44;
 // Counts the call and says whether this caller gets the window size.

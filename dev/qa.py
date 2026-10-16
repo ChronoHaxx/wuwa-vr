@@ -36,8 +36,10 @@ RESULTS = ROOT / 'qa' / 'results.jsonl'
 REPORT = ROOT / 'docs' / 'QA-MATRIX.md'
 RESULT_KINDS = ('pass', 'fail', 'blocked')
 CHECK_KINDS = ('unit', 'invariant', 'simulator', 'tool', 'manual')
-# Game image sizes seen for build 0x6aa96d2d (WuWaCodeCompatibility.hpp): which copy a log came from.
-COPIES = {'ad21000': 'launcher', 'ad1c000': 'steam'}
+# Game image sizes seen (WuWaCodeCompatibility.hpp): which copy a log came from. 3.7 (0x6aa96d2d):
+# ad21000 launcher, ad1c000 Steam; the 16 Oct hotfix (0x6ace6377): ad1e000 on both, so the session
+# reads the copy from the log's game path first.
+COPIES = {'ad21000': 'launcher', 'ad1c000': 'steam', 'ad1e000': 'launcher'}
 
 
 def load_matrix(path: Path = MATRIX) -> dict:
@@ -161,10 +163,15 @@ def session(text: str, known_off: list[dict] = ()) -> dict:
             name = msg.split('OpenXR system Name:', 1)[1].strip()
             s['runtime'] = 'simulator' if 'Simulator' in name else 'headset'
             s['runtime_name'] = name
+        # The game path names the copy; the image size only when the path is missing (the hotfix
+        # 0x6ace6377 has one size on both copies).
+        mp = re.search(r'\[PluginLoader\] Module path (.+Client-Win64-Shipping\.exe)', msg)
+        if mp:
+            s['copy_from_path'] = 'steam' if 'steamapps' in mp.group(1).lower() else 'launcher'
         r = re.search(r'\[WuWaStereoCode\] route=(.+?) verified_ranges=\d+ image_size=(\w+) timestamp=(\w+)', msg)
         if r:
             s['routes'][r.group(1)] = 'verified'
-            s['copy'] = COPIES.get(r.group(2), f'unknown image {r.group(2)}')
+            s['copy'] = s.get('copy_from_path') or COPIES.get(r.group(2), f'unknown image {r.group(2)}')
             s['game_build'] = r.group(3)
         if re.search(r'unavailable|refused|code mismatch|code changed', msg) and re.search(r'\[WuWa\w*\]', msg) \
                 and 'WuWaCinema' not in msg and 'HUD refresh unavailable' not in msg:

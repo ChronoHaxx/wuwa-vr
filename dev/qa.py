@@ -366,17 +366,22 @@ def run_unit(cpp: bool, only: str | None) -> int:
                 'WuWaLuaEnum.hpp' in (ROOT / 'dev' / name).read_text(encoding='utf-8', errors='replace')
             # System graphics libraries, for tests of renderers (unused ones cost nothing).
             lib = (f' "{LUA_LIB}"' if uses_lua and LUA_LIB.exists() else '') + ' d3d12.lib d3d11.lib dxgi.lib d3dcompiler.lib'
-            script.write_text(f'@call "{VCVARS}" >nul\r\n@cl /nologo /utf-8 /std:c++latest /EHsc /MT /Od {glm}'
-                              f'"{ROOT / "dev" / name}" /Fo"{work / (Path(name).stem + ".obj")}" /Fe"{exe}"{lib} >"{exe}.log" 2>&1 || exit /b 9\r\n'
-                              f'@"{exe}"\r\n', encoding='utf-8')
+            # write_bytes: write_text would turn each \r\n into \r\r\n, and cmd would then look for a
+            # program named "<exe>\r" and skip the test while the script still exited 0.
+            script.write_bytes((f'@call "{VCVARS}" >nul\r\n@cl /nologo /utf-8 /std:c++latest /EHsc /MT /Od {glm}'
+                                f'"{ROOT / "dev" / name}" /Fo"{work / (Path(name).stem + ".obj")}" /Fe"{exe}"{lib} >"{exe}.log" 2>&1 || exit /b 9\r\n'
+                                f'@"{exe}"\r\n@exit /b %errorlevel%\r\n').encode('utf-8'))
             cmd = ['cmd', '/c', str(script)]
         r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=600)
-        text = (r.stdout + r.stderr).strip().splitlines()
+        # vcvars64.bat's own "'vswhere.exe' is not recognized" lines are not test output.
+        text = [l for l in (r.stdout + r.stderr).strip().splitlines()
+                if 'vswhere' not in l and l.strip() != 'operable program or batch file.']
         if name.endswith('.cpp') and r.returncode == 9:
             # Exit 9 is the compile step: show the compiler's errors, not vcvars' noise.
             log = Path(f'{exe}.log').read_text(encoding='utf-8', errors='replace').splitlines() if Path(f'{exe}.log').exists() else []
             text = ['FAIL compile: ' + l.strip() for l in log if ' error ' in l or 'fatal error' in l][:6] or text
-        bad = r.returncode != 0 or any(l.startswith(('FAIL', 'LUA ERROR')) for l in text)
+        bad = r.returncode != 0 or any(l.startswith(('FAIL', 'LUA ERROR')) for l in text) or \
+            any('is not recognized as an internal or external command' in l and Path(name).stem in l for l in text)
         missing = sorted(set(re.findall(r"ModuleNotFoundError: No module named '([\w.]+)'", '\n'.join(text))))
         if bad and missing:
             skipped.append((name, 'needs ' + ', '.join(missing)))

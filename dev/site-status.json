@@ -1,8 +1,8 @@
 {
-  "tag": "beta-1-2-3",
-  "previousTag": "beta-1-2-2",
+  "tag": "beta-1-2-4",
+  "previousTag": "beta-1-2-3",
   "game": "3.7",
-  "appVersion": "1.2.3",
-  "buildId": "ui-layout-1-2-3",
+  "appVersion": "1.2.4",
+  "buildId": "game-hotfix-1-2-4",
   "installer": "WuWa-VR-Setup.exe"
 }

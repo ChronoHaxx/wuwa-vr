@@ -1,37 +1,37 @@
 {
   "schema": 3,
-  "build": "ui-layout-1-2-3",
+  "build": "game-hotfix-1-2-4",
   "privateCandidate": false,
-  "launcherVersion": "1.2.3",
+  "launcherVersion": "1.2.4",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "11ee60fed0371c03be178c1ba39fc59f66970bb45b93c6f90eefdc42dd904f39",
-  "frozenPatchSha256": "82d9725a4e2fcac6d0c4f32fd854fb240f6b816d370d121b6e626e208c41c776",
-  "sourceReconstructedTree": "6426882945f61a695e8667a1eae1cab544ce887a",
-  "buildCompleted": "2026-10-15T22:31:56+0100",
+  "backendSha256": "4c693d68c11987e4292c00f3f7023d52c192f05835a5413b87574466dd4695ad",
+  "frozenPatchSha256": "d4feab64c3550e85338398292bf66b87472d59520302cf263107ed7540074dd1",
+  "sourceReconstructedTree": "e8f5f5fdce9e94186df9b0a768650223b6de8bee",
+  "buildCompleted": "2026-10-16T22:29:06+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 52897540,
-    "sha256": "188aef4a4ed157fac25f16540c91b354e20fde226d0b9c4c9c06cdd6fe30390f",
+    "bytes": 52893341,
+    "sha256": "eba29c8babc189f5939863839d5068515c5b56a26481487ebee212c922b74e9c",
     "public": true
   },
-  "liveAcceptance": "1.2.0 and 1.2.1 played in the headset by the owner (1.2.1 with the Kuro launcher copy); test 17j of 1.2.3 played in the headset (SteamVR) with the Kuro launcher copy. Owner simulator passes: test 17p on the Kuro launcher copy (all steps), test 17q (this build) on the Steam copy, where the UI redirect starts and the five stereo code routes verify (both-copies.json). 17p to 17q changed no hook or route code. Pending: headset play of 1.2.3, the character screen reflection on the Weapon/Echoes/Forte/Chain tabs, story-video detection on 3.7, PlayStation hardware and broad headset compatibility.",
+  "liveAcceptance": "1.2.0 and 1.2.1 played in the headset by the owner (1.2.1 with the Kuro launcher copy); test 17j of 1.2.3 played in the headset (SteamVR) with the Kuro launcher copy. 1.2.4 is 1.2.3 ported to game build 0x6ace6377 (16 Oct 2026 hotfix, both copies): all 211 pinned sites moved with unchanged code. Simulator passes on the updated game (testport1, this build): Kuro launcher copy with the controller smoke route in full VR, stereo screen and mono theatre, the stick cursor, the character screen (taller layout, live reflection) and the owner's mouse check; Steam copy with the five stereo code routes verified and the UI redirect installed (both-copies.json). Pending: headset play of 1.2.4, the character screen reflection on the Weapon/Echoes/Forte/Chain tabs, PlayStation hardware and broad headset compatibility.",
   "previousPublicRelease": {
-    "tag": "beta-1-2-2",
-    "backendSha256": "f474b942bcf242cb10b363ea913d4c27dec4538a31e920b6fedd2a365ed4dd73"
+    "tag": "beta-1-2-3",
+    "backendSha256": "11ee60fed0371c03be178c1ba39fc59f66970bb45b93c6f90eefdc42dd904f39"
   },
-  "sourceIdentity": "1.2.2 plus: LGUI view-rect sites give the game UI the flat 16:9 size, with the taller layout keeping the canvas rect and the mouse ray alone given the window size (utility/WuWaLguiRedirect, WuWaLguiViewport, WuWaLguiCompatibility); a VR mouse cursor and input-activity tracking (utility/WuWaInputActivity); the cursor clipped to the game window while it is in front (utility/WuWaCursorClip); fades and the post-load frame in both eyes; the classic UEVR window kept open with Ctrl+Shift+End/Home emergency keys; hide characters at your eyes and the close-up stop behind performers (mod/lua/02_WuWaVR_PolarControls.lua); automatic cinema on by default with story-picture and character-screen detection (mod/lua/wuwa_auto_cinema.lua); live status lines translated as parts (utility/WuWaStatusText); VR menu defaults, X/Delete reset and the save switch (utility/WuWaVrMenu, mods/vr/WuWaVrMenuHost); launcher guide controls generated from mod/controls.json (dev/i18n/build_guide.py). See docs/launch-kit/UI-LAYOUT-1.2.3.md. 1.2.2 fixes, Steam identity, AO, VR menu, DX12 handoff and graphics policy retained.",
+  "sourceIdentity": "1.2.3 ported to game build 0x6ace6377 (the 16 Oct 2026 hotfix on Steam and the Kuro launcher): the pinned PE timestamp, LGUI identity and every route RVA moved by dev/wuwa_port_offsets.py, with code hashes re-derived where only relocations differ (utility/WuWaCodeCompatibility, WuWaLguiProbe, WuWaLguiCompatibility, WuWaLguiRedirect and the other route tables). See docs/launch-kit/GAME-HOTFIX-1.2.4.md. 1.2.3 features, 1.2.2 fixes, Steam identity, AO, VR menu, DX12 handoff and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "ui-layout-1-2-3",
+  "rendererBuild": "game-hotfix-1-2-4",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-1-2-3",
+  "releaseTag": "beta-1-2-4",
   "sdkPatchSha256": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
   "sdkReconstructedTree": "0ad1702a10fec58469ec88265fa7297365fffab6",
-  "launcherSha256": "6dfad43887dbd65d750797f998f3cc5b243bf4d1f8917ece89ed629f6778b72a",
-  "setupSha256": "59e806d2dcdb6eab7a93436aa4a5efb673ff262091ba76fe45cddff6be1e7fac"
+  "launcherSha256": "2c5af80b0528ccdb46488a789432ceffcb478f063a1e519b598d81c5c94c18d3",
+  "setupSha256": "b99d5595a98c0df4d2468c9da373404952c7d1c455dfc2d8861b35aa32dcefcd"
 }

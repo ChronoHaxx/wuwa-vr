@@ -275817,7 +275817,7 @@ index 82bf8b9c8aa16598cb11a191f1d6e8b7595839ff..9f67af5198fe496a4034cee0dfe3cb73
 \ No newline at end of file
 +} // namespace vrmod
 diff --git a/src/mods/vr/FFakeStereoRenderingHook.cpp b/src/mods/vr/FFakeStereoRenderingHook.cpp
-index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d504de1760d 100644
+index 148f14391b004cdefc4389c529c329c967a1aaf5..097264f1f6a193d21107556f83d34d0e1b9209ab 100644
 --- a/src/mods/vr/FFakeStereoRenderingHook.cpp
 +++ b/src/mods/vr/FFakeStereoRenderingHook.cpp
 @@ -4,7 +4,9 @@
@@ -275854,7 +275854,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
  #include "FFakeStereoRenderingHook.hpp"
  
-@@ -65,6 +84,553 @@
+@@ -65,6 +84,555 @@
  FFakeStereoRenderingHook* g_hook = nullptr;
  uint32_t g_frame_count{};
  
@@ -276133,13 +276133,15 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
 +        {0x55d57a0, 0x22, 0x2f1e3aef861c6d36ULL},
 +        {0x56354c0, 0x19a, 0x859f1b3dc2a1336bULL}}};
 +    try {
-+        const auto target = wuwa_code_check::verify("Mono authored camera", ranges) + 0x526f1a0;
++        wuwa_code_check::verify_portable("Mono authored camera", ranges);
++        const auto target = wuwa_self_port::at(0x526f1a0);
 +        if (discovered_projection_data && discovered_projection_data != target)
 +            throw std::runtime_error("Discovered GetProjectionData differs from verified native-camera route");
 +        mono_projection_hook = safetyhook::create_inline(reinterpret_cast<void*>(target),
 +            &mono_get_projection_data, safetyhook::InlineHook::StartDisabled);
 +        if (!mono_projection_hook) throw std::runtime_error("Could not create native-camera hook");
-+        native_constrained_rect = target - 0x526f1a0 + 0x56354c0;
++        native_constrained_rect = wuwa_self_port::at(0x56354c0);
++        // +0x299 lies inside the verified 0xc7a-byte function, unchanged apart from moved fields.
 +        authored_camera_hook = safetyhook::create_mid(reinterpret_cast<void*>(target + 0x299),
 +            &capture_authored_camera, safetyhook::MidHook::StartDisabled);
 +        if (!authored_camera_hook || !authored_camera_hook.enable() || !mono_projection_hook.enable())
@@ -276167,7 +276169,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
 +            {0x41024ed, 0xfa, 0x4e2509c845b2f4c1ULL}}};
 +        try {
 +            if (!wuwa_shadow::compatible()) return false;
-+            wuwa_code_check::verify("Cinematic native aspect metadata", ranges);
++            wuwa_code_check::verify_portable("Cinematic native aspect metadata", ranges);
 +            return true;
 +        } catch (const std::exception& e) {
 +            SPDLOG_WARN("[WuWaCinematicFraming] Native aspect metadata unavailable: {}", e.what());
@@ -276230,7 +276232,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
 +            {0x54cbd94, 0x41, 0xe89e328ae132e02aULL}}};
 +        try {
 +            if (!wuwa_shadow::compatible()) return false; // Family and both pass-field proofs.
-+            wuwa_code_check::verify("Read-only completed cinematic views", ranges);
++            wuwa_code_check::verify_portable("Read-only completed cinematic views", ranges);
 +            return true;
 +        } catch (const std::exception& e) {
 +            SPDLOG_WARN("[WuWaFramingPair] Diagnostic unavailable: {}", e.what());
@@ -276346,7 +276348,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
 +        constexpr std::array<wuwa_code_compatibility::Range,2> ranges{{
 +            {0x526f420,25,0x6768d3242ced7ccaULL},
 +            {0x526f76f,221,0xb7d245ba0cd11175ULL}}};
-+        try {return wuwa_code_check::verify("Same-draw stereo game camera",ranges)+0x526f7d2;}
++        try {wuwa_code_check::verify_portable("Same-draw stereo game camera",ranges);return wuwa_self_port::at(0x526f7d2);}
 +        catch(const std::exception& e) {SPDLOG_WARN("[WuWaStereoBase] {}",e.what());return 0;}
 +        catch(...) {return 0;}
 +    }();
@@ -276408,7 +276410,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  // Scan through function instructions to detect usage of double
  // floating point precision instructions.
  bool is_using_double_precision(uintptr_t addr) {
-@@ -101,6 +667,24 @@ FFakeStereoRenderingHook::FFakeStereoRenderingHook() {
+@@ -101,6 +669,24 @@ FFakeStereoRenderingHook::FFakeStereoRenderingHook() {
  }
  
  void FFakeStereoRenderingHook::on_frame() {
@@ -276433,7 +276435,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      attempt_hook_game_engine_tick();
      attempt_hook_slate_thread();
      attempt_hook_fsceneview_constructor();
-@@ -2365,6 +2949,9 @@ FRHITexture2D** FFakeStereoRenderingHook::viewport_get_render_target_texture_hoo
+@@ -2365,6 +2951,9 @@ FRHITexture2D** FFakeStereoRenderingHook::viewport_get_render_target_texture_hoo
  
  void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewportClient* viewport_client, sdk::FViewport* viewport, sdk::FCanvas* canvas, void* a4) {
      ZoneScopedN(__FUNCTION__);
@@ -276443,7 +276445,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      // UI compatibility mode
      // Tries to redirect calls to GetRenderTargetTexture to point towards our UI
-@@ -2410,9 +2997,29 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
+@@ -2410,9 +2999,29 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
          return;
      }
  
@@ -276473,7 +276475,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      if (hook_attempts < 100 && !g_hook->m_hooked_game_engine_tick && g_hook->m_attempted_hook_game_engine_tick) {
          ZoneScopedN("UGameViewportClient::Draw (hook UGameEngine::Tick)");
          SPDLOG_INFO("Performing alternative UGameEngine::Tick hook for synced AFR.");
-@@ -2454,6 +3061,19 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
+@@ -2454,6 +3063,19 @@ void FFakeStereoRenderingHook::game_viewport_client_draw_hook(sdk::UGameViewport
          }
      }
  
@@ -276493,7 +276495,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      const auto& mods = g_framework->get_mods()->get_mods();
  
      for (const auto& mod : mods) {
-@@ -3016,6 +3636,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3016,6 +3638,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
      SPDLOG_INFO_ONCE("Called FSceneView constructor for the first time");
  
      auto& vr = VR::get();
@@ -276501,7 +276503,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      if (!g_hook->is_in_viewport_client_draw() || !vr->is_hmd_active()) {
          return g_hook->m_sceneview_data.constructor_hook.unsafe_call<sdk::FSceneView*>(view, init_options, a3, a4);
-@@ -3046,7 +3667,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3046,7 +3669,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      const auto init_options_scene_state = init_options->get_scene_state();
  
@@ -276515,7 +276517,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          if (is_ue5) {
              auto& vio_entry = g_hook->m_sceneview_data.view_init_options_ue5[init_options_scene_state];
              memcpy(&vio_entry, init_options, sizeof(sdk::FSceneViewInitOptionsUE5));
-@@ -3054,6 +3680,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3054,6 +3682,14 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
              auto& vio_entry = g_hook->m_sceneview_data.view_init_options_ue4[init_options_scene_state];
              memcpy(&vio_entry, init_options, sizeof(sdk::FSceneViewInitOptionsUE4));
          }
@@ -276530,7 +276532,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      }
  
      auto& known_scene_states = g_hook->m_sceneview_data.known_scene_states;
-@@ -3068,7 +3702,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3068,7 +3704,13 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      const auto true_index = vr->is_using_afr() ? (g_frame_count + last_index) % 2 : last_index;
  
@@ -276545,7 +276547,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          int32_t w = vr->get_hmd_width();
          int32_t h = vr->get_hmd_height();
  
-@@ -3142,11 +3782,78 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3142,11 +3784,78 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
          }
      }
  
@@ -276625,7 +276627,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          if (g_hook->get_render_target_manager()->get_scene_capture_render_target() != nullptr) {
              init_options->set_stereo_pass(EStereoscopicPass::eSSP_PRIMARY);
  
-@@ -3165,7 +3872,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3165,7 +3874,12 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      bool new_scene_state_inserted_this_frame = false;
  
@@ -276639,7 +276641,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          SPDLOG_INFO("Inserting new scene state {:x}", (uintptr_t)init_options_scene_state);
          known_scene_states.insert(init_options_scene_state);
          new_scene_state_inserted_this_frame = true;
-@@ -3177,7 +3889,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3177,7 +3891,7 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
          }
      }
  
@@ -276648,7 +276650,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          init_options->set_stereo_pass(EStereoscopicPass::eSSP_PRIMARY);
  
          // Set the scene state to the one that isn't the current one
-@@ -3192,7 +3904,105 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
+@@ -3192,7 +3906,105 @@ sdk::FSceneView* FFakeStereoRenderingHook::sceneview_constructor(sdk::FSceneView
  
      last_index++;
  
@@ -276754,7 +276756,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      // Reset the view count back to what it was.
      if (views_original_count.has_value()) {
-@@ -3305,6 +4115,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3305,6 +4117,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
      auto& vr = VR::get();
      auto rtm = g_hook->get_render_target_manager();
@@ -276763,7 +276765,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      if (!vr->is_hmd_active() || !vr->is_native_stereo_fix_enabled()) {
          rtm->destroy_scene_capture();
-@@ -3342,6 +4154,16 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3342,6 +4156,16 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      const auto rtrsrc = rt != nullptr ? (sdk::FTextureRenderTargetResource*)rt->get_resource() : nullptr;
      const auto rtfrt = rtrsrc != nullptr ? rtrsrc->as_render_target() : nullptr;
  
@@ -276780,7 +276782,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      if (rtfrt == nullptr) {
          // This is fine to call constantly because we use an in-flight render target
          // that gets unset after the texture is fully created. This function exits early otherwise.
-@@ -3359,6 +4181,37 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3359,6 +4183,37 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          return;
      }
  
@@ -276818,7 +276820,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      bool wants_swap = false;
      if (views.count > 1) {
          views.count = 1;
-@@ -3374,8 +4227,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3374,8 +4229,19 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
  
              const auto last_frame = (frame_count) % runtimes::OpenXR::QUEUE_SIZE;
              const auto now_frame = (frame_count + 1) % runtimes::OpenXR::QUEUE_SIZE;
@@ -276839,7 +276841,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          } else {
              auto openvr = (runtimes::OpenVR*)runtime;
              std::unique_lock __{ openvr->pose_mtx };
-@@ -3401,7 +4265,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3401,7 +4267,78 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          view_family.views.data[1]->constructor((sdk::FSceneViewInitOptions*)init_options_copy2.data());*/
      }
  
@@ -276919,7 +276921,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      if (wants_swap) {
          // Swap out the existing render target for our custom one
-@@ -3410,11 +4345,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3410,11 +4347,25 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          // because the engine is still working on the old render target
          const auto original_target = view_family_target;
  
@@ -276948,7 +276950,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
              // We decrement the frame count because it fixes motion vectors in the right eye.
              scene->decrement_frame_count();
          }
-@@ -3422,7 +4371,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3422,7 +4373,18 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
          std::swap(views[0], views[1]);
  
          // Call it again
@@ -276968,7 +276970,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
          std::swap(views[0], views[1]);
  
-@@ -3430,6 +4390,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
+@@ -3430,6 +4392,8 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
      }
  
      views.count = prev_count;
@@ -276977,7 +276979,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  }
  
  void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* extension, sdk::FSceneViewFamily& view_family) {
-@@ -3444,7 +4406,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
+@@ -3444,7 +4408,7 @@ void FFakeStereoRenderingHook::begin_render_viewfamily(ISceneViewExtension* exte
      sdk::FSceneViewFamily::update_offsets(&view_family, g_hook->get_render_target_manager()->get_viewport());
      auto si = view_family.get_scene_interface();
  
@@ -276986,7 +276988,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          sdk::FScene::update_offsets((sdk::FScene*)si);
      }
  
-@@ -4092,6 +5054,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
+@@ -4092,6 +5056,69 @@ bool FFakeStereoRenderingHook::setup_view_extensions() try {
      SPDLOG_INFO("Current ext count: {}", view_extensions.extensions.count);
      SPDLOG_INFO("Current ext capacity: {}", view_extensions.extensions.capacity);
  
@@ -277056,7 +277058,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      // Verifications on the current memory of the FSceneViewExtensions, because pre-4.10 (?) the view extensions array did not actually exist
      if (m_rendertarget_manager_embedded_in_stereo_device) {
          SPDLOG_INFO("Performing verifications on the current memory of the FSceneViewExtensions...");
-@@ -4621,6 +5646,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
+@@ -4621,6 +5648,9 @@ bool FFakeStereoRenderingHook::is_stereo_enabled(FFakeStereoRendering* stereo) {
          g_hook->set_should_recreate_textures(true);
          return true;
      }
@@ -277066,7 +277068,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      
      /*if (g_hook->m_analyzing_view_extensions) {
          const auto now = std::chrono::high_resolution_clock::now();
-@@ -4696,13 +5724,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4696,13 +5726,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -277085,7 +277087,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      // The purpose of this is to prevent the game from crashing in IDirect3D12CommandList::Close
      // Because the game will try to copy a texture region that is out of bounds.
-@@ -4725,6 +5752,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4725,6 +5754,12 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
          return;
      }
  
@@ -277098,7 +277100,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      if (VR::get()->is_stereo_emulation_enabled()) {
          *w *= 2;
      } else {
-@@ -4735,7 +5768,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
+@@ -4735,7 +5770,7 @@ void FFakeStereoRenderingHook::adjust_view_rect(FFakeStereoRendering* stereo, in
  
      *w = *w / 2;
  
@@ -277107,7 +277109,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      if (!VR::get()->is_native_stereo_fix_enabled()) {
          *x += *w * true_index;
-@@ -4756,6 +5789,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4756,6 +5791,11 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          return;
      }
  
@@ -277119,7 +277121,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      auto vr = VR::get();
      //std::scoped_lock _{vr->get_vr_mutex()};
  
-@@ -4787,8 +5825,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4787,8 +5827,57 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto is_full_pass = view_index == 0 && !index_was_ever_two && !index_was_ever_negative && !g_hook->m_has_double_precision;
  
      auto true_index = index_starts_from_one ? ((view_index + 1) % 2) : (view_index % 2);
@@ -277177,7 +277179,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      if (vr->is_using_afr() && !is_full_pass) {
          true_index = g_frame_count % 2;
-@@ -4815,6 +5902,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4815,6 +5904,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
              g_hook->m_last_pre_rotation_double = *rot_d;
          } else {
              g_hook->m_last_pre_rotation = *view_rotation;
@@ -277185,7 +277187,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          }
  
          //vr->wait_for_present();
-@@ -4852,6 +5940,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4852,6 +5942,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -277194,7 +277196,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      const auto view_d = (Vector3d*)view_location;
  
      const auto view_mat = !has_double_precision ? 
-@@ -4905,6 +5995,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4905,6 +5997,7 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
      const auto camera_up = quat_converter * (vqi_norm * glm::vec3{0, -camera_up_offset, 0});
  
      const auto world_scale = world_to_meters * vr->get_world_scale();
@@ -277202,7 +277204,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      if (has_double_precision) {
          *view_d += camera_forward;
-@@ -4924,6 +6015,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4924,6 +6017,13 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto rotation_offset = vr->get_rotation_offset();
          const auto current_hmd_rotation = glm::normalize(rotation_offset * glm::quat{vr->get_rotation(0)});
@@ -277216,7 +277218,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
          const auto current_eye_rotation_offset = glm::normalize(glm::quat{vr->get_eye_transform(true_index)});
  
          const auto new_rotation = glm::normalize(vqi_norm * current_hmd_rotation * current_eye_rotation_offset);
-@@ -4938,7 +6036,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -4938,7 +6038,17 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
  
          const auto head_offset = quat_converter * (vqi_norm * (pos * world_scale));
          const auto head_offset_flat = quat_converter * (vqi_norm * (pos_flat * world_scale));
@@ -277235,7 +277237,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
          if (!has_double_precision) {
              if (!is_2d_screen) {
-@@ -5047,6 +6155,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
+@@ -5047,6 +6157,9 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
          }
      }
  
@@ -277245,7 +277247,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  #ifdef FFAKE_STEREO_RENDERING_LOG_ALL_CALLS
      SPDLOG_INFO("Finished calculating stereo view offset!");
  #else
-@@ -5103,22 +6214,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5103,22 +6216,10 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          return out;
      }
  
@@ -277272,7 +277274,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
      // Can happen if we hooked this differently.
      if (g_hook->m_calculate_stereo_projection_matrix_hook) {
-@@ -5131,8 +6230,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5131,8 +6232,16 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
          }
      }
  
@@ -277290,7 +277292,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
          const float width = VR::get()->get_hmd_width();
          const float height = VR::get()->get_hmd_height();
-@@ -5163,11 +6270,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
+@@ -5163,11 +6272,17 @@ __forceinline Matrix4x4f* FFakeStereoRenderingHook::calculate_stereo_projection_
      // SPDLOG_INFO("NearZ: {}", old_znear);
  
      if (out != nullptr) {
@@ -277309,7 +277311,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
          auto& double_matrix = *(Matrix4x4d*)out;
  
-@@ -5500,6 +6613,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
+@@ -5500,6 +6615,7 @@ void FFakeStereoRenderingHook::post_calculate_stereo_projection_matrix(safetyhoo
  
              if (get_projection_data) {
                  SPDLOG_INFO("Successfully found GetProjectionData at {:x}", *get_projection_data);
@@ -277317,7 +277319,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
                  g_hook->m_hooked_alternative_localplayer_scan = true;
  
-@@ -5682,11 +6796,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5682,11 +6798,22 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
      if (idx) {
          SPDLOG_INFO("Calling PostInitProperties on local player!");
  
@@ -277345,7 +277347,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
  
          // If the exception count exceeds a certain amount, we need to un-nop the function call because it was supposed to return a pointer.
          static auto exception_count = 0;
-@@ -5804,7 +6929,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
+@@ -5804,7 +6931,9 @@ void FFakeStereoRenderingHook::post_init_properties(uintptr_t localplayer) {
  
          // remove the handler
          RemoveVectoredExceptionHandler(exception_handler);
@@ -277356,7 +277358,7 @@ index 148f14391b004cdefc4389c529c329c967a1aaf5..06de5fd4fd3b67eabcce72045d1c1d50
      }
  
      g_hook->m_sceneview_data.known_scene_states.clear();
-@@ -8065,8 +9192,8 @@ bool VRRenderTargetManager::AllocateRenderTargetTexture(uint32_t Index, uint32_t
+@@ -8065,8 +9194,8 @@ bool VRRenderTargetManager::AllocateRenderTargetTexture(uint32_t Index, uint32_t
      // to the engine that we are letting the engine itself
      // create the texture, rather than us creating it ourselves.
      // This should allow maximum compatibility across engine versions.
@@ -283622,13 +283624,14 @@ index 0000000000000000000000000000000000000000..028aaa87c09723fb059e2ca017d367b5
 +} // namespace wuwa_clv
 diff --git a/src/utility/WuWaCodeCheck.hpp b/src/utility/WuWaCodeCheck.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..ddffce2138c4c00263a4234e509b03da7b198120
+index 0000000000000000000000000000000000000000..58e485aecf3354cc1675d07e2b8de86267ee77eb
 --- /dev/null
 +++ b/src/utility/WuWaCodeCheck.hpp
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,56 @@
 +#pragma once
 +#include "WuWaCodeCompatibility.hpp"
 +#include "WuWaLguiProbe.hpp"
++#include "WuWaSelfPort.hpp"
 +
 +namespace wuwa_code_check {
 +namespace memory = wuwa_lgui_probe::detail;
@@ -283660,6 +283663,25 @@ index 0000000000000000000000000000000000000000..ddffce2138c4c00263a4234e509b03da
 +    spdlog::info("[WuWaStereoCode] route={} verified_ranges={} image_size={:x} timestamp={:x}",
 +        route, ranges.size(), identity.size, identity.timestamp);
 +    return base;
++}
++
++// verify() for routes that take every address from wuwa_self_port::at()/find(): on the reference
++// build the raw hashes must match as before; on a self-ported build each range must have been
++// found and be unchanged apart from moved call/jump targets and RIP displacements.
++inline void verify_portable(const char* route, std::span<const contract::Range> ranges) {
++    const auto& live = wuwa_self_port::live();
++    if (live.state == wuwa_self_port::State::reference) { (void)verify(route, ranges); return; }
++    if (live.state != wuwa_self_port::State::moved)
++        throw std::runtime_error(fmt::format("{} refused: game build {:x} is not supported ({})", route, live.timestamp, live.reason));
++    for (const auto& range : ranges) {
++        if (!wuwa_self_port::range_matches(range)) {
++            const auto found = wuwa_self_port::find_rva(range.rva);
++            throw std::runtime_error(fmt::format("{} refused: code range {:x}+{:x} {} in game build {:x}", route, range.rva,
++                range.size, found ? fmt::format("changed at {:x}", *found) : std::string{"not found"}, live.timestamp));
++        }
++    }
++    spdlog::info("[WuWaStereoCode] route={} verified_ranges={} image_size={:x} timestamp={:x} self_ported_from={:x}",
++        route, ranges.size(), live.image_size, live.timestamp, wuwa_self_port::table::reference_timestamp);
 +}
 +} // namespace wuwa_code_check
 diff --git a/src/utility/WuWaCodeCompatibility.hpp b/src/utility/WuWaCodeCompatibility.hpp
@@ -287211,10 +287233,10 @@ index 0000000000000000000000000000000000000000..55efb8caf8e7188dff4fce6d3a32be10
 +} // namespace wuwa_lgui_probe
 diff --git a/src/utility/WuWaLguiRedirect.hpp b/src/utility/WuWaLguiRedirect.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d059525be26288
+index 0000000000000000000000000000000000000000..167ed7d9c80def56443d4fb6931ed5b21c30fd5b
 --- /dev/null
 +++ b/src/utility/WuWaLguiRedirect.hpp
-@@ -0,0 +1,1056 @@
+@@ -0,0 +1,1070 @@
 +#pragma once
 +
 +// Opt-in experiment pinned to the inspected September 8 WuWa code. See
@@ -287228,6 +287250,7 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +#include "WuWaWorldLabelStereo.hpp"
 +#include "WuWaMenuSignals.hpp"
 +#include "WuWaMotionTrace.hpp"
++#include "WuWaSelfPort.hpp"
 +#include "Logging.hpp"
 +#include <cmath>
 +#include <intrin.h>
@@ -287269,6 +287292,11 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    bool attempted{};
 +    Mode mode{Mode::register_only};
 +    uintptr_t base{};
++    // The pinned sites in the running build (WuWaSelfPort.hpp), resolved once before any hook.
++    struct Live {
++        uintptr_t setup{}, pass{}, menu_setup{}, menu_pass{}, wrap{}, registration{};
++        uintptr_t graph_vtable{}, pooled_vtable{}, release{}, addref{}, world_caller{};
++    } live{};
 +    Provider provider{};
 +    safetyhook::InlineHook setup{};
 +    safetyhook::MidHook pass{};
@@ -287319,30 +287347,22 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    ++s.invalid;
 +}
 +
-+template<size_t N> inline bool verify_code(HMODULE executable, uint32_t image_size,
-+        const std::array<compatibility::CodeRange, N>& ranges, const char* route) {
-+    const auto base = reinterpret_cast<uintptr_t>(executable);
++// Each range at its place in the running build: raw hash on the reference build, unchanged
++// apart from moved call/jump targets and RIP displacements on a self-ported one.
++template<size_t N> inline bool verify_code(const std::array<compatibility::CodeRange, N>& ranges, const char* route) {
 +    size_t matched{}, total_bytes{};
 +    for (const auto& range : ranges) {
-+        const bool in_image = range.size > 0 && range.rva < image_size &&
-+            range.size <= image_size - range.rva && base <= UINTPTR_MAX - image_size;
-+        std::vector<uint8_t> bytes(range.size);
-+        const bool readable = in_image && checked::executable_site(base + range.rva, range.size, executable) &&
-+            checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(base + range.rva), range.size);
-+        uint64_t hash = 0xcbf29ce484222325ULL;
-+        if (readable) {
-+            for (const auto value : bytes) { hash ^= value; hash *= 0x100000001b3ULL; }
-+        }
-+        if (readable && hash == range.fingerprint) {
++        if (wuwa_self_port::range_matches({uint32_t(range.rva), uint32_t(range.size), range.fingerprint})) {
 +            ++matched;
 +        } else {
-+            spdlog::error("[WuWaLguiRedirect] code mismatch rva={:x} size={} readable={} expected={:x} actual={:x}",
-+                range.rva, range.size, readable, range.fingerprint, hash);
++            const auto found = wuwa_self_port::find_rva(uint32_t(range.rva));
++            spdlog::error("[WuWaLguiRedirect] code mismatch rva={:x} size={} found={} expected={:x}",
++                range.rva, range.size, found ? fmt::format("{:x}", *found) : std::string{"no"}, range.fingerprint);
 +        }
 +        total_bytes += range.size;
 +    }
-+    spdlog::info("[WuWaLguiRedirect] code compatibility route={} matched={}/{} bytes={}",
-+        route, matched, ranges.size(), total_bytes);
++    spdlog::info("[WuWaLguiRedirect] code compatibility route={} matched={}/{} bytes={} build={}",
++        route, matched, ranges.size(), total_bytes, wuwa_self_port::state_name());
 +    return matched == ranges.size();
 +}
 +
@@ -287363,7 +287383,7 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    uintptr_t vtable{};
 +    GraphStatus status{GraphStatus::valid};
 +    if (!checked::read(graph, vtable)) status = GraphStatus::unreadable_object;
-+    else if (vtable != state().base + graph_vtable_rva) status = GraphStatus::other_vtable;
++    else if (vtable != state().live.graph_vtable) status = GraphStatus::other_vtable;
 +    else if (!checked::read_field(graph, 0x10, rhi)) status = GraphStatus::unreadable_rhi;
 +    else if (rhi == 0) status = GraphStatus::null_rhi;
 +    if (diagnostic != nullptr) *diagnostic = status;
@@ -287381,8 +287401,10 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    const auto& s = state();
 +    RejectedDescription result{};
 +    result.status = status;
-+    if (vtable >= s.base && vtable - s.base < checked::image_size) result.vtable_rva = vtable - s.base;
-+    if (status == GraphStatus::unreadable_object || vtable != s.base + graph_vtable_rva) return result;
++    // The graph vtable by its reference RVA, which WuWaLguiTargetPolicy compares; others by live RVA.
++    if (vtable != 0 && vtable == s.live.graph_vtable) result.vtable_rva = graph_vtable_rva;
++    else if (vtable >= s.base && vtable - s.base < checked::image_size) result.vtable_rva = vtable - s.base;
++    if (status == GraphStatus::unreadable_object || vtable != s.live.graph_vtable) return result;
 +    uintptr_t name_pointer{};
 +    std::array<wchar_t, 48> text{};
 +    if (checked::read_field(color, 0x8, name_pointer) && name_pointer != 0 && checked::read(name_pointer, text)) {
@@ -287554,11 +287576,11 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +inline uintptr_t register_ui_target(State& s, const wuwa_lgui_route::Target& target,
 +        uintptr_t builder, const std::array<int32_t, 2>& ui_size) {
 +        uintptr_t pooled{};
-+        reinterpret_cast<Wrap>(s.base + wrap_rva)(&pooled, target.ui, target_name);
++        reinterpret_cast<Wrap>(s.live.wrap)(&pooled, target.ui, target_name);
 +        if (!pooled) { record_invalid(s, s.invalid_wrap); return 0; }
 +        uintptr_t vtable{}, release{};
-+        if (!checked::read(pooled, vtable) || vtable != s.base + pooled_vtable_rva ||
-+            !checked::read_field(vtable, 0x40, release) || release != s.base + release_rva) {
++        if (!checked::read(pooled, vtable) || vtable != s.live.pooled_vtable ||
++            !checked::read_field(vtable, 0x40, release) || release != s.live.release) {
 +            // A layout mismatch is exceptional: do not invoke an unknown virtual.
 +            // Stop further engine calls. Retain this one wrapper until exit.
 +            s.active.store(false, std::memory_order_release);
@@ -287571,7 +287593,7 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +        } owned{pooled, release};
 +        // Selector 0 uses the targetable RHI at pooled+8. Flags 0 are the
 +        // ordinary registration mode. Both are traced in the shipped function.
-+        const auto graph = reinterpret_cast<Register>(s.base + register_rva)(
++        const auto graph = reinterpret_cast<Register>(s.live.registration)(
 +            builder, &pooled, target_name, 0, 0);
 +        uintptr_t result_rhi{};
 +        std::array<int32_t, 2> result_size{};
@@ -287636,7 +287658,7 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +                // the RHI field of an object whose class guard did not match.
 +                if (count <= 3) {
 +                    spdlog::info("[WuWaLguiRedirect] graph_sample reason={} color={:x} vtable={:x} expected_vtable={:x} rhi={:x} game={:x} ui={:x} capture={:x} {}",
-+                        category, color, graph_vtable, s.base + graph_vtable_rva, source,
++                        category, color, graph_vtable, s.live.graph_vtable, source,
 +                        target.game, target.ui, target.capture, describe_rejected(description));
 +                }
 +                return unchanged;
@@ -287846,7 +287868,7 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    ++s.world_calls;
 +    try {
 +        const auto target = s.provider ? s.provider() : wuwa_lgui_route::Target{};
-+        if (caller != s.base + 0x4116523) { ++s.world_caller_skips; return result; }
++        if (caller != s.live.world_caller) { ++s.world_caller_skips; return result; }
 +        if (!target.world_labels_enabled) { ++s.world_disabled_skips; return result; }
 +        if (target.native_stereo_fix || target.independent_eyes) { ++s.world_mode_skips; return result; }
 +        // Only the verified last-view caller is expanded. Do not replay a pass
@@ -287858,7 +287880,7 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +            views > UINTPTR_MAX - 0xe940 || view != views + 0xe940 ||
 +            !checked::read(color, result.color) || !checked::read(depth, result.depth) ||
 +            !checked::read(result.color.graph, cv) || !checked::read(result.depth.graph, dv) ||
-+            cv != s.base + graph_vtable_rva || dv != cv ||
++            cv != s.live.graph_vtable || dv != cv ||
 +            !graph_resource(result.color.graph, color_rhi) || color_rhi != target.game ||
 +            !extent(target.game, layout.game_extent) ||
 +            !extent(result.color.graph, layout.color_extent) || !extent(result.depth.graph, layout.depth_extent) ||
@@ -287930,11 +287952,11 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    state().world_setup.call<void>(renderer, builder, color, depth, view, view_index);
 +}
 +
-+inline void install_world_labels(State& s, HMODULE executable, uint32_t image_size) noexcept {
++inline void install_world_labels(State& s) noexcept {
 +    try {
-+        checked::require(verify_code(executable, image_size, compatibility::world_label_code_ranges,
-+            "world-labels"), "World-label route code mismatch");
-+        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + 0x4116a70),
++        checked::require(verify_code(compatibility::world_label_code_ranges, "world-labels"), "World-label route code mismatch");
++        s.live.world_caller = wuwa_self_port::at(0x4116523);
++        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x4116a70)),
 +            &world_setup_callback, safetyhook::InlineHook::StartDisabled);
 +        checked::require(hook.has_value(), "Cannot create world-label setup hook");
 +        s.world_setup = std::move(*hook);
@@ -287997,11 +288019,11 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    try { if(s.stage0_construct && !s.stage0_construct.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
 +    try { if(s.stage0_dispatch && !s.stage0_dispatch.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
 +}
-+inline void install_stage0_probe(State& s,HMODULE executable,uint32_t image_size) noexcept {
++inline void install_stage0_probe(State& s) noexcept {
 +    try {
-+        checked::require(verify_code(executable,image_size,compatibility::stage0_probe_code_ranges,"stage0-recording"),"Stage-0 probe code mismatch");
-+        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40f7be0),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
-+        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40fb64c),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
++        checked::require(verify_code(compatibility::stage0_probe_code_ranges,"stage0-recording"),"Stage-0 probe code mismatch");
++        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x40f7be0)),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
++        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x40fb64c)),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
 +        checked::require(constructor.has_value() && dispatch.has_value(),"Cannot create stage-0 recording probe");
 +        s.stage0_construct=std::move(*constructor);s.stage0_dispatch=std::move(*dispatch);
 +        checked::require(s.stage0_construct.enable().has_value() && s.stage0_dispatch.enable().has_value(),"Cannot enable stage-0 recording probe");
@@ -288018,18 +288040,20 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    try { if (s.menu_pass) { const auto result = s.menu_pass.disable(); if (!result) ++s.callback_errors; } } catch (...) { ++s.callback_errors; }
 +}
 +
-+inline void install_menu(State& s, HMODULE executable, uint32_t image_size) noexcept {
++inline void install_menu(State& s) noexcept {
 +    try {
-+        checked::require(verify_code(executable, image_size, compatibility::menu_code_ranges, "menu-stage3"),
++        checked::require(verify_code(compatibility::menu_code_ranges, "menu-stage3"),
 +            "Menu stage code changed; preserving HUD-only hooks");
 +        uintptr_t thunk{};
-+        checked::require(checked::read(s.base + 0x7feada8 + sizeof(uintptr_t), thunk) &&
-+            thunk == s.base + 0x410bfc0, "Menu execute vtable changed; preserving HUD-only hooks");
-+        auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + menu_setup_rva),
++        checked::require(checked::read(wuwa_self_port::at(0x7feada8) + sizeof(uintptr_t), thunk) &&
++            thunk == wuwa_self_port::at(0x410bfc0), "Menu execute vtable changed; preserving HUD-only hooks");
++        s.live.menu_setup = wuwa_self_port::at(menu_setup_rva);
++        s.live.menu_pass = wuwa_self_port::at(menu_pass_rva);
++        auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.live.menu_setup),
 +            &menu_setup_callback, safetyhook::InlineHook::StartDisabled);
 +        checked::require(setup.has_value(), "Cannot create menu setup hook");
 +        s.menu_setup = std::move(*setup);
-+        auto pass = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + menu_pass_rva),
++        auto pass = safetyhook::MidHook::create(reinterpret_cast<void*>(s.live.menu_pass),
 +            &menu_pass_callback, safetyhook::MidHook::StartDisabled);
 +        checked::require(pass.has_value(), "Cannot create menu pass hook");
 +        s.menu_pass = std::move(*pass);
@@ -288060,7 +288084,7 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +        // The view-rect getter pushes rdi and reserves 0x130 (fingerprinted with the function), so
 +        // its return address is at rsp + 0x138 here too.
 +        const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
-+        if (ret - state().base == wuwa_lgui_viewport::pointer_ray_return) {
++        if (wuwa_lgui_viewport::pointer_ray_caller(ret - state().base)) {
 +            // The pointer ray (0xd58a50) keeps its event data in rbp across the call.
 +            wuwa_lgui_viewport::rewrite_pointer_ray(c.rsp, site.offset, reinterpret_cast<const uint8_t*>(c.rbp));
 +            return;
@@ -288087,15 +288111,19 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +    }
 +}
 +
-+inline void install_viewport(State& s, HMODULE executable, uint32_t image_size) noexcept {
++inline void install_viewport(State& s) noexcept {
 +    try {
-+        checked::require(verify_code(executable, image_size, compatibility::viewport_code_ranges, "lgui-viewport"),
++        checked::require(verify_code(compatibility::viewport_code_ranges, "lgui-viewport"),
 +            "LGUI canvas code changed; full VR keeps the eye-shaped UI");
++        // Callers are matched by return address in the running build; one not found counts as "other".
++        wuwa_lgui_viewport::set_live_returns([](uint32_t rva) { return wuwa_self_port::find_rva(rva).value_or(0); });
++        std::array<uintptr_t, viewport_sites.size()> sites{};
++        for (size_t i = 0; i < viewport_sites.size(); ++i) sites[i] = wuwa_self_port::at(uint32_t(viewport_sites[i].rva));
 +        constexpr std::array<safetyhook::MidHookFn, 5> callbacks{viewport_callback<0>, viewport_callback<1>,
 +            viewport_callback<2>, viewport_callback<3>, viewport_callback<4>};
 +        static_assert(callbacks.size() == viewport_sites.size());
 +        for (size_t i = 0; i < viewport_sites.size(); ++i) {
-+            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + viewport_sites[i].rva),
++            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(sites[i]),
 +                callbacks[i], safetyhook::MidHook::StartDisabled);
 +            checked::require(hook.has_value(), "Cannot create LGUI viewport hook");
 +            s.viewport[i] = std::move(*hook);
@@ -288163,41 +288191,49 @@ index 0000000000000000000000000000000000000000..2b44afa212588baaa9d5171133d05952
 +                s.base, nt.FileHeader.TimeDateStamp, nt.OptionalHeader.SizeOfImage, nt.FileHeader.Machine, nt.OptionalHeader.Magic);
 +            // Any image size of this build (Kuro launcher, Steam): the code ranges,
 +            // engine signatures and vtable checks below decide before any hook.
++            // The reference build, or another build the self-port found every site of (WuWaSelfPort.hpp):
++            // the code ranges, engine signatures and vtable checks below decide before any hook.
 +            checked::require(
 +                nt.Signature == IMAGE_NT_SIGNATURE && nt.FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64 &&
-+                nt.OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC && nt.FileHeader.TimeDateStamp == checked::timestamp &&
++                nt.OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC &&
++                wuwa_self_port::live().state != wuwa_self_port::State::unsupported &&
 +                nt.OptionalHeader.SizeOfImage != 0, "Game identity mismatch");
-+            checked::require(verify_code(executable, nt.OptionalHeader.SizeOfImage, compatibility::code_ranges, "hud"), "Inspected LGUI/graph code changed; hooks remain disabled");
++            checked::require(verify_code(compatibility::code_ranges, "hud"), "Inspected LGUI/graph code changed; hooks remain disabled");
 +            constexpr std::array<uintptr_t, 4> sites{setup_rva, pass_rva, wrap_rva, register_rva};
-+            for (size_t i = 0; i < sites.size(); ++i) {
-+                std::array<uint8_t, 32> bytes{};
-+                checked::require(checked::executable_site(s.base + sites[i], bytes.size(), executable) &&
-+                    checked::read(s.base + sites[i], bytes) && bytes == signatures[i], "Engine signature mismatch");
-+            }
++            for (size_t i = 0; i < sites.size(); ++i)
++                checked::require(wuwa_self_port::code_matches(uint32_t(sites[i]), signatures[i]), "Engine signature mismatch");
++            s.live.setup = wuwa_self_port::at(setup_rva);
++            s.live.pass = wuwa_self_port::at(pass_rva);
++            s.live.wrap = wuwa_self_port::at(wrap_rva);
++            s.live.registration = wuwa_self_port::at(register_rva);
++            s.live.graph_vtable = wuwa_self_port::at(graph_vtable_rva);
++            s.live.pooled_vtable = wuwa_self_port::at(pooled_vtable_rva);
++            s.live.release = wuwa_self_port::at(release_rva);
++            s.live.addref = wuwa_self_port::at(addref_rva);
 +            uintptr_t release{}, addref{};
-+            checked::require(checked::read(s.base + pooled_vtable_rva + 0x38, addref) && addref == s.base + addref_rva &&
-+                checked::read(s.base + pooled_vtable_rva + 0x40, release) &&
-+                release == s.base + release_rva && checked::executable_site(release, 32, executable), "Pooled reference-counting vtable mismatch");
++            checked::require(checked::read(s.live.pooled_vtable + 0x38, addref) && addref == s.live.addref &&
++                checked::read(s.live.pooled_vtable + 0x40, release) &&
++                release == s.live.release && checked::executable_site(release, 32, executable), "Pooled reference-counting vtable mismatch");
 +            HMODULE retained{};
 +            checked::require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
 +                reinterpret_cast<LPCWSTR>(&setup_callback), &retained) != 0, "Cannot retain redirect module");
-+            auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + setup_rva), &setup_callback,
++            auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.live.setup), &setup_callback,
 +                safetyhook::InlineHook::StartDisabled);
 +            checked::require(setup.has_value(), "Cannot create setup hook");
 +            s.setup = std::move(*setup);
-+            auto pass = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + pass_rva), &pass_callback,
++            auto pass = safetyhook::MidHook::create(reinterpret_cast<void*>(s.live.pass), &pass_callback,
 +                safetyhook::MidHook::StartDisabled);
 +            checked::require(pass.has_value(), "Cannot create pass hook");
 +            s.pass = std::move(*pass);
 +            s.provider = provider;
 +            checked::require(s.pass.enable().has_value(), "Cannot enable pass hook");
 +            checked::require(s.setup.enable().has_value(), "Cannot enable setup hook");
-+            install_menu(s, executable, nt.OptionalHeader.SizeOfImage);
-+            install_viewport(s, executable, nt.OptionalHeader.SizeOfImage);
++            install_menu(s);
++            install_viewport(s);
 +            // Fingerprints include the unmodified stage-0 execution body; do
 +            // this before installing its optional recording mid-hooks.
-+            if(request.value("repair_world_labels",false)) install_world_labels(s,executable,nt.OptionalHeader.SizeOfImage);
-+            if(request.value("record_stages",false)) install_stage0_probe(s,executable,nt.OptionalHeader.SizeOfImage);
++            if(request.value("repair_world_labels",false)) install_world_labels(s);
++            if(request.value("record_stages",false)) install_stage0_probe(s);
 +            s.active.store(true, std::memory_order_release);
 +            spdlog::info("[WuWaLguiRedirect] installed mode={} base={:x} setup={:x} wrapper={:x} register={:x}",
 +                mode, s.base, setup_rva, wrap_rva, register_rva);
@@ -288624,10 +288660,10 @@ index 0000000000000000000000000000000000000000..e7ea740a4e3520f9f2c5d1fcb2b2ad02
 +} // namespace wuwa_lgui_redirect
 diff --git a/src/utility/WuWaLguiViewport.hpp b/src/utility/WuWaLguiViewport.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..f18b6f6add95159128020f501da29043805ca531
+index 0000000000000000000000000000000000000000..30819a215f44ce5b470dc72fc1842f714615e450
 --- /dev/null
 +++ b/src/utility/WuWaLguiViewport.hpp
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,179 @@
 +#pragma once
 +
 +// Full VR shows the flat game's 16:9 screen UI.
@@ -288703,6 +288739,9 @@ index 0000000000000000000000000000000000000000..f18b6f6add95159128020f501da29043
 +    // never saved). Without site 2 the reflection is live but the layout breaks, so one caller is it.
 +    std::array<std::atomic<uint32_t>, 9> callers{};
 +    std::atomic<uint32_t> caller_mask{0x1ff};
++    // The return addresses below in the running game build (set_live_returns; 0 = not found).
++    std::array<std::atomic<uint32_t>, 8> live_returns{};
++    std::atomic<uint32_t> live_pointer_ray_return{0};
 +};
 +// Read by hook stubs until process exit; never destroyed.
 +inline State& state() { static auto* value = new State{}; return *value; }
@@ -288713,10 +288752,22 @@ index 0000000000000000000000000000000000000000..f18b6f6add95159128020f501da29043
 +inline constexpr uintptr_t pointer_ray_return = 0xd58b15;
 +// LGUIPointerEventData (3.7 reflection): inputType (byte; 0 pointer, 1 navigation) and pointerID.
 +inline constexpr uint32_t event_input_type = 0x40, event_pointer_id = 0x44;
++// The pinned return addresses in the running build: lookup(reference RVA) gives the live RVA or 0.
++template<class Lookup> inline void set_live_returns(Lookup lookup) noexcept {
++    auto& s = state();
++    for (size_t i = 0; i < viewport_size_returns.size(); ++i)
++        s.live_returns[i].store(lookup(uint32_t(viewport_size_returns[i])), std::memory_order_relaxed);
++    s.live_pointer_ray_return.store(lookup(uint32_t(pointer_ray_return)), std::memory_order_release);
++}
++inline bool pointer_ray_caller(uintptr_t return_rva) noexcept {
++    const auto live = state().live_pointer_ray_return.load(std::memory_order_acquire);
++    return live != 0 && return_rva == live;
++}
 +// Counts the call and says whether this caller gets the window size.
 +inline bool allow_caller(uintptr_t return_rva) noexcept {
 +    uint32_t caller = 8;
-+    for (uint32_t i = 0; i < viewport_size_returns.size(); ++i) if (viewport_size_returns[i] == return_rva) caller = i;
++    for (uint32_t i = 0; i < viewport_size_returns.size(); ++i)
++        if (const auto live = state().live_returns[i].load(std::memory_order_relaxed); live != 0 && live == return_rva) caller = i;
 +    auto& s = state();
 +    s.callers[caller].fetch_add(1, std::memory_order_relaxed);
 +    return (s.caller_mask.load(std::memory_order_relaxed) >> caller) & 1u;
@@ -293293,10 +293344,10 @@ index 0000000000000000000000000000000000000000..5ae8c8e6b599bca94e0b3169583beced
 +} // namespace wuwa_raw_snapshot
 diff --git a/src/utility/WuWaReflectionCapture.hpp b/src/utility/WuWaReflectionCapture.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..a6893085a5c3fe99c57f0b0937717975ab24961b
+index 0000000000000000000000000000000000000000..09c0df0d5f3340f777de7114db400f65729bd2bf
 --- /dev/null
 +++ b/src/utility/WuWaReflectionCapture.hpp
-@@ -0,0 +1,182 @@
+@@ -0,0 +1,184 @@
 +#pragma once
 +#include "WuWaCodeCheck.hpp"
 +#include "WuWaReflectionProjection.hpp"
@@ -293431,18 +293482,20 @@ index 0000000000000000000000000000000000000000..a6893085a5c3fe99c57f0b0937717975
 +            {0x3d889c0,2853,0x10fa026d2bc45191ULL},
 +            {0x54e9480,188,0x3b3e235d5c144105ULL},
 +            {0x54e9540,5681,0xb7fc844380e92582ULL}}};
-+        const auto base = wuwa_code_check::verify("Custom reflection capture projection",ranges);
-+        factory_caller=base+0x3d87c23;
++        wuwa_code_check::verify_portable("Custom reflection capture projection",ranges);
++        factory_caller=wuwa_self_port::at(0x3d87c23);
++        const auto projection_site=wuwa_self_port::at(0x3d8781d);
++        const std::array<uintptr_t,3> sites{wuwa_self_port::at(0x3f8a510),wuwa_self_port::at(0x3d88d4d),
++            wuwa_self_port::at(0x3d8870f)};
 +        memory::require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
 +            reinterpret_cast<LPCWSTR>(&callback),&retained_backend) != 0,"Cannot retain reflection capture backend");
-+        auto created = safetyhook::MidHook::create(reinterpret_cast<void*>(base+0x3d8781d),
++        auto created = safetyhook::MidHook::create(reinterpret_cast<void*>(projection_site),
 +            callback,safetyhook::MidHook::StartDisabled);
 +        memory::require(created.has_value(),"Cannot create reflection capture projection hook");
 +        hook = new safetyhook::MidHook(std::move(*created));
-+        const std::array<uintptr_t,3> sites{0x3f8a510,0x3d88d4d,0x3d8870f};
 +        const std::array<safetyhook::MidHookFn,3> callbacks{select_history,refresh_deferred,refresh_mobile};
 +        for (size_t i=0;i<sites.size();++i) {
-+            auto next=safetyhook::MidHook::create(reinterpret_cast<void*>(base+sites[i]),
++            auto next=safetyhook::MidHook::create(reinterpret_cast<void*>(sites[i]),
 +                callbacks[i],safetyhook::MidHook::StartDisabled);
 +            memory::require(next.has_value(),"Cannot create reflection history/pose hook");
 +            history_hooks[i]=new safetyhook::MidHook(std::move(*next));
@@ -294605,6 +294658,212 @@ index 0000000000000000000000000000000000000000..71244b0ee4e59d3ddcf2aea15938513c
 +    return true;
 +}
 +} // namespace wuwa_second_eye
+diff --git a/src/utility/WuWaSelfPort.hpp b/src/utility/WuWaSelfPort.hpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..bdfe05c0d831487d5c24b472ae67759f59a42c69
+--- /dev/null
++++ b/src/utility/WuWaSelfPort.hpp
+@@ -0,0 +1,200 @@
++#pragma once
++// Game-build self-port. Every build-pinned address in the plugin is written for one reference
++// build (WuWaSelfPortTable.hpp, generated from a capture of it). On that build the addresses are
++// used as written. On any other build the first caller scans the loaded game once (about half a
++// second) for the table's fingerprints, and a route uses only addresses found with exact
++// evidence and code ranges unchanged apart from moved call/jump targets and RIP displacements.
++// A route that needs anything not found refuses, exactly as on an unknown build before.
++//
++// Routes opt in by taking every address from at()/find() and verifying through
++// wuwa_code_check::verify_portable(); a route still on base + RVA keeps its strict build check.
++//
++// Test switch: an empty file wuwa-self-port-force.txt beside the loaded backend scans even on
++// the reference build, where every found site must map to itself.
++
++#include <chrono>
++#include <filesystem>
++#include <optional>
++#include <span>
++#include <stdexcept>
++#include <string>
++
++#include <windows.h>
++#include <spdlog/spdlog.h>
++
++#include "WuWaCodeCompatibility.hpp"
++#include "WuWaLguiProbe.hpp"
++#include "WuWaSelfPortCore.hpp"
++
++namespace wuwa_self_port {
++static_assert(table::reference_timestamp == wuwa_code_compatibility::timestamp,
++    "WuWaSelfPortTable.hpp is not generated from the build the source is pinned to");
++namespace memory = wuwa_lgui_probe::detail;
++
++struct LiveModule final : Memory {
++    uintptr_t base{};
++    bool copy(uint32_t rva, void* out, size_t size) const override {
++        return uint64_t(rva) + size <= image_size &&
++            memory::guarded_copy(out, reinterpret_cast<const void*>(base + rva), size);
++    }
++};
++
++enum class State { reference, moved, unsupported };
++
++struct Live {
++    State state{State::unsupported};
++    uintptr_t base{};
++    uint32_t timestamp{}, image_size{};
++    LiveModule module;
++    Result result;      // moved builds
++    std::string reason; // unsupported builds
++};
++
++namespace detail {
++inline std::filesystem::path backend_directory() {
++    HMODULE self{};
++    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
++            reinterpret_cast<LPCWSTR>(&backend_directory), &self)) return {};
++    return memory::module_path(self).parent_path();
++}
++
++// Readable pages of each section, split into code and data spans.
++inline void read_spans(LiveModule& m, const IMAGE_NT_HEADERS64& nt, uint32_t headers) {
++    const auto count = nt.FileHeader.NumberOfSections;
++    for (WORD i = 0; i < count; ++i) {
++        IMAGE_SECTION_HEADER section{};
++        if (!memory::read(m.base + headers + i * sizeof(section), section)) continue;
++        const uint32_t begin = section.VirtualAddress, end = begin + section.Misc.VirtualSize;
++        if (!section.Misc.VirtualSize || end > m.image_size) continue;
++        auto& spans = (section.Characteristics & IMAGE_SCN_MEM_EXECUTE) ? m.code : m.data;
++        for (uint32_t cursor = begin; cursor < end;) {
++            MEMORY_BASIC_INFORMATION region{};
++            if (VirtualQuery(reinterpret_cast<void*>(m.base + cursor), &region, sizeof(region)) != sizeof(region)) break;
++            const auto region_end = uint32_t((std::min<uint64_t>)(end,
++                reinterpret_cast<uintptr_t>(region.BaseAddress) + region.RegionSize - m.base));
++            if (region_end <= cursor) break;
++            if (memory::readable(region)) {
++                if (!spans.empty() && spans.back().end == cursor) spans.back().end = region_end;
++                else spans.push_back({cursor, region_end});
++            }
++            cursor = region_end;
++        }
++    }
++}
++
++inline Live inspect() {
++    Live live;
++    const auto module = GetModuleHandleW(nullptr);
++    live.base = reinterpret_cast<uintptr_t>(module);
++    IMAGE_DOS_HEADER dos{}; IMAGE_NT_HEADERS64 nt{};
++    if (!module || _wcsicmp(memory::module_path(module).filename().c_str(), L"Client-Win64-Shipping.exe") != 0) {
++        live.reason = "not the game executable"; return live;
++    }
++    if (!memory::read(live.base, dos) || dos.e_magic != IMAGE_DOS_SIGNATURE || dos.e_lfanew < int(sizeof(dos)) ||
++        dos.e_lfanew > 0x100000 || !memory::read(live.base + dos.e_lfanew, nt) || nt.Signature != IMAGE_NT_SIGNATURE ||
++        nt.FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64 || nt.OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
++        live.reason = "invalid executable headers"; return live;
++    }
++    live.timestamp = nt.FileHeader.TimeDateStamp;
++    live.image_size = nt.OptionalHeader.SizeOfImage;
++    std::error_code ignored;
++    const bool forced = std::filesystem::exists(backend_directory() / L"wuwa-self-port-force.txt", ignored);
++    if (live.timestamp == table::reference_timestamp && !forced) {
++        live.state = State::reference;
++        spdlog::info("[WuWaSelfPort] game build {:x} is the reference build; pinned addresses used as written", live.timestamp);
++        return live;
++    }
++    live.module.base = live.base;
++    live.module.va_base = live.base;
++    live.module.image_size = live.image_size;
++    read_spans(live.module, nt, uint32_t(dos.e_lfanew + offsetof(IMAGE_NT_HEADERS64, OptionalHeader) +
++        nt.FileHeader.SizeOfOptionalHeader));
++    const auto started = std::chrono::steady_clock::now();
++    try {
++        live.result = locate(live.module);
++    } catch (const std::exception& e) {
++        live.reason = std::string{"scan failed: "} + e.what(); return live;
++    }
++    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
++    size_t moved_sites{};
++    for (const auto& [ref, m] : live.result.sites) moved_sites += m.live != ref;
++    std::string refused;
++    for (size_t i = 0; i < live.result.refused.size() && i < 12; ++i) refused += fmt::format("{}{:x}", i ? "," : "", live.result.refused[i]);
++    live.state = live.result.sites.empty() ? State::unsupported : State::moved;
++    if (live.state == State::unsupported) live.reason = "no pinned site found";
++    spdlog::info("[WuWaSelfPort] game build {:x} (reference {:x}{}): found {}/{} sites ({} moved) in {} ms; ranges {} unchanged, "
++        "{} changed, {} not found; refused [{}]", live.timestamp, table::reference_timestamp, forced ? ", forced scan" : "",
++        live.result.sites.size(), std::size(table::sites), moved_sites, ms, live.result.ranges_ok, live.result.ranges_changed,
++        live.result.ranges_unmapped, refused);
++    return live;
++}
++} // namespace detail
++
++// The running game build, inspected once (thread-safe).
++inline const Live& live() {
++    static const Live value = [] {
++        try {
++            return detail::inspect();
++        } catch (const std::exception& e) {
++            Live failed; failed.reason = e.what();
++            spdlog::error("[WuWaSelfPort] game build inspection failed: {}", e.what());
++            return failed;
++        }
++    }();
++    return value;
++}
++
++// The live address of a reference RVA, or nothing on a build without it.
++inline std::optional<uintptr_t> find(uint32_t reference_rva) {
++    const auto& l = live();
++    if (l.state == State::reference) return l.base + reference_rva;
++    if (l.state != State::moved) return std::nullopt;
++    const auto it = l.result.sites.find(reference_rva);
++    if (it == l.result.sites.end()) return std::nullopt;
++    return l.base + it->second.live;
++}
++
++inline uintptr_t at(uint32_t reference_rva) {
++    if (const auto address = find(reference_rva)) return *address;
++    throw std::runtime_error(fmt::format("game build {:x} has no match for pinned site {:x}", live().timestamp, reference_rva));
++}
++
++// Live RVA, for code that compares return addresses or vtables as RVAs.
++inline std::optional<uint32_t> find_rva(uint32_t reference_rva) {
++    const auto address = find(reference_rva);
++    if (!address) return std::nullopt;
++    return uint32_t(*address - live().base);
++}
++
++// A source range ({rva, size, hash}) at its live place: raw hash on the reference build, masked
++// compare on a moved build.
++inline bool range_matches(const wuwa_code_compatibility::Range& range) {
++    const auto& l = live();
++    if (l.state == State::moved) return range_unchanged(l.module, l.result, range.rva, range.size, range.hash);
++    if (l.state != State::reference || !range.size || range.rva >= l.image_size || range.size > l.image_size - range.rva) return false;
++    std::vector<uint8_t> bytes(range.size);
++    return memory::executable_site(l.base + range.rva, range.size, GetModuleHandleW(nullptr)) &&
++        memory::guarded_copy(bytes.data(), reinterpret_cast<const void*>(l.base + range.rva), bytes.size()) &&
++        fnv(bytes) == range.hash;
++}
++
++// Code that must equal a byte list from the source: raw on the reference build, masked when moved.
++inline bool code_matches(uint32_t reference_rva, std::span<const uint8_t> expected) {
++    const auto& l = live();
++    if (l.state == State::moved) return bytes_unchanged(l.module, l.result, reference_rva, expected);
++    if (l.state != State::reference) return false;
++    std::vector<uint8_t> bytes(expected.size());
++    const auto site = l.base + reference_rva;
++    return memory::executable_site(site, bytes.size(), GetModuleHandleW(nullptr)) &&
++        memory::guarded_copy(bytes.data(), reinterpret_cast<const void*>(site), bytes.size()) &&
++        std::equal(bytes.begin(), bytes.end(), expected.begin());
++}
++
++inline const char* state_name() {
++    switch (live().state) {
++    case State::reference: return "reference";
++    case State::moved: return "self-ported";
++    default: return "unsupported";
++    }
++}
++} // namespace wuwa_self_port
 diff --git a/src/utility/WuWaSelfPortCore.hpp b/src/utility/WuWaSelfPortCore.hpp
 new file mode 100644
 index 0000000000000000000000000000000000000000..e85d6c684f38b3d0bd99be5377b7752f25a988ab
@@ -296301,10 +296560,10 @@ index 0000000000000000000000000000000000000000..0c7a1820145cd757eb94daa33ff8bbdb
 +} // namespace wuwa_self_port_table
 diff --git a/src/utility/WuWaShadowPass.hpp b/src/utility/WuWaShadowPass.hpp
 new file mode 100644
-index 0000000000000000000000000000000000000000..af2b118afbdbb00f593a88c37880f94c440d29e9
+index 0000000000000000000000000000000000000000..7da68b9e79568db905b0f6a8a2bce81e69712abb
 --- /dev/null
 +++ b/src/utility/WuWaShadowPass.hpp
-@@ -0,0 +1,498 @@
+@@ -0,0 +1,491 @@
 +#pragma once
 +
 +#include <array>
@@ -296318,6 +296577,7 @@ index 0000000000000000000000000000000000000000..af2b118afbdbb00f593a88c37880f94c
 +#include <spdlog/spdlog.h>
 +#include "Logging.hpp"
 +#include "WuWaLguiProbe.hpp"
++#include "WuWaSelfPort.hpp"
 +#include "WuWaScenePass.hpp"
 +#include "WuWaEarlyStereo.hpp"
 +#include "WuWaStateSwap.hpp"
@@ -296363,13 +296623,9 @@ index 0000000000000000000000000000000000000000..af2b118afbdbb00f593a88c37880f94c
 +            compatibility = -1;
 +            return;
 +        }
-+        const auto module = GetModuleHandleW(nullptr);
-+        const auto base = reinterpret_cast<uintptr_t>(module);
 +        for (const auto& check : code_checks) {
-+            std::array<uint8_t, 24> bytes{};
-+            if (!checked::executable_site(base + check.rva, check.size, module) ||
-+                !checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(base + check.rva), check.size) ||
-+                std::memcmp(bytes.data(), check.bytes.data(), check.size) != 0) {
++            // At the check's live place on a self-ported build (WuWaSelfPort.hpp).
++            if (!wuwa_self_port::code_matches(check.rva, std::span<const uint8_t>{check.bytes.data(), check.size})) {
 +                compatibility = -1;
 +                spdlog::error("[WuWaShadow] code check failed at {:x}; observation and writes disabled", check.rva);
 +                return;
@@ -296710,11 +296966,7 @@ index 0000000000000000000000000000000000000000..af2b118afbdbb00f593a88c37880f94c
 +    0x41,0x0f,0x10,0x85,0x40,0x01,0x00,0x00, 0x0f,0x11,0x83,0x80,0x0c,0x00,0x00};
 +inline bool overlay_compatible() {
 +    static const bool matched = [] {
-+        const auto module = GetModuleHandleW(nullptr);
-+        const auto site = reinterpret_cast<uintptr_t>(module) + overlay_code_rva;
-+        std::array<uint8_t, overlay_code.size()> bytes{};
-+        const bool ok = compatible() && checked::executable_site(site, overlay_code.size(), module) &&
-+            checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(site), bytes.size()) && bytes == overlay_code;
++        const bool ok = compatible() && wuwa_self_port::code_matches(overlay_code_rva, overlay_code);
 +        if (ok) spdlog::info("[WuWaShadow] camera fade fields matched; fades copied to the second eye");
 +        else spdlog::error("[WuWaShadow] camera fade code check failed at {:x}; fades not copied", overlay_code_rva);
 +        return ok;

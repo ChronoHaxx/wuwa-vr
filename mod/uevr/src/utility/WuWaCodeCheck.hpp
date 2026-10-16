@@ -1,6 +1,7 @@
 #pragma once
 #include "WuWaCodeCompatibility.hpp"
 #include "WuWaLguiProbe.hpp"
+#include "WuWaSelfPort.hpp"
 
 namespace wuwa_code_check {
 namespace memory = wuwa_lgui_probe::detail;
@@ -32,5 +33,24 @@ inline uintptr_t verify(const char* route, std::span<const contract::Range> rang
     spdlog::info("[WuWaStereoCode] route={} verified_ranges={} image_size={:x} timestamp={:x}",
         route, ranges.size(), identity.size, identity.timestamp);
     return base;
+}
+
+// verify() for routes that take every address from wuwa_self_port::at()/find(): on the reference
+// build the raw hashes must match as before; on a self-ported build each range must have been
+// found and be unchanged apart from moved call/jump targets and RIP displacements.
+inline void verify_portable(const char* route, std::span<const contract::Range> ranges) {
+    const auto& live = wuwa_self_port::live();
+    if (live.state == wuwa_self_port::State::reference) { (void)verify(route, ranges); return; }
+    if (live.state != wuwa_self_port::State::moved)
+        throw std::runtime_error(fmt::format("{} refused: game build {:x} is not supported ({})", route, live.timestamp, live.reason));
+    for (const auto& range : ranges) {
+        if (!wuwa_self_port::range_matches(range)) {
+            const auto found = wuwa_self_port::find_rva(range.rva);
+            throw std::runtime_error(fmt::format("{} refused: code range {:x}+{:x} {} in game build {:x}", route, range.rva,
+                range.size, found ? fmt::format("changed at {:x}", *found) : std::string{"not found"}, live.timestamp));
+        }
+    }
+    spdlog::info("[WuWaStereoCode] route={} verified_ranges={} image_size={:x} timestamp={:x} self_ported_from={:x}",
+        route, ranges.size(), live.image_size, live.timestamp, wuwa_self_port::table::reference_timestamp);
 }
 } // namespace wuwa_code_check

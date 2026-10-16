@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include "Logging.hpp"
 #include "WuWaLguiProbe.hpp"
+#include "WuWaSelfPort.hpp"
 #include "WuWaScenePass.hpp"
 #include "WuWaEarlyStereo.hpp"
 #include "WuWaStateSwap.hpp"
@@ -56,13 +57,9 @@ inline bool compatible() {
             compatibility = -1;
             return;
         }
-        const auto module = GetModuleHandleW(nullptr);
-        const auto base = reinterpret_cast<uintptr_t>(module);
         for (const auto& check : code_checks) {
-            std::array<uint8_t, 24> bytes{};
-            if (!checked::executable_site(base + check.rva, check.size, module) ||
-                !checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(base + check.rva), check.size) ||
-                std::memcmp(bytes.data(), check.bytes.data(), check.size) != 0) {
+            // At the check's live place on a self-ported build (WuWaSelfPort.hpp).
+            if (!wuwa_self_port::code_matches(check.rva, std::span<const uint8_t>{check.bytes.data(), check.size})) {
                 compatibility = -1;
                 spdlog::error("[WuWaShadow] code check failed at {:x}; observation and writes disabled", check.rva);
                 return;
@@ -403,11 +400,7 @@ inline constexpr std::array<uint8_t, 30> overlay_code{
     0x41,0x0f,0x10,0x85,0x40,0x01,0x00,0x00, 0x0f,0x11,0x83,0x80,0x0c,0x00,0x00};
 inline bool overlay_compatible() {
     static const bool matched = [] {
-        const auto module = GetModuleHandleW(nullptr);
-        const auto site = reinterpret_cast<uintptr_t>(module) + overlay_code_rva;
-        std::array<uint8_t, overlay_code.size()> bytes{};
-        const bool ok = compatible() && checked::executable_site(site, overlay_code.size(), module) &&
-            checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(site), bytes.size()) && bytes == overlay_code;
+        const bool ok = compatible() && wuwa_self_port::code_matches(overlay_code_rva, overlay_code);
         if (ok) spdlog::info("[WuWaShadow] camera fade fields matched; fades copied to the second eye");
         else spdlog::error("[WuWaShadow] camera fade code check failed at {:x}; fades not copied", overlay_code_rva);
         return ok;

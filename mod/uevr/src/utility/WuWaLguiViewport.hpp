@@ -73,6 +73,9 @@ struct State {
     // never saved). Without site 2 the reflection is live but the layout breaks, so one caller is it.
     std::array<std::atomic<uint32_t>, 9> callers{};
     std::atomic<uint32_t> caller_mask{0x1ff};
+    // The return addresses below in the running game build (set_live_returns; 0 = not found).
+    std::array<std::atomic<uint32_t>, 8> live_returns{};
+    std::atomic<uint32_t> live_pointer_ray_return{0};
 };
 // Read by hook stubs until process exit; never destroyed.
 inline State& state() { static auto* value = new State{}; return *value; }
@@ -83,10 +86,22 @@ inline constexpr std::array<uintptr_t, 8> viewport_size_returns{
 inline constexpr uintptr_t pointer_ray_return = 0xd58b15;
 // LGUIPointerEventData (3.7 reflection): inputType (byte; 0 pointer, 1 navigation) and pointerID.
 inline constexpr uint32_t event_input_type = 0x40, event_pointer_id = 0x44;
+// The pinned return addresses in the running build: lookup(reference RVA) gives the live RVA or 0.
+template<class Lookup> inline void set_live_returns(Lookup lookup) noexcept {
+    auto& s = state();
+    for (size_t i = 0; i < viewport_size_returns.size(); ++i)
+        s.live_returns[i].store(lookup(uint32_t(viewport_size_returns[i])), std::memory_order_relaxed);
+    s.live_pointer_ray_return.store(lookup(uint32_t(pointer_ray_return)), std::memory_order_release);
+}
+inline bool pointer_ray_caller(uintptr_t return_rva) noexcept {
+    const auto live = state().live_pointer_ray_return.load(std::memory_order_acquire);
+    return live != 0 && return_rva == live;
+}
 // Counts the call and says whether this caller gets the window size.
 inline bool allow_caller(uintptr_t return_rva) noexcept {
     uint32_t caller = 8;
-    for (uint32_t i = 0; i < viewport_size_returns.size(); ++i) if (viewport_size_returns[i] == return_rva) caller = i;
+    for (uint32_t i = 0; i < viewport_size_returns.size(); ++i)
+        if (const auto live = state().live_returns[i].load(std::memory_order_relaxed); live != 0 && live == return_rva) caller = i;
     auto& s = state();
     s.callers[caller].fetch_add(1, std::memory_order_relaxed);
     return (s.caller_mask.load(std::memory_order_relaxed) >> caller) & 1u;

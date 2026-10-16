@@ -20,7 +20,7 @@ bool accepts_factory(const Eye& eye, uintptr_t component, uintptr_t frame,
         stack > UINTPTR_MAX-0x660 || frame != stack+0x100) return false;
     uintptr_t caller{};
     int32_t count{};
-    // The factory's exact prologue and call-site contract (3.7: RVA 0x3f89ac0,
+    // The factory's exact prologue and call-site contract (3.7: RVA 0x3f8a200,
     // return address at frame+0x558, view count at rsp+0x78; was +0x548 / +0x50). This is the custom
     // reflection producer, not an arbitrary SceneCapture using the factory.
     return read(frame+0x558,caller) && caller==expected_caller &&

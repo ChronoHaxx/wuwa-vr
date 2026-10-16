@@ -36,8 +36,9 @@ RESULTS = ROOT / 'qa' / 'results.jsonl'
 REPORT = ROOT / 'docs' / 'QA-MATRIX.md'
 RESULT_KINDS = ('pass', 'fail', 'blocked')
 CHECK_KINDS = ('unit', 'invariant', 'simulator', 'tool', 'manual')
-# Game image sizes seen for build 0x6aa96d2d (WuWaCodeCompatibility.hpp): which copy a log came from.
-COPIES = {'ad21000': 'launcher', 'ad1c000': 'steam'}
+# Game image sizes seen (WuWaCodeCompatibility.hpp): which copy a log came from. 3.7 (0x6aa96d2d):
+# ad21000 launcher, ad1c000 Steam; the 16 Oct hotfix (0x6ace6377): ad1e000 launcher.
+COPIES = {'ad21000': 'launcher', 'ad1c000': 'steam', 'ad1e000': 'launcher'}
 
 
 def load_matrix(path: Path = MATRIX) -> dict:

@@ -47,12 +47,22 @@ The 3.7 update (30 Sep to 1 Oct 2026) is the worked example used below:
 
 ## Day 1: port (no headset needed until the end)
 
-1. **Capture the new game.** Write
-   `{"output": "E:/Coding/wuwa-vr/data/game-<version>/client-<version>-<date>.bin", "any_build": true}`
-   as `wuwa-module-capture.request.json` beside the backend, launch, and wait for the
-   capture to finish. Remove the request file afterwards. The capture is read-only. The
-   exe on disk is encrypted, so only an in-memory capture works.
-   `launcher\dev\wuwa_merge_captures.py` joins interrupted captures.
+1. **Capture the new game.** The backend only writes directly under
+   `E:\Coding\wuwa-vr\extracted\lgui-live`; that folder must exist. So create it, write
+   `{"output": "E:/Coding/wuwa-vr/extracted/lgui-live/client-<timestamp>-<copy>.bin", "any_build": true}`
+   as `wuwa-module-capture.request.json` beside the loaded backend. That is the installed
+   version's `app\runtime\Wuthering Waves UEVR - <build>` folder: the launch record's
+   `build.json` names it. Then launch.
+   - The capture starts about 30 s after the plugin loads; the world need not be loaded.
+     The log says `module capture finished: status=complete`.
+   - The request is read once per backend load, so a refused request needs a new launch.
+   - Remove the request file afterwards. Move the capture and its JSON files to
+     `data\game-<version>\`, then delete `extracted\` again.
+   - The capture is read-only. The exe on disk is encrypted, so only an in-memory capture works.
+   - `launcher\dev\wuwa_merge_captures.py` joins interrupted captures.
+
+   A hotfix also needs this. Every rebuild of the exe changes the PE timestamp and moves code.
+   For the 16 Oct 2026 hotfix (0x6ace6377), every one of the 211 sites mapped as `ok`.
 2. **Map every pinned address.**
    ```powershell
    python launcher\dev\wuwa_port_offsets.py --old <current capture> --new <new capture> --report ..\data\game-<version>\port-<version>.json

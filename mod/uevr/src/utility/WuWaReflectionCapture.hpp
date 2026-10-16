@@ -123,24 +123,24 @@ inline void configure(bool requested) noexcept {
         // Complete archived producer and both projection-helper stages. No
         // unverified address/layout fallback after a game update.
         constexpr std::array<wuwa_code_compatibility::Range,9> ranges{{
-            {0x3d85d10,8282,0x6380221725f168ccULL},
-            {0x3f63640,236,0x4f10d39ebbb0f37aULL},
-            {0x3f63730,27,0x0e63f3701c79635fULL},
-            {0x3f89ac0,6334,0xe7be3fff761f3891ULL},
-            {0x4fe58c0,293,0xe0c1800f6ded95c5ULL},
-            {0x3d87d70,1285,0x7d05f5929d6e1c6dULL},
-            {0x3d88280,2853,0x684f2b9cdf6ac940ULL},
-            {0x54e8f00,188,0x3b3e235d5c144105ULL},
-            {0x54e8fc0,5681,0xe81e275647c604a6ULL}}};
+            {0x3d86450,8282,0x057f3ffc165d34d6ULL},
+            {0x3f63d80,236,0x2601eed48466472aULL},
+            {0x3f63e70,27,0x0e63f3701c79635fULL},
+            {0x3f8a200,6334,0xd51fba1853c26e41ULL},
+            {0x4fe5fa0,293,0x488a2aa1b097afe6ULL},
+            {0x3d884b0,1285,0xb03f1bcee2a88a25ULL},
+            {0x3d889c0,2853,0x10fa026d2bc45191ULL},
+            {0x54e9480,188,0x3b3e235d5c144105ULL},
+            {0x54e9540,5681,0xb7fc844380e92582ULL}}};
         const auto base = wuwa_code_check::verify("Custom reflection capture projection",ranges);
-        factory_caller=base+0x3d874e3;
+        factory_caller=base+0x3d87c23;
         memory::require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
             reinterpret_cast<LPCWSTR>(&callback),&retained_backend) != 0,"Cannot retain reflection capture backend");
-        auto created = safetyhook::MidHook::create(reinterpret_cast<void*>(base+0x3d870dd),
+        auto created = safetyhook::MidHook::create(reinterpret_cast<void*>(base+0x3d8781d),
             callback,safetyhook::MidHook::StartDisabled);
         memory::require(created.has_value(),"Cannot create reflection capture projection hook");
         hook = new safetyhook::MidHook(std::move(*created));
-        const std::array<uintptr_t,3> sites{0x3f89dd0,0x3d8860d,0x3d87fcf};
+        const std::array<uintptr_t,3> sites{0x3f8a510,0x3d88d4d,0x3d8870f};
         const std::array<safetyhook::MidHookFn,3> callbacks{select_history,refresh_deferred,refresh_mobile};
         for (size_t i=0;i<sites.size();++i) {
             auto next=safetyhook::MidHook::create(reinterpret_cast<void*>(base+sites[i]),

@@ -353,19 +353,19 @@ bool ensure_mono_projection_hook(bool bootstrap_ready) noexcept {
     // IsStereoEnabled helper, and eye-pass helper. All bytes must match the
     // running executable; archived disassembly by itself is not authority.
     constexpr std::array<wuwa_code_compatibility::Range, 5> ranges{{
-        {0x526ec20, 0xc7a, 0xffc0a799b1500b68ULL},
-        {0x4eba2a0, 0x782, 0xccf4387d201f0e1bULL},
-        {0x56699d0, 0x44, 0xd2e1723937fd68dcULL},
-        {0x55d5220, 0x22, 0xeedafe479dcc76d1ULL},
-        {0x5634f40, 0x19a, 0x5518bf98bae86ccfULL}}};
+        {0x526f1a0, 0xc7a, 0xb4296fa03fdb95beULL},
+        {0x4eba980, 0x782, 0x083cde4571bb87c1ULL},
+        {0x5669f50, 0x44, 0xd2e1723937fd68dcULL},
+        {0x55d57a0, 0x22, 0x2f1e3aef861c6d36ULL},
+        {0x56354c0, 0x19a, 0x859f1b3dc2a1336bULL}}};
     try {
-        const auto target = wuwa_code_check::verify("Mono authored camera", ranges) + 0x526ec20;
+        const auto target = wuwa_code_check::verify("Mono authored camera", ranges) + 0x526f1a0;
         if (discovered_projection_data && discovered_projection_data != target)
             throw std::runtime_error("Discovered GetProjectionData differs from verified native-camera route");
         mono_projection_hook = safetyhook::create_inline(reinterpret_cast<void*>(target),
             &mono_get_projection_data, safetyhook::InlineHook::StartDisabled);
         if (!mono_projection_hook) throw std::runtime_error("Could not create native-camera hook");
-        native_constrained_rect = target - 0x526ec20 + 0x5634f40;
+        native_constrained_rect = target - 0x526f1a0 + 0x56354c0;
         authored_camera_hook = safetyhook::create_mid(reinterpret_cast<void*>(target + 0x299),
             &capture_authored_camera, safetyhook::MidHook::StartDisabled);
         if (!authored_camera_hook || !authored_camera_hook.enable() || !mono_projection_hook.enable())
@@ -385,12 +385,12 @@ bool cinematic_metadata_layout_verified() noexcept {
     static const bool verified = []() noexcept {
         constexpr std::array<wuwa_code_compatibility::Range, 4> ranges{{
             // CalcSceneView: platform switch + authored POV constrain/aspect -> init tail.
-            {0x5267278, 0x49, 0x9e850968f841dabbULL},
+            {0x52677f8, 0x49, 0x3e37bd2eb292a5e0ULL},
             // Ctor loads init+289/+28c, then stores completed view+2d9/+2dc.
-            {0x54cc129, 0x5b, 0x79d0dbf2636663bcULL},
-            {0x54cc557, 0x4a, 0xa3c547b54c5d0cc1ULL},
+            {0x54cc6a9, 0x5b, 0x79d0dbf2636663bcULL},
+            {0x54ccad7, 0x4a, 0xa3c547b54c5d0cc1ULL},
             // Native LGUI independently aspect-fits its draw rect from these fields.
-            {0x4101dad, 0xfa, 0xad4bf4d4da5ee74bULL}}};
+            {0x41024ed, 0xfa, 0x4e2509c845b2f4c1ULL}}};
         try {
             if (!wuwa_shadow::compatible()) return false;
             wuwa_code_check::verify("Cinematic native aspect metadata", ranges);
@@ -451,9 +451,9 @@ bool completed_framing_layout_verified() noexcept {
     static const bool verified = []() noexcept {
         constexpr std::array<wuwa_code_compatibility::Range, 2> ranges{{
             // Native ctor: init+a0 -> view+2f8; init+90 -> view+308.
-            {0x54cb78c, 0x26, 0x6c76cc153e6a992bULL},
+            {0x54cbd0c, 0x26, 0x6c76cc153e6a992bULL},
             // Native ctor: init+50..8f projection -> view+c20..c5f.
-            {0x54cb814, 0x41, 0xe89e328ae132e02aULL}}};
+            {0x54cbd94, 0x41, 0xe89e328ae132e02aULL}}};
         try {
             if (!wuwa_shadow::compatible()) return false; // Family and both pass-field proofs.
             wuwa_code_check::verify("Read-only completed cinematic views", ranges);
@@ -570,9 +570,9 @@ uintptr_t stereo_base_callsite() noexcept {
         // Native GetProjectionData supplies raw pass 2/3 and the game pose to
         // CalculateStereoViewOffset. CALL RBX is two bytes: return is +8402.
         constexpr std::array<wuwa_code_compatibility::Range,2> ranges{{
-            {0x526eea0,25,0x6768d3242ced7ccaULL},
-            {0x526f1ef,221,0xd84222f2627df3e4ULL}}};
-        try {return wuwa_code_check::verify("Same-draw stereo game camera",ranges)+0x526f252;}
+            {0x526f420,25,0x6768d3242ced7ccaULL},
+            {0x526f76f,221,0xb7d245ba0cd11175ULL}}};
+        try {return wuwa_code_check::verify("Same-draw stereo game camera",ranges)+0x526f7d2;}
         catch(const std::exception& e) {SPDLOG_WARN("[WuWaStereoBase] {}",e.what());return 0;}
         catch(...) {return 0;}
     }();
@@ -9192,8 +9192,8 @@ bool VRRenderTargetManager::AllocateRenderTargetTexture(uint32_t Index, uint32_t
     // to the engine that we are letting the engine itself
     // create the texture, rather than us creating it ourselves.
     // This should allow maximum compatibility across engine versions.
-    /*const auto dynamic_rhi = *(uintptr_t*)((uintptr_t)sdk::get_ue_module(L"Engine") + 0x3309C50);
-    const auto command_list = (uintptr_t)sdk::get_ue_module(L"Engine") + 0x330AE70;
+    /*const auto dynamic_rhi = *(uintptr_t*)((uintptr_t)sdk::get_ue_module(L"Engine") + 0x330a3c0);
+    const auto command_list = (uintptr_t)sdk::get_ue_module(L"Engine") + 0x330b5e0;
     struct {
         void* bulk_data{nullptr};
         void* rsrc_array{nullptr};

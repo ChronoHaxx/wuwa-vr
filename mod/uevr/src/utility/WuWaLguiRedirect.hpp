@@ -116,9 +116,17 @@ template<size_t N> inline bool verify_code(const std::array<compatibility::CodeR
         if (wuwa_self_port::range_matches({uint32_t(range.rva), uint32_t(range.size), range.fingerprint})) {
             ++matched;
         } else {
+            // The pre-self-port wording (qa/matrix.json known_off matches it), plus the live place when moved.
+            const auto& live = wuwa_self_port::live();
             const auto found = wuwa_self_port::find_rva(uint32_t(range.rva));
-            spdlog::error("[WuWaLguiRedirect] code mismatch rva={:x} size={} found={} expected={:x}",
-                range.rva, range.size, found ? fmt::format("{:x}", *found) : std::string{"no"}, range.fingerprint);
+            std::vector<uint8_t> bytes(range.size);
+            const bool readable = found && range.size && uint64_t(*found) + range.size <= live.image_size &&
+                checked::executable_site(live.base + *found, range.size, GetModuleHandleW(nullptr)) &&
+                checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(live.base + *found), range.size);
+            const auto actual = readable ? wuwa_self_port::fnv(bytes) : 0xcbf29ce484222325ULL;
+            spdlog::error("[WuWaLguiRedirect] code mismatch rva={:x} size={} readable={} expected={:x} actual={:x}{}",
+                range.rva, range.size, readable, range.fingerprint, actual,
+                live.state == wuwa_self_port::State::moved ? fmt::format(" live={}", found ? fmt::format("{:x}", *found) : "none") : "");
         }
         total_bytes += range.size;
     }

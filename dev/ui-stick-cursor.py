@@ -119,6 +119,8 @@ def ray_on_canvas(f, canvas):
 
 
 def main():
+    if len(sys.argv) < 2 or sys.argv[1].startswith('-'):
+        sys.exit('usage: ui-stick-cursor.py OUT_DIR')
     out = Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
     tolerance = float(sys.argv[sys.argv.index('--tolerance') + 1]) if '--tolerance' in sys.argv else 12.0
     if not game_in_front():

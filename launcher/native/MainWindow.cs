@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -867,7 +868,7 @@ namespace WuWaVR.Manager
                 {
                     if (!Confirm("resetConfirm")) return;
                     await EnsureConnected(c); await SubmitJob("/api/apply", new { id = CurrentBuild(), reset = true }, c);
-                }), Action("remove", async c => await Remove(c)))));
+                }), Action("remove", async c => await Remove(c)), Action("removeOld", async c => await RemoveOld(c)))));
             recovery.Children.Add(Wrap(Action("scanGame", async c => await DiscoverGame(c)), Action("openLogs", c =>
             {
                 if (!Directory.Exists(bridge.Data)) throw new DirectoryNotFoundException(text["logsMissing"]);
@@ -1523,6 +1524,29 @@ namespace WuWaVR.Manager
             Disconnected();
             await Task.Run(() => store.Remove(item), c); status.Clear(); PopulateInstalled(); operationText.Text = text["removed"];
             if (store.Selected != null) { await Connect(c); operationText.Text = text["removed"]; }
+        }
+        // Every version but the one in use, the previous one and any the active OpenXR runtime uses (OldVersions.cs).
+        // The kept version stays connected: nothing it runs from is touched.
+        async Task RemoveOld(CancellationToken c)
+        {
+            var plan = await Task.Run(() => OldVersions.Find(store, ActiveRuntimesOrNull()), c);
+            if (plan.Empty) { operationText.Text = text["removeOldNone"]; return; }
+            if (!Confirm("removeOldConfirm", plan.Versions.Count + plan.Leftovers.Count, SizeText(plan.Bytes), String.Join(", ", plan.Kept))) return;
+            var result = await Task.Run(() => OldVersions.Remove(store, plan, c), c);
+            PopulateInstalled();
+            operationText.Text = String.Format(text[result.Retained.Count == 0 ? "removedOld" : "removedOldPartly"],
+                result.Removed, SizeText(result.Freed), result.Retained.Count);
+        }
+        static string[] ActiveRuntimesOrNull()
+        {
+            try { return LauncherUninstall.ReadActiveRuntimes(); } catch (Exception) { return null; }
+        }
+        string SizeText(long bytes)
+        {
+            CultureInfo culture;
+            try { culture = CultureInfo.GetCultureInfo(text.Language); } catch (CultureNotFoundException) { culture = CultureInfo.InvariantCulture; }
+            return bytes >= 1L << 30 ? String.Format(text["sizeGB"], (bytes / (double)(1L << 30)).ToString("0.0", culture))
+                : String.Format(text["sizeMB"], Math.Max(1L, bytes >> 20).ToString(culture));
         }
         Task Run(Func<CancellationToken, Task> action) { return RunAction(action, true); }
         async Task RunAction(Func<CancellationToken, Task> action, bool refreshAfter)

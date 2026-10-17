@@ -260,7 +260,7 @@ namespace WuWaVR.Manager
         static bool IsWithin(string root, string path)
         { return !String.IsNullOrWhiteSpace(path) && Path.GetFullPath(path).StartsWith(root.TrimEnd('\\', '/') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase); }
 
-        static string[] ReadActiveRuntimes()
+        internal static string[] ReadActiveRuntimes()
         {
             var paths = new List<string>();
             foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })

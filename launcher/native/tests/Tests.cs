@@ -1439,6 +1439,7 @@ class Tests
             ControllerDiagnosticsTests.Run();
             ProcessRecoveryTests.Run(root);
             UninstallTests.Run(root);
+            OldVersionsTests.Run(root);
             LauncherUpdateTests.Run(root);
             WindowTests.Run(root); return 0;
         }

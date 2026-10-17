@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-17T08:03:33.653900+00:00",
+  "updatedAt": "2026-10-17T08:13:57.344948+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -75,7 +75,7 @@
     "dev/merge-controls-l10n.py": "87acfd752d2c64a47fcd6a8b32541089cd6e19f2c016cefaedc4b3d334b944f2",
     "dev/package-beta.py": "655e7c5923159c5b637a0341735d3b4c945010b23174173f11683246afa4d533",
     "dev/publish-launcher-release.py": "573c8b06a9e2589194fb146b05055b572f0c6b906f3081c2faf387f8a6b0a026",
-    "dev/qa.py": "0ecdb513dbad71d18da00159734ca7c8025a7608e709c0b9d0aeee9e1bc703cf",
+    "dev/qa.py": "e4cebf3d1ccc9159eb00f401c34b87f9a3dd4e510a2c27485fbcd4d9a02317cd",
     "dev/render-understanding.cjs": "26d151222ab7710eacd496245d4de3d8e0665c07f3952f56e4f268c5618a07ac",
     "dev/site-layout.cjs": "bb1b2bc45d4841e30b7f9aaec4749ffea9c97677a95fa5e91f9bc468e8157186",
     "dev/site-metadata.cjs": "52a7f11184185a1d54e09b638a24046df9aaf2c6d8656651ae3826548baf2f60",
@@ -580,7 +580,7 @@
     "mod/uevr/src/utility/WuWaWindowPresentation.hpp": "8cace58fdaa53d0aae80ca4ed5d9205f7e77fbc339acc5ce34c92f1741c56a43",
     "mod/uevr/src/utility/WuWaWorldLabelStereo.hpp": "6e33b0340e3fdff7ffcdbbc1691a6236d3dbc4a1b262f73bd162a5484b18ba91",
     "package.json": "165947dc642229291e1aeca7e23b881530a1a8f923a7da1e5066dc346a728bc2",
-    "qa/matrix.json": "13f8b3b27ed4c3c306b1ef2d06866a6a39390a80352d197c144fc3231ffd24d7",
+    "qa/matrix.json": "102fd53be8d4bf6f5ca58de461cb3355988323e725cb30d65a2847bc25d972be",
     "qa/results.jsonl": "0d6cf0d47a9c96e9384f1b455862450ed37967a98f1c0c80bde6cbc8a2ba7e40",
     "release/security-reports.json": "6017365ec4543a71b8b0d68743727f813aa0d4d669df90cf5ab0e749be7cff62",
     "release/site-media.json": "ba51556899a864ce7ca51f86b6a52daa6d36a18cf970f51e4d0c65a112325a00",

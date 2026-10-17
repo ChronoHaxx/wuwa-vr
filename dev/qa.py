@@ -173,6 +173,15 @@ def session(text: str, known_off: list[dict] = ()) -> dict:
             s['routes'][r.group(1)] = 'verified'
             s['copy'] = s.get('copy_from_path') or COPIES.get(r.group(2), f'unknown image {r.group(2)}')
             s['game_build'] = r.group(3)
+        # The self-port's own summary (WuWaSelfPort.hpp): its "refused [...]" lists sites, not a route.
+        sp = re.search(r'\[WuWaSelfPort\] game build (\w+) (?:is the reference build|\(reference (\w+)(, forced scan)?\): '
+                       r'found (\d+)/(\d+) sites \((\d+) moved\) in (\d+) ms; ranges (\d+) unchanged, (\d+) changed, (\d+) not found)', msg)
+        if sp:
+            s['self_port'] = {'build': sp.group(1), 'reference': sp.group(2) or sp.group(1), 'forced': bool(sp.group(3)),
+                              'found': int(sp.group(4) or 0), 'sites': int(sp.group(5) or 0), 'moved': int(sp.group(6) or 0),
+                              'ms': int(sp.group(7) or 0), 'ranges_ok': int(sp.group(8) or 0),
+                              'ranges_changed': int(sp.group(9) or 0), 'ranges_missing': int(sp.group(10) or 0)}
+            continue
         if re.search(r'unavailable|refused|code mismatch|code changed', msg) and re.search(r'\[WuWa\w*\]', msg) \
                 and 'WuWaCinema' not in msg and 'HUD refresh unavailable' not in msg:
             text_ = re.sub(r'^\[[^\]]*\] ', '', msg)[:160]
@@ -209,6 +218,16 @@ def invariants(s: dict, baseline: dict | None = None) -> list[tuple[str, str, st
     out.append(('game-build', 'pass' if s['game_build'] else 'unknown',
                 f"{s['copy']} copy, build {s['game_build']}" if s['game_build'] else 'no verified route line'))
     lost = sorted(set(baseline['routes']) - set(s['routes'])) if baseline else []
+    sp = s.get('self_port')
+    if sp:
+        if sp['reference'] == sp['build'] and not sp['sites']:
+            out.append(('self-port', 'pass', f"build {sp['build']} is the reference build"))
+        else:
+            # Moved builds pass when every found range is unchanged; refused sites leave their routes off.
+            out.append(('self-port', 'fail' if sp['ranges_changed'] or not sp['found'] else 'pass',
+                        f"build {sp['build']} from reference {sp['reference']}{' (forced scan)' if sp['forced'] else ''}: "
+                        f"{sp['found']}/{sp['sites']} sites ({sp['moved']} moved, {sp['ms']} ms); ranges {sp['ranges_ok']} unchanged, "
+                        f"{sp['ranges_changed']} changed, {sp['ranges_missing']} not found"))
     out.append(('code-checks', 'fail' if s['refused'] else ('pass' if s['routes'] else 'unknown'),
                 f"{len(s['routes'])} routes verified; refused: {len(s['refused'])}; known off: {len(s['known_off'])}"
                 + (f"; verified in the baseline but not here (not used yet, or broken): {', '.join(lost)}" if lost else '')))

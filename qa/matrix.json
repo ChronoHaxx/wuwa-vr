@@ -28,8 +28,8 @@
     {"match": "\\[WuWaWorldLabels\\]", "why": "World labels route: still pinned to game 3.6 (0x6a74963e), off on purpose; the HUD/menu route is kept"},
     {"match": "\\[WuWaLguiRedirect\\] code mismatch .*readable=false", "why": "The world-label and Stage-0 ranges: 3.6 RVAs, outside the 3.7 image"},
     {"match": "\\[WuWaLguiStage0\\]", "why": "Stage-0 recording probe for the NPC-label investigation (docs/COMFORT.md): diagnostic, pinned"},
-    {"match": "\\[WuWaKuroReflection\\] .*out-of-image range", "why": "Kuro reflection texture comparison: diagnostic, still pinned to 3.6"},
-    {"match": "NSF shared scene frame refused: out-of-image range", "why": "Shared scene frame counter: still pinned to 3.6; the generic counter write stays off"}
+    {"match": "\\[WuWaKuroReflection\\] Kuro reflection texture refused", "why": "Kuro reflection texture comparison: diagnostic, still pinned to 3.6 (out of image, or the timestamp on a self-ported build)"},
+    {"match": "NSF shared scene frame refused", "why": "Shared scene frame counter: still pinned to 3.6 (out of image, or the timestamp on a self-ported build); the generic counter write stays off"}
   ],
   "features": [
     {"id": "launch", "area": "Launch", "name": "Install, update and launch into VR", "states": ["load"],

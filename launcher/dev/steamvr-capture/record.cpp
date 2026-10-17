@@ -183,7 +183,10 @@ struct Steady {
 };
 // Draws one eye as seen from the steadied view into a 16:9 target (and a 32x32 fingerprint of the whole eye), and
 // reads them back. Each output pixel is a ray of the steadied camera, turned into the rendered eye's frame and
-// projected with the eye's tangents (OpenVR GetProjectionRaw: left < 0 < right, top < 0 < bottom, y down).
+// projected with the eye's tangents. OpenVR GetProjectionRaw gives left < 0 < right, and names the vertical sides
+// the other way round from the picture: "top" is the downward tangent (negative) and "bottom" the upward one, which
+// its own projection matrix puts on the first row (OpenXR's angleDown / angleUp, as UEVR logs them). Up to test 18
+// the crop read top as up, so a headset with more view below than above recorded a view tilted down.
 struct ShowcaseCrop {
     struct Constants { float tangents[4]; float crop[4]; float rows[3][4]; };
     ComPtr<ID3D11Texture2D> target,staging,print_target,print_staging;
@@ -212,10 +215,10 @@ struct V { float4 p:SV_Position; float2 uv:TEXCOORD0; };
 V vert(uint id:SV_VertexID) { V v; v.uv=float2((id<<1)&2,id&2); v.p=float4(v.uv*float2(2,-2)+float2(-1,1),0,1); return v; }
 Texture2D eye:register(t0); SamplerState smp:register(s0);
 float4 pixel(V v):SV_Target {
-    float3 ray=float3((v.uv.x*2-1)*crop.x,(1-v.uv.y*2)*crop.y,-1);
+    float3 ray=float3((v.uv.x*2-1)*crop.x+crop.z,(1-v.uv.y*2)*crop.y+crop.w,-1);
     float3 a=float3(dot(row0.xyz,ray),dot(row1.xyz,ray),dot(row2.xyz,ray));
     float2 t=a.xy/max(1e-4,-a.z);
-    float2 uv=float2((t.x-tangents.x)/(tangents.y-tangents.x),(-t.y-tangents.z)/(tangents.w-tangents.z));
+    float2 uv=float2((t.x-tangents.x)/(tangents.y-tangents.x),(tangents.w-t.y)/(tangents.w-tangents.z));
     return float4(eye.Sample(smp,uv).rgb,1);
 }
 float4 whole(V v):SV_Target { return float4(eye.Sample(smp,v.uv).rgb,1); }
@@ -264,15 +267,25 @@ float4 whole(V v):SV_Target { return float4(eye.Sample(smp,v.uv).rgb,1); }
         read_back(context,target.Get(),staging.Get(),width,height,out);
     }
 };
-// The crop: at most 90 degrees across, centred on the optical axis, leaving room for the steady view to turn.
-struct ShowcaseFrame { double half_width{},half_height{}; };
+// The crop: the eye's whole width less room on each side for the steady view to turn, at most 90 degrees across
+// (trimmed from the wider side first), and 16:9 centred on the axis vertically. An eye sees further outwards than
+// towards the nose, so the window sits off the axis on the outer side (a shifted lens, like an off-axis camera):
+// test 18 kept it centred, which cut it to the narrow nasal side (65 degrees across on a headset that shows 89).
+struct ShowcaseFrame { double half_width{},half_height{},centre_x{},centre_y{}; };
 static ShowcaseFrame showcase_frame(float left,float right,float top,float bottom,double room_angle) {
     ShowcaseFrame f;
-    const double across=std::min(std::atan(std::min(-double(left),double(right))),0.7853981633974483)-room_angle;
-    const double upward=std::atan(std::min(-double(top),double(bottom)))-room_angle;
-    if (across<=0.05 || upward<=0.03) throw std::runtime_error("Eye view too narrow for a showcase crop");
-    f.half_width=std::tan(across); f.half_height=f.half_width*9.0/16.0;
-    if (f.half_height>std::tan(upward)) { f.half_height=std::tan(upward); f.half_width=f.half_height*16.0/9.0; }
+    double outer_left=std::atan(-double(left))-room_angle, outer_right=std::atan(double(right))-room_angle;
+    const double up=std::atan(double(bottom))-room_angle, down=std::atan(-double(top))-room_angle;
+    if (outer_left<=0.03 || outer_right<=0.03 || up<=0.03 || down<=0.03) throw std::runtime_error("Eye view too narrow for a showcase crop");
+    if (double excess=outer_left+outer_right-1.5707963267948966; excess>0) {
+        double& wider=outer_left>outer_right?outer_left:outer_right;
+        const double even=std::min(excess,std::abs(outer_left-outer_right));
+        wider-=even; excess-=even; outer_left-=excess/2; outer_right-=excess/2;
+    }
+    const double x0=-std::tan(outer_left), x1=std::tan(outer_right), y_up=std::tan(up), y_down=std::tan(down);
+    f.half_width=(x1-x0)/2; f.centre_x=(x1+x0)/2; f.half_height=f.half_width*9.0/16.0;
+    if (2*f.half_height>y_up+y_down) { f.half_height=(y_up+y_down)/2; f.half_width=f.half_height*16.0/9.0; }
+    f.centre_y=std::clamp(0.0,f.half_height-y_down,y_up-f.half_height);
     return f;
 }
 static bool same_print(const std::vector<BYTE>& a,const std::vector<BYTE>& b) {
@@ -300,6 +313,34 @@ int wmain(int argc,wchar_t** argv) {
             ComPtr<ID3D11Texture2D> tex; ComPtr<ID3D11ShaderResourceView> view;
             check(test_device->CreateTexture2D(&d,&data,&tex)); check(test_device->CreateShaderResourceView(tex.Get(),nullptr,&view));
             ShowcaseCrop crop; crop.open(test_device.Get(),320,180);
+            {
+                // An eye like the lighthouse headset of test 18: 49 degrees outwards, 40 inwards, 38 up, 50 down.
+                // OpenVR order: left, right, "top" (the downward tangent), "bottom" (the upward one).
+                const float l=-1.157f,r=0.829f,down=-1.215f,up=0.788f;
+                const auto f=showcase_frame(l,r,down,up,0.12);
+                const double across=std::atan(f.half_width-f.centre_x)+std::atan(f.half_width+f.centre_x);
+                if (across<1.25 || f.centre_x>=0 || std::abs(f.centre_y)>1e-9 || f.half_height>std::tan(std::atan(up)-0.12))
+                    throw std::runtime_error("Showcase crop of an asymmetric eye is narrow, centred or outside the eye");
+                // The axis lies at row up/(up-down) of the eye; a marker there must land where the crop puts the axis.
+                std::vector<BYTE> marked(640*640*4);
+                const int axis_row=int(640.0*up/(up-down)), axis_col=int(640.0*-l/(r-l));
+                for (int y=0;y<640;++y) for (int x=0;x<640;++x) {
+                    const auto i=(y*640+x)*4; marked[i]=std::abs(x-axis_col)<12&&std::abs(y-axis_row)<12?255:0; marked[i+3]=255;
+                }
+                D3D11_TEXTURE2D_DESC md{}; md.Width=md.Height=640; md.MipLevels=md.ArraySize=1; md.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
+                md.SampleDesc.Count=1; md.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+                D3D11_SUBRESOURCE_DATA mdata{marked.data(),640*4,0};
+                ComPtr<ID3D11Texture2D> mtex; ComPtr<ID3D11ShaderResourceView> mview;
+                check(test_device->CreateTexture2D(&md,&mdata,&mtex)); check(test_device->CreateShaderResourceView(mtex.Get(),nullptr,&mview));
+                ShowcaseCrop::Constants on_axis{{l,r,down,up},{0.02f,0.01125f,0,0}}; qrows(Quat{},on_axis.rows);
+                std::vector<BYTE> seen; crop.read(test_context.Get(),mview.Get(),false,on_axis,seen);
+                if (seen[(90*320+160)*4]<200) throw std::runtime_error("Showcase view of an asymmetric eye is off the optical axis");
+                // The full crop shows the axis at its own spot: right of centre (the window leans outwards), mid-height.
+                ShowcaseCrop::Constants full{{l,r,down,up},{float(f.half_width),float(f.half_height),float(f.centre_x),float(f.centre_y)}};
+                qrows(Quat{},full.rows); crop.read(test_context.Get(),mview.Get(),false,full,seen);
+                const int col=int(std::lround(160+160*(-f.centre_x)/f.half_width));
+                if (seen[(90*320+col)*4]<200 || seen[(90*320+160)*4]>8) throw std::runtime_error("Off-axis showcase crop lost the optical axis");
+            }
             const auto frame=showcase_frame(-1,1,-1,1,0.12);
             ShowcaseCrop::Constants c{{-1,1,-1,1},{float(frame.half_width),float(frame.half_height),0,0}};
             qrows(Quat{},c.rows);
@@ -331,7 +372,7 @@ int wmain(int argc,wchar_t** argv) {
                 encoder.close(); MFShutdown(); media=false; CoUninitialize(); com=false;
                 std::cout<<"Showcase encoder: 60 frames, 2560x1440, 40 Mbps, uneven frame times ("<<at_time/10000<<" ms).\n";
             }
-            std::cout<<"Synthetic showcase view: centred, turned, fingerprint and steady checks passed; no game/VR access.\n"; return 0;
+            std::cout<<"Synthetic showcase view: asymmetric eye, centred, turned, fingerprint and steady checks passed; no game/VR access.\n"; return 0;
         }
         if ((argc==3 || argc==4) && std::wstring_view(argv[1])==L"--self-test") {
             const UINT test_fps=argc==4 ? std::stoul(argv[3]) : 30;
@@ -450,7 +491,7 @@ int wmain(int argc,wchar_t** argv) {
                     const Quat d=steady.update(qmul(head,eye_to_head),t,tau,max_angle);
                     view=d;
                 } else ++unsteadied;
-                ShowcaseCrop::Constants c{{tan_l,tan_r,tan_t,tan_b},{float(frame.half_width),float(frame.half_height),0,0}};
+                ShowcaseCrop::Constants c{{tan_l,tan_r,tan_t,tan_b},{float(frame.half_width),float(frame.half_height),float(frame.centre_x),float(frame.centre_y)}};
                 qrows(view,c.rows);
                 const auto capture_begin=utc();
                 crop.read(context.Get(),eye.view,eye.srgb,c,pixels);
@@ -476,8 +517,8 @@ int wmain(int argc,wchar_t** argv) {
                 {"fps_target",fps},{"captured_fps",count/elapsed},{"wall_seconds",elapsed},
                 {"timing","one sample per new game frame at its arrival time (variable frame rate, no repeats)"},
                 {"source_eye_size",{eye.width,eye.height}},{"eye_tangents",{tan_l,tan_r,tan_t,tan_b}},
-                {"crop_half_tangents",{frame.half_width,frame.half_height}},{"steady",{{"seconds",tau},{"margin_rad",max_angle}}},
-                {"method","OpenVR left-eye mirror; 16:9 view on the optical axis, steadied with the pose each frame was rendered with"},
+                {"crop_half_tangents",{frame.half_width,frame.half_height}},{"crop_centre_tangents",{frame.centre_x,frame.centre_y}},{"steady",{{"seconds",tau},{"margin_rad",max_angle}}},
+                {"method","OpenVR left-eye mirror; 16:9 view across the eye's width, level with the optical axis, steadied with the pose each frame was rendered with"},
                 {"desktop_captured",false},{"input_sent",false},{"audio",false}};
             std::ofstream(out/L"recording.json")<<result.dump(2)<<'\n';
         } else {

@@ -21,6 +21,7 @@ struct CardState {
     bool hide_near{};        // Hide characters at your eyes (LT + RT, then Y)
     bool portal{}, diorama{}, mouse_mode{}, first_person{}, fixed_camera{}, ui_hidden{};
     bool story_nudge{};      // a story shot the camera nudge works in: Y / X move along the shot
+    float story_nudge_cm{};  // the nudge in use there, cm (+ nearer); shown on the Y / X row when not 0
     bool pinned{};
 };
 // 1600 x 900 design units, centred in size.

@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string_view>
 
 void wuwa_playtest::draw_controls(const std::filesystem::path& profile) {
@@ -1345,7 +1346,9 @@ void WuWaControlsComponent::draw_passive_overlay() {
     state.first_person=m_camera->value()==3;
     state.fixed_camera=m_camera->value()==1;
     // The camera script reports a nudge value only during story shots it can nudge.
-    state.story_nudge=m_story_nudge->value() && !story_nudge_now().empty();
+    const auto nudge_now=story_nudge_now();
+    state.story_nudge=m_story_nudge->value() && !nudge_now.empty();
+    state.story_nudge_cm=state.story_nudge ? static_cast<float>(std::atof(nudge_now.c_str())) : 0.0f;
     state.ui_hidden=!vr->is_gui_enabled();
     state.pinned=m_pin_card->value();
     wuwa_sheet::draw_card(list,size,ImGui::GetFont(),state);

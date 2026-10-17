@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstdio>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -201,14 +203,18 @@ void draw_fit(const Canvas& c, const Fit& f, float x, float middle, ImU32 color,
     }
 }
 
-// A small status pill such as "On" or "Blur off". Returns its width.
-float pill_width(const Canvas& c, const std::string& english, float px) { return c.width(px, tr(english)) + px * 1.2f; }
-void pill(const Canvas& c, float x, float middle, float px, const std::string& english, ImU32 color, bool filled = false) {
-    const auto text = tr(english);
-    const float w = pill_width(c, english, px), h = px * 1.45f;
+// A small status pill such as "On" or "Blur off". Returns its width. The _text forms take text that
+// is already translated and in visual order (a value such as "+12 cm").
+float pill_text_width(const Canvas& c, const std::string& text, float px) { return c.width(px, text) + px * 1.2f; }
+float pill_width(const Canvas& c, const std::string& english, float px) { return pill_text_width(c, tr(english), px); }
+void pill_text(const Canvas& c, float x, float middle, float px, const std::string& text, ImU32 color, bool filled = false) {
+    const float w = pill_text_width(c, text, px), h = px * 1.45f;
     if (filled) c.list->AddRectFilled(c.at(x, middle - h * 0.5f), c.at(x + w, middle + h * 0.5f), color, h * 0.5f * c.s);
     else c.list->AddRect(c.at(x, middle - h * 0.5f), c.at(x + w, middle + h * 0.5f), color, h * 0.5f * c.s, 0, 1.4f * c.s);
     c.text(x + px * 0.6f, middle - px * 0.56f, px, filled ? lit_text : color, text);
+}
+void pill(const Canvas& c, float x, float middle, float px, const std::string& english, ImU32 color, bool filled = false) {
+    pill_text(c, x, middle, px, tr(english), color, filled);
 }
 
 void frame(const Canvas& c) {
@@ -344,6 +350,7 @@ struct Row {
     ImU32 state_color;
     bool dim = false;       // does nothing in the current camera
     const char* note = nullptr; // a smaller second line under the label
+    const char* value = nullptr; // a pill with text already translated (a value), in place of state
 };
 void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, const Row& row) {
     constexpr float w = 440.0f, h = 62.0f, key_px = 26.0f;
@@ -361,7 +368,8 @@ void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, con
     } else {
         chip(c, key_x, middle, key_px, row.token, row.lit);
     }
-    const float state_w = row.state ? pill_width(c, row.state, 18.0f) + 12.0f : 0.0f;
+    const std::string state = row.value ? std::string{row.value} : row.state ? tr(row.state) : std::string{};
+    const float state_w = state.empty() ? 0.0f : pill_text_width(c, state, 18.0f) + 12.0f;
     const float text_w = w - 32.0f - keys - 16.0f - state_w;
     const float text_x = left ? x + 16.0f + state_w : x + 16.0f + keys + 16.0f;
     if (row.note) {
@@ -370,7 +378,7 @@ void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, con
     } else {
         draw_fit(c, fit(c, row.english, 27.0f, text_w), text_x, middle, row.dim ? muted : ink, left ? 1.0f : 0.0f, text_w);
     }
-    if (row.state) pill(c, left ? x + 16.0f : x + w - 16.0f - state_w + 12.0f, middle, 18.0f, row.state, row.state_color);
+    if (!state.empty()) pill_text(c, left ? x + 16.0f : x + w - 16.0f - state_w + 12.0f, middle, 18.0f, state, row.state_color);
     // Leader: out from the box, then straight to the button's edge.
     const ImVec2 start = c.at(left ? x + w : x, middle), bend = c.at(left ? x + w + 16.0f : x - 16.0f, middle);
     ImVec2 end = pad.at(row.tx, row.ty);
@@ -392,6 +400,13 @@ void l3_card(const Canvas& c, const CardState& st) {
     const Pad pad{c, o, k};
     const auto held = [&](unsigned mask) { return (st.buttons & mask) != 0; };
     const bool camera_moves = st.first_person || st.fixed_camera;
+    // The story camera nudge in use now, as on the Cinema page's status line.
+    std::string nudge;
+    if (st.story_nudge && std::fabs(st.story_nudge_cm) >= 1.0f) {
+        char text[48]{};
+        std::snprintf(text, sizeof(text), wuwa_l10n::translate("%+.0f cm").c_str(), st.story_nudge_cm);
+        nudge = wuwa_l10n::visual(text);
+    }
     const Row left[] = {
         {"LT", N_("Portal window"), st.lt, 182, 39, 17, st.portal ? N_("On") : nullptr, green},
         {"LB", N_("HUD / mouse mode"), held(lb), 182, 74, 12, st.mouse_mode ? N_("On") : nullptr, green},
@@ -405,9 +420,10 @@ void l3_card(const Canvas& c, const CardState& st) {
         // Y / X move the camera up and down in first person and the fixed camera, and along the shot in story
         // scenes on the game camera (the story camera nudge); both together reset it.
         {"YX", st.story_nudge ? N_("Story camera: nearer / back") : N_("Camera up / down"), held(button_x | button_y),
-            439, 151, 0, nullptr, 0, !camera_moves && !st.story_nudge,
+            439, 151, 0, nullptr, green, !camera_moves && !st.story_nudge,
             st.story_nudge ? N_("Y + X together: back to the game's spot")
-                : camera_moves ? N_("Y + X together: back to default") : N_("Only in first person, the fixed camera and story scenes")},
+                : camera_moves ? N_("Y + X together: back to default") : N_("Only in first person, the fixed camera and story scenes"),
+            nudge.empty() ? nullptr : nudge.c_str()},
         {"B", N_("Show / hide game UI"), held(button_b), 490, 168, 17, st.ui_hidden ? N_("Hidden") : nullptr, red},
         {"A", N_("Recenter view"), held(button_a), 456, 202, 17, nullptr, 0},
         {"R3", N_("WuWa VR menu"), held(r3), 388, 244, 25, nullptr, 0},

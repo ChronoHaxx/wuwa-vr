@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-17T14:01:52.316510+00:00",
+  "updatedAt": "2026-10-17T14:17:20.085451+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -457,7 +457,7 @@
     "mod/uevr/src/mods/vr/FFakeStereoRenderingHook.cpp": "3b04cd43689f6486ccdd0cfc3cf9921b8a5dc8a208362e9b015f469743f9542a",
     "mod/uevr/src/mods/vr/OverlayComponent.cpp": "5dfb8602c774449a65a92cc5d430ef9430a3019c98e98d21a4517245bb4d7234",
     "mod/uevr/src/mods/vr/OverlayComponent.hpp": "15dfda0d237e8b358ac2592f81859178989fef96978c51554c13db2729f9de12",
-    "mod/uevr/src/mods/vr/WuWaControlsComponent.cpp": "a49c3fc7dd19ffa9d17aa815287296f4a707f57e4cedb78e7b47f34106bb274d",
+    "mod/uevr/src/mods/vr/WuWaControlsComponent.cpp": "a6e681e1837c0c2b532badace19bc68a8a2822ce13e209961bac0e2a10cd9252",
     "mod/uevr/src/mods/vr/WuWaControlsComponent.hpp": "784f6855225e651859171646d1fec0a19d6668e7e4d5035bc6370350a3c2934b",
     "mod/uevr/src/mods/vr/WuWaVrMenuHost.cpp": "22b02939e5bd9a3151eef80fe8d5e7f47676e6227bbb4b5242b79d856c098745",
     "mod/uevr/src/mods/vr/WuWaVrMenuHost.hpp": "99ce9efb1890607f1f86ff78e00fb1840c2e26b0a95ea9749c1dc6832b64a616",
@@ -546,8 +546,8 @@
     "mod/uevr/src/utility/WuWaScreenEyeOrder.hpp": "556e182b3aae5b2362ecda89e86e48cece8d8ef27ebb2015d10c4bd8fbed7d3e",
     "mod/uevr/src/utility/WuWaSecondEyeBuild.hpp": "deaa2acc3ab8fff1c2edc0e65df3f506a7d4e19480fc75c5399e8c088a456960",
     "mod/uevr/src/utility/WuWaShadowPass.hpp": "d96b74858e4136f05f01ff1a097c979956bd364a6d20764f284f58394fc2e733",
-    "mod/uevr/src/utility/WuWaShortcutSheet.cpp": "572313d558559bc9d9972314835ff414cca4ee76e742995ba26a0f7b3451d379",
-    "mod/uevr/src/utility/WuWaShortcutSheet.hpp": "718a7b8b3d32fa055f45a251fd27ce824914dc321ff0d7c44686f72d1d7d083e",
+    "mod/uevr/src/utility/WuWaShortcutSheet.cpp": "89d6f597f58846b30db7a3aaed2bd815322de697680cffaa1a4b8dfcb4187932",
+    "mod/uevr/src/utility/WuWaShortcutSheet.hpp": "06faed7cb8e8f6bef3e68c0a3fe68fb21efb8c01436077a39b942d92ab7f6b69",
     "mod/uevr/src/utility/WuWaSightseeingInput.hpp": "4752d6376bade0e6a6882d5db7338f7352a83b392805e58f5a695e5338bb8dda",
     "mod/uevr/src/utility/WuWaStage0Payload.hpp": "cf0e7717c504cfa03171b5fc28e39951070780173e9c7fe2f860880cae1110d7",
     "mod/uevr/src/utility/WuWaStateSwap.hpp": "1d380676af25395df2ce63febcb46a59cbec56b2dc61bb390a9e208733f64da4",

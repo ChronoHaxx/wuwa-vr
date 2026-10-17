@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-16T23:56:49.564828+00:00",
+  "updatedAt": "2026-10-17T00:04:01.807032+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -279,7 +279,7 @@
     "launcher/dev/wuwa_playtest.py": "36cf44f513c2d1447c82387471869e717d5fe4f958a31ce8f0d2a642ca1fa809",
     "launcher/dev/wuwa_playtest_bridge.py": "f20c87bc09f5f52df2a4a070b8ec67efc3113bb209929717d105de4ee05c05f8",
     "launcher/dev/wuwa_playtest_service.py": "74bf2c277ac9c0bc73613f6d3b9751d71ec0874579c7e5aea9025d8b920f6fcd",
-    "launcher/dev/wuwa_port_offsets.py": "93a13ca556311b30ef77bc85cf71da49562afcea93196bf3a17900c67b3bb564",
+    "launcher/dev/wuwa_port_offsets.py": "b60ed8346a7fd7d2d8ea18d2997f18d030b2a26834fe50aef61ea64b1c1f24e1",
     "launcher/dev/wuwa_register_candidate.py": "aefbf3e3843470ea3ca38689a4474afdca95ed4b8078cee797b42a6855afa48a",
     "launcher/dev/wuwa_route_log.py": "601496baac2ba3b5c7540722e4df2ac05db8a6ca8eebccf78e3992c082b78e94",
     "launcher/dev/wuwa_self_port_table.py": "d11d8f2e0fc58df7a7d28f79562d4cb6b95b3dfed11bdb4d6282a38fa495f34b",

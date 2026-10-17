@@ -14,6 +14,7 @@
         {"keys": "L3 + RB", "action": "Game / fixed camera", "button": "RB"},
         {"keys": "L3 + Menu", "action": "Keep this card open", "button": "Menu"},
         {"keys": "L3 + Y / X", "action": "Camera up / down", "button": "YX"},
+        {"keys": "L3 + Y / X", "action": "Story camera: nearer / back"},
         {"keys": "L3 + Y + X", "action": "Y + X together: back to default"},
         {"keys": "L3 + B", "action": "Show / hide game UI", "button": "B"},
         {"keys": "L3 + A", "action": "Recenter view", "button": "A"},

@@ -20,6 +20,7 @@ struct CardState {
     bool blur{};
     bool hide_near{};        // Hide characters at your eyes (LT + RT, then Y)
     bool portal{}, diorama{}, mouse_mode{}, first_person{}, fixed_camera{}, ui_hidden{};
+    bool story_nudge{};      // a story shot the camera nudge works in: Y / X move along the shot
     bool pinned{};
 };
 // 1600 x 900 design units, centred in size.

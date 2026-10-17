@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -72,7 +73,11 @@ CinemaHint hint{};
 // ends after two minutes without such a character.
 CinemaHint near_hint{300, 5000, 120000};
 constexpr int32_t near_note_count = 3;
-int hint_kind{}; // 1 cinematic scene, 2 someone at your eyes
+// Test 19: the story camera nudge's buttons, a second and a half into a story scene in full VR; a scene
+// ends after two minutes without story shots (owner, 17 Oct: so new players know they can move).
+CinemaHint story_hint{1500, 6000, 120000};
+constexpr int32_t story_note_count = 3;
+int hint_kind{}; // 1 cinematic scene, 2 someone at your eyes, 3 the story camera nudge
 
 std::int64_t unix_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -410,6 +415,29 @@ Item story_nudge_status() {
     });
 }
 
+// The nudge the camera script applies now is at least a centimetre either way.
+bool story_nudged() {
+    const auto now = VR::get()->get_wuwa_controls().story_nudge_now();
+    return !now.empty() && std::abs(std::atof(now.c_str())) >= 1.0;
+}
+
+Item story_nudge_reset() {
+    auto item = action("Reset story camera nudge",
+        "Puts the camera back at the game's spot now, as L3 + Y + X does. Only while a nudge is in use.",
+        [] { VR::get()->get_wuwa_controls().reset_story_nudge(); });
+    item.enabled = story_nudged;
+    return item;
+}
+
+Item story_hint_toggle() {
+    auto item = setting_toggle("Note about the story camera nudge",
+        "A short note with the buttons in your first story scenes. It turns itself off after 3 notes, or once you "
+        "have used the nudge.",
+        "WuWaControls_StoryNudgeHint");
+    item.enabled = [] { auto* on = typed<bool>("WuWaControls_StoryNudge"); return on && on->value(); };
+    return item;
+}
+
 Item lens_subject_choice() {
     return setting_choice("Close-up aims at",
         "Characters in the shot: the person the game focuses on (or nearest the middle of the 2D frame), and Close-up match "
@@ -724,6 +752,7 @@ Page camera_page() {
         page.items.push_back(lens_nearest_slider());
         page.items.push_back(story_nudge_toggle());
         page.items.push_back(story_nudge_status());
+        page.items.push_back(story_nudge_reset());
         page.items.push_back(near_hide_toggle());
         page.items.push_back(near_hint_toggle());
         page.items.push_back(near_clip_slider());
@@ -787,6 +816,8 @@ Page cinema_page() {
     page.items.push_back(story_nudge_toggle());
     page.items.push_back(story_nudge_keep_choice());
     page.items.push_back(story_nudge_status());
+    page.items.push_back(story_nudge_reset());
+    page.items.push_back(story_hint_toggle());
     page.items.push_back(near_hide_toggle());
     page.items.push_back(near_hint_toggle());
     page.items.push_back(near_clip_slider());
@@ -1418,10 +1449,31 @@ bool hint_active() {
     auto* note = typed<bool>("WuWaControls_NearHint");
     auto* hiding = typed<bool>("WuWaControls_HideNearCharacters");
     const bool near_eligible = full_vr && note && note->value() && hiding && !hiding->value();
+    // The camera script reports a nudge value only in story shots it can nudge (game camera, full VR).
+    const auto nudge_now = vr->get_wuwa_controls().story_nudge_now();
+    auto* story_note = typed<bool>("WuWaControls_StoryNudgeHint");
+    auto* nudge = typed<bool>("WuWaControls_StoryNudge");
+    const bool story_eligible = full_vr && story_note && story_note->value() && nudge && nudge->value();
+    const bool nudged = !nudge_now.empty() && std::abs(std::atof(nudge_now.c_str())) >= 1.0;
     std::scoped_lock lock{hint_mutex};
     const bool cinema_on = hint.update(cinematic, eligible, now);
     // One note at a time: the scene note first; this one waits rather than running unseen.
     const bool near_on = !cinema_on && near_hint.update(near_recent, near_eligible, now);
+    const bool story_on = !cinema_on && !near_on && story_hint.update(!nudge_now.empty(), story_eligible, now);
+    // The nudge note: 3 notes, or using the nudge once, turns it off; it ends a note it is showing first.
+    if (auto* shown = typed<int32_t>("WuWaControls_StoryNudgeHintShown")) {
+        static std::uint64_t story_counted{};
+        if (story_on && story_hint.shown != story_counted) {
+            story_counted = story_hint.shown;
+            shown->value() = (std::max)(shown->value(), 0) + 1;
+            g_framework->deferred_save_config();
+        }
+        if (!story_on && story_note && story_note->value() && (shown->value() >= story_note_count || nudged)) {
+            story_note->value() = false;
+            shown->value() = 0;
+            g_framework->deferred_save_config();
+        }
+    }
     // Shown near_note_count times, then it turns itself off, as the view hints do (owner, 15 Oct:
     // useful at first, then in the way). Counted when a note starts; switched off when the last
     // one ends (switching off at once would cut that note short).
@@ -1440,13 +1492,13 @@ bool hint_active() {
         }
     }
     was_near = near_on;
-    hint_kind = cinema_on ? 1 : near_on ? 2 : 0;
+    hint_kind = cinema_on ? 1 : near_on ? 2 : story_on ? 3 : 0;
     return hint_kind != 0;
 }
 
-bool near_note_showing() {
+bool dialogue_note_showing() {
     std::scoped_lock lock{hint_mutex};
-    return hint_kind == 2;
+    return hint_kind == 2 || hint_kind == 3;
 }
 
 void draw_hint(ImDrawList* list, const ImVec2& size) {
@@ -1460,6 +1512,12 @@ void draw_hint(ImDrawList* list, const ImVec2& size) {
         // Short and high: it shows during dialogue (test 16: the full note was in the way; 17p:
         // the overlay lifts it above the HUD, OverlayComponent).
         wuwa_menu::draw_note(list, size, font, "Hide characters at your eyes", "LT + RT, then Y",
+            "Shows 3 times, then turns itself off (Cinema page).", true);
+        return;
+    }
+    if (kind == 3) {
+        // The same short, high note: it shows during dialogue too.
+        wuwa_menu::draw_note(list, size, font, "Story camera nudge", "Hold L3, then Y: nearer, X: back, Y + X: reset",
             "Shows 3 times, then turns itself off (Cinema page).", true);
         return;
     }

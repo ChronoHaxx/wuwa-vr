@@ -92,6 +92,9 @@
   "A select  ·  Left / right change  ·  LB / RB pages  ·  B close": [
     "utility/WuWaVrMenu.cpp"
   ],
+  "A short note with the buttons in your first story scenes. It turns itself off after 3 notes, or once you have used the nudge.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "A-D restore all controller slots for a fair comparison. Each records until stopped or 1000 changes. Close with Insert, test LB+Y before and after Alt-Tab, then return with Insert. Restore above to undo this batch. UEVR saves the current settings on exit.": [
     "mods/VR.cpp"
   ],
@@ -1170,6 +1173,9 @@
   "Hold L3, or both triggers, for half a second: a card rises under your view and lights each button as you use it. Let go and it sinks away. L3 + Menu keeps it open. Close UEVR settings to see it; it is absent from the game's flat spectator view.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Hold L3, then Y: nearer, X: back, Y + X: reset": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1755,6 +1761,9 @@
   "Not tested": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Note about the story camera nudge": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Note when someone is at your eyes": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -1801,7 +1810,7 @@
   "On: your settings are saved whenever this menu opens or closes. Off: try things freely; nothing is saved, and the game starts with your saved settings next time. Turning it back on saves what you have now. For each setting, the help at the bottom says whether it is saved and what its default is.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Only in first person and the fixed camera": [
+  "Only in first person, the fixed camera and story scenes": [
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Only slot 0": [
@@ -1970,6 +1979,9 @@
   "Profile ID top": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Puts the camera back at the game's spot now, as L3 + Y + X does. Only while a nudge is in use.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Quick": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2130,6 +2142,9 @@
   ],
   "Reset headset position and direction now": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Reset story camera nudge": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Restart plan": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -2523,6 +2538,10 @@
   ],
   "Story camera nudge: waiting for a story shot": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Story camera: nearer / back": [
+    "mod/controls.json",
+    "utility/WuWaShortcutSheet.cpp"
   ],
   "Story cutscenes and dialogue": [
     "mods/VR.cpp"
@@ -2946,6 +2965,9 @@
   ],
   "Y + X together: back to default": [
     "mod/controls.json",
+    "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Y + X together: back to the game's spot": [
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Yaw rate (degrees / second)": [

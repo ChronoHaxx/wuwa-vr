@@ -1246,12 +1246,13 @@ std::optional<std::reference_wrapper<XrCompositionLayerQuad>> OverlayComponent::
         layer.space = vr->m_openxr->view_space;
         layer.size = {1.6f, 1.6f * (float)ui_swapchain.height / (float)ui_swapchain.width};
         layer.pose = {{0.0f,0.0f,0.0f,1.0f}, {0.0f,0.0f,-2.0f}};
-        // "Someone at your eyes" is drawn at the panel's top edge (about 11 degrees up), where the
-        // game's HUD ends; raised 28 cm it sits near 18 degrees, above the HUD (owner, 15 Oct: still
-        // in the way in dialogue). Only when that note is what the panel shows (menu warnings come first).
+        // A dialogue note ("someone at your eyes", the story camera nudge) is drawn at the panel's top
+        // edge (about 11 degrees up), where the game's HUD ends; raised 28 cm it sits near 18 degrees,
+        // above the HUD (owner, 15 Oct: still in the way in dialogue). Only when that note is what the
+        // panel shows (menu warnings come first).
         auto& controls = vr->get_wuwa_controls();
         const bool warning_first = !controls.floor_visible() && (controls.menu_warning_active() || controls.mode_warning_active());
-        if (!warning_first && wuwa_menu_host::near_note_showing()) layer.pose.position.y = 0.28f;
+        if (!warning_first && wuwa_menu_host::dialogue_note_showing()) layer.pose.position.y = 0.28f;
         m_parent->m_framework_intersect_state.intersecting = false;
         return layer;
     }

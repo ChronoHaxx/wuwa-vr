@@ -402,9 +402,12 @@ void l3_card(const Canvas& c, const CardState& st) {
         {"RT", N_("Diorama (10\xC3\x97)"), st.rt, 458, 39, 17, st.diorama ? N_("On") : nullptr, green},
         {"RB", N_("Game / fixed camera"), held(rb), 458, 74, 12, st.fixed_camera ? N_("Fixed") : nullptr, green},
         {"Menu", N_("Keep this card open"), held(menu), 357, 158.5f, 9, st.pinned ? N_("Pinned") : nullptr, green},
-        // Y / X only move the camera in first person and the fixed camera; both together reset it.
-        {"YX", N_("Camera up / down"), held(button_x | button_y), 439, 151, 0, nullptr, 0, !camera_moves,
-            camera_moves ? N_("Y + X together: back to default") : N_("Only in first person and the fixed camera")},
+        // Y / X move the camera up and down in first person and the fixed camera, and along the shot in story
+        // scenes on the game camera (the story camera nudge); both together reset it.
+        {"YX", st.story_nudge ? N_("Story camera: nearer / back") : N_("Camera up / down"), held(button_x | button_y),
+            439, 151, 0, nullptr, 0, !camera_moves && !st.story_nudge,
+            st.story_nudge ? N_("Y + X together: back to the game's spot")
+                : camera_moves ? N_("Y + X together: back to default") : N_("Only in first person, the fixed camera and story scenes")},
         {"B", N_("Show / hide game UI"), held(button_b), 490, 168, 17, st.ui_hidden ? N_("Hidden") : nullptr, red},
         {"A", N_("Recenter view"), held(button_a), 456, 202, 17, nullptr, 0},
         {"R3", N_("WuWa VR menu"), held(r3), 388, 244, 25, nullptr, 0},

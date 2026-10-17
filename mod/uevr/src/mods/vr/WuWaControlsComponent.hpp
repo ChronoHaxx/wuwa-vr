@@ -92,6 +92,8 @@ public:
     bool character_screen_active() const { return m_character_screen.load(std::memory_order_relaxed); }
     // The story camera nudge the camera script applies now, in cm ("+4"), or empty outside story shots.
     std::string story_nudge_now() const { return m_story_nudge_now.get(); }
+    // Back to the game's spot, as L3 + Y + X does (the VR menu's reset): the keys value reads "reset" briefly.
+    void reset_story_nudge() { m_story_reset_ms.store(GetTickCount64()); }
     std::string auto_cinema_status() const;
     void reset_auto_cinema();
     void override_auto_cinema();
@@ -248,8 +250,13 @@ private:
     const ModToggle::Ptr m_story_nudge{ModToggle::create("WuWaControls_StoryNudge", true)};
     const ModCombo::Ptr m_story_nudge_keep{ModCombo::create("WuWaControls_StoryNudgeKeep",
         {"Until the next cut", "For the whole scene"}, 0)};
-    // Transient: 0 the keyboard keys held (1 nearer, -1 back, 2 reset, 0 none, game focused only),
-    // 1 the plot is running (the detector's plot flag, whatever view or layout it serves), 2 the nudge now.
+    // A note with the buttons in the first story shots in full VR (test 19); after 3 notes, or once the
+    // player has nudged, it turns itself off (WuWaVrMenuHost.cpp hint_active).
+    const ModToggle::Ptr m_story_hint{ModToggle::create("WuWaControls_StoryNudgeHint", true)};
+    const ModInt32::Ptr m_story_hint_shown{ModInt32::create("WuWaControls_StoryNudgeHintShown", 0)};
+    std::atomic<uint64_t> m_story_reset_ms{}; // reset_story_nudge(); 0: never
+    // Transient: 0 the keyboard keys held (1 nearer, -1 back, 2 reset, 0 none, game focused only; 2 also for
+    // 400 ms after the menu's reset), 1 the plot is running (the detector's plot flag, whatever view or layout it serves), 2 the nudge now.
     struct StoryValue : ModString {
         WuWaControlsComponent& owner;
         int kind;

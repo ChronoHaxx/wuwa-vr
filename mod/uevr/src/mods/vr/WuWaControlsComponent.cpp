@@ -363,6 +363,9 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
 
 std::string WuWaControlsComponent::StoryValue::get() const {
     if (kind == 0) {
+        // The menu's reset reads as Home held for a moment (the script resets on the press).
+        const auto reset = owner.m_story_reset_ms.load();
+        if (reset && GetTickCount64() - reset < 400) return "2";
         // Read only while the game has focus and UEVR is closed; the keys still reach the game.
         if (!game_focused()) return "0";
         if (GetAsyncKeyState(VK_HOME) & 0x8000) return "2";
@@ -385,7 +388,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
+        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_style, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
@@ -1341,6 +1344,8 @@ void WuWaControlsComponent::draw_passive_overlay() {
     state.mouse_mode=m_adjust.value() || mode_warning_active();
     state.first_person=m_camera->value()==3;
     state.fixed_camera=m_camera->value()==1;
+    // The camera script reports a nudge value only during story shots it can nudge.
+    state.story_nudge=m_story_nudge->value() && !story_nudge_now().empty();
     state.ui_hidden=!vr->is_gui_enabled();
     state.pinned=m_pin_card->value();
     wuwa_sheet::draw_card(list,size,ImGui::GetFont(),state);

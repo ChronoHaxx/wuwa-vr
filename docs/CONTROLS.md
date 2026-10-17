@@ -272,6 +272,8 @@ cursor flag, so the smaller hint remains available. **L3 + B** restores the UI.
 | --- | --- |
 | L3 + Y / X | Raise/lower the first-person or fixed camera |
 | L3 + Y + X | That camera's height back to its default |
+| L3 + Y / X in a story scene (game camera) | Story camera nudge: move nearer / back along the shot (keyboard Page Up / Page Down) |
+| L3 + Y + X in a story scene | Nudge back to the game's spot (keyboard Home; also *Reset story camera nudge* in the WuWa VR menu) |
 | LB + LT / RT | Fixed camera farther/closer |
 | L3 + View | Leave/enter first person |
 | L3 + RB | Leave/enter fixed camera |

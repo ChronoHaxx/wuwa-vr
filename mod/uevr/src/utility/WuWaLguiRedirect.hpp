@@ -11,6 +11,7 @@
 #include "WuWaWorldLabelStereo.hpp"
 #include "WuWaMenuSignals.hpp"
 #include "WuWaMotionTrace.hpp"
+#include "WuWaSelfPort.hpp"
 #include "Logging.hpp"
 #include <cmath>
 #include <intrin.h>
@@ -52,6 +53,11 @@ struct State {
     bool attempted{};
     Mode mode{Mode::register_only};
     uintptr_t base{};
+    // The pinned sites in the running build (WuWaSelfPort.hpp), resolved once before any hook.
+    struct Live {
+        uintptr_t setup{}, pass{}, menu_setup{}, menu_pass{}, wrap{}, registration{};
+        uintptr_t graph_vtable{}, pooled_vtable{}, release{}, addref{}, world_caller{};
+    } live{};
     Provider provider{};
     safetyhook::InlineHook setup{};
     safetyhook::MidHook pass{};
@@ -102,30 +108,30 @@ inline void record_invalid(State& s, std::atomic<uint64_t>& reason) noexcept {
     ++s.invalid;
 }
 
-template<size_t N> inline bool verify_code(HMODULE executable, uint32_t image_size,
-        const std::array<compatibility::CodeRange, N>& ranges, const char* route) {
-    const auto base = reinterpret_cast<uintptr_t>(executable);
+// Each range at its place in the running build: raw hash on the reference build, unchanged
+// apart from moved call/jump targets and RIP displacements on a self-ported one.
+template<size_t N> inline bool verify_code(const std::array<compatibility::CodeRange, N>& ranges, const char* route) {
     size_t matched{}, total_bytes{};
     for (const auto& range : ranges) {
-        const bool in_image = range.size > 0 && range.rva < image_size &&
-            range.size <= image_size - range.rva && base <= UINTPTR_MAX - image_size;
-        std::vector<uint8_t> bytes(range.size);
-        const bool readable = in_image && checked::executable_site(base + range.rva, range.size, executable) &&
-            checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(base + range.rva), range.size);
-        uint64_t hash = 0xcbf29ce484222325ULL;
-        if (readable) {
-            for (const auto value : bytes) { hash ^= value; hash *= 0x100000001b3ULL; }
-        }
-        if (readable && hash == range.fingerprint) {
+        if (wuwa_self_port::range_matches({uint32_t(range.rva), uint32_t(range.size), range.fingerprint})) {
             ++matched;
         } else {
-            spdlog::error("[WuWaLguiRedirect] code mismatch rva={:x} size={} readable={} expected={:x} actual={:x}",
-                range.rva, range.size, readable, range.fingerprint, hash);
+            // The pre-self-port wording (qa/matrix.json known_off matches it), plus the live place when moved.
+            const auto& live = wuwa_self_port::live();
+            const auto found = wuwa_self_port::find_rva(uint32_t(range.rva));
+            std::vector<uint8_t> bytes(range.size);
+            const bool readable = found && range.size && uint64_t(*found) + range.size <= live.image_size &&
+                checked::executable_site(live.base + *found, range.size, GetModuleHandleW(nullptr)) &&
+                checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(live.base + *found), range.size);
+            const auto actual = readable ? wuwa_self_port::fnv(bytes) : 0xcbf29ce484222325ULL;
+            spdlog::error("[WuWaLguiRedirect] code mismatch rva={:x} size={} readable={} expected={:x} actual={:x}{}",
+                range.rva, range.size, readable, range.fingerprint, actual,
+                live.state == wuwa_self_port::State::moved ? fmt::format(" live={}", found ? fmt::format("{:x}", *found) : "none") : "");
         }
         total_bytes += range.size;
     }
-    spdlog::info("[WuWaLguiRedirect] code compatibility route={} matched={}/{} bytes={}",
-        route, matched, ranges.size(), total_bytes);
+    spdlog::info("[WuWaLguiRedirect] code compatibility route={} matched={}/{} bytes={} build={}",
+        route, matched, ranges.size(), total_bytes, wuwa_self_port::state_name());
     return matched == ranges.size();
 }
 
@@ -146,7 +152,7 @@ inline bool graph_resource(uintptr_t graph, uintptr_t& rhi,
     uintptr_t vtable{};
     GraphStatus status{GraphStatus::valid};
     if (!checked::read(graph, vtable)) status = GraphStatus::unreadable_object;
-    else if (vtable != state().base + graph_vtable_rva) status = GraphStatus::other_vtable;
+    else if (vtable != state().live.graph_vtable) status = GraphStatus::other_vtable;
     else if (!checked::read_field(graph, 0x10, rhi)) status = GraphStatus::unreadable_rhi;
     else if (rhi == 0) status = GraphStatus::null_rhi;
     if (diagnostic != nullptr) *diagnostic = status;
@@ -164,8 +170,10 @@ inline RejectedDescription read_rejected(uintptr_t color, uintptr_t vtable, Grap
     const auto& s = state();
     RejectedDescription result{};
     result.status = status;
-    if (vtable >= s.base && vtable - s.base < checked::image_size) result.vtable_rva = vtable - s.base;
-    if (status == GraphStatus::unreadable_object || vtable != s.base + graph_vtable_rva) return result;
+    // The graph vtable by its reference RVA, which WuWaLguiTargetPolicy compares; others by live RVA.
+    if (vtable != 0 && vtable == s.live.graph_vtable) result.vtable_rva = graph_vtable_rva;
+    else if (vtable >= s.base && vtable - s.base < checked::image_size) result.vtable_rva = vtable - s.base;
+    if (status == GraphStatus::unreadable_object || vtable != s.live.graph_vtable) return result;
     uintptr_t name_pointer{};
     std::array<wchar_t, 48> text{};
     if (checked::read_field(color, 0x8, name_pointer) && name_pointer != 0 && checked::read(name_pointer, text)) {
@@ -337,11 +345,11 @@ struct ScopedSetupContext {
 inline uintptr_t register_ui_target(State& s, const wuwa_lgui_route::Target& target,
         uintptr_t builder, const std::array<int32_t, 2>& ui_size) {
         uintptr_t pooled{};
-        reinterpret_cast<Wrap>(s.base + wrap_rva)(&pooled, target.ui, target_name);
+        reinterpret_cast<Wrap>(s.live.wrap)(&pooled, target.ui, target_name);
         if (!pooled) { record_invalid(s, s.invalid_wrap); return 0; }
         uintptr_t vtable{}, release{};
-        if (!checked::read(pooled, vtable) || vtable != s.base + pooled_vtable_rva ||
-            !checked::read_field(vtable, 0x40, release) || release != s.base + release_rva) {
+        if (!checked::read(pooled, vtable) || vtable != s.live.pooled_vtable ||
+            !checked::read_field(vtable, 0x40, release) || release != s.live.release) {
             // A layout mismatch is exceptional: do not invoke an unknown virtual.
             // Stop further engine calls. Retain this one wrapper until exit.
             s.active.store(false, std::memory_order_release);
@@ -354,7 +362,7 @@ inline uintptr_t register_ui_target(State& s, const wuwa_lgui_route::Target& tar
         } owned{pooled, release};
         // Selector 0 uses the targetable RHI at pooled+8. Flags 0 are the
         // ordinary registration mode. Both are traced in the shipped function.
-        const auto graph = reinterpret_cast<Register>(s.base + register_rva)(
+        const auto graph = reinterpret_cast<Register>(s.live.registration)(
             builder, &pooled, target_name, 0, 0);
         uintptr_t result_rhi{};
         std::array<int32_t, 2> result_size{};
@@ -419,7 +427,7 @@ inline SetupRoute route_setup(uintptr_t renderer, uintptr_t builder, uintptr_t c
                 // the RHI field of an object whose class guard did not match.
                 if (count <= 3) {
                     spdlog::info("[WuWaLguiRedirect] graph_sample reason={} color={:x} vtable={:x} expected_vtable={:x} rhi={:x} game={:x} ui={:x} capture={:x} {}",
-                        category, color, graph_vtable, s.base + graph_vtable_rva, source,
+                        category, color, graph_vtable, s.live.graph_vtable, source,
                         target.game, target.ui, target.capture, describe_rejected(description));
                 }
                 return unchanged;
@@ -629,7 +637,7 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
     ++s.world_calls;
     try {
         const auto target = s.provider ? s.provider() : wuwa_lgui_route::Target{};
-        if (caller != s.base + 0x4116523) { ++s.world_caller_skips; return result; }
+        if (caller != s.live.world_caller) { ++s.world_caller_skips; return result; }
         if (!target.world_labels_enabled) { ++s.world_disabled_skips; return result; }
         if (target.native_stereo_fix || target.independent_eyes) { ++s.world_mode_skips; return result; }
         // Only the verified last-view caller is expanded. Do not replay a pass
@@ -641,7 +649,7 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
             views > UINTPTR_MAX - 0xe940 || view != views + 0xe940 ||
             !checked::read(color, result.color) || !checked::read(depth, result.depth) ||
             !checked::read(result.color.graph, cv) || !checked::read(result.depth.graph, dv) ||
-            cv != s.base + graph_vtable_rva || dv != cv ||
+            cv != s.live.graph_vtable || dv != cv ||
             !graph_resource(result.color.graph, color_rhi) || color_rhi != target.game ||
             !extent(target.game, layout.game_extent) ||
             !extent(result.color.graph, layout.color_extent) || !extent(result.depth.graph, layout.depth_extent) ||
@@ -713,11 +721,11 @@ inline void world_setup_callback(uintptr_t renderer, uintptr_t builder, uintptr_
     state().world_setup.call<void>(renderer, builder, color, depth, view, view_index);
 }
 
-inline void install_world_labels(State& s, HMODULE executable, uint32_t image_size) noexcept {
+inline void install_world_labels(State& s) noexcept {
     try {
-        checked::require(verify_code(executable, image_size, compatibility::world_label_code_ranges,
-            "world-labels"), "World-label route code mismatch");
-        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + 0x4116a70),
+        checked::require(verify_code(compatibility::world_label_code_ranges, "world-labels"), "World-label route code mismatch");
+        s.live.world_caller = wuwa_self_port::at(0x4116523);
+        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x4116a70)),
             &world_setup_callback, safetyhook::InlineHook::StartDisabled);
         checked::require(hook.has_value(), "Cannot create world-label setup hook");
         s.world_setup = std::move(*hook);
@@ -780,11 +788,11 @@ inline void disable_stage0_probe(State& s) noexcept {
     try { if(s.stage0_construct && !s.stage0_construct.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
     try { if(s.stage0_dispatch && !s.stage0_dispatch.disable()) ++s.callback_errors; } catch (...) { ++s.callback_errors; }
 }
-inline void install_stage0_probe(State& s,HMODULE executable,uint32_t image_size) noexcept {
+inline void install_stage0_probe(State& s) noexcept {
     try {
-        checked::require(verify_code(executable,image_size,compatibility::stage0_probe_code_ranges,"stage0-recording"),"Stage-0 probe code mismatch");
-        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40f7be0),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
-        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(s.base+0x40fb64c),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
+        checked::require(verify_code(compatibility::stage0_probe_code_ranges,"stage0-recording"),"Stage-0 probe code mismatch");
+        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x40f7be0)),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
+        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x40fb64c)),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
         checked::require(constructor.has_value() && dispatch.has_value(),"Cannot create stage-0 recording probe");
         s.stage0_construct=std::move(*constructor);s.stage0_dispatch=std::move(*dispatch);
         checked::require(s.stage0_construct.enable().has_value() && s.stage0_dispatch.enable().has_value(),"Cannot enable stage-0 recording probe");
@@ -801,18 +809,20 @@ inline void disable_menu(State& s) noexcept {
     try { if (s.menu_pass) { const auto result = s.menu_pass.disable(); if (!result) ++s.callback_errors; } } catch (...) { ++s.callback_errors; }
 }
 
-inline void install_menu(State& s, HMODULE executable, uint32_t image_size) noexcept {
+inline void install_menu(State& s) noexcept {
     try {
-        checked::require(verify_code(executable, image_size, compatibility::menu_code_ranges, "menu-stage3"),
+        checked::require(verify_code(compatibility::menu_code_ranges, "menu-stage3"),
             "Menu stage code changed; preserving HUD-only hooks");
         uintptr_t thunk{};
-        checked::require(checked::read(s.base + 0x7feada8 + sizeof(uintptr_t), thunk) &&
-            thunk == s.base + 0x410bfc0, "Menu execute vtable changed; preserving HUD-only hooks");
-        auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + menu_setup_rva),
+        checked::require(checked::read(wuwa_self_port::at(0x7feada8) + sizeof(uintptr_t), thunk) &&
+            thunk == wuwa_self_port::at(0x410bfc0), "Menu execute vtable changed; preserving HUD-only hooks");
+        s.live.menu_setup = wuwa_self_port::at(menu_setup_rva);
+        s.live.menu_pass = wuwa_self_port::at(menu_pass_rva);
+        auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.live.menu_setup),
             &menu_setup_callback, safetyhook::InlineHook::StartDisabled);
         checked::require(setup.has_value(), "Cannot create menu setup hook");
         s.menu_setup = std::move(*setup);
-        auto pass = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + menu_pass_rva),
+        auto pass = safetyhook::MidHook::create(reinterpret_cast<void*>(s.live.menu_pass),
             &menu_pass_callback, safetyhook::MidHook::StartDisabled);
         checked::require(pass.has_value(), "Cannot create menu pass hook");
         s.menu_pass = std::move(*pass);
@@ -843,7 +853,7 @@ template<size_t I> void viewport_callback(safetyhook::Context& c) noexcept {
         // The view-rect getter pushes rdi and reserves 0x130 (fingerprinted with the function), so
         // its return address is at rsp + 0x138 here too.
         const auto ret = *reinterpret_cast<const uintptr_t*>(c.rsp + 0x138);
-        if (ret - state().base == wuwa_lgui_viewport::pointer_ray_return) {
+        if (wuwa_lgui_viewport::pointer_ray_caller(ret - state().base)) {
             // The pointer ray (0xd58a50) keeps its event data in rbp across the call.
             wuwa_lgui_viewport::rewrite_pointer_ray(c.rsp, site.offset, reinterpret_cast<const uint8_t*>(c.rbp));
             return;
@@ -870,15 +880,19 @@ inline void disable_viewport(State& s) noexcept {
     }
 }
 
-inline void install_viewport(State& s, HMODULE executable, uint32_t image_size) noexcept {
+inline void install_viewport(State& s) noexcept {
     try {
-        checked::require(verify_code(executable, image_size, compatibility::viewport_code_ranges, "lgui-viewport"),
+        checked::require(verify_code(compatibility::viewport_code_ranges, "lgui-viewport"),
             "LGUI canvas code changed; full VR keeps the eye-shaped UI");
+        // Callers are matched by return address in the running build; one not found counts as "other".
+        wuwa_lgui_viewport::set_live_returns([](uint32_t rva) { return wuwa_self_port::find_rva(rva).value_or(0); });
+        std::array<uintptr_t, viewport_sites.size()> sites{};
+        for (size_t i = 0; i < viewport_sites.size(); ++i) sites[i] = wuwa_self_port::at(uint32_t(viewport_sites[i].rva));
         constexpr std::array<safetyhook::MidHookFn, 5> callbacks{viewport_callback<0>, viewport_callback<1>,
             viewport_callback<2>, viewport_callback<3>, viewport_callback<4>};
         static_assert(callbacks.size() == viewport_sites.size());
         for (size_t i = 0; i < viewport_sites.size(); ++i) {
-            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + viewport_sites[i].rva),
+            auto hook = safetyhook::MidHook::create(reinterpret_cast<void*>(sites[i]),
                 callbacks[i], safetyhook::MidHook::StartDisabled);
             checked::require(hook.has_value(), "Cannot create LGUI viewport hook");
             s.viewport[i] = std::move(*hook);
@@ -946,41 +960,49 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
                 s.base, nt.FileHeader.TimeDateStamp, nt.OptionalHeader.SizeOfImage, nt.FileHeader.Machine, nt.OptionalHeader.Magic);
             // Any image size of this build (Kuro launcher, Steam): the code ranges,
             // engine signatures and vtable checks below decide before any hook.
+            // The reference build, or another build the self-port found every site of (WuWaSelfPort.hpp):
+            // the code ranges, engine signatures and vtable checks below decide before any hook.
             checked::require(
                 nt.Signature == IMAGE_NT_SIGNATURE && nt.FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64 &&
-                nt.OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC && nt.FileHeader.TimeDateStamp == checked::timestamp &&
+                nt.OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC &&
+                wuwa_self_port::live().state != wuwa_self_port::State::unsupported &&
                 nt.OptionalHeader.SizeOfImage != 0, "Game identity mismatch");
-            checked::require(verify_code(executable, nt.OptionalHeader.SizeOfImage, compatibility::code_ranges, "hud"), "Inspected LGUI/graph code changed; hooks remain disabled");
+            checked::require(verify_code(compatibility::code_ranges, "hud"), "Inspected LGUI/graph code changed; hooks remain disabled");
             constexpr std::array<uintptr_t, 4> sites{setup_rva, pass_rva, wrap_rva, register_rva};
-            for (size_t i = 0; i < sites.size(); ++i) {
-                std::array<uint8_t, 32> bytes{};
-                checked::require(checked::executable_site(s.base + sites[i], bytes.size(), executable) &&
-                    checked::read(s.base + sites[i], bytes) && bytes == signatures[i], "Engine signature mismatch");
-            }
+            for (size_t i = 0; i < sites.size(); ++i)
+                checked::require(wuwa_self_port::code_matches(uint32_t(sites[i]), signatures[i]), "Engine signature mismatch");
+            s.live.setup = wuwa_self_port::at(setup_rva);
+            s.live.pass = wuwa_self_port::at(pass_rva);
+            s.live.wrap = wuwa_self_port::at(wrap_rva);
+            s.live.registration = wuwa_self_port::at(register_rva);
+            s.live.graph_vtable = wuwa_self_port::at(graph_vtable_rva);
+            s.live.pooled_vtable = wuwa_self_port::at(pooled_vtable_rva);
+            s.live.release = wuwa_self_port::at(release_rva);
+            s.live.addref = wuwa_self_port::at(addref_rva);
             uintptr_t release{}, addref{};
-            checked::require(checked::read(s.base + pooled_vtable_rva + 0x38, addref) && addref == s.base + addref_rva &&
-                checked::read(s.base + pooled_vtable_rva + 0x40, release) &&
-                release == s.base + release_rva && checked::executable_site(release, 32, executable), "Pooled reference-counting vtable mismatch");
+            checked::require(checked::read(s.live.pooled_vtable + 0x38, addref) && addref == s.live.addref &&
+                checked::read(s.live.pooled_vtable + 0x40, release) &&
+                release == s.live.release && checked::executable_site(release, 32, executable), "Pooled reference-counting vtable mismatch");
             HMODULE retained{};
             checked::require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
                 reinterpret_cast<LPCWSTR>(&setup_callback), &retained) != 0, "Cannot retain redirect module");
-            auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.base + setup_rva), &setup_callback,
+            auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.live.setup), &setup_callback,
                 safetyhook::InlineHook::StartDisabled);
             checked::require(setup.has_value(), "Cannot create setup hook");
             s.setup = std::move(*setup);
-            auto pass = safetyhook::MidHook::create(reinterpret_cast<void*>(s.base + pass_rva), &pass_callback,
+            auto pass = safetyhook::MidHook::create(reinterpret_cast<void*>(s.live.pass), &pass_callback,
                 safetyhook::MidHook::StartDisabled);
             checked::require(pass.has_value(), "Cannot create pass hook");
             s.pass = std::move(*pass);
             s.provider = provider;
             checked::require(s.pass.enable().has_value(), "Cannot enable pass hook");
             checked::require(s.setup.enable().has_value(), "Cannot enable setup hook");
-            install_menu(s, executable, nt.OptionalHeader.SizeOfImage);
-            install_viewport(s, executable, nt.OptionalHeader.SizeOfImage);
+            install_menu(s);
+            install_viewport(s);
             // Fingerprints include the unmodified stage-0 execution body; do
             // this before installing its optional recording mid-hooks.
-            if(request.value("repair_world_labels",false)) install_world_labels(s,executable,nt.OptionalHeader.SizeOfImage);
-            if(request.value("record_stages",false)) install_stage0_probe(s,executable,nt.OptionalHeader.SizeOfImage);
+            if(request.value("repair_world_labels",false)) install_world_labels(s);
+            if(request.value("record_stages",false)) install_stage0_probe(s);
             s.active.store(true, std::memory_order_release);
             spdlog::info("[WuWaLguiRedirect] installed mode={} base={:x} setup={:x} wrapper={:x} register={:x}",
                 mode, s.base, setup_rva, wrap_rva, register_rva);

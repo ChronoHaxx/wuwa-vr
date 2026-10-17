@@ -359,13 +359,15 @@ bool ensure_mono_projection_hook(bool bootstrap_ready) noexcept {
         {0x55d57a0, 0x22, 0x2f1e3aef861c6d36ULL},
         {0x56354c0, 0x19a, 0x859f1b3dc2a1336bULL}}};
     try {
-        const auto target = wuwa_code_check::verify("Mono authored camera", ranges) + 0x526f1a0;
+        wuwa_code_check::verify_portable("Mono authored camera", ranges);
+        const auto target = wuwa_self_port::at(0x526f1a0);
         if (discovered_projection_data && discovered_projection_data != target)
             throw std::runtime_error("Discovered GetProjectionData differs from verified native-camera route");
         mono_projection_hook = safetyhook::create_inline(reinterpret_cast<void*>(target),
             &mono_get_projection_data, safetyhook::InlineHook::StartDisabled);
         if (!mono_projection_hook) throw std::runtime_error("Could not create native-camera hook");
-        native_constrained_rect = target - 0x526f1a0 + 0x56354c0;
+        native_constrained_rect = wuwa_self_port::at(0x56354c0);
+        // +0x299 lies inside the verified 0xc7a-byte function, unchanged apart from moved fields.
         authored_camera_hook = safetyhook::create_mid(reinterpret_cast<void*>(target + 0x299),
             &capture_authored_camera, safetyhook::MidHook::StartDisabled);
         if (!authored_camera_hook || !authored_camera_hook.enable() || !mono_projection_hook.enable())
@@ -393,7 +395,7 @@ bool cinematic_metadata_layout_verified() noexcept {
             {0x41024ed, 0xfa, 0x4e2509c845b2f4c1ULL}}};
         try {
             if (!wuwa_shadow::compatible()) return false;
-            wuwa_code_check::verify("Cinematic native aspect metadata", ranges);
+            wuwa_code_check::verify_portable("Cinematic native aspect metadata", ranges);
             return true;
         } catch (const std::exception& e) {
             SPDLOG_WARN("[WuWaCinematicFraming] Native aspect metadata unavailable: {}", e.what());
@@ -456,7 +458,7 @@ bool completed_framing_layout_verified() noexcept {
             {0x54cbd94, 0x41, 0xe89e328ae132e02aULL}}};
         try {
             if (!wuwa_shadow::compatible()) return false; // Family and both pass-field proofs.
-            wuwa_code_check::verify("Read-only completed cinematic views", ranges);
+            wuwa_code_check::verify_portable("Read-only completed cinematic views", ranges);
             return true;
         } catch (const std::exception& e) {
             SPDLOG_WARN("[WuWaFramingPair] Diagnostic unavailable: {}", e.what());
@@ -572,7 +574,7 @@ uintptr_t stereo_base_callsite() noexcept {
         constexpr std::array<wuwa_code_compatibility::Range,2> ranges{{
             {0x526f420,25,0x6768d3242ced7ccaULL},
             {0x526f76f,221,0xb7d245ba0cd11175ULL}}};
-        try {return wuwa_code_check::verify("Same-draw stereo game camera",ranges)+0x526f7d2;}
+        try {wuwa_code_check::verify_portable("Same-draw stereo game camera",ranges);return wuwa_self_port::at(0x526f7d2);}
         catch(const std::exception& e) {SPDLOG_WARN("[WuWaStereoBase] {}",e.what());return 0;}
         catch(...) {return 0;}
     }();

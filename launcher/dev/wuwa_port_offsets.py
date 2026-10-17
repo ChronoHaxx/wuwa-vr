@@ -113,7 +113,8 @@ class Site:
 def source_files(src: Path):
     files = sorted((src / "utility").glob("WuWa*.hpp")) + sorted((src / "mods" / "vr").glob("WuWa*.hpp"))
     files += [src / "mods" / "vr" / "FFakeStereoRenderingHook.cpp", src / "Framework.cpp"]
-    return [f for f in files if f.is_file()]
+    # The self-port table is generated from these sites (wuwa_self_port_table.py), not a source of them.
+    return [f for f in files if f.is_file() and f.name != "WuWaSelfPortTable.hpp"]
 
 
 def collect(src: Path, old: Image) -> list[Site]:

@@ -16,6 +16,19 @@ addresses (RVAs) and checks the bytes first. So an update has two possible outco
   property or class that was renamed. Or the game changes behaviour without changing the code
   we hash.
 
+**Self-port (from 1.2.5).** A hotfix that only moves code no longer needs a release for the
+converted routes: the LGUI HUD and menu redirect with its viewport rewrites, and the five stereo
+code routes (mono authored camera, same-draw stereo camera, cinematic aspect metadata, completed
+cinematic views, custom reflection capture). On a game build other than the reference the plugin
+scans the loaded game once at startup (about half a second) for the fingerprints in
+`utility/WuWaSelfPortTable.hpp`. It uses a site only on exact evidence, and a code range only when
+every byte outside the moved call/jump targets and RIP displacements is unchanged. The log line
+`[WuWaSelfPort] game build ... found N/M sites ... refused [...]` says what it found. Those routes
+then log `self_ported_from=<reference>`. A route still on `base + RVA` keeps the strict build check
+and refuses on any new build. Convert a route by taking every address from
+`wuwa_self_port::at()/find()` and checking through `wuwa_code_check::verify_portable()` or
+`wuwa_self_port::range_matches()/code_matches()`.
+
 The 3.7 update (30 Sep to 1 Oct 2026) is the worked example used below:
 - timestamp 0x6aa96d2d, image 0xad21000;
 - the engine's views moved from 0xe8d0 to 0xe940 bytes apart, and view fields moved by
@@ -92,9 +105,23 @@ The 3.7 update (30 Sep to 1 Oct 2026) is the worked example used below:
    - the movie and plot-skip widgets (automatic cinema).
 
    `[Plugin] WuWaCinema:` status lines name the signal that is missing.
-5. Rebuild, check-sums, register the candidate, launch on **both** copies:
+5. **Regenerate the self-port table** from the new capture, which is now the reference build.
+   `utility/WuWaSelfPort.hpp` refuses to compile when the table and
+   `WuWaCodeCompatibility.hpp` name different builds.
+   ```powershell
+   # PowerShell, in the repository (Python with capstone and numpy)
+   python launcher\dev\wuwa_self_port_table.py --image <new capture> --header mod\uevr\src\utility\WuWaSelfPortTable.hpp
+   python launcher\dev\wuwa_self_port_table.py --image <new capture> --simulate <old capture> --expect ..\data\game-<version>\port-<version>.json
+   ```
+   The second line runs the plugin's matching on the previous build. Every site it maps must
+   agree with the port report (it may also correct one: on 16 Oct it found the LguiRoute slot
+   the port tool got wrong). Then update `dev/test_self_port.cpp` to the new captures.
+6. Rebuild, check-sums, register the candidate, launch on **both** copies:
    `python dev\qa.py session <log> --baseline <day-0 log>`. Every route the old build
    verified must verify again, and no new error kinds may appear.
+   To exercise the in-game scanner on the reference build, put an empty
+   `wuwa-self-port-force.txt` beside the loaded backend. Every found site must map to itself
+   (`0 moved`), and the converted routes must still verify. Remove the file afterwards.
 
 ## Verify and release
 

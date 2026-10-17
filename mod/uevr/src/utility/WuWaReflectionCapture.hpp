@@ -132,18 +132,20 @@ inline void configure(bool requested) noexcept {
             {0x3d889c0,2853,0x10fa026d2bc45191ULL},
             {0x54e9480,188,0x3b3e235d5c144105ULL},
             {0x54e9540,5681,0xb7fc844380e92582ULL}}};
-        const auto base = wuwa_code_check::verify("Custom reflection capture projection",ranges);
-        factory_caller=base+0x3d87c23;
+        wuwa_code_check::verify_portable("Custom reflection capture projection",ranges);
+        factory_caller=wuwa_self_port::at(0x3d87c23);
+        const auto projection_site=wuwa_self_port::at(0x3d8781d);
+        const std::array<uintptr_t,3> sites{wuwa_self_port::at(0x3f8a510),wuwa_self_port::at(0x3d88d4d),
+            wuwa_self_port::at(0x3d8870f)};
         memory::require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
             reinterpret_cast<LPCWSTR>(&callback),&retained_backend) != 0,"Cannot retain reflection capture backend");
-        auto created = safetyhook::MidHook::create(reinterpret_cast<void*>(base+0x3d8781d),
+        auto created = safetyhook::MidHook::create(reinterpret_cast<void*>(projection_site),
             callback,safetyhook::MidHook::StartDisabled);
         memory::require(created.has_value(),"Cannot create reflection capture projection hook");
         hook = new safetyhook::MidHook(std::move(*created));
-        const std::array<uintptr_t,3> sites{0x3f8a510,0x3d88d4d,0x3d8870f};
         const std::array<safetyhook::MidHookFn,3> callbacks{select_history,refresh_deferred,refresh_mobile};
         for (size_t i=0;i<sites.size();++i) {
-            auto next=safetyhook::MidHook::create(reinterpret_cast<void*>(base+sites[i]),
+            auto next=safetyhook::MidHook::create(reinterpret_cast<void*>(sites[i]),
                 callbacks[i],safetyhook::MidHook::StartDisabled);
             memory::require(next.has_value(),"Cannot create reflection history/pose hook");
             history_hooks[i]=new safetyhook::MidHook(std::move(*next));

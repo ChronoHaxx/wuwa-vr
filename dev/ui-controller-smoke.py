@@ -235,6 +235,10 @@ def run(out, tag):
 
 
 def main():
+    # The output folder must be a path: an option there would start the route and write into "--help".
+    if len(sys.argv) < 2 or sys.argv[1].startswith('-'):
+        print('usage: ui-controller-smoke.py OUT_DIR [--ab] [--repeat N]\n\n' + __doc__)
+        return 2
     out = Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
     ab = '--ab' in sys.argv
     require_front()
@@ -274,4 +278,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

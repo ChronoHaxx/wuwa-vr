@@ -38,7 +38,8 @@ class BridgeStyle(unittest.TestCase):
     def send(self, **extra):
         request = dict(version=1, session=self.bridge.session, id='r' + str(len(self.started)) + str(len(extra)),
                        pid=42, created_ms=1000, expires_ms=12_000, action='start', fps=60, eye_width=1280,
-                       telemetry=False, **extra)
+                       telemetry=False)
+        request.update(extra)
         (self.profile / 'video-control').mkdir(exist_ok=True)
         (self.profile / 'video-control/request-42.json').write_text(json.dumps(request), encoding='utf-8')
         self.bridge.step()
@@ -47,6 +48,17 @@ class BridgeStyle(unittest.TestCase):
     def test_showcase_reaches_the_launcher(self):
         self.assertTrue(self.send(style='showcase')['ok'])
         self.assertEqual(self.started, [((True, 60, 1280, 42), {'style': 'showcase'})])
+
+    def test_showcase_height_reaches_the_launcher(self):
+        self.assertTrue(self.send(style='showcase', showcase_pitch=-15)['ok'])
+        self.assertEqual(self.started, [((True, 60, 1280, 42), {'style': 'showcase', 'pitch': -15})])
+
+    def test_showcase_height_out_of_range_is_refused(self):
+        for n, bad in enumerate((-41, 21, 1.5, '5')):
+            reply = self.send(style='showcase', showcase_pitch=bad, **{'id': f'bad{n}'})
+            self.assertFalse(reply['ok'])
+            self.assertIn('height', reply['message'])
+        self.assertEqual(self.started, [])
 
     def test_older_plugins_keep_the_side_by_side_call(self):
         self.assertTrue(self.send()['ok'])
@@ -80,6 +92,16 @@ class RecorderCommand(unittest.TestCase):
                                            str((Path(d) / 'stop').resolve())])
             source, command = recorder.recorder_command(self.args(Path(d)), client)
             self.assertNotIn('--showcase', command)
+
+    def test_showcase_pitch_follows_the_flag(self):
+        with tempfile.TemporaryDirectory() as d:
+            client = types.SimpleNamespace(pid=42, simulator=Path(d) / 'sim', created=0)
+            source, command = recorder.recorder_command(self.args(Path(d), style='showcase', pitch=-15), client)
+            self.assertEqual(command[1:3], ['--showcase', '--pitch=-15'])
+            source, command = recorder.recorder_command(self.args(Path(d), style='sbs', pitch=-15), client)
+            self.assertFalse(any(c.startswith('--pitch') for c in command))
+            with self.assertRaisesRegex(ValueError, 'pitch'):
+                recorder.recorder_command(self.args(Path(d), style='showcase', pitch=30), client)
 
     def test_simulator_refuses_showcase(self):
         with tempfile.TemporaryDirectory() as d:

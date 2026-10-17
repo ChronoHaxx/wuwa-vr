@@ -268,11 +268,14 @@ float4 whole(V v):SV_Target { return float4(eye.Sample(smp,v.uv).rgb,1); }
     }
 };
 // The crop: the eye's whole width less room on each side for the steady view to turn, at most 90 degrees across
-// (trimmed from the wider side first), and 16:9 centred on the axis vertically. An eye sees further outwards than
-// towards the nose, so the window sits off the axis on the outer side (a shifted lens, like an off-axis camera):
-// test 18 kept it centred, which cut it to the narrow nasal side (65 degrees across on a headset that shows 89).
+// (trimmed from the wider side first), and 16:9. An eye sees further outwards than towards the nose, so the window
+// sits off the axis on the outer side (a shifted lens, like an off-axis camera): test 18 kept it centred, which cut
+// it to the narrow nasal side (65 degrees across on a headset that shows 89). Vertically the lens shifts by pitch
+// (radians, negative looks lower), within the eye: people look below where the head points, and on the owner's
+// headset level with the head read as too high and 23 degrees down as too low (test 18c, 17 Oct).
+constexpr double showcase_default_pitch=-0.20943951023931956;  // 12 degrees down
 struct ShowcaseFrame { double half_width{},half_height{},centre_x{},centre_y{}; };
-static ShowcaseFrame showcase_frame(float left,float right,float top,float bottom,double room_angle) {
+static ShowcaseFrame showcase_frame(float left,float right,float top,float bottom,double room_angle,double pitch=0) {
     ShowcaseFrame f;
     double outer_left=std::atan(-double(left))-room_angle, outer_right=std::atan(double(right))-room_angle;
     const double up=std::atan(double(bottom))-room_angle, down=std::atan(-double(top))-room_angle;
@@ -285,7 +288,7 @@ static ShowcaseFrame showcase_frame(float left,float right,float top,float botto
     const double x0=-std::tan(outer_left), x1=std::tan(outer_right), y_up=std::tan(up), y_down=std::tan(down);
     f.half_width=(x1-x0)/2; f.centre_x=(x1+x0)/2; f.half_height=f.half_width*9.0/16.0;
     if (2*f.half_height>y_up+y_down) { f.half_height=(y_up+y_down)/2; f.half_width=f.half_height*16.0/9.0; }
-    f.centre_y=std::clamp(0.0,f.half_height-y_down,y_up-f.half_height);
+    f.centre_y=std::clamp(std::tan(std::clamp(pitch,-1.0,1.0)),f.half_height-y_down,y_up-f.half_height);
     return f;
 }
 static bool same_print(const std::vector<BYTE>& a,const std::vector<BYTE>& b) {
@@ -340,6 +343,13 @@ int wmain(int argc,wchar_t** argv) {
                 qrows(Quat{},full.rows); crop.read(test_context.Get(),mview.Get(),false,full,seen);
                 const int col=int(std::lround(160+160*(-f.centre_x)/f.half_width));
                 if (seen[(90*320+col)*4]<200 || seen[(90*320+160)*4]>8) throw std::runtime_error("Off-axis showcase crop lost the optical axis");
+                // Looking 12 degrees lower puts the axis above the middle of the picture, at its own row.
+                const auto low=showcase_frame(l,r,down,up,0.12,showcase_default_pitch);
+                if (std::abs(low.centre_y-std::tan(showcase_default_pitch))>1e-9) throw std::runtime_error("Showcase pitch was not applied");
+                ShowcaseCrop::Constants lowered{{l,r,down,up},{float(low.half_width),float(low.half_height),float(low.centre_x),float(low.centre_y)}};
+                qrows(Quat{},lowered.rows); crop.read(test_context.Get(),mview.Get(),false,lowered,seen);
+                const int row=int(std::lround(90*(1+low.centre_y/low.half_height)));
+                if (row>=80 || seen[(row*320+col)*4]<200) throw std::runtime_error("Lowered showcase crop put the axis in the wrong place");
             }
             const auto frame=showcase_frame(-1,1,-1,1,0.12);
             ShowcaseCrop::Constants c{{-1,1,-1,1},{float(frame.half_width),float(frame.half_height),0,0}};
@@ -421,7 +431,14 @@ int wmain(int argc,wchar_t** argv) {
         // --showcase first: the left eye as a steadied 16:9 camera (showcase.mp4) instead of both eyes side by side.
         const bool showcase=argc>1 && std::wstring_view(argv[1])==L"--showcase";
         if (showcase) { ++argv; --argc; }
-        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..1920), optional stop file");
+        // Then optionally --pitch=<degrees>: where the showcase view looks, below (negative) or above the head.
+        double pitch=showcase_default_pitch;
+        if (showcase && argc>1 && std::wstring_view(argv[1]).starts_with(L"--pitch=")) {
+            const double degrees=std::stod(std::wstring(argv[1]+8));
+            if (!(degrees>=-40 && degrees<=20)) throw std::runtime_error("Showcase pitch must be -40..20 degrees");
+            pitch=degrees*std::acos(-1.0)/180; ++argv; --argc;
+        }
+        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES]] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..1920), optional stop file");
         const UINT pid=std::stoul(argv[2]), seconds=std::stoul(argv[4]), fps=std::stoul(argv[5]), ew=std::stoul(argv[6]); out=argv[3];
         if (!pid||seconds<1||seconds>300||fps<10||fps>60||ew<640||ew>1920||ew%2) throw std::runtime_error("Invalid recording bounds");
         // Ends the recording cleanly when the game exits (a crash included) instead of waiting out the time.
@@ -451,7 +468,7 @@ int wmain(int argc,wchar_t** argv) {
             float tan_l{},tan_r{},tan_t{},tan_b{}; system->GetProjectionRaw(vr::Eye_Left,&tan_l,&tan_r,&tan_t,&tan_b);
             const Quat eye_to_head=quat_from(system->GetEyeToHeadTransform(vr::Eye_Left));
             constexpr double max_angle=0.10, tau=0.35;
-            const auto frame=showcase_frame(tan_l,tan_r,tan_t,tan_b,max_angle+0.02);
+            const auto frame=showcase_frame(tan_l,tan_r,tan_t,tan_b,max_angle+0.02,pitch);
             // Picture size 720 / 1024 / 1280 px per eye maps to 720p / 1080p / 1440p.
             const UINT ow=ew<=720?1280u:ew<=1024?1920u:2560u, oh=ow*9/16;
             const UINT bitrate=oh>=1440?40000000u:oh>=1080?24000000u:12000000u;
@@ -517,8 +534,8 @@ int wmain(int argc,wchar_t** argv) {
                 {"fps_target",fps},{"captured_fps",count/elapsed},{"wall_seconds",elapsed},
                 {"timing","one sample per new game frame at its arrival time (variable frame rate, no repeats)"},
                 {"source_eye_size",{eye.width,eye.height}},{"eye_tangents",{tan_l,tan_r,tan_t,tan_b}},
-                {"crop_half_tangents",{frame.half_width,frame.half_height}},{"crop_centre_tangents",{frame.centre_x,frame.centre_y}},{"steady",{{"seconds",tau},{"margin_rad",max_angle}}},
-                {"method","OpenVR left-eye mirror; 16:9 view across the eye's width, level with the optical axis, steadied with the pose each frame was rendered with"},
+                {"crop_half_tangents",{frame.half_width,frame.half_height}},{"crop_centre_tangents",{frame.centre_x,frame.centre_y}},{"pitch_degrees",pitch*180/std::acos(-1.0)},{"steady",{{"seconds",tau},{"margin_rad",max_angle}}},
+                {"method","OpenVR left-eye mirror; 16:9 view across the eye's width, lens shifted to the pitch, steadied with the pose each frame was rendered with"},
                 {"desktop_captured",false},{"input_sent",false},{"audio",false}};
             std::ofstream(out/L"recording.json")<<result.dump(2)<<'\n';
         } else {

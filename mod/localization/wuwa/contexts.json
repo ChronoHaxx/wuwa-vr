@@ -1,6 +1,7 @@
 {
   "%+.0f cm": [
-    "mods/vr/WuWaVrMenuHost.cpp"
+    "mods/vr/WuWaVrMenuHost.cpp",
+    "utility/WuWaShortcutSheet.cpp"
   ],
   "%+.2f m": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -1306,6 +1307,9 @@
   "In story close-ups, a character right at your eyes but outside the flat shot (VR shows more around it) is hidden whole while it is there. Anyone the flat shot shows stays. Shortcut: hold LT + RT, then press Y.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "In the 16:9 UI layout the profile ID row sits lower; it has its own box:": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Include camera and controller data": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1970,13 +1974,25 @@
   "Profile ID bottom": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Profile ID bottom (16:9)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Profile ID left": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Profile ID left (16:9)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Profile ID right": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Profile ID right (16:9)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Profile ID top": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Profile ID top (16:9)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Puts the camera back at the game's spot now, as L3 + Y + X does. Only while a nudge is in use.": [
@@ -2319,6 +2335,12 @@
   ],
   "Show optical hands (this launch only)": [
     "mods/vr/runtimes/OpenXR.cpp"
+  ],
+  "Showcase view height": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Showcase view height (degrees)": [
+    "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Showcase: one eye, steady, 16:9": [
     "mods/vr/WuWaControlsComponent.hpp",
@@ -2873,6 +2895,9 @@
   ],
   "When to show the profile ID box": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Where the showcase video looks, in degrees from where your head points. People look a little below that, so the default is 12 below. Lower shows more ground, higher more sky.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Where this menu floats around you. Full VR and the screen views each keep their own place; on a screen view Low sits just under the picture, whatever its size and distance, and the menu always stays in front of it.": [
     "mods/vr/WuWaVrMenuHost.cpp"

@@ -45,7 +45,7 @@ class Bridge:
 
     def validate(self, request, game):
         allowed = {'version', 'session', 'id', 'pid', 'created_ms', 'expires_ms',
-                   'action', 'fps', 'eye_width', 'telemetry', 'recording_id', 'style'}
+                   'action', 'fps', 'eye_width', 'telemetry', 'recording_id', 'style', 'showcase_pitch'}
         if set(request) - allowed:
             raise ValueError('Unknown recording request field')
         if type(request.get('version')) is not int or request['version'] != 1 or request.get('session') != self.session:
@@ -72,6 +72,10 @@ class Bridge:
             # Absent from older plugins: the side-by-side recording.
             if request.get('style', 'sbs') not in ('sbs', 'showcase'):
                 raise ValueError('Unsupported recording style')
+            # Absent from older plugins: the recorder's own default (12 degrees down).
+            pitch = request.get('showcase_pitch', 0)
+            if type(pitch) is not int or not -40 <= pitch <= 20:
+                raise ValueError('Unsupported showcase view height')
         elif action == 'stop':
             if not isinstance(request.get('recording_id'), str) or not request['recording_id']:
                 raise ValueError('Missing recording identity')
@@ -111,8 +115,9 @@ class Bridge:
                     self.seen.add(identity)
                     if request['action'] == 'start':
                         if request.get('style', 'sbs') == 'showcase':
+                            extra = {'pitch': request['showcase_pitch']} if 'showcase_pitch' in request else {}
                             self.start(not request['telemetry'], request['fps'],
-                                       request['eye_width'], game['pid'], style='showcase')
+                                       request['eye_width'], game['pid'], style='showcase', **extra)
                         else:
                             self.start(not request['telemetry'], request['fps'],
                                        request['eye_width'], game['pid'])

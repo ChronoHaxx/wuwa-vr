@@ -217,7 +217,11 @@ def recorder_command(args, client):
         exe=args.recorder.resolve(); openvr=args.openvr.resolve()
         if not exe.is_file(): raise ValueError('wuwa-recorder.exe is missing')
         if not openvr.is_file(): raise ValueError('openvr_api.dll is missing')
-        prefix=[str(exe)]+(['--showcase'] if style=='showcase' else [])+[str(openvr)]; source='steamvr'
+        # --pitch: where the showcase view looks, in degrees (negative below the head); absent, the recorder's default.
+        pitch=getattr(args,'pitch',None)
+        if pitch is not None and (type(pitch) is not int or not -40<=pitch<=20): raise ValueError('Choose a showcase pitch of -40..20 degrees')
+        flags=(['--showcase']+([f'--pitch={pitch}'] if pitch is not None else [])) if style=='showcase' else []
+        prefix=[str(exe)]+flags+[str(openvr)]; source='steamvr'
     return source, prefix+[str(client.pid),str(args.output.resolve()),str(args.seconds),
         str(args.fps),str(args.eye_width),str(args.stop_file.resolve())]
 
@@ -306,6 +310,7 @@ def main(argv=None):
     p.add_argument("--pid",type=int)
     p.add_argument("--profile",type=Path)
     p.add_argument("--stop-file",type=Path)
+    p.add_argument("--pitch",type=int,help="showcase: where the view looks, -40..20 degrees (negative below the head; default -12)")
     p.add_argument("--recorder",type=Path,default=ROOT/"dev-tools/wuwa-recorder.exe")
     p.add_argument("--simulator-recorder",type=Path,default=ROOT/"dev-tools/wuwa-simulator-recorder.exe")
     p.add_argument("--openvr",type=Path,default=ROOT/"dev-tools/openvr_api.dll")

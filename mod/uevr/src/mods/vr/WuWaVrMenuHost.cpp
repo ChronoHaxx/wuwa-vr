@@ -1025,6 +1025,14 @@ Page record_page() {
         "frame rate. Picture size 720, 1024 or 1280 px gives 720p, 1080p or 1440p. Needs SteamVR. Side by side: "
         "both eyes, to help find what went wrong.",
         "WuWaRecording_Style", {"Both eyes, side by side", "Showcase: one eye, steady, 16:9"}));
+    {
+        auto height = setting_slider("Showcase view height",
+            "Where the showcase video looks, in degrees from where your head points. People look a little below "
+            "that, so the default is 12 below. Lower shows more ground, higher more sky.",
+            "WuWaRecording_ShowcasePitch", -40.0f, 20.0f, 1.0f, "%.0f deg");
+        height.enabled = [] { auto* style = typed<int32_t>("WuWaRecording_Style"); return style && style->value() == 1; };
+        page.items.push_back(std::move(height));
+    }
     page.items.push_back(setting_choice("Frame rate", "Frames per second in the video.", "WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}));
     page.items.push_back(setting_choice("Picture size", "Width per eye. Larger is sharper and makes bigger files.",
         "WuWaRecording_Width", {"720 px", "1024 px", "1280 px"}));
@@ -1449,8 +1457,10 @@ bool hint_active() {
     auto* note = typed<bool>("WuWaControls_NearHint");
     auto* hiding = typed<bool>("WuWaControls_HideNearCharacters");
     const bool near_eligible = full_vr && note && note->value() && hiding && !hiding->value();
-    // The camera script reports a nudge value only in story shots it can nudge (game camera, full VR).
+    // The camera script reports a nudge value in story shots it can nudge (game camera, full VR). It also counts
+    // a close-up lens without the plot, which the login screen has (test 18c), so the note asks for the plot too.
     const auto nudge_now = vr->get_wuwa_controls().story_nudge_now();
+    const bool story_shot = !nudge_now.empty() && vr->get_wuwa_controls().plot_running();
     auto* story_note = typed<bool>("WuWaControls_StoryNudgeHint");
     auto* nudge = typed<bool>("WuWaControls_StoryNudge");
     const bool story_eligible = full_vr && story_note && story_note->value() && nudge && nudge->value();
@@ -1459,8 +1469,20 @@ bool hint_active() {
     const bool cinema_on = hint.update(cinematic, eligible, now);
     // One note at a time: the scene note first; this one waits rather than running unseen.
     const bool near_on = !cinema_on && near_hint.update(near_recent, near_eligible, now);
-    const bool story_on = !cinema_on && !near_on && story_hint.update(!nudge_now.empty(), story_eligible, now);
-    // The nudge note: 3 notes, or using the nudge once, turns it off; it ends a note it is showing first.
+    // Switched back on (the menu, or a steps plan): a fresh start, shown in the next story scene again (test 18c:
+    // re-enabled, it never came back, the old scene's note counting as shown).
+    static bool story_note_was_on{};
+    const bool story_note_on = story_note && story_note->value();
+    if (story_note_on && !story_note_was_on) story_hint = CinemaHint{1500, 6000, 120000};
+    story_note_was_on = story_note_on;
+    const bool story_on = !cinema_on && !near_on && story_hint.update(story_shot, story_eligible, now);
+    // The nudge note: 3 notes, or using the nudge, turns it off; it ends a note it is showing first. Using means
+    // moving it from the game's spot while the note is on, not a nudge kept from before.
+    static bool was_nudged{};
+    const bool used = nudged && !was_nudged;
+    was_nudged = nudged;
+    static bool story_used{};
+    if (!story_note_on) story_used = false; else if (used) story_used = true;
     if (auto* shown = typed<int32_t>("WuWaControls_StoryNudgeHintShown")) {
         static std::uint64_t story_counted{};
         if (story_on && story_hint.shown != story_counted) {
@@ -1468,7 +1490,7 @@ bool hint_active() {
             shown->value() = (std::max)(shown->value(), 0) + 1;
             g_framework->deferred_save_config();
         }
-        if (!story_on && story_note && story_note->value() && (shown->value() >= story_note_count || nudged)) {
+        if (!story_on && story_note_on && (shown->value() >= story_note_count || story_used)) {
             story_note->value() = false;
             shown->value() = 0;
             g_framework->deferred_save_config();

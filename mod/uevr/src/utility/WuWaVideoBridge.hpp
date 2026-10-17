@@ -86,9 +86,10 @@ public:
         return m_connected ? m_status.value("message",std::string{}) : "";
     }
     std::string folder() const { return m_connected ? m_status.value("folder",std::string{}) : ""; }
-    // showcase: the launcher records the left eye as a steadied 16:9 video instead of both eyes side by side.
+    // showcase: the launcher records the left eye as a steadied 16:9 video instead of both eyes side by side,
+    // looking pitch degrees from where the head points (negative lower).
     bool submit(const std::filesystem::path& profile,bool start,int fps=30,int width=1024,bool telemetry=true,
-                bool showcase=false) noexcept {
+                bool showcase=false,int pitch=-12) noexcept {
         poll(profile,true);
         try {
             if (!available() || pending()) throw std::runtime_error("Wait for the recording launcher.");
@@ -103,7 +104,7 @@ public:
                 {"pid",GetCurrentProcessId()},{"created_ms",process_created_ms()},
                 {"expires_ms",unix_ms()+4000},{"action",start?"start":"stop"}};
             if (start) { request["fps"]=fps;request["eye_width"]=width;request["telemetry"]=telemetry;
-                         if (showcase) request["style"]="showcase"; }
+                         if (showcase) { request["style"]="showcase"; request["showcase_pitch"]=std::clamp(pitch,-40,20); } }
             else request["recording_id"]=m_status.at("recording_id");
             const auto target=m_directory/("request-"+std::to_string(GetCurrentProcessId())+".json");
             const auto temporary=m_directory/(id+".tmp");

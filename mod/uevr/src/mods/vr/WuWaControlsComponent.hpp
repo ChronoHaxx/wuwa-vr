@@ -88,6 +88,8 @@ public:
     void advance_auto_cinema(bool runtime_ready, bool story_ready, bool character_ready);
     // A story dialogue or video the detector sees (HUD page "Story scenes in 16:9").
     bool story_scene_active() const { return m_story_scene.load(std::memory_order_relaxed); }
+    // The detector's plot flag (story dialogue or cutscene running), whatever the view or layout.
+    bool plot_running() const { const auto seen = m_plot_seen_ms.load(); return seen && GetTickCount64() - seen < 1500; }
     // The camera at the character screen's showroom (HUD page "Character screen in the taller layout").
     bool character_screen_active() const { return m_character_screen.load(std::memory_order_relaxed); }
     // The story camera nudge the camera script applies now, in cm ("+4"), or empty outside story shots.
@@ -314,6 +316,9 @@ private:
     // Side by side (both eyes, for finding problems) or showcase (the left eye as a steadied 16:9 video).
     const ModCombo::Ptr m_video_style{ModCombo::create("WuWaRecording_Style",
         {"Both eyes, side by side", "Showcase: one eye, steady, 16:9"}, 0)};
+    // Where the showcase video looks, degrees from where the head points (negative lower). Test 18c: level with
+    // the head read as too high, 23 degrees down as too low; people look a little below the head's direction.
+    const ModSlider::Ptr m_showcase_pitch{ModSlider::create("WuWaRecording_ShowcasePitch", -40.0f, 20.0f, -12.0f)};
     // 1.2.4: a new key, off by default. The old one was on for everyone, and in live play the smoothing made
     // the window trail head turns ("lead-lag"); OBS users switch it on for recordings.
     const ModToggle::Ptr m_steady_desktop{ModToggle::create("WuWaRecording_SteadyWindow", false)};
@@ -463,6 +468,13 @@ private:
     const ModSlider::Ptr m_id_top{ModSlider::create("WuWaPrivacy_ProfileTop",0.0f,1.0f,0.17f)};
     const ModSlider::Ptr m_id_right{ModSlider::create("WuWaPrivacy_ProfileRight",0.0f,1.0f,0.39f)};
     const ModSlider::Ptr m_id_bottom{ModSlider::create("WuWaPrivacy_ProfileBottom",0.0f,1.0f,0.215f)};
+    // The profile ID row in the 16:9 UI layout, where the ESC terminal is laid out on the window's shape and the
+    // row sits lower (36-39% down, 23-37% across, measured on the 17 Oct smoke screenshots; the taller layout's
+    // box above missed it, owner 17 Oct). The bottom-right UID box fits both layouts.
+    const ModSlider::Ptr m_id169_left{ModSlider::create("WuWaPrivacy_Profile169Left",0.0f,1.0f,0.205f)};
+    const ModSlider::Ptr m_id169_top{ModSlider::create("WuWaPrivacy_Profile169Top",0.0f,1.0f,0.34f)};
+    const ModSlider::Ptr m_id169_right{ModSlider::create("WuWaPrivacy_Profile169Right",0.0f,1.0f,0.395f)};
+    const ModSlider::Ptr m_id169_bottom{ModSlider::create("WuWaPrivacy_Profile169Bottom",0.0f,1.0f,0.41f)};
 
     struct MouseState { bool active{}, utility{}; int buttons{}, x{}, y{}; };
     mutable std::mutex m_bridge_mutex;

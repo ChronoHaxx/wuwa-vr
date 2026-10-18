@@ -12,6 +12,10 @@ static_assert(openxr_sources(true, false, false, true)[0] == 0);
 static_assert(openxr_sources(false, true, false, true)[0] == 0);
 static_assert(openxr_sources(true, true, true, true)[0] == 0);
 static_assert(openxr_sources(true, true, false, false)[0] == 0);
+// NSF before its capture exists: one rendered view, shown in both eyes.
+static_assert(openxr_sources(true, false, false, false)[1] == 0);
+static_assert(openxr_sources(true, true, false, false)[1] == 0);
+static_assert(openxr_sources(false, false, false, false)[1] == 1);
 
 int main() {
     // Distinct source pixels model the existing NSF double-wide compositor.
@@ -29,19 +33,23 @@ int main() {
     }
 
     // Independent gates: an unrelated saved SwapEyes setting must not change
-    // ordinary stereo, an unavailable-capture fallback, or AFR/duplicate AFR.
+    // ordinary stereo or AFR/duplicate AFR. NSF without its capture has only
+    // the first half rendered, so both eyes take it instead of a black half.
     for (bool nsf : {false, true}) {
         for (bool swap : {false, true}) {
             for (bool afr : {false, true}) {
                 for (bool capture : {false, true}) {
                     const auto order = openxr_sources(nsf, swap, afr, capture);
-                    assert(order[0] < 2 && order[1] < 2 && order[0] != order[1]);
-                    if (!nsf || !swap || afr || !capture) {
-                        assert(order[0] == 0 && order[1] == 1);
+                    assert(order[0] < 2 && order[1] < 2);
+                    if (nsf && !afr && !capture) {
+                        assert(order[0] == 0 && order[1] == 0);
+                    } else {
+                        assert(order[0] != order[1]);
+                        if (!nsf || !swap || afr) assert(order[0] == 0 && order[1] == 1);
                     }
                 }
             }
         }
     }
-    std::cout << "2D screen eye order: compositor parity and fallback gates passed\n";
+    std::cout << "2D screen eye order: compositor parity, fallback gates and the missing-capture flat screen passed\n";
 }

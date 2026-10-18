@@ -26,6 +26,7 @@
 #include "Mod.hpp"
 #include "Mods.hpp"
 #include "mods/VR.hpp"
+#include "utility/WuWaClvRefresh.hpp"
 #include "utility/WuWaDofSync.hpp"
 #include "utility/WuWaNearClip.hpp"
 #include "utility/WuWaStatusText.hpp"
@@ -1046,8 +1047,13 @@ Page fixes_page() {
         "With the game's Cutscene Mode on letterbox, black bars cover the world above and below story scenes. In full VR "
         "they are hidden; the stereo and mono screens keep them. Recommended.",
         "WuWaStereo_HideCutsceneBars"));
-    page.items.push_back(setting_toggle("Refresh far lighting",
-        "Refreshes the far-lighting cache so distant lighting matches between eyes. A limited workaround.", "WuWaStereo_RefillFarLighting"));
+    page.items.push_back(setting_toggle("Refresh far lighting automatically",
+        "After you start, load or teleport, refills the far lighting for both eyes, so distant hills and buildings are "
+        "lit the same in each eye. Turning it on also refills once. Each refill pauses the picture for a moment.",
+        "WuWaStereo_RefillFarLighting"));
+    page.items.push_back(action("Refill far lighting now",
+        "Rebuilds the far lighting for both eyes now. Use it when distant hills or buildings look darker in one eye "
+        "than the other. The picture pauses for a moment.", [] { wuwa_clv::request(); }));
     page.items.push_back(setting_toggle("Match cinematic framing",
         "Gives both eyes the same framing during letterboxed scenes.", "VR_CinematicFramingFix"));
     page.items.push_back(setting_toggle("Ambient occlusion",

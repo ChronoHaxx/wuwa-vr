@@ -242,7 +242,10 @@ saw everything as further away. If it returns, check the eye FOVs first, then th
 **Fixed**, 1 Oct (cause 2). Kuro's Cascade Lighting Volume keeps indirect light
 per view state, and its refresh filled only the first eye. The mod now pulses
 `r.CLV.RefreshEveryFrame` for one frame after starts, loading screens and
-teleports. Manual control: WuWa Controls → Refill far lighting now. Related
+teleports. Manual control: VR menu → Fixes → Refill far lighting now (from test
+21b; also WuWa Controls in the classic panel). A long glide with no loading
+screen or jump does not trigger a refill (18 Oct recording: right eye darker
+after a ~440 m glide). Related
 cvars: `r.CLV.TriggerRefresh`, `r.CLV.UpdateEveryFrame`.
 
 **Shading on rocks and hills differs per eye (ambient occlusion).**

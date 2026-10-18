@@ -145,6 +145,9 @@
   "Advanced rendering and script diagnostics": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "After you start, load or teleport, refills the far lighting for both eyes, so distant hills and buildings are lit the same in each eye. Turning it on also refills once. Each refill pauses the picture for a moment.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "After you switch views, a line shows for 3 seconds with how to go on or come back. It switches itself off after 5 switches.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2106,6 +2109,9 @@
   "Reality Runner is open: 10 seconds of walking starts a run.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Rebuilds the far lighting for both eyes now. Use it when distant hills or buildings look darker in one eye than the other. The picture pauses for a moment.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Recenter headset / portal": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -2178,7 +2184,8 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Refill far lighting now": [
-    "mods/vr/WuWaControlsComponent.cpp"
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Reflection capture correction stopped or could not verify this game build. See the diagnostic log.": [
     "mods/VR.cpp"
@@ -2192,7 +2199,7 @@
   "Refresh HUD layout": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Refresh far lighting": [
+  "Refresh far lighting automatically": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Refresh far-lighting cache (limited workaround)": [
@@ -2200,9 +2207,6 @@
   ],
   "Refresh position before drawing (Custom)": [
     "mods/vr/WuWaControlsComponent.cpp"
-  ],
-  "Refreshes the far-lighting cache so distant lighting matches between eyes. A limited workaround.": [
-    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Release RT (Xbox) or pull left stick fully down (Mode 2), then tap RB to arm. Tap RB again or hold LB to pause/disarm. LB + RB levels the drone and stops it. Double R3 exits. Focus loss, menus and shortcut chords pause/disarm it; arm again to resume.": [
     "mods/vr/WuWaControlsComponent.cpp"

@@ -153,8 +153,10 @@ int main() {
         stop(policy, inactive, Source::Automatic);
         expect(policy, fresh(50000, 2, true, 1, 90, false), Action::None, Source::None,
             "disabled automatic retry remained eligible");
-        expect(policy, fresh(50010, 2, false), Action::None, Source::None,
-            "cancelled automatic arm retried");
+        // Switching back on refills once as a manual pulse; the cancelled automatic arm stays cancelled.
+        start(policy, fresh(50010, 2, false), Source::Manual);
+        stop(policy, fresh(50015, 3, false), Source::Manual);
+        check(!policy.status().automatic_pending && !policy.take_auto_consumed(), "cancelled automatic arm retried");
         policy.request_manual();
         start(policy, fresh(50020, 2, false, 1, 0, false), Source::Manual);
         stop(policy, fresh(50030, 3, false, 1, 0, false), Source::Manual);
@@ -323,6 +325,26 @@ int main() {
         policy.confirm_stop(true); // No owned pulse: ignored.
         check(!policy.status().owns_refresh && policy.status().pulse_attempts == 0,
             "out-of-order confirmations invented an owned pulse");
+    }
+    {
+        ++groups;
+        // The switch: on at start-up is not a request; off -> on refills once, even
+        // with the automatic arm already consumed; on -> off and staying on are not.
+        RefreshPolicy policy;
+        expect(policy, fresh(1000), Action::None, Source::None, "enabled at start-up requested a refill");
+        expect(policy, fresh(1010, 1, false, 1, 90, false), Action::None, Source::None, "switching off requested a refill");
+        check(!policy.status().manual_pending, "switching off left a request pending");
+        expect(policy, fresh(1020), Action::Start, Source::Manual, "switching on did not refill");
+        policy.confirm_start(StartResult::Started);
+        stop(policy, fresh(1030, 2), Source::Manual);
+        check(!policy.status().manual_pending, "observed switch refill stayed pending");
+        expect(policy, fresh(5000, 3), Action::None, Source::None, "staying on refilled again");
+
+        RefreshPolicy manual_off;
+        expect(manual_off, fresh(1000, 1, false, 1, 90, false), Action::None, Source::None, "off at start-up acted");
+        manual_off.request_manual();
+        expect(manual_off, fresh(1010, 1, false, 1, 90, false), Action::Start, Source::Manual,
+            "the refill button did not work with automatic refill off");
     }
     std::cout << "PASS " << checks << " checks in " << groups << " CLV scheduling groups\n";
 }

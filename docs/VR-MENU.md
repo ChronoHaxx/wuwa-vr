@@ -173,8 +173,11 @@ REC badge with the elapsed time shows while recording.
    Mode on letterbox the game draws the bars as two textures,
    `BlackTexture`/`BlackTexture1` in `UiView_BlackFadeScreen_Prefab`;
    `mod/lua/wuwa_cutscene_bars.lua` sets their alpha to 0 in full VR while they
-   are letterbox-sized and gives the game's alpha back on the screens), far
-   lighting, matched framing, **Ambient
+   are letterbox-sized and gives the game's alpha back on the screens),
+   **Refresh far lighting automatically** (`WuWaStereo_RefillFarLighting`;
+   from test 21b switching it on also refills once) and the action **Refill far
+   lighting now** (`wuwa_clv::request()`, the same refill as the classic
+   panel button, works with the toggle off), matched framing, **Ambient
    occlusion** (`WuWaStereo_AmbientOcclusion`, default on from 1.2.2; while
    on it renders symmetric eye frustums so both eyes shade alike, about 7 %
    frame time; see REFERENCE.md), and

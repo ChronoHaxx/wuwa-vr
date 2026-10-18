@@ -51,6 +51,11 @@ public:
 
     Decision tick(const Snapshot& snapshot) noexcept {
         snapshot_ = snapshot;
+        // Switching automatic refill on (from a seen off) refills once now; an
+        // already-consumed arm would otherwise leave the switch doing nothing.
+        if (have_enabled_ && snapshot.automatic_enabled && !last_enabled_) request_manual();
+        have_enabled_ = true;
+        last_enabled_ = snapshot.automatic_enabled;
         if (!have_auto_generation_ || snapshot.arm_sequence != auto_generation_) {
             have_auto_generation_ = true;
             auto_generation_ = snapshot.arm_sequence;
@@ -180,7 +185,7 @@ private:
     std::uint32_t manual_frames_{1}, ticks_left_{}, pulse_attempt_number_{};
     std::optional<std::uint64_t> auto_consumed_{};
     bool awaiting_start_{}, awaiting_stop_{}, pair_observed_{}, pulse_auto_armed_{};
-    bool have_auto_generation_{}, automatic_retired_{};
+    bool have_auto_generation_{}, automatic_retired_{}, have_enabled_{}, last_enabled_{};
 };
 
 } // namespace wuwa_clv

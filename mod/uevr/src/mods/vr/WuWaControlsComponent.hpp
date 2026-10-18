@@ -311,8 +311,11 @@ private:
     // Outside control recovery: resetting camera/input does not reset language.
     const ModString::Ptr m_language{ModString::create("WuWaLocale", "en")};
     const ModCombo::Ptr m_video_fps{ModCombo::create("WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}, 0)};
-    const ModCombo::Ptr m_video_width{ModCombo::create("WuWaRecording_Width", {"720", "1024", "1280"}, 1)};
+    // 1536 and 2048 (1.2.5): SteamVR only; 2048 makes a 4096x2048 side-by-side video, the widest H.264 allows.
+    const ModCombo::Ptr m_video_width{ModCombo::create("WuWaRecording_Width", {"720", "1024", "1280", "1536", "2048"}, 1)};
     const ModToggle::Ptr m_video_telemetry{ModToggle::create("WuWaRecording_Telemetry", true)};
+    // 1.2.5: what the PC plays, as the video's sound track (SteamVR recordings).
+    const ModToggle::Ptr m_video_sound{ModToggle::create("WuWaRecording_Sound", true)};
     // Side by side (both eyes, for finding problems) or showcase (the left eye as a steadied 16:9 video).
     const ModCombo::Ptr m_video_style{ModCombo::create("WuWaRecording_Style",
         {"Both eyes, side by side", "Showcase: one eye, steady, 16:9"}, 0)};

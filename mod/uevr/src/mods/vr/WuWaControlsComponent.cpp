@@ -392,7 +392,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect,
-        *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_style, *m_showcase_pitch, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
+        *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_sound, *m_video_style, *m_showcase_pitch, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom, *m_id169_left, *m_id169_top, *m_id169_right, *m_id169_bottom};
 }
@@ -735,15 +735,16 @@ void WuWaControlsComponent::on_draw_recording() {
     wuwa_ui::draw(*m_video_fps,"Target recording rate");
     wuwa_ui::draw(*m_video_width,"Maximum pixels per eye");
     wuwa_ui::draw(*m_video_telemetry,"Include camera and controller data");
+    wuwa_ui::draw(*m_video_sound,"Record sound (everything the PC plays)");
     wuwa_ui::draw(*m_video_style,"Video style");
     wuwa_ui::draw(*m_showcase_pitch,"Showcase view height (degrees)");
     ImGui::EndDisabled();
     ImGui::BeginDisabled(!m_video.available() || busy || m_video.pending());
     if (wuwa_ui::Button("Start video recording")) {
-        constexpr int rates[]{30,45,60},widths[]{720,1024,1280};
+        constexpr int rates[]{30,45,60},widths[]{720,1024,1280,1536,2048};
         if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
-                      widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value(),
-                      m_video_style->value()==1,static_cast<int>(std::lround(m_showcase_pitch->value()))))
+                      widths[std::clamp(m_video_width->value(),0,4)],m_video_telemetry->value(),
+                      m_video_style->value()==1,static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value()))
             m_recording_live.store(true,std::memory_order_relaxed);
     }
     ImGui::EndDisabled();
@@ -818,9 +819,10 @@ void WuWaControlsComponent::on_draw_ui() {
     if (wuwa_ui::TreeNode("Camera customization")) {
         wuwa_ui::draw(*m_fixed_distance,"Fixed camera distance (game units)");
         wuwa_ui::draw(*m_fixed_height,"Fixed camera height above pawn (game units)");
-        wuwa_ui::draw(*m_free_speed,"Freecam movement speed");
-        wuwa_ui::draw(*m_free_turn,"Freecam turning speed");
         wuwa_ui::draw(*m_free_style,"Freecam movement style");
+        // Speed drives Polar fly and the hover drone; turn speed every style but acro, which has its own rates.
+        if (m_free_style->value()<=1) wuwa_ui::draw(*m_free_speed,"Freecam movement speed");
+        if (m_free_style->value()<=2) wuwa_ui::draw(*m_free_turn,"Freecam turning speed");
         if (m_free_style->value()==1) {
             wuwa_ui::draw(*m_drone_response,"Drone response (higher = less drift)");
             wuwa_ui::TextWrapped("Hover drone: left stick moves horizontally, right stick looks, LT rises, LB descends, RT boosts. Release the stick to settle into a hover.");
@@ -1243,11 +1245,11 @@ void WuWaControlsComponent::menu_recording_toggle() {
     m_video.poll(profile,true);
     const auto state=m_video.state();
     if (state=="starting" || state=="recording") { m_video.submit(profile,false); return; }
-    constexpr int rates[]{30,45,60},widths[]{720,1024,1280};
+    constexpr int rates[]{30,45,60},widths[]{720,1024,1280,1536,2048};
     // Cover the IDs from the request on, before the launcher reports "starting".
     if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
-                  widths[std::clamp(m_video_width->value(),0,2)],m_video_telemetry->value(),
-                  m_video_style->value()==1,static_cast<int>(std::lround(m_showcase_pitch->value()))))
+                  widths[std::clamp(m_video_width->value(),0,4)],m_video_telemetry->value(),
+                  m_video_style->value()==1,static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value()))
         m_recording_live.store(true,std::memory_order_relaxed);
 }
 

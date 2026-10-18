@@ -8,6 +8,9 @@
 #include <mfapi.h>
 #include <mfidl.h>
 #include <mfreadwrite.h>
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <mmreg.h>
 #include <codecapi.h>
 #include <wrl/client.h>
 #include <openvr.h>
@@ -21,6 +24,9 @@
 #include <cmath>
 #include <Xinput.h>
 #include <timeapi.h>
+#include <thread>
+#include <atomic>
+#include <mutex>
 using Microsoft::WRL::ComPtr;
 using Json=nlohmann::json;
 static void check(HRESULT value) { if (FAILED(value)) throw std::runtime_error("HRESULT "+std::to_string(value)); }
@@ -33,12 +39,15 @@ static bool steamvr_running() {
     CloseHandle(snap); return found;
 }
 struct Encoder {
-    ComPtr<IMFSinkWriter> writer; DWORD stream{}; UINT w{},h{};
-    // high: H.264 High profile (the showcase video); the side-by-side recording keeps the encoder default.
-    void open(const std::filesystem::path& path,UINT width,UINT height,UINT fps,UINT bitrate=16000000,bool high=false) {
+    ComPtr<IMFSinkWriter> writer; DWORD stream{},sound{}; UINT w{},h{}; bool has_sound{};
+    std::mutex lock;  // the sound thread writes beside the picture loop
+    // high: H.264 High profile. sound_rate (44100 or 48000): adds a stereo AAC track fed by add_sound.
+    void open(const std::filesystem::path& path,UINT width,UINT height,UINT fps,UINT bitrate=16000000,bool high=false,UINT sound_rate=0) {
         w=width; h=height;
         ComPtr<IMFAttributes> attrs; check(MFCreateAttributes(&attrs,2));
         check(attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS,TRUE));
+        // A stream that runs ahead must not stall the other one; both arrive in real time anyway.
+        check(attrs->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING,TRUE));
         check(MFCreateSinkWriterFromURL(path.c_str(),nullptr,attrs.Get(),&writer));
         ComPtr<IMFMediaType> out,in; check(MFCreateMediaType(&out));
         check(out->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Video)); check(out->SetGUID(MF_MT_SUBTYPE,MFVideoFormat_H264));
@@ -51,16 +60,153 @@ struct Encoder {
         check(MFSetAttributeSize(in.Get(),MF_MT_FRAME_SIZE,w,h)); check(MFSetAttributeRatio(in.Get(),MF_MT_FRAME_RATE,fps,1));
         check(MFSetAttributeRatio(in.Get(),MF_MT_PIXEL_ASPECT_RATIO,1,1));
         check(in->SetUINT32(MF_MT_DEFAULT_STRIDE,w*4));
-        check(writer->SetInputMediaType(stream,in.Get(),nullptr)); check(writer->BeginWriting());
+        check(writer->SetInputMediaType(stream,in.Get(),nullptr));
+        if (sound_rate) {
+            // 192 kbit/s AAC-LC; the Windows AAC encoder takes 16-bit PCM at 44.1 or 48 kHz.
+            ComPtr<IMFMediaType> aac,pcm; check(MFCreateMediaType(&aac));
+            check(aac->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Audio)); check(aac->SetGUID(MF_MT_SUBTYPE,MFAudioFormat_AAC));
+            check(aac->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE,16)); check(aac->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND,sound_rate));
+            check(aac->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS,2)); check(aac->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,24000));
+            check(writer->AddStream(aac.Get(),&sound));
+            check(MFCreateMediaType(&pcm));
+            check(pcm->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Audio)); check(pcm->SetGUID(MF_MT_SUBTYPE,MFAudioFormat_PCM));
+            check(pcm->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE,16)); check(pcm->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND,sound_rate));
+            check(pcm->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS,2)); check(pcm->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT,4));
+            check(pcm->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,sound_rate*4));
+            check(writer->SetInputMediaType(sound,pcm.Get(),nullptr)); has_sound=true;
+        }
+        check(writer->BeginWriting());
     }
-    void add(const std::vector<BYTE>& pixels,LONGLONG timestamp,LONGLONG duration) {
-        ComPtr<IMFMediaBuffer> buffer; check(MFCreateMemoryBuffer(static_cast<DWORD>(pixels.size()),&buffer));
-        BYTE* data{}; check(buffer->Lock(&data,nullptr,nullptr)); memcpy(data,pixels.data(),pixels.size()); check(buffer->Unlock());
-        check(buffer->SetCurrentLength(static_cast<DWORD>(pixels.size())));
+    void write(DWORD target,const void* bytes,size_t size,LONGLONG timestamp,LONGLONG duration) {
+        ComPtr<IMFMediaBuffer> buffer; check(MFCreateMemoryBuffer(static_cast<DWORD>(size),&buffer));
+        BYTE* data{}; check(buffer->Lock(&data,nullptr,nullptr)); memcpy(data,bytes,size); check(buffer->Unlock());
+        check(buffer->SetCurrentLength(static_cast<DWORD>(size)));
         ComPtr<IMFSample> sample; check(MFCreateSample(&sample)); check(sample->AddBuffer(buffer.Get()));
-        check(sample->SetSampleTime(timestamp)); check(sample->SetSampleDuration(duration)); check(writer->WriteSample(stream,sample.Get()));
+        check(sample->SetSampleTime(timestamp)); check(sample->SetSampleDuration(duration));
+        std::lock_guard guard(lock); if (writer) check(writer->WriteSample(target,sample.Get()));
     }
-    void close() { if (writer) { const auto result=writer->Finalize(); writer.Reset(); check(result); } }
+    void add(const std::vector<BYTE>& pixels,LONGLONG timestamp,LONGLONG duration) { write(stream,pixels.data(),pixels.size(),timestamp,duration); }
+    // Interleaved stereo 16-bit frames.
+    void add_sound(const int16_t* frames,size_t count,LONGLONG timestamp,LONGLONG duration) { write(sound,frames,count*4,timestamp,duration); }
+    void close() { std::lock_guard guard(lock); if (writer) { const auto result=writer->Finalize(); writer.Reset(); check(result); } }
+};
+// Now on the performance counter, in the 100-ns units WASAPI stamps each packet with.
+static LONGLONG qpc_100ns() {
+    LARGE_INTEGER count{},frequency{}; QueryPerformanceCounter(&count); QueryPerformanceFrequency(&frequency);
+    return count.QuadPart/frequency.QuadPart*10000000+count.QuadPart%frequency.QuadPart*10000000/frequency.QuadPart;
+}
+// The sound the PC plays: WASAPI loopback of the default output (the headset while SteamVR runs). Windows 10
+// cannot capture one process alone (process loopback needs build 20348), so voice chat and notifications are
+// recorded too; the recording menus say so. Loopback delivers nothing while nothing plays: those gaps become
+// silence, placed by each packet's clock, so the track keeps time with the picture.
+struct Loopback {
+    ComPtr<IAudioClient> client; ComPtr<IAudioCaptureClient> capture;
+    UINT source_rate{},channels{},bits{},rate{}; bool floats{};
+    std::thread worker; std::atomic<bool> stopping{false};
+    std::string error; double silence_seconds{}; uint64_t frames_written{},discontinuities{};
+    Encoder* target{}; LONGLONG started{}; double next{};  // next: the track frame the next packet starts at
+    ~Loopback() { stop(); }
+    bool open() {
+        try {
+            ComPtr<IMMDeviceEnumerator> devices;
+            check(CoCreateInstance(__uuidof(MMDeviceEnumerator),nullptr,CLSCTX_ALL,IID_PPV_ARGS(&devices)));
+            ComPtr<IMMDevice> device; check(devices->GetDefaultAudioEndpoint(eRender,eConsole,&device));
+            check(device->Activate(__uuidof(IAudioClient),CLSCTX_ALL,nullptr,reinterpret_cast<void**>(client.GetAddressOf())));
+            WAVEFORMATEX* mix{}; check(client->GetMixFormat(&mix));
+            source_rate=mix->nSamplesPerSec; channels=mix->nChannels; bits=mix->wBitsPerSample;
+            WORD tag=mix->wFormatTag;
+            if (tag==WAVE_FORMAT_EXTENSIBLE) tag=static_cast<WORD>(reinterpret_cast<WAVEFORMATEXTENSIBLE*>(mix)->SubFormat.Data1);
+            floats=tag==WAVE_FORMAT_IEEE_FLOAT && bits==32;
+            const bool pcm=tag==WAVE_FORMAT_PCM && (bits==16 || bits==24 || bits==32);
+            HRESULT initialized=E_FAIL;
+            if ((floats || pcm) && channels>=1) initialized=client->Initialize(AUDCLNT_SHAREMODE_SHARED,AUDCLNT_STREAMFLAGS_LOOPBACK,10000000,0,mix,nullptr);
+            CoTaskMemFree(mix);
+            if (!floats && !pcm) throw std::runtime_error("unsupported output format");
+            check(initialized); check(client->GetService(IID_PPV_ARGS(&capture)));
+            rate=source_rate==44100?44100u:48000u;  // anything else is resampled to 48 kHz
+            return true;
+        } catch (const std::exception& e) { error=e.what(); client.Reset(); capture.Reset(); return false; }
+    }
+    // start: the picture's time zero, from qpc_100ns(), the clock of each packet.
+    void begin(Encoder& encoder,LONGLONG start) {
+        target=&encoder; started=start;
+        worker=std::thread([this,&encoder,start] {
+            const bool com_ok=SUCCEEDED(CoInitializeEx(nullptr,COINIT_MULTITHREADED));
+            try {
+                check(client->Start());
+                std::vector<int16_t> stereo,out; std::vector<int16_t> silence(rate/10*2);
+                double phase=0; int16_t last[2]{};
+                const auto put=[&](const int16_t* data,size_t count) {
+                    encoder.add_sound(data,count,static_cast<LONGLONG>(next*1e7/rate),static_cast<LONGLONG>(count*1e7/rate));
+                    next+=double(count); frames_written+=count;
+                };
+                while (!stopping) {
+                    Sleep(10);
+                    UINT32 waiting{};
+                    while (!stopping && SUCCEEDED(capture->GetNextPacketSize(&waiting)) && waiting) {
+                        BYTE* data{}; UINT32 count{}; DWORD flags{}; UINT64 position{},clock{};
+                        check(capture->GetBuffer(&data,&count,&flags,&position,&clock));
+                        if (flags&AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) ++discontinuities;
+                        stereo.resize(size_t(count)*2);
+                        for (UINT32 i=0;i<count;++i) for (UINT c=0;c<2;++c) {
+                            const UINT from=std::min(c,channels-1);
+                            float v=0;
+                            if (!(flags&AUDCLNT_BUFFERFLAGS_SILENT)) {
+                                const BYTE* at=data+(size_t(i)*channels+from)*(bits/8);
+                                if (floats) v=*reinterpret_cast<const float*>(at);
+                                else if (bits==16) v=*reinterpret_cast<const int16_t*>(at)/32768.0f;
+                                else if (bits==24) v=float((int32_t(at[0])<<8|int32_t(at[1])<<16|int32_t(at[2])<<24)>>8)/8388608.0f;
+                                else v=*reinterpret_cast<const int32_t*>(at)/2147483648.0f;
+                            }
+                            stereo[size_t(i)*2+c]=static_cast<int16_t>(std::lround(std::clamp(v,-1.0f,1.0f)*32767.0f));
+                        }
+                        check(capture->ReleaseBuffer(count));
+                        const int16_t* frames=stereo.data(); size_t frame_count=count;
+                        if (source_rate!=rate && count) {
+                            // Linear resampling to 48 kHz, continuous across packets.
+                            const double step=double(source_rate)/rate; out.clear();
+                            for (;phase<double(count);phase+=step) {
+                                const auto i=static_cast<size_t>(std::floor(phase)); const double f=phase-std::floor(phase);
+                                for (int c=0;c<2;++c) {
+                                    const double a=i==0?last[c]:stereo[(i-1)*2+c], b=stereo[i*2+c];
+                                    out.push_back(static_cast<int16_t>(std::lround(a+(b-a)*f)));
+                                }
+                            }
+                            phase-=double(count); last[0]=stereo[(count-1)*2]; last[1]=stereo[(count-1)*2+1];
+                            frames=out.data(); frame_count=out.size()/2;
+                        }
+                        // Where this packet belongs on the picture's clock, in track frames.
+                        double at=(double(clock)-double(start))*rate/1e7;
+                        if (at+double(frame_count)<=0) continue;  // played before the recording started
+                        if (at<0) { const auto skip=static_cast<size_t>(-at); frames+=skip*2; frame_count-=std::min(skip,frame_count); at=0; }
+                        if (at>next+rate*0.02) {  // nothing played for a while: keep time with silence
+                            silence_seconds+=(at-next)/rate;
+                            while (next+1<at) put(silence.data(),std::min(silence.size()/2,static_cast<size_t>(at-next)));
+                        }
+                        if (frame_count) put(frames,frame_count);
+                    }
+                }
+            } catch (const std::exception& e) { error=e.what(); }
+            client->Stop();
+            if (com_ok) CoUninitialize();
+        });
+    }
+    void stop() { stopping=true; if (worker.joinable()) worker.join(); }
+    // Before the encoder closes: silence up to now, so the track lasts as long as the picture (and a recording
+    // where nothing played still has samples; the sink writer refuses to finish a track without any).
+    void finish() {
+        stop();
+        if (!target || !error.empty()) return;
+        try {
+            std::vector<int16_t> silence(rate/10*2);
+            const double end=double(qpc_100ns()-started)*rate/1e7;
+            while (next+1<end) {
+                const auto count=std::min(silence.size()/2,static_cast<size_t>(end-next));
+                target->add_sound(silence.data(),count,static_cast<LONGLONG>(next*1e7/rate),static_cast<LONGLONG>(count*1e7/rate));
+                next+=double(count); frames_written+=count; silence_seconds+=double(count)/rate;
+            }
+        } catch (const std::exception& e) { error=e.what(); }
+    }
 };
 struct Eye {
     vr::IVRCompositor* compositor{}; ID3D11ShaderResourceView* view{};
@@ -296,9 +442,20 @@ static bool same_print(const std::vector<BYTE>& a,const std::vector<BYTE>& b) {
     for (size_t i=0;i<a.size();++i) if (std::abs(int(a[i])-int(b[i]))>2) return false;
     return true;
 }
+// Side-by-side bitrate, about 0.18 bits per pixel: 18 Mbit/s at 1280 px per eye and 30 fps, 45 at 2048.
+static UINT sbs_bitrate(UINT width,UINT height,UINT fps) {
+    return static_cast<UINT>(std::clamp(double(width)*height*fps*0.18,16e6,100e6));
+}
+static Json report_sound(bool asked,bool opened,const Loopback& sound) {
+    if (!asked) return Json{{"audio",false}};
+    if (!opened) return Json{{"audio",false},{"audio_error",sound.error}};
+    return Json{{"audio",sound.error.empty() && sound.frames_written>0},{"audio_source","default output device (everything the PC plays)"},
+        {"audio_rate",sound.rate},{"audio_device_rate",sound.source_rate},{"audio_seconds",double(sound.frames_written)/sound.rate},
+        {"audio_silence_seconds",sound.silence_seconds},{"audio_discontinuities",sound.discontinuities},{"audio_error",sound.error}};
+}
 int wmain(int argc,wchar_t** argv) {
     HMODULE library{}; void(__cdecl* shutdown)(){}; bool initialized=false,media=false,com=false;
-    Encoder encoder; Json result; std::filesystem::path out; bool output_created=false;
+    Encoder encoder; Loopback sound; Json result; std::filesystem::path out; bool output_created=false;
     try {
         if ((argc==2 || argc==3) && std::wstring_view(argv[1])==L"--self-test-showcase") {
             if (argc==3 && std::filesystem::exists(argv[2])) throw std::runtime_error("Self-test output exists");
@@ -384,6 +541,64 @@ int wmain(int argc,wchar_t** argv) {
             }
             std::cout<<"Synthetic showcase view: asymmetric eye, centred, turned, fingerprint and steady checks passed; no game/VR access.\n"; return 0;
         }
+        if (argc==3 && std::wstring_view(argv[1])==L"--self-test-large") {
+            // The largest side-by-side video, 2048 px per eye (4096x2048, the H.264 width limit), with a sound
+            // track: 3 s through the GPU resize and encoder with a 440 Hz tone written in 10 ms packets, timing
+            // each frame. With an output device, a second short file runs the real loopback thread for 1.2 s.
+            const std::filesystem::path video=argv[1+1];
+            auto beside=video; beside.replace_filename(video.stem().wstring()+L"-loopback.mp4");
+            if (std::filesystem::exists(video) || std::filesystem::exists(beside)) throw std::runtime_error("Self-test output exists");
+            ComPtr<ID3D11Device> test_device; ComPtr<ID3D11DeviceContext> test_context;
+            check(D3D11CreateDevice(nullptr,D3D_DRIVER_TYPE_HARDWARE,nullptr,0,nullptr,0,D3D11_SDK_VERSION,&test_device,nullptr,&test_context));
+            constexpr UINT side=2048;
+            std::vector<BYTE> eye_pixels(size_t(side)*side*4);
+            for (UINT y=0;y<side;++y) for (UINT x=0;x<side;++x) {
+                const auto i=(size_t(y)*side+x)*4; eye_pixels[i]=BYTE(x*255/side); eye_pixels[i+1]=BYTE(y*255/side); eye_pixels[i+2]=(x/64+y/64)%2?200:40; eye_pixels[i+3]=255;
+            }
+            D3D11_TEXTURE2D_DESC d{}; d.Width=d.Height=side; d.MipLevels=d.ArraySize=1; d.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
+            d.SampleDesc.Count=1; d.BindFlags=D3D11_BIND_SHADER_RESOURCE;
+            D3D11_SUBRESOURCE_DATA data{eye_pixels.data(),side*4,0};
+            ComPtr<ID3D11Texture2D> tex; ComPtr<ID3D11ShaderResourceView> view;
+            check(test_device->CreateTexture2D(&d,&data,&tex)); check(test_device->CreateShaderResourceView(tex.Get(),nullptr,&view));
+            check(CoInitializeEx(nullptr,COINIT_MULTITHREADED)); com=true; check(MFStartup(MF_VERSION)); media=true;
+            const bool device_sound=sound.open();
+            const UINT rate=device_sound?sound.rate:48000u, fps=30;
+            StereoResize resize; resize.open(test_device.Get(),side,side);
+            encoder.open(video,side*2,side,fps,sbs_bitrate(side*2,side,fps),true,rate);
+            std::vector<BYTE> pixels; std::vector<int16_t> tone(size_t(rate/100)*2);
+            double worst=0,total=0; uint64_t tone_frames=0;
+            for (UINT frame=0;frame<fps*3;++frame) {
+                const auto begin=std::chrono::steady_clock::now();
+                resize.read(test_context.Get(),view.Get(),view.Get(),false,false,pixels);
+                encoder.add(pixels,LONGLONG(frame)*10000000/fps,10000000/fps);
+                const double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-begin).count();
+                worst=std::max(worst,ms); total+=ms;
+                while (tone_frames*fps<uint64_t(frame+1)*rate) {
+                    for (size_t i=0;i<tone.size()/2;++i) tone[i*2]=tone[i*2+1]=int16_t(8000*std::sin(2*std::acos(-1.0)*440*double(tone_frames+i)/rate));
+                    encoder.add_sound(tone.data(),tone.size()/2,LONGLONG(tone_frames*10000000/rate),LONGLONG(tone.size()/2*10000000/rate));
+                    tone_frames+=tone.size()/2;
+                }
+            }
+            encoder.close();
+            if (pixels.size()!=size_t(side)*2*side*4) throw std::runtime_error("Large side-by-side picture has the wrong size");
+            std::cout<<"Large side by side: "<<fps*3<<" frames, "<<side*2<<"x"<<side<<" at "<<sbs_bitrate(side*2,side,fps)/1000000
+                <<" Mbit/s, "<<tone_frames<<" sound frames at "<<rate<<" Hz; resize+encode "<<total/(fps*3)<<" ms per frame (worst "<<worst<<" ms).\n";
+            if (device_sound) {
+                Encoder probe; probe.open(beside,320,240,fps,2000000,true,sound.rate);
+                std::vector<BYTE> black(320*240*4,0);
+                const auto start=std::chrono::steady_clock::now(); sound.begin(probe,qpc_100ns());
+                for (UINT frame=0;frame<fps*6/5;++frame) {
+                    probe.add(black,LONGLONG(frame)*10000000/fps,10000000/fps);
+                    std::this_thread::sleep_until(start+std::chrono::milliseconds((frame+1)*1000/fps));
+                }
+                sound.finish(); probe.close();
+                const double seconds=double(sound.frames_written)/sound.rate;
+                if (!sound.error.empty() || seconds<1.1) throw std::runtime_error("Loopback sound track short or failed: "+sound.error);
+                std::cout<<"Loopback: "<<sound.source_rate<<" Hz, "<<sound.channels<<" channels, "<<(sound.floats?"float":"PCM")<<"; "
+                    <<seconds<<" s written, "<<sound.silence_seconds<<" s of it silence.\n";
+            } else std::cout<<"Loopback: no output device to open ("<<sound.error<<"); the recorder would save the picture alone.\n";
+            MFShutdown(); media=false; CoUninitialize(); com=false; return 0;
+        }
         if ((argc==3 || argc==4) && std::wstring_view(argv[1])==L"--self-test") {
             const UINT test_fps=argc==4 ? std::stoul(argv[3]) : 30;
             if (test_fps!=30 && test_fps!=45 && test_fps!=60) throw std::runtime_error("Self-test FPS must be 30, 45 or 60");
@@ -428,19 +643,25 @@ int wmain(int argc,wchar_t** argv) {
             encoder.close(); MFShutdown(); media=false; CoUninitialize(); com=false;
             std::cout<<"Synthetic GPU SBS resize + RGB/orientation encoder test: "<<test_fps*2<<" frames, 640x480, "<<test_fps<<"fps; no game/VR access.\n"; return 0;
         }
-        // --showcase first: the left eye as a steadied 16:9 camera (showcase.mp4) instead of both eyes side by side.
-        const bool showcase=argc>1 && std::wstring_view(argv[1])==L"--showcase";
-        if (showcase) { ++argv; --argc; }
-        // Then optionally --pitch=<degrees>: where the showcase view looks, below (negative) or above the head.
-        double pitch=showcase_default_pitch;
-        if (showcase && argc>1 && std::wstring_view(argv[1]).starts_with(L"--pitch=")) {
-            const double degrees=std::stod(std::wstring(argv[1]+8));
-            if (!(degrees>=-40 && degrees<=20)) throw std::runtime_error("Showcase pitch must be -40..20 degrees");
-            pitch=degrees*std::acos(-1.0)/180; ++argv; --argc;
+        // Options first: --showcase (the left eye as a steadied 16:9 camera, showcase.mp4, instead of both eyes
+        // side by side), --pitch=<degrees> with it (where that view looks, below (negative) or above the head),
+        // and --sound (what the PC plays, as an AAC track).
+        bool showcase=false, with_sound=false, pitched=false; double pitch=showcase_default_pitch;
+        while (argc>1 && std::wstring_view(argv[1]).starts_with(L"--")) {
+            const std::wstring_view option=argv[1];
+            if (option==L"--showcase") showcase=true;
+            else if (option==L"--sound") with_sound=true;
+            else if (option.starts_with(L"--pitch=")) {
+                const double degrees=std::stod(std::wstring(option.substr(8)));
+                if (!(degrees>=-40 && degrees<=20)) throw std::runtime_error("Showcase pitch must be -40..20 degrees");
+                pitch=degrees*std::acos(-1.0)/180; pitched=true;
+            } else throw std::runtime_error("Unknown option");
+            ++argv; --argc;
         }
-        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES]] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..1920), optional stop file");
+        if (pitched && !showcase) throw std::runtime_error("--pitch needs --showcase");
+        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES]] [--sound] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..2048), optional stop file");
         const UINT pid=std::stoul(argv[2]), seconds=std::stoul(argv[4]), fps=std::stoul(argv[5]), ew=std::stoul(argv[6]); out=argv[3];
-        if (!pid||seconds<1||seconds>300||fps<10||fps>60||ew<640||ew>1920||ew%2) throw std::runtime_error("Invalid recording bounds");
+        if (!pid||seconds<1||seconds>300||fps<10||fps>60||ew<640||ew>2048||ew%2) throw std::runtime_error("Invalid recording bounds");
         // Ends the recording cleanly when the game exits (a crash included) instead of waiting out the time.
         const HANDLE game=OpenProcess(SYNCHRONIZE,FALSE,pid);
         if (std::filesystem::exists(out)) throw std::runtime_error("Output exists; refusing to overwrite");
@@ -463,24 +684,28 @@ int wmain(int argc,wchar_t** argv) {
         ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
         check(D3D11CreateDevice(adapter.Get(),D3D_DRIVER_TYPE_UNKNOWN,nullptr,0,nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context));
         check(CoInitializeEx(nullptr,COINIT_MULTITHREADED)); com=true; check(MFStartup(MF_VERSION)); media=true;
+        // No output device (or an odd one): the picture is recorded alone and the report says why.
+        const bool sounding=with_sound && sound.open();
+        const auto sound_report=[&] { return report_sound(with_sound,sounding,sound); };
         if (showcase) {
             Eye eye; eye.open(compositor,device.Get(),0);
             float tan_l{},tan_r{},tan_t{},tan_b{}; system->GetProjectionRaw(vr::Eye_Left,&tan_l,&tan_r,&tan_t,&tan_b);
             const Quat eye_to_head=quat_from(system->GetEyeToHeadTransform(vr::Eye_Left));
             constexpr double max_angle=0.10, tau=0.35;
             const auto frame=showcase_frame(tan_l,tan_r,tan_t,tan_b,max_angle+0.02,pitch);
-            // Picture size 720 / 1024 / 1280 px per eye maps to 720p / 1080p / 1440p.
-            const UINT ow=ew<=720?1280u:ew<=1024?1920u:2560u, oh=ow*9/16;
-            const UINT bitrate=oh>=1440?40000000u:oh>=1080?24000000u:12000000u;
+            // Picture size 720 / 1024 / 1280 (or 1536) / 2048 px per eye maps to 720p / 1080p / 1440p / 2160p.
+            const UINT ow=ew<=720?1280u:ew<=1024?1920u:ew<=1536?2560u:3840u, oh=ow*9/16;
+            const UINT bitrate=oh>=2160?60000000u:oh>=1440?40000000u:oh>=1080?24000000u:12000000u;
             if (!std::filesystem::create_directories(out)) throw std::runtime_error("Output appeared during startup; refusing to overwrite");
             output_created=true;
-            encoder.open(out/L"showcase.mp4",ow,oh,fps,bitrate,true);
+            encoder.open(out/L"showcase.mp4",ow,oh,fps,bitrate,true,sounding?sound.rate:0);
             std::ofstream frames(out/L"frames.jsonl",std::ios::binary);
             if (!frames) throw std::runtime_error("Cannot write frame sidecar");
             ShowcaseCrop crop; crop.open(device.Get(),ow,oh);
             timeBeginPeriod(1);  // 2 ms polls: a new game frame is noticed within a few ms of arriving
             Steady steady; std::vector<BYTE> pixels,pending,print,last_print;
             Sleep(250); const auto start=std::chrono::steady_clock::now();
+            if (sounding) sound.begin(encoder,qpc_100ns());
             uint64_t count=0,unsteadied=0,too_soon=0; uint32_t last_index=0; bool have_index=false; const auto start_ms=utc();
             double pending_t=-1, waiting_since=-1;
             std::string end_reason="time_limit"; Json pauses=Json::array(); double paused_at=-1, t=0;
@@ -525,7 +750,7 @@ int wmain(int argc,wchar_t** argv) {
                 ++count; if (count%fps==0) frames.flush();
             }
             if (pending_t>=0) encoder.add(pending,static_cast<LONGLONG>(pending_t*10000000),10000000/fps);
-            encoder.close(); timeEndPeriod(1);
+            sound.finish(); encoder.close(); timeEndPeriod(1);
             if (paused_at>=0) pauses.push_back({{"from_s",paused_at},{"to_s",t}});
             const double elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
             result={{"status","recorded"},{"style","showcase"},{"end_reason",end_reason},{"scene_pauses",pauses},
@@ -536,7 +761,8 @@ int wmain(int argc,wchar_t** argv) {
                 {"source_eye_size",{eye.width,eye.height}},{"eye_tangents",{tan_l,tan_r,tan_t,tan_b}},
                 {"crop_half_tangents",{frame.half_width,frame.half_height}},{"crop_centre_tangents",{frame.centre_x,frame.centre_y}},{"pitch_degrees",pitch*180/std::acos(-1.0)},{"steady",{{"seconds",tau},{"margin_rad",max_angle}}},
                 {"method","OpenVR left-eye mirror; 16:9 view across the eye's width, lens shifted to the pitch, steadied with the pose each frame was rendered with"},
-                {"desktop_captured",false},{"input_sent",false},{"audio",false}};
+                {"desktop_captured",false},{"input_sent",false}};
+            result.update(sound_report());
             std::ofstream(out/L"recording.json")<<result.dump(2)<<'\n';
         } else {
             Eye eyes[2]; for (int i=0;i<2;++i) eyes[i].open(compositor,device.Get(),i);
@@ -544,12 +770,14 @@ int wmain(int argc,wchar_t** argv) {
             const UINT eh=std::max(2u,static_cast<UINT>(std::lround(double(ew)*eyes[0].height/eyes[0].width/2))*2);
             if (!std::filesystem::create_directories(out)) throw std::runtime_error("Output appeared during startup; refusing to overwrite");
             output_created=true;
-            encoder.open(out/L"clean-sbs.mp4",ew*2,eh,fps);
+            const UINT bitrate=sbs_bitrate(ew*2,eh,fps);
+            encoder.open(out/L"clean-sbs.mp4",ew*2,eh,fps,bitrate,true,sounding?sound.rate:0);
             std::ofstream frames(out/L"frames.jsonl",std::ios::binary);
             if (!frames) throw std::runtime_error("Cannot write frame sidecar");
             std::vector<BYTE> pixels(static_cast<size_t>(ew)*2*eh*4);
             StereoResize resize; resize.open(device.Get(),ew,eh);
             Sleep(250); const auto start=std::chrono::steady_clock::now();
+            if (sounding) sound.begin(encoder,qpc_100ns());
             uint64_t count=0; const auto start_ms=utc();
             // A hitch, loading stall or hang can hand SteamVR's scene to another process. Nothing is read
             // then (another application is never captured); the video holds its last frame and resumes
@@ -581,21 +809,22 @@ int wmain(int argc,wchar_t** argv) {
                 const auto remaining=std::chrono::duration_cast<std::chrono::milliseconds>(target-std::chrono::steady_clock::now()).count();
                 if (remaining>0) Sleep(static_cast<DWORD>(remaining));
             }
-            encoder.close();
+            sound.finish(); encoder.close();
             if (paused_at>=0) pauses.push_back({{"from_s",paused_at},{"to_s",t}});
             const double elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
             result={{"status","recorded"},{"end_reason",end_reason},{"scene_pauses",pauses},
-                {"pid",pid},{"started_unix_ms",start_ms},{"frames",count},{"width",ew*2},{"height",eh},
+                {"pid",pid},{"started_unix_ms",start_ms},{"frames",count},{"width",ew*2},{"height",eh},{"bitrate",bitrate},
                 {"fps_target",fps},{"captured_fps",count/elapsed},{"wall_seconds",elapsed},
                 {"timing","wall-clock presentation timestamps; encoder may repeat frames to meet target FPS"},
                 {"source_eye_size",{eyes[0].width,eyes[0].height}},{"method","OpenVR per-eye mirror; GPU SBS resize and one readback"},
-                {"stereo_gpu_synchronized",false},{"desktop_captured",false},{"input_sent",false},{"audio",false}};
+                {"stereo_gpu_synchronized",false},{"desktop_captured",false},{"input_sent",false}};
+            result.update(sound_report());
             std::ofstream(out/L"recording.json")<<result.dump(2)<<'\n';
         }
         shutdown(); initialized=false; FreeLibrary(library); library=nullptr; MFShutdown(); media=false; CoUninitialize(); com=false;
         std::cout<<result.dump()<<'\n'; return 0;
     } catch (const std::exception& e) {
-        try { encoder.close(); } catch (...) {}
+        sound.stop(); try { encoder.close(); } catch (...) {}
         if (output_created) std::ofstream(out/L"recording-error.txt")<<e.what()<<'\n';
         if (initialized&&shutdown) shutdown(); if (library) FreeLibrary(library); if (media) MFShutdown(); if (com) CoUninitialize();
         std::cerr<<e.what()<<'\n'; return 1;

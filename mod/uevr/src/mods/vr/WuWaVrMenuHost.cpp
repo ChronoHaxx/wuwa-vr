@@ -137,6 +137,12 @@ int camera_mode() {
     return mode ? mode->value() : 0;
 }
 
+// Freecam flying style: 0 Polar fly, 1 hover drone, 2 plane, 3 acro drone. Each has its own settings.
+int free_style() {
+    auto* style = typed<int32_t>("WuWaControls_FreeStyle");
+    return style ? style->value() : 0;
+}
+
 // Test plans switch settings by config key, exactly like the plugin API
 // (including the diorama, which is a request rather than a saved setting).
 wuwa_steps::Settings settings_access() {
@@ -716,8 +722,59 @@ Page camera_page() {
         page.items.push_back(setting_choice("Flying style",
             "Polar fly: simple flying. Hover drone: floats and drifts to a stop. Plane: always moves forward. Acro drone: full manual control.",
             "WuWaControls_FreeStyle", {"Polar fly", "Hover drone", "Plane", "Acro drone"}));
-        page.items.push_back(setting_slider("Speed", "How fast the freecam moves.", "WuWaControls_FreeSpeed", 50.0f, 3000.0f, 50.0f, "%.0f"));
-        page.items.push_back(setting_slider("Turn speed", "How fast the freecam turns.", "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f"));
+        // Only the chosen style's settings (owner, 18 Oct: Speed looked like it applied to every style).
+        switch (free_style()) {
+        case 0:
+            page.items.push_back(paragraph("Left stick moves where you look, right stick looks. LT rises, LB sinks, "
+                "RT flies 3 times faster."));
+            page.items.push_back(setting_slider("Speed", "How fast Polar fly moves, in game units (cm) a second.",
+                "WuWaControls_FreeSpeed", 50.0f, 3000.0f, 50.0f, "%.0f"));
+            page.items.push_back(setting_slider("Turn speed", "How fast the right stick turns and tilts the view, in degrees "
+                "a second.", "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f"));
+            break;
+        case 1:
+            page.items.push_back(paragraph("Left stick moves level with the ground, right stick looks. LT rises, LB sinks, "
+                "RT flies 3 times faster. Let go and it drifts to a hover."));
+            page.items.push_back(setting_slider("Speed", "Top speed of the hover drone, in game units (cm) a second.",
+                "WuWaControls_FreeSpeed", 50.0f, 3000.0f, 50.0f, "%.0f"));
+            page.items.push_back(setting_slider("Turn speed", "How fast the right stick turns and tilts the view, in degrees "
+                "a second.", "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f"));
+            page.items.push_back(setting_slider("Drift", "How quickly the drone speeds up and stops. Lower drifts longer.",
+                "WuWaControls_DroneResponse", 0.5f, 20.0f, 0.5f, "%.1f"));
+            page.items.push_back(setting_toggle("Lean the view", "Tilts the view sideways as the drone moves sideways.",
+                "WuWaControls_FlightRoll"));
+            break;
+        case 2:
+            page.items.push_back(paragraph("Always flies forward. Right stick pitches and banks, left stick steers. RT speeds "
+                "up, LT slows down, RB boosts, LB brakes."));
+            page.items.push_back(setting_slider("Cruise speed", "The plane's speed, in game units (cm) a second. RT and LT "
+                "change it in flight.", "WuWaControls_PlaneSpeed", 0.0f, 3000.0f, 50.0f, "%.0f"));
+            page.items.push_back(setting_slider("Turn speed", "How fast the plane banks, turns and climbs, in degrees a second.",
+                "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f"));
+            page.items.push_back(setting_toggle("Bank the view", "Tilts the view with the plane as it banks.",
+                "WuWaControls_FlightRoll"));
+            break;
+        default:
+            page.items.push_back(paragraph("Right stick rolls and pitches, left stick turns. Release the throttle, then tap RB "
+                "to arm; RB again disarms, LB + RB levels and stops. Gravity and momentum keep acting while armed."));
+            page.items.push_back(setting_choice("Throttle", "Right trigger, or the left stick up and down like a drone radio "
+                "(Mode 2; centred is half throttle).", "WuWaControls_AcroThrottle", {"Right trigger", "Left stick (Mode 2)"}));
+            page.items.push_back(setting_slider("Roll and pitch rate", "Fastest roll and pitch at full stick, in degrees a "
+                "second.", "WuWaControls_AcroRate", 30.0f, 1000.0f, 10.0f, "%.0f"));
+            page.items.push_back(setting_slider("Yaw rate", "Fastest turn at full stick, in degrees a second.",
+                "WuWaControls_AcroYawRate", 30.0f, 720.0f, 10.0f, "%.0f"));
+            page.items.push_back(setting_slider("Expo", "Softens the sticks near the centre for fine control; full stick "
+                "still reaches the full rate.", "WuWaControls_AcroExpo", 0.0f, 0.9f, 0.05f, "%.2f"));
+            page.items.push_back(setting_slider("Thrust", "Full throttle as a multiple of the drone's weight.",
+                "WuWaControls_AcroThrust", 1.1f, 10.0f, 0.1f, "%.1fx"));
+            page.items.push_back(setting_slider("Air drag", "How quickly the air slows the drone down.",
+                "WuWaControls_AcroDrag", 0.0f, 3.0f, 0.05f, "%.2f"));
+            page.items.push_back(setting_slider("Camera tilt", "Camera angle up from the drone's body, like a real FPV "
+                "camera. More tilt suits faster flight.", "WuWaControls_AcroTilt", 0.0f, 60.0f, 1.0f, "%.0f deg"));
+            page.items.push_back(setting_toggle("Invert pitch", "Pulling the right stick back pitches down instead of up.",
+                "WuWaControls_AcroInvertPitch"));
+            break;
+        }
         page.items.push_back(setting_toggle("Collide with the world",
             "Stops the freecam at walls and the ground. Experimental.", "WuWaControls_FreeCollision"));
         page.items.push_back(action("Leave freecam", "Back to the game camera.", [] {
@@ -1022,8 +1079,8 @@ Page record_page() {
     page.items.push_back(live_text([] { return recorder_line(); }));
     page.items.push_back(setting_choice("Video style",
         "Showcase: the left eye as a normal 16:9 video, steadied, with the HUD where you see it, at the game's own "
-        "frame rate. Picture size 720, 1024 or 1280 px gives 720p, 1080p or 1440p. Needs SteamVR. Side by side: "
-        "both eyes, to help find what went wrong.",
+        "frame rate. Picture size 720, 1024, 1280 or 2048 px gives 720p, 1080p, 1440p or 2160p. Needs SteamVR. "
+        "Side by side: both eyes, the whole view of each.",
         "WuWaRecording_Style", {"Both eyes, side by side", "Showcase: one eye, steady, 16:9"}));
     {
         auto height = setting_slider("Showcase view height",
@@ -1034,8 +1091,12 @@ Page record_page() {
         page.items.push_back(std::move(height));
     }
     page.items.push_back(setting_choice("Frame rate", "Frames per second in the video.", "WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}));
-    page.items.push_back(setting_choice("Picture size", "Width per eye. Larger is sharper and makes bigger files.",
-        "WuWaRecording_Width", {"720 px", "1024 px", "1280 px"}));
+    page.items.push_back(setting_choice("Picture size", "Width per eye. Larger is sharper and makes bigger files. "
+        "1536 and 2048 px need SteamVR; at 2048 px, 30 or 45 fps keeps up best.",
+        "WuWaRecording_Width", {"720 px", "1024 px", "1280 px", "1536 px", "2048 px"}));
+    page.items.push_back(setting_toggle("Record sound",
+        "Everything your PC plays goes into the video: the game, and also voice chat and notifications. "
+        "SteamVR recordings only.", "WuWaRecording_Sound"));
     page.items.push_back(setting_toggle("Camera and controller data",
         "Saves the camera and controller movement next to the video, to help find what went wrong.", "WuWaRecording_Telemetry"));
     page.items.push_back(paragraph("Desktop window", true));
@@ -1162,7 +1223,8 @@ Page menu_page() {
 std::string layout_key() {
     // The language picker lists names drawn for the current language.
     return (steps.loaded() ? "plan " + std::to_string(steps.revision()) : std::string{"no plan"}) + ", camera " +
-        std::to_string(camera_mode()) + ", language " + wuwa_l10n::language() +
+        std::to_string(camera_mode()) + (camera_mode() == 2 ? ", flying " + std::to_string(free_style()) : std::string{}) +
+        ", language " + wuwa_l10n::language() +
         (wuwa_lgui_viewport::installed() ? (VR::get()->is_wuwa_ui_window_size_enabled() ? ", window-size UI" : ", tall UI") : "");
 }
 

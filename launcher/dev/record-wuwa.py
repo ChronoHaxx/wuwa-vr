@@ -178,6 +178,11 @@ def make_replay(folder: Path):
     return report
 
 
+# Pixels per eye. 1536 and 2048 are SteamVR only: 2048 makes a 4096x2048 side-by-side video, the
+# widest H.264 allows; the simulator recorder stops at 1280.
+EYE_WIDTHS = (720, 1024, 1280, 1536, 2048)
+
+
 def recorder_command(args, client):
     source=getattr(args,'source','auto')
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording')
@@ -208,6 +213,7 @@ def recorder_command(args, client):
         if runtime is None: raise RuntimeError('No current simulator status for this game process')
         # The showcase view steadies with the headset pose each frame was rendered with: SteamVR only.
         if style=='showcase': raise RuntimeError('The showcase video needs SteamVR; the OpenXR Simulator records side by side only')
+        if args.eye_width > 1280: raise RuntimeError('The OpenXR Simulator records up to 1280 px per eye; 1536 and 2048 need SteamVR')
         if runtime.get('video_stream_version') != 1:
             raise RuntimeError('This simulator needs the recording update; no runtime was changed')
         exe=Path(getattr(args,'simulator_recorder',ROOT/'dev-tools/wuwa-simulator-recorder.exe')).resolve()
@@ -221,6 +227,8 @@ def recorder_command(args, client):
         pitch=getattr(args,'pitch',None)
         if pitch is not None and (type(pitch) is not int or not -40<=pitch<=20): raise ValueError('Choose a showcase pitch of -40..20 degrees')
         flags=(['--showcase']+([f'--pitch={pitch}'] if pitch is not None else [])) if style=='showcase' else []
+        # --sound: what the PC plays (the headset's output while SteamVR runs) as an AAC track.
+        if getattr(args,'sound',False): flags.append('--sound')
         prefix=[str(exe)]+flags+[str(openvr)]; source='steamvr'
     return source, prefix+[str(client.pid),str(args.output.resolve()),str(args.seconds),
         str(args.fps),str(args.eye_width),str(args.stop_file.resolve())]
@@ -229,7 +237,7 @@ def recorder_command(args, client):
 def record(args):
     if type(args.seconds) is not int or not 1<=args.seconds<=300: raise ValueError('Choose 1..300 seconds')
     if type(args.fps) is not int or args.fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps')
-    if type(args.eye_width) is not int or args.eye_width not in (720,1024,1280): raise ValueError('Choose 720, 1024 or 1280 pixels per eye')
+    if type(args.eye_width) is not int or args.eye_width not in EYE_WIDTHS: raise ValueError('Choose 720, 1024, 1280, 1536 or 2048 pixels per eye')
     if args.output.exists(): raise ValueError("Output already exists; preserve it and choose a new folder")
     sequence_module = plan = None
     if getattr(args, 'input_plan', None) is not None:
@@ -303,7 +311,8 @@ def main(argv=None):
     p.add_argument("output",type=Path)
     p.add_argument("--seconds",type=int,choices=range(1,301),metavar="1..300",default=120)
     p.add_argument("--fps",type=int,choices=(30,45,60),default=30)
-    p.add_argument("--eye-width",type=int,choices=(720,1024,1280),default=1024)
+    p.add_argument("--eye-width",type=int,choices=EYE_WIDTHS,default=1024)
+    p.add_argument("--sound",action="store_true",help="SteamVR: record what the PC plays (game, voice chat, notifications) as an AAC track")
     p.add_argument("--source",choices=('auto','steamvr','simulator'),default='auto')
     p.add_argument("--style",choices=('sbs','showcase'),default='sbs',
                    help="showcase: the left eye as a steadied 16:9 video (SteamVR only) instead of both eyes side by side")

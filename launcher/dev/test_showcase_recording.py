@@ -65,6 +65,17 @@ class BridgeStyle(unittest.TestCase):
         self.assertTrue(self.send(style='sbs')['ok'])
         self.assertEqual(self.started, [((True, 60, 1280, 42), {})] * 2)
 
+    def test_sound_and_large_sizes_reach_the_launcher(self):
+        self.assertTrue(self.send(sound=False, eye_width=2048)['ok'])
+        self.assertTrue(self.send(style='showcase', sound=True, eye_width=1536, id='s2')['ok'])
+        self.assertEqual(self.started, [((True, 60, 2048, 42), {'sound': False}),
+                                        ((True, 60, 1536, 42), {'style': 'showcase', 'sound': True})])
+        reply = self.send(sound='yes', id='s3')
+        self.assertFalse(reply['ok'])
+        self.assertIn('sound', reply['message'])
+        reply = self.send(eye_width=1920, id='s4')
+        self.assertFalse(reply['ok'])
+
     def test_unknown_style_is_refused(self):
         reply = self.send(style='desktop')
         self.assertFalse(reply['ok'])
@@ -102,6 +113,26 @@ class RecorderCommand(unittest.TestCase):
             self.assertFalse(any(c.startswith('--pitch') for c in command))
             with self.assertRaisesRegex(ValueError, 'pitch'):
                 recorder.recorder_command(self.args(Path(d), style='showcase', pitch=30), client)
+
+    def test_sound_flag_for_steamvr(self):
+        with tempfile.TemporaryDirectory() as d:
+            client = types.SimpleNamespace(pid=42, simulator=Path(d) / 'sim', created=0)
+            source, command = recorder.recorder_command(self.args(Path(d), sound=True, eye_width=2048), client)
+            self.assertEqual(command[1], '--sound')
+            self.assertEqual(command[-2], '2048')
+            source, command = recorder.recorder_command(self.args(Path(d), style='showcase', pitch=-10, sound=True), client)
+            self.assertEqual(command[1:4], ['--showcase', '--pitch=-10', '--sound'])
+            source, command = recorder.recorder_command(self.args(Path(d)), client)
+            self.assertNotIn('--sound', command)
+
+    def test_simulator_stops_at_1280(self):
+        with tempfile.TemporaryDirectory() as d:
+            client = types.SimpleNamespace(pid=42, simulator=Path(d) / 'sim', created=0)
+            client.simulator.mkdir()
+            (client.simulator / 'runtime_status.json').write_text('{}', encoding='utf-8')
+            with patch.object(recorder.live, 'fresh_json', return_value={'runtime_pid': 42, 'video_stream_version': 1}):
+                with self.assertRaisesRegex(RuntimeError, '1280'):
+                    recorder.recorder_command(self.args(Path(d), eye_width=1536, source='auto'), client)
 
     def test_simulator_refuses_showcase(self):
         with tempfile.TemporaryDirectory() as d:

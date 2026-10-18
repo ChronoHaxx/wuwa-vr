@@ -31,6 +31,7 @@
     "Apply without launching": "仅应用，不启动",
     "Stop waiting": "停止等待",
     "Record gameplay": "录制游戏",
+    "Record sound (SteamVR): everything your PC plays, voice chat and notifications included": "录制声音（SteamVR）：电脑播放的所有声音，包括语音聊天和通知音",
     "Purpose": "用途",
     "Playtest with camera and Xbox data": "游戏测试：含镜头和 Xbox 数据",
     "Content creation: clean video only": "内容制作：仅纯净视频",
@@ -69,7 +70,7 @@
     "start": "阅读并接受风险说明，选择版本，点击“应用并启动”。允许 Windows 的注入权限请求，然后在游戏启动器中点击开始游戏。独立官方启动器是已测试的方式；Steam/Epic 版注入仍未经验证。",
     "controls": "L3 + R3 打开 WuWa VR 菜单。想知道每个按键的作用，按住 L3 或 LT + RT 半秒即可。L3 + B 显示/隐藏 HUD 和菜单；L3 + A 重置视角中心；L3 + LB 切换 HUD/鼠标模式。使用游戏快捷键前请关闭菜单。",
     "recovery": "“重置此版本”会备份现有配置并恢复随包配置。“恢复使用 WuWa VR 前的设置”恢复先前配置。卸载时先恢复头显运行时和设置，停止启动器，再删除解压文件夹。",
-    "recording": "录制支持 SteamVR 和更新后的 OpenXR Simulator，暂不支持 VDXR、桌面或声音录制。保持模拟器预览窗口开启，选择 Both eyes、side-by-side，关闭 Full render。旧安装包的模拟器需在关闭游戏后，通过运行时按钮切换为本包版本。",
+    "recording": "录制支持 SteamVR 和更新后的 OpenXR Simulator，不支持 VDXR 或桌面录制；声音仅在使用 SteamVR 时录制。保持模拟器预览窗口开启，选择 Both eyes、side-by-side，关闭 Full render。旧安装包的模拟器需在关闭游戏后，通过运行时按钮切换为本包版本。",
     "scope": "启动器主要控件和本设置指南已翻译。部分版本描述、开发工具及诊断错误仍为英文。翻译为初稿；此选择不会更改游戏或 UEVR 的语言。",
     "support": "免费同人项目。赞助完全自愿，不保证后续更新或长期支持。代码与反馈：https://github.com/ChronoHaxx/wuwa-vr — 自愿赞助：https://ko-fi.com/chronohax"
   }

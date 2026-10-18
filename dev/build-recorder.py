@@ -4,7 +4,8 @@
     python dev/build-recorder.py [--out builds/next-release-1.2.4/recorder]
 
 Builds in %TEMP%/wuwa-recorder-build (the system SSD, not the USB drive), then runs the GPU and encoder
-self-tests: side by side, the showcase view, and a 1440p High-profile encode. With --out, the tested
+self-tests: side by side, the showcase view, a 1440p High-profile encode, and the largest side-by-side
+video (4096x2048) with a sound track. With --out, the tested
 wuwa-recorder.exe is copied there (for dev/candidate.py --recorder or a release). No game or VR access.
 """
 import argparse
@@ -39,6 +40,8 @@ def main(argv=None) -> int:
     with tempfile.TemporaryDirectory(prefix='wuwa-recorder-test ') as scratch:
         run(exe, '--self-test', Path(scratch) / 'sbs.mp4', '60')
         run(exe, '--self-test-showcase', Path(scratch) / 'showcase.mp4')
+        # 2048 px per eye (4096x2048) with a sound track, and 1.2 s of real loopback when there is an output.
+        run(exe, '--self-test-large', Path(scratch) / 'large.mp4')
     if a.out:
         a.out.mkdir(parents=True, exist_ok=True)
         shutil.copy2(exe, a.out / exe.name)

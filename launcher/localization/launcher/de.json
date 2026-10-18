@@ -31,6 +31,7 @@
     "Apply without launching": "Anwenden ohne Start",
     "Stop waiting": "Warten beenden",
     "Record gameplay": "Spiel aufnehmen",
+    "Record sound (SteamVR): everything your PC plays, voice chat and notifications included": "Ton aufnehmen (SteamVR): alles, was dein PC abspielt, auch Sprachchat und Benachrichtigungen",
     "Purpose": "Zweck",
     "Playtest with camera and Xbox data": "Spieltest mit Kamera- und Xbox-Daten",
     "Content creation: clean video only": "Inhaltserstellung: nur Video",
@@ -69,7 +70,7 @@
     "start": "Lies und akzeptiere den Risikohinweis, wähle eine Version und klicke auf Anwenden und starten. Bestätige die Windows-Berechtigung zur Injection und drücke Spielen im Spiel-Launcher. Getestet wurde der eigenständige offizielle Launcher; Steam/Epic-Injection ist nicht bestätigt.",
     "controls": "L3 + R3 öffnet das WuWa-VR-Menü. Was jede Taste tut, siehst du, wenn du L3 oder LT + RT eine halbe Sekunde hältst. L3 + B zeigt/verbirgt HUD und Menüs; L3 + A zentriert; L3 + LB schaltet den HUD-/Mausmodus um. Schließe das Menü vor Spiel-Tastenkombinationen.",
     "recovery": "Diese Version zurücksetzen sichert deine Einstellungen und stellt das mitgelieferte Profil wieder her. Frühere Einstellungen wiederherstellen lädt deine vorherige Konfiguration. Zum Entfernen zuerst Headset-Laufzeit und Einstellungen wiederherstellen, den Launcher stoppen und den entpackten Ordner löschen.",
-    "recording": "Aufnahmen unterstützen SteamVR und den aktualisierten OpenXR Simulator. VDXR, Desktop und Ton werden nicht unterstützt. Lasse die Vorschau mit Both eyes und side-by-side offen; Full render bleibt aus. Wechsle einen alten Simulator nach dem Schließen des Spiels über die Laufzeit-Schaltfläche.",
+    "recording": "Aufnahmen unterstützen SteamVR und den aktualisierten OpenXR Simulator. VDXR und Desktop werden nicht unterstützt; Ton wird nur mit SteamVR aufgenommen. Lasse die Vorschau mit Both eyes und side-by-side offen; Full render bleibt aus. Wechsle einen alten Simulator nach dem Schließen des Spiels über die Laufzeit-Schaltfläche.",
     "scope": "Die wichtigsten Launcher-Bedienelemente und diese Anleitung sind übersetzt. Einige Versionsbeschreibungen, Entwicklerwerkzeuge und Diagnosefehler bleiben Englisch. Die Übersetzungen sind Entwürfe; Spiel- und UEVR-Sprache bleiben unverändert.",
     "support": "Kostenloses Fanprojekt. Spenden sind freiwillig und garantieren keine Updates oder dauerhafte Unterstützung. Code und Feedback: https://github.com/ChronoHaxx/wuwa-vr — freiwillige Unterstützung: https://ko-fi.com/chronohax"
   }

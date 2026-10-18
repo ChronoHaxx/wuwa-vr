@@ -31,6 +31,7 @@
     "Apply without launching": "Aplicar sem iniciar",
     "Stop waiting": "Parar de esperar",
     "Record gameplay": "Gravar jogo",
+    "Record sound (SteamVR): everything your PC plays, voice chat and notifications included": "Gravar som (SteamVR): tudo o que o PC toca, incluindo chat de voz e notificações",
     "Purpose": "Finalidade",
     "Playtest with camera and Xbox data": "Teste com dados de câmera e Xbox",
     "Content creation: clean video only": "Criação de conteúdo: apenas vídeo",
@@ -69,7 +70,7 @@
     "start": "Leia e aceite o aviso de risco, escolha uma versão e clique em Aplicar e iniciar. Aceite a permissão do Windows para a injeção e clique em Jogar no launcher. A opção testada é o launcher oficial independente; a injeção nas versões Steam/Epic ainda não foi verificada.",
     "controls": "L3 + R3 abre o menu do WuWa VR. Para ver o que cada botão faz, segure L3 ou LT + RT por meio segundo. L3 + B mostra/oculta HUD e menus; L3 + A recentraliza; L3 + LB alterna o modo HUD/mouse. Feche o menu antes de usar atalhos do jogo.",
     "recovery": "Redefinir esta versão faz um backup e restaura o perfil incluído. Restaurar minhas configurações anteriores recupera sua configuração original. Para remover o mod, restaure o runtime do headset e suas configurações, pare o launcher e apague a pasta extraída.",
-    "recording": "A gravação suporta SteamVR e o OpenXR Simulator atualizado. VDXR, área de trabalho e áudio não são suportados. Mantenha a prévia aberta em Both eyes e side-by-side, com Full render desligado. Troque simuladores antigos pelo botão de runtime após fechar o jogo.",
+    "recording": "A gravação suporta SteamVR e o OpenXR Simulator atualizado. VDXR e área de trabalho não são suportados; o som só é gravado com SteamVR. Mantenha a prévia aberta em Both eyes e side-by-side, com Full render desligado. Troque simuladores antigos pelo botão de runtime após fechar o jogo.",
     "scope": "Os controles principais do launcher e este guia estão traduzidos. Algumas descrições de versões, ferramentas de desenvolvimento e erros continuam em inglês. São traduções iniciais; esta opção não muda o idioma do jogo nem do UEVR.",
     "support": "Projeto gratuito de fãs. Apoio é opcional e não garante atualizações ou suporte contínuo. Código e feedback: https://github.com/ChronoHaxx/wuwa-vr — apoio opcional: https://ko-fi.com/chronohax"
   }

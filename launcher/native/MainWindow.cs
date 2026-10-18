@@ -79,7 +79,7 @@ namespace WuWaVR.Manager
         FrameworkElement versionConsent;
         Border connectionPanel;
         TextBlock connectionMessage;
-        CheckBox compatible, risk;
+        CheckBox compatible, risk, recordSound;
         TextBlock gamePath, gameHint, runtime, runtimeHint, packageState, launchState, catalogState, operationText, gameVersion, recordingState, riskNotice;
         GameDiscovery.Result discovery;
         StackPanel gameLocationOptions;
@@ -803,17 +803,20 @@ namespace WuWaVR.Manager
         {
             source = Choice(text["auto"], text["steamvr"], text["simulator"]);
             source.SelectionChanged += (s, e) => { if (!rendering) ShowStatus(); };
-            fps = Choice("30", "45", "60"); size = Choice("720", "1024", "1280"); size.SelectedIndex = 1; purpose = Choice(text["videoOnly"], text["playtest"]);
+            fps = Choice("30", "45", "60"); size = Choice("720", "1024", "1280", "1536", "2048"); size.SelectedIndex = 1; purpose = Choice(text["videoOnly"], text["playtest"]);
             var panel = new StackPanel(); panel.Children.Add(Label(text["recordInfo"], 14, muted));
             recordingState = Label("", 12, accent); panel.Children.Add(recordingState);
             recordingOptions = new Expander { Header = text["recordOptions"], Foreground = muted, Margin = new Thickness(0, 12, 0, 0), Content = new StackPanel() };
             ((StackPanel)recordingOptions.Content).Children.Add(CaptureFields("source", source, "purpose", purpose));
             ((StackPanel)recordingOptions.Content).Children.Add(CaptureFields("fps", fps, "eyeSize", size));
+            // 1.2.5: the video's sound track, what the PC plays (SteamVR recordings).
+            recordSound = new CheckBox { Content = Label(text["recordSound"], 12), Foreground = foreground, IsChecked = true, Margin = new Thickness(0, 10, 0, 0) };
+            ((StackPanel)recordingOptions.Content).Children.Add(recordSound);
             panel.Children.Add(Card(text["record"], Label(text["recordDefaults"], 12, muted),
                 Wrap(Action("recordStart", async c =>
                 {
                     await EnsureConnected(c);
-                    await SubmitJob("/api/record-start", new { videoOnly = purpose.SelectedIndex == 0, fps = int.Parse((string)fps.SelectedItem), eyeWidth = int.Parse((string)size.SelectedItem), source = new[] { "auto", "steamvr", "simulator" }[source.SelectedIndex] }, c);
+                    await SubmitJob("/api/record-start", new { videoOnly = purpose.SelectedIndex == 0, fps = int.Parse((string)fps.SelectedItem), eyeWidth = int.Parse((string)size.SelectedItem), sound = recordSound.IsChecked == true, source = new[] { "auto", "steamvr", "simulator" }[source.SelectedIndex] }, c);
                 }, true), Action("recordStop", async c => { await EnsureConnected(c); await bridge.Post("/api/record-stop", new { }, c); }),
                 Action("openRecordings", async c => { await EnsureConnected(c); await bridge.Post("/api/open", new { folder = "recordings" }, c); operationText.Text = text["folderOpened"]; })), recordingOptions));
             panel.Children.Add(Label(text["recordPrivacy"], 12, muted)); return panel;
@@ -1715,6 +1718,7 @@ namespace WuWaVR.Manager
             UpdateControllerCheck();
             UpdateProcessRecovery();
             foreach (var choice in new[] { releases, installed, source, fps, size, purpose, gameLocations }) choice.IsEnabled = operation == null && !running;
+            if (recordSound != null) recordSound.IsEnabled = operation == null && !running;
             bool active = operation != null || running;
             recoveryShortcut.Visibility = unresolvedStartup || (hasPackage && !connectionReady) || workerFailed ? Visibility.Visible : Visibility.Collapsed;
             bool canCancel = operation != null || (bridge.Address != null && LauncherBridge.CanCancelLaunch(status));

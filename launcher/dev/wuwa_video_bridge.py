@@ -45,7 +45,7 @@ class Bridge:
 
     def validate(self, request, game):
         allowed = {'version', 'session', 'id', 'pid', 'created_ms', 'expires_ms',
-                   'action', 'fps', 'eye_width', 'telemetry', 'recording_id', 'style', 'showcase_pitch'}
+                   'action', 'fps', 'eye_width', 'telemetry', 'recording_id', 'style', 'showcase_pitch', 'sound'}
         if set(request) - allowed:
             raise ValueError('Unknown recording request field')
         if type(request.get('version')) is not int or request['version'] != 1 or request.get('session') != self.session:
@@ -64,11 +64,14 @@ class Bridge:
             raise ValueError('Recording request expired')
         action = request.get('action')
         if action == 'start':
-            for name, choices in (('fps', (30, 45, 60)), ('eye_width', (720, 1024, 1280))):
+            for name, choices in (('fps', (30, 45, 60)), ('eye_width', (720, 1024, 1280, 1536, 2048))):
                 if type(request.get(name)) is not int or request[name] not in choices:
                     raise ValueError('Unsupported recording ' + name)
             if type(request.get('telemetry')) is not bool:
                 raise ValueError('Choose whether to include camera/controller data')
+            # Absent from older plugins: sound on (the recorder's default since 1.2.5).
+            if type(request.get('sound', True)) is not bool:
+                raise ValueError('Choose whether to record sound')
             # Absent from older plugins: the side-by-side recording.
             if request.get('style', 'sbs') not in ('sbs', 'showcase'):
                 raise ValueError('Unsupported recording style')
@@ -114,13 +117,15 @@ class Bridge:
                         self.seen.clear()
                     self.seen.add(identity)
                     if request['action'] == 'start':
+                        sound = {'sound': request['sound']} if 'sound' in request else {}
                         if request.get('style', 'sbs') == 'showcase':
                             extra = {'pitch': request['showcase_pitch']} if 'showcase_pitch' in request else {}
+                            extra.update(sound)
                             self.start(not request['telemetry'], request['fps'],
                                        request['eye_width'], game['pid'], style='showcase', **extra)
                         else:
                             self.start(not request['telemetry'], request['fps'],
-                                       request['eye_width'], game['pid'])
+                                       request['eye_width'], game['pid'], **sound)
                         message = 'Starting recording'
                     else:
                         self.stop(request['recording_id'])

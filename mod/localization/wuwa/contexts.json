@@ -60,7 +60,13 @@
   "1280 px": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "1536 px": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "16:9 UI layout": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "2048 px": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "30 fps": [
@@ -145,6 +151,9 @@
   "Aiming and right-stick pitch": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Air drag": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Air drag (per second)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -190,6 +199,9 @@
   ],
   "Always (manual mask)": [
     "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Always flies forward. Right stick pitches and banks, left stick steers. RT speeds up, LT slows down, RB boosts, LB brakes.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Ambient occlusion": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -289,6 +301,9 @@
   "Back to the game camera.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Bank the view": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Black bars": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -372,6 +387,9 @@
   "Camera and gameplay controls": [
     "mods/VR.cpp"
   ],
+  "Camera angle up from the drone's body, like a real FPV camera. More tilt suits faster flight.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Camera collision radius (game units)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -379,6 +397,9 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Camera position": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Camera tilt": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Camera up / down": [
@@ -522,6 +543,9 @@
   "Covers the ID row on the ESC profile screen too.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Cruise speed": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Current renderer: %s": [
     "mods/VR.cpp"
   ],
@@ -659,6 +683,9 @@
   "Draws the missing eye of the world-label stage with its own camera and depth rectangle. Requires the matching candidate DLL and native stereo without Native Stereo Fix. Unsupported layouts keep the original rendering. NPC/bubble acceptance is pending; this does not repair reflections or character materials.": [
     "mods/VR.cpp"
   ],
+  "Drift": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Drone response (higher = less drift)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -710,6 +737,9 @@
   "Everything else: {L3}+{R3} opens the WuWa VR menu": [
     "utility/WuWaShortcutSheet.cpp"
   ],
+  "Everything your PC plays goes into the video: the game, and also voice chat and notifications. SteamVR recordings only.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Exact animation (stick does not steer view)": [
     "mods/vr/WuWaControlsComponent.hpp"
   ],
@@ -717,6 +747,9 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Expect: ": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Expo": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Extract additional game menus (experimental)": [
@@ -738,6 +771,12 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Far trees and props switch detail together in both eyes. Recommended.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Fastest roll and pitch at full stick, in degrees a second.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Fastest turn at full stick, in degrees a second.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Fill whole frame (stretch)": [
@@ -955,6 +994,9 @@
   ],
   "Full speed while Polar walk is on": [
     "mod/controls.json"
+  ],
+  "Full throttle as a multiple of the drone's weight.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Full-resolution translucent materials in stereo (candidate)": [
     "mods/VR.cpp"
@@ -1244,10 +1286,13 @@
   "How far behind your character the camera stays, in game units (centimetres).": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "How fast the freecam moves.": [
+  "How fast Polar fly moves, in game units (cm) a second.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "How fast the freecam turns.": [
+  "How fast the plane banks, turns and climbs, in degrees a second.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "How fast the right stick turns and tilts the view, in degrees a second.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "How high above your character the camera sits, in game units. In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.": [
@@ -1263,6 +1308,12 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "How near Close-up match may bring you to the person in the shot. Lower comes closer. Close-up match at 100 already gives the 2D size; this only stops it short when the shot is very tight.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "How quickly the air slows the drone down.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "How quickly the drone speeds up and stops. Lower drifts longer.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "How small the world gets in diorama. 10x is an action-figure view. The diorama has its own camera distance (Camera page).": [
@@ -1321,6 +1372,9 @@
   ],
   "Invert acro pitch stick": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Invert pitch": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Joint inspector (left-eye preview)": [
     "mods/vr/runtimes/OpenXR.cpp"
@@ -1550,6 +1604,9 @@
   "Launch settings include any custom settings saved before starting this game. Supplied profile controls are the build's original choices, not UEVR factory defaults.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Lean the view": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Leave first person": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -1575,11 +1632,20 @@
   "Left stick": [
     "mod/controls.json"
   ],
+  "Left stick (Mode 2)": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Left stick Cursor    A Click    B Back": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Left stick Y (Mode 2)": [
     "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Left stick moves level with the ground, right stick looks. LT rises, LB sinks, RT flies 3 times faster. Let go and it drifts to a hover.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Left stick moves where you look, right stick looks. LT rises, LB sinks, RT flies 3 times faster.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Legacy automatic mouse can intercept game menu buttons. Manual L3 + LB adjustment remains the normal choice.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -1995,6 +2061,9 @@
   "Profile ID top (16:9)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Pulling the right stick back pitches down instead of up.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Puts the camera back at the game's spot now, as L3 + Y + X does. Only while a nudge is in use.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2043,6 +2112,12 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Record camera and Xbox diagnostics": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Record sound": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Record sound (everything the PC plays)": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Record video": [
@@ -2195,8 +2270,17 @@
   "Right / left": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Right stick rolls and pitches, left stick turns. Release the throttle, then tap RB to arm; RB again disarms, LB + RB levels and stops. Gravity and momentum keep acting while armed.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Right trigger": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Right trigger (Xbox)": [
     "mods/vr/WuWaControlsComponent.hpp"
+  ],
+  "Right trigger, or the left stick up and down like a drone radio (Mode 2; centred is half throttle).": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Right-stick pitch; animated yaw and roll": [
     "mods/vr/WuWaControlsComponent.hpp"
@@ -2218,6 +2302,9 @@
   ],
   "Rim workaround waits for the current graphics comparison to end.": [
     "utility/WuWaRimSuppressionPolicy.hpp"
+  ],
+  "Roll and pitch rate": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Run on: %s, walking %s, %.2f km in the game.": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2346,7 +2433,7 @@
     "mods/vr/WuWaControlsComponent.hpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Showcase: the left eye as a normal 16:9 video, steadied, with the HUD where you see it, at the game's own frame rate. Picture size 720, 1024 or 1280 px gives 720p, 1080p or 1440p. Needs SteamVR. Side by side: both eyes, to help find what went wrong.": [
+  "Showcase: the left eye as a normal 16:9 video, steadied, with the HUD where you see it, at the game's own frame rate. Picture size 720, 1024, 1280 or 2048 px gives 720p, 1080p, 1440p or 2160p. Needs SteamVR. Side by side: both eyes, the whole view of each.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Shows 3 times, then turns itself off (Cinema page).": [
@@ -2417,6 +2504,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Soft contact shadows in corners and under objects. On by default. It keeps the game's own setting and renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is slightly softer. Off is a little faster.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Softens the sticks near the centre for fine control; full stick still reaches the full rate.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Something else": [
@@ -2637,6 +2727,9 @@
   "The hold gesture is unavailable while Enable motion-controller input is on; use this checkbox.": [
     "mods/VR.cpp"
   ],
+  "The plane's speed, in game units (cm) a second. RT and LT change it in flight.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "The previous character rim value was restored and verified.": [
     "utility/WuWaRimSuppressionPolicy.hpp"
   ],
@@ -2685,11 +2778,26 @@
   "This runtime cannot identify optical hands. Controller-derived joints are not shown.": [
     "mods/vr/runtimes/OpenXR.cpp"
   ],
+  "Throttle": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Thrust": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Tilts the view sideways as the drone moves sideways.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Tilts the view with the plane as it banks.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Times your run and saves your route in the game once a second, with a sync flash for OBS videos. With Reality Runner open, walking starts a run by itself (Controllers page).": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Toggle HUD / mouse adjustment": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Top speed of the hover drone, in game units (cm) a second.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Trace mesh triangles when supported": [
     "mods/vr/WuWaControlsComponent.cpp"
@@ -2930,7 +3038,7 @@
   "Wide 90 degrees": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Width per eye. Larger is sharper and makes bigger files.": [
+  "Width per eye. Larger is sharper and makes bigger files. 1536 and 2048 px need SteamVR; at 2048 px, 30 or 45 fps keeps up best.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Window alignment down / up": [
@@ -2994,6 +3102,9 @@
   ],
   "Y + X together: back to the game's spot": [
     "utility/WuWaShortcutSheet.cpp"
+  ],
+  "Yaw rate": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Yaw rate (degrees / second)": [
     "mods/vr/WuWaControlsComponent.cpp"

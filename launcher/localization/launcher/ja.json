@@ -31,6 +31,7 @@
     "Apply without launching": "起動せず適用",
     "Stop waiting": "待機を停止",
     "Record gameplay": "ゲームを録画",
+    "Record sound (SteamVR): everything your PC plays, voice chat and notifications included": "音声を録音 (SteamVR): PC で再生されるすべての音。ボイスチャットや通知音も含みます",
     "Purpose": "用途",
     "Playtest with camera and Xbox data": "テスト：カメラとXboxデータ付き",
     "Content creation: clean video only": "動画制作：映像のみ",
@@ -69,7 +70,7 @@
     "start": "リスク説明に同意し、ビルドを選んで「適用して起動」を押します。注入のWindows許可に同意し、ゲームランチャーでプレイを押してください。確認済みなのは独立した公式ランチャーです。Steam/Epic版への注入は未確認です。",
     "controls": "L3 + R3でWuWa VRメニューを開きます。各ボタンの役割は、L3かLT + RTを0.5秒押したままにすると表示されます。L3 + BでHUDとメニューの表示切替、L3 + Aでリセンター、L3 + LBでHUD／マウスモードを切り替えます。ゲーム用ショートカットの前にメニューを閉じてください。",
     "recovery": "「このビルドをリセット」はバックアップ後に同梱設定へ戻します。「導入前の設定を復元」は元の設定を戻します。削除する場合はヘッドセットのランタイムと設定を復元し、ランチャーを停止してから展開フォルダーを削除します。",
-    "recording": "録画はSteamVRと更新版OpenXR Simulatorに対応します。VDXR、デスクトップ、音声の録画には未対応です。プレビューを開き、Both eyesとside-by-sideを選び、Full renderをオフにします。古いシミュレーターはゲーム終了後にランタイムボタンで切り替えてください。",
+    "recording": "録画はSteamVRと更新版OpenXR Simulatorに対応します。VDXRとデスクトップの録画には未対応です。音声はSteamVRでのみ録音できます。プレビューを開き、Both eyesとside-by-sideを選び、Full renderをオフにします。古いシミュレーターはゲーム終了後にランタイムボタンで切り替えてください。",
     "scope": "ランチャーの主な操作と設定ガイドを翻訳しています。一部のビルド説明、開発ツール、診断エラーは英語です。翻訳は初稿です。ゲームやUEVRの言語は変わりません。",
     "support": "無料のファンプロジェクトです。支援は任意で、更新や継続的なサポートを保証しません。コードとフィードバック：https://github.com/ChronoHaxx/wuwa-vr — 任意の支援：https://ko-fi.com/chronohax"
   }

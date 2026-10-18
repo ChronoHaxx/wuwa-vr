@@ -100,7 +100,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <p class="small">Simulator: keep the preview open with Both eyes, side-by-side and Full render off. Video resolution is limited by the preview size. The replay can export single-eye or stereo stills.</p>
 <p><label>Purpose <select id="recordPurpose"><option value="debug">Playtest with camera and Xbox data</option><option value="content">Content creation: clean video only</option></select></label></p>
 <p><label>Capture source <select id="recordSource"><option value="auto">Detect automatically</option><option value="simulator">OpenXR Simulator</option><option value="steamvr">SteamVR</option></select></label></p>
-<p><label>Target frame rate <select id="recordFps"><option value="30">30 fps</option><option value="45">45 fps</option><option value="60">60 fps</option></select></label> <label>Resolution per eye <select id="recordSize"><option value="720">720 px - lighter</option><option value="1024" selected>1024 px - balanced</option><option value="1280">1280 px - larger</option></select></label></p>
+<p><label>Target frame rate <select id="recordFps"><option value="30">30 fps</option><option value="45">45 fps</option><option value="60">60 fps</option></select></label> <label>Resolution per eye <select id="recordSize"><option value="720">720 px - lighter</option><option value="1024" selected>1024 px - balanced</option><option value="1280">1280 px - larger</option><option value="1536">1536 px - SteamVR</option><option value="2048">2048 px - SteamVR</option></select></label></p>
+<p><label><input type="checkbox" id="recordSound" checked> Record sound (SteamVR): everything your PC plays, voice chat and notifications included</label></p>
 <p class="small">Choose content creation for older builds without camera/controller recording.</p>
 <p class="small">30 fps is a useful starting point for 30-45 fps gameplay. Higher targets need more headroom. The recorder reports its measured capture rate; choosing 60 cannot create game frames that were never rendered. Video has no diagnostic labels burned in, in either mode.</p>
 <div class="actions"><button id="recordStart" type="button">Start recording</button><button id="recordStop" type="button" disabled>Stop recording</button><button id="openRecordings" type="button">Open recordings</button></div>
@@ -318,7 +319,7 @@ $("reset").addEventListener("click", () => { if (confirm("Replace this build's c
 $("restore").addEventListener("click", () => { if (confirm("Restore your UEVR settings from before WuWa VR? The mod's settings are backed up first.")) act("/api/restore", {}, "Restoring…"); });
 $("verify").addEventListener("click", () => act("/api/verify", {}, "Checking package files…"));
 $("openData").addEventListener("click", () => act("/api/open", {folder: "data"}));
-$("recordStart").addEventListener("click", () => act("/api/record-start", {videoOnly: $("recordPurpose").value === "content", fps: Number($("recordFps").value), eyeWidth: Number($("recordSize").value), source: $("recordSource").value}, "Starting recording…"));
+$("recordStart").addEventListener("click", () => act("/api/record-start", {videoOnly: $("recordPurpose").value === "content", fps: Number($("recordFps").value), eyeWidth: Number($("recordSize").value), sound: $("recordSound").checked, source: $("recordSource").value}, "Starting recording…"));
 $("recordStop").addEventListener("click", () => act("/api/record-stop", {}, "Finishing recording…"));
 $("openRecordings").addEventListener("click", () => act("/api/open", {folder: "recordings"}));
 $("compareGraphics").addEventListener("click", () => act("/api/compare-graphics", {}, "Waiting for WuWa focus…"));

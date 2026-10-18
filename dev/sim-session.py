@@ -139,9 +139,12 @@ def wait(label, check, timeout, interval=2.0):
 
 
 def press(button, times=1, gap=0.6):
+    """Press a pad button through uevr-mcp; returns the last reply (polling and activation report)."""
+    reply = {}
     for i in range(times):
-        api("/api/input/gamepad", {"buttons": {button.lower(): True}, "duration": 0.15})
+        reply = api("/api/input/gamepad", {"buttons": {button.lower(): True}, "duration": 0.15})
         time.sleep(0.15 + gap)
+    return reply
 
 
 def player():
@@ -165,6 +168,36 @@ def sync_plugin():
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(PLUGIN, target)
     say("Copied the current uevr-mcp plugin into the profile")
+
+
+# UEVR opens its menu at every start unless it remembers the menu state, and nothing reaches the game
+# while the menu is open (the plugin's pad included: UEVR's menu reads the pad before plugins). start
+# turns "remember, closed" on for the session; quit puts the owner's two values back.
+MENU_KEYS = {"FrameworkConfig_RememberMenuState": "true", "FrameworkConfig_MenuOpen": "false"}
+# The title screen: first PlayerController while it loads, then BP_StartupPlayerController_C at
+# "Tap to land"; both with DefaultPawn. Pressing A during the loading part does nothing useful.
+TITLE_CONTROLLERS = {"PlayerController", "BP_StartupPlayerController_C"}
+
+
+def set_profile_values(values):
+    """Set config.txt keys, keeping the file's own line endings; returns the old values (None: absent)."""
+    path = PROFILE / "config.txt"
+    data = path.read_bytes().decode("utf-8")
+    newline = "\r\n" if "\r\n" in data else "\n"
+    lines = data.split(newline)
+    old = {}
+    for key, value in values.items():
+        index = next((i for i, line in enumerate(lines) if line.startswith(key + "=")), None)
+        old[key] = None if index is None else lines[index][len(key) + 1:]
+        if value is None:
+            if index is not None:
+                del lines[index]
+        elif index is None:
+            lines.insert(len(lines) - 1 if lines and lines[-1] == "" else len(lines), f"{key}={value}")
+        else:
+            lines[index] = f"{key}={value}"
+    path.write_bytes(newline.join(lines).encode("utf-8"))
+    return old
 
 
 def save_session(values):
@@ -209,6 +242,10 @@ def cmd_start(args):
         say("OpenXR runtime switched to the simulator")
     elif not load_session().get("restore"):
         save_session({"restore": "", "restorePath": before})
+    session = load_session()
+    if "menu" not in session:
+        session["menu"] = set_profile_values(MENU_KEYS)
+        save_session(session)
     header = (log_lines() or [""])[0]
     started = time.monotonic()
     launch = helper("launch", copy=args.copy)
@@ -223,16 +260,23 @@ def cmd_start(args):
         return
     seen = None
     deadline = time.monotonic() + args.world_timeout
+    pressed = 0.0
     while time.monotonic() < deadline:
         controller, pawn = player()
         if (controller, pawn) != seen:
             say(f"Player controller {controller}, pawn {pawn}")
             seen = (controller, pawn)
-        if pawn and controller and "login" not in (pawn + controller).lower():
+        if pawn and controller and controller not in TITLE_CONTROLLERS and pawn != "DefaultPawn":
             say(f"In the world after {time.monotonic() - started:.0f} s")
             return
-        press("a", times=2)
-        time.sleep(4)
+        # One A at "Tap to land", again only if it is still there 10 s later (the first press can
+        # just switch the prompts to the pad).
+        if controller == "BP_StartupPlayerController_C" and time.monotonic() - pressed > 10:
+            reply = press("a")
+            pressed = time.monotonic()
+            say(f"Pressed A at the title (pad last read {reply.get('slotPolledMsAgo')} ms before the press, "
+                f"foreground: {reply.get('foreground')})")
+        time.sleep(2)
     sys.exit("Not in the world yet; check a screenshot (python dev/sim-session.py status).")
 
 
@@ -250,6 +294,10 @@ def cmd_quit(args):
         wait("the game to exit", lambda: not ({GAME, INJECTOR} & running()), 120)
         say("Game closed")
     session = load_session()
+    if "menu" in session:
+        set_profile_values(session.pop("menu"))
+        save_session(session)
+        say("UEVR menu start-up setting put back")
     if args.keep_runtime or not session.get("restore"):
         return
     helper("runtime", mode=session["restore"])

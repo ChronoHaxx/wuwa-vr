@@ -72,7 +72,10 @@ function Invoke-Launch($request) {
     $injectorProcess = Start-Process -FilePath $injector -WorkingDirectory $folder -ArgumentList $arguments -WindowStyle Hidden -PassThru
     Start-Sleep -Seconds 2
     if ($injectorProcess.HasExited) { throw ('the injector exited at once, code ' + $injectorProcess.ExitCode) }
-    $gameProcess = Start-Process -FilePath $game -WorkingDirectory (Split-Path -Parent $game) -PassThru
+    # The argument each official route passes; without it the client stops with "use kuro quality!".
+    $gameArguments = [string]$config.($copy + 'Arguments')
+    if ($gameArguments -notmatch '^-krqlv=[a-z]+$') { throw "unexpected pinned game argument: $gameArguments" }
+    $gameProcess = Start-Process -FilePath $game -WorkingDirectory (Split-Path -Parent $game) -ArgumentList $gameArguments -PassThru
     return [ordered]@{ copy = $copy; runtimeFolder = $folder; injectorPid = $injectorProcess.Id; gamePid = $gameProcess.Id }
 }
 

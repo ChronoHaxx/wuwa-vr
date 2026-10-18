@@ -59,6 +59,10 @@ try {
         headset = $headset
         kuro = $kuroGame
         steam = $steamGame
+        # The client refuses to start without the quality argument its launcher passes ("launch not by
+        # commandlet, use kuro quality!"): the Kuro launcher's log shows -krqlv=uhd, Steam's app info -krqlv=hd.
+        kuroArguments = '-krqlv=uhd'
+        steamArguments = '-krqlv=hd'
         profile = Join-Path $env:APPDATA 'UnrealVRMod\Client-Win64-Shipping'
         # Not under AppData: the Claude desktop app is an MSIX package, and Windows diverts the new
         # AppData folders its shells create into the package's private copy, unseen by this task.

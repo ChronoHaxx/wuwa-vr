@@ -1,6 +1,7 @@
 """Run a WuWa VR test session on the OpenXR simulator with nobody at the PC.
 
     python dev/sim-session.py status
+    python dev/sim-session.py install builds/<candidate folder>
     python dev/sim-session.py start [--copy kuro|steam] [--title-only]
     python dev/sim-session.py press A [--times 2]
     python dev/sim-session.py quit [--keep-runtime]
@@ -14,7 +15,9 @@ the game to exit (console "quit") and puts back the runtime start replaced.
 The elevated steps go through the "WuWa VR dev helper" scheduled task; install it once with
 dev/sim-helper/install.ps1 (one UAC prompt). Input reaches the game through the uevr-mcp plugin
 in the profile, synced here from upstream/uevr-mcp before each start; nothing takes focus.
-The build that runs is the one applied in the launcher (injector_config.txt).
+The build that runs is the one applied in the launcher (injector_config.txt). install puts a
+private candidate there the way the launcher window does: the Test Launcher's own installer
+(dev/install-candidate.ps1), then the package's "Select" step that Apply & launch runs first.
 """
 import argparse
 import hashlib
@@ -280,6 +283,50 @@ def cmd_start(args):
     sys.exit("Not in the world yet; check a screenshot (python dev/sim-session.py status).")
 
 
+def launcher_busy():
+    """The WuWa VR window or its helper (wuwa_player.py) holds the version store and the profile."""
+    script = ("Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'WuWa VR.exe' -or "
+              "($_.Name -like 'python*' -and $_.CommandLine -like '*wuwa_player*') } | "
+              "ForEach-Object { $_.Name + ' ' + $_.ProcessId }")
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True, text=True)
+    return [line for line in out.stdout.splitlines() if line.strip()]
+
+
+def cmd_install(args):
+    folder = Path(args.candidate).resolve()
+    if folder.name != "Test Launcher":
+        folder = folder / "Test Launcher"
+    launcher = folder / "WuWa VR.exe"
+    archives = sorted(folder.glob("packages/*/*.zip"))
+    if not launcher.is_file() or len(archives) != 1:
+        sys.exit(f"Not a candidate's Test Launcher (WuWa VR.exe and one package): {folder}")
+    if running():
+        sys.exit("The game or an injector is running; quit first (python dev/sim-session.py quit).")
+    busy = launcher_busy()
+    if busy:
+        sys.exit("Close the WuWa VR app first (it holds the version store): " + ", ".join(busy))
+    powershell = ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"]
+    result = subprocess.run(powershell + [str(REPO / "dev/install-candidate.ps1"), "-Launcher", str(launcher),
+                                          "-Archive", str(archives[0])], capture_output=True, text=True)
+    if result.returncode:
+        sys.exit("Install failed: " + (result.stderr or result.stdout).strip()[-800:])
+    installed = json.loads(result.stdout.strip().splitlines()[-1])
+    say(f"{'Selected the installed' if installed['reused'] else 'Installed'} {installed['release']}")
+    data = Path(os.environ["LOCALAPPDATA"]) / "WuWa VR Launcher"
+    package = Path(installed["folder"])
+    result = subprocess.run(powershell + [str(package / "app/dev/wuwa-build.ps1"), "-Action", "Select",
+                                          "-Id", installed["build"], "-DataRoot", str(data)],
+                            capture_output=True, text=True, encoding="utf-8")
+    if result.returncode:
+        sys.exit("Apply failed: " + (result.stderr or result.stdout).strip()[-800:])
+    runtime = next((line.split("=", 1)[1].strip() for line in
+                    (PROFILE / "injector_config.txt").read_text(encoding="utf-8-sig").splitlines()
+                    if line.startswith("custom_var_urvr_folder=")), "")
+    if not Path(runtime).resolve().is_relative_to(package.resolve()):
+        sys.exit(f"Applied, but the injector still points elsewhere: {runtime}")
+    say(f"Applied build {installed['build']}; the next start runs it")
+
+
 def cmd_press(args):
     press(args.button, args.times)
     say(f"Pressed {args.button} x{args.times}")
@@ -309,6 +356,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("status").set_defaults(run=cmd_status)
+    install = sub.add_parser("install", help="install and apply a private candidate (its builds/ folder)")
+    install.add_argument("candidate")
+    install.set_defaults(run=cmd_install)
     runtime = sub.add_parser("runtime")
     runtime.add_argument("mode", choices=["simulator", "headset"])
     runtime.set_defaults(run=cmd_runtime)

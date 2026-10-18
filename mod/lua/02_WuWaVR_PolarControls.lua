@@ -1080,7 +1080,9 @@ local function tick(_,delta)
     end
     mode=number("WuWaControls_CameraMode",0,0,3)
     local pawn=api:get_local_pawn(0)
-    context_mouse=game_menu
+    -- WuWa shows the cursor for dialogue choices with keyboard and mouse. That is not a menu:
+    -- the chosen camera stays through story and NPC dialogue, as it does on a pad (18 Oct).
+    context_mouse=game_menu and (enabled("WuWaControls_NativeMenu") or not enabled("WuWaControls_StoryScene"))
     if actions.adjust then set("WuWaControls_AdjustMode",not adjusting()); p=nil end
     local adjust=adjusting()
     if not context_mouse and not adjust then

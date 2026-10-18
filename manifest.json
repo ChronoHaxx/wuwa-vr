@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-18T11:02:02.412170+00:00",
+  "updatedAt": "2026-10-18T11:46:16.862629+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -394,7 +394,7 @@
     "mod/localization/wuwa/zh-Hans.json": "0e308b8327a612f97efb989e561df0d02f0aa509e56dde05940a033ad02fb9db",
     "mod/lua/00_WuWaVR_DevPanel.lua": "4329848fd7e2a156ec5a918fcb31bcef1822ba308acf0102089071ec8e28f659",
     "mod/lua/01_WuWaVR_Comfort.lua": "90d86ee07b76fb9883557946fb0b0f444a9855cd2e09a75503283d764799a878",
-    "mod/lua/02_WuWaVR_PolarControls.lua": "bb8eaed393b46e28198ea4c9c8070a8214f9ebe472bfa9e365f37473ec4a0314",
+    "mod/lua/02_WuWaVR_PolarControls.lua": "eaa3c497e147fcefcb6163ca2533fbe3975c260b32235da2b9f30ca0bc040c71",
     "mod/lua/inventory-nearby-static-meshes-request.lua": "3d89c426b358733d12c0a3b8cb631e0820940d79dfaf80a19579ee3ea91f8524",
     "mod/lua/wuwa_auto_cinema.lua": "3f56d7e62b1c270394d097ad6c37a055add17acdc1b3a7f7e11963ab5d280329",
     "mod/lua/wuwa_hud_refresh.lua": "b132b9980f6004f643d206092b02932e1057c177ede576bf2fc685cdd2543382",

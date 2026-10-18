@@ -198,6 +198,13 @@ def main() -> None:
         if branch_copy.exists() and sha(branch_copy) != sha(script):
             shutil.copy2(branch_copy, script)
             print('script from branch:', script.name, flush=True)
+    # A script the branch added (test 21: wuwa_cutscene_bars.lua) is not in the base seed yet; the seed is
+    # every mod/lua script except the HUD probe, as the release staging requires.
+    for branch_copy in sorted((REPO / 'mod/lua').glob('*.lua')):
+        script = out / 'app' / seed / 'scripts' / branch_copy.name
+        if branch_copy.name != 'zz_WuWaHudProbe.lua' and not script.exists():
+            shutil.copy2(branch_copy, script)
+            print('new script from branch:', script.name, flush=True)
     for script in sorted((out / 'app/dev').glob('*.py')):
         branch_copy = REPO / 'launcher/dev' / script.name
         if branch_copy.exists() and sha(branch_copy) != sha(script):

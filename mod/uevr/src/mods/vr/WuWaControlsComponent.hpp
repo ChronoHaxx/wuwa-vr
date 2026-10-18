@@ -39,6 +39,7 @@ public:
     // One line about the treadmill run: on, last one, or how one starts (translated, logical order).
     std::string run_status() const;
     bool suppress_npc_rim() const { return m_suppress_npc_rim.requested.load(); }
+    bool full_terrain_detail() const { return m_terrain_detail->value(); }
     bool steady_desktop_view() const { return m_steady_desktop->value(); }
     float steady_desktop_seconds() const { return m_steady_desktop_seconds->value(); }
     bool desktop_hud_as_headset() const { return m_desktop_hud->value() == 0; }
@@ -350,6 +351,10 @@ private:
     // Configs saved before 1.2.2 hold the old default (off). 1 = moved to the new default.
     const ModInt32::Ptr m_ambient_occlusion_default{ModInt32::create("WuWaStereo_AmbientOcclusionDefault", 0)};
     std::atomic<bool> m_ao_rendering{false};
+    // Full VR: terrain LOD by distance (r.Landscape.KuroLODMode 1), so the ground near the
+    // player keeps the holes for stone steps and ledges; the screens keep the game's value.
+    // Why and evidence: utility/WuWaTerrainLodPolicy.hpp (18 Oct 2026).
+    const ModToggle::Ptr m_terrain_detail{ModToggle::create("WuWaStereo_FullTerrainDetail", true)};
     struct RimToggle : ModToggle {
         RimToggle() : ModToggle{"WuWaStereo_SuppressNpcRim", false} {}
         std::atomic<bool> requested{false};

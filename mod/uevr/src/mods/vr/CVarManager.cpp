@@ -23,6 +23,7 @@
 #include "utility/WuWaTestControl.hpp"
 #include "utility/WuWaClvRefresh.hpp"
 #include "utility/WuWaSceneCache.hpp"
+#include "utility/WuWaTerrainLod.hpp"
 #include "utility/WuWaRunMarker.hpp"
 #include "utility/WuWaTreadmillApp.hpp"
 
@@ -171,6 +172,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
         const bool conflict = wuwa_test::console_lease.var != nullptr || wuwa_test::graphics_lease.spec != nullptr ||
             wuwa_projection_test::lease.status(GetTickCount64()).active;
         wuwa_rim::tick(vr->get_wuwa_controls().suppress_npc_rim(), eligible, conflict);
+        wuwa_terrain_lod::tick(vr->get_wuwa_controls().full_terrain_detail(), eligible, conflict);
     }
 
     wuwa_test::process_test_request(Framework::get_persistent_dir(), [this](const wchar_t* name) {
@@ -216,7 +218,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "VR_WuWaLguiRedirect", "VR_WuWaLguiMenuRedirect", "VR_WuWaUiWindowSize", "VR_WuWaUiStoryWindowSize", "VR_WuWaUiCharacterTall", "VR_WuWaNativeFrameTiming", "VR_WuWaWorldLabelsStereo",
                 "VR_WuWaDioramaScale", "VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset",
                 "VR_WuWaPlanarEyeParameters", "VR_WuWaStereoTranslucency",
-                "VR_WuWaHideKuroReflections", "VR_WuWaStereoBasePose", "WuWaStereo_SuppressNpcRim",
+                "VR_WuWaHideKuroReflections", "VR_WuWaStereoBasePose", "WuWaStereo_SuppressNpcRim", "WuWaStereo_FullTerrainDetail",
                 "VR_RenderingMethod", "VR_ExtremeCompatibilityMode",
                 "VR_NativeStereoFix", "VR_HorizontalProjectionOverride", "VR_VerticalProjectionOverride",
                 "VR_GrowRectangleForProjectionCropping", "VR_2DScreenMode", "VR_MonoTheatreMode", "VR_CinematicFramingFix",

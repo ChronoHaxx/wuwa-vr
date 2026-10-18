@@ -1038,6 +1038,10 @@ Page fixes_page() {
     Page page{"Fixes"};
     page.items.push_back(setting_toggle("Match far detail between eyes",
         "Far trees and props switch detail together in both eyes. Recommended.", "WuWaStereo_SyncEyeLod"));
+    page.items.push_back(setting_toggle("Full ground detail",
+        "Keeps the ground near you as detailed as in the flat game, so stone steps and ledges are not covered by dirt "
+        "and your feet do not sink in. Full VR only; the stereo and mono screens keep the game's setting. Recommended.",
+        "WuWaStereo_FullTerrainDetail"));
     page.items.push_back(setting_toggle("Refresh far lighting",
         "Refreshes the far-lighting cache so distant lighting matches between eyes. A limited workaround.", "WuWaStereo_RefillFarLighting"));
     page.items.push_back(setting_toggle("Match cinematic framing",

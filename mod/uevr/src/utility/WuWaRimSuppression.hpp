@@ -31,11 +31,13 @@ struct Access : sdk::IConsoleVariable {
             info->get_int_vtable_index && info->get_float_vtable_index;
     }
 };
+// Also used for other console variables a fix owns (WuWaTerrainLod.hpp).
 struct ConsoleIO {
+    const wchar_t* name{variable_wname};
     sdk::IConsoleVariable* find() {
         const auto manager = sdk::FConsoleManager::get();
         if (!manager) return nullptr;
-        auto* object = manager->find(variable_wname);
+        auto* object = manager->find(name);
         if (!Access::available(object) || object->AsCommand()) return nullptr;
         return static_cast<sdk::IConsoleVariable*>(object);
     }

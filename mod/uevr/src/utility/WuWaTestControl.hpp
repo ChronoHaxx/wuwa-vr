@@ -35,6 +35,7 @@
 #include "WuWaStereoOrder.hpp"
 #include "WuWaProjectionTest.hpp"
 #include "WuWaRimSuppression.hpp"
+#include "WuWaTerrainLod.hpp"
 #include "WuWaConsoleReadPolicy.hpp"
 
 namespace wuwa_test {
@@ -458,6 +459,7 @@ inline Json test_status(const Json& camera, const Json& live_options) {
     status["stereo_candidate_test"] = stereo_candidate_status();
     status["projection_test"] = projection_test_status(GetTickCount64());
     status["rim_suppression"] = wuwa_rim::diagnostic_status();
+    status["terrain_lod"] = wuwa_terrain_lod::diagnostic_status();
     status["lod_probe"] = wuwa_lod_probe::status();
     status["live_options"] = live_options;
     status["graphics_test_cvars"] = Json::array();
@@ -764,6 +766,8 @@ void process_test_request(const std::filesystem::path& directory, IsFrozen is_fr
             const auto seconds = request.value("seconds", 0);
             if (seconds != 0 && _stricmp(name.c_str(), wuwa_rim::variable_name) == 0 && wuwa_rim::busy())
                 throw std::runtime_error("Disable the character rim workaround before testing its console variable");
+            if (seconds != 0 && _stricmp(name.c_str(), wuwa_terrain_lod::variable_name) == 0 && wuwa_terrain_lod::busy())
+                throw std::runtime_error("Turn off full ground detail before testing its console variable");
             if (seconds == 0) {
                 reply["restore"] = restore_console();
             } else {

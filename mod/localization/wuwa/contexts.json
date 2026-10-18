@@ -992,6 +992,10 @@
   "Full frame at 1 fills both axes of the portal rectangle. It stretches the HUD if its proportions differ from the frame. Preserve proportions leaves space on one axis. Safe fit also leaves a margin for rounded/feathered edges. Your separate HUD layout is retained.": [
     "mods/vr/OverlayComponent.cpp"
   ],
+  "Full ground detail": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Full speed while Polar walk is on": [
     "mod/controls.json"
   ],
@@ -1426,6 +1430,10 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Keeps the HUD where you expect it while decoupled pitch is on.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Keeps the ground near you as detailed as in the flat game, so stone steps and ledges are not covered by dirt and your feet do not sink in. Full VR only; the stereo and mono screens keep the game's setting. Recommended.": [
+    "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Keeps the horizon level in first person. Custom motion only.": [

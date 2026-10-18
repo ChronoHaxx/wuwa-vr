@@ -204,9 +204,10 @@ public static class WindowTests
                         Check(AllowRecordStart || RejectRecordStart, "recording route was not enabled for this test");
                         RecordingBody = request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                         var capture = Json.Read<Dictionary<string, object>>(RecordingBody);
-                        Check(capture.Count == 4 && capture.ContainsKey("videoOnly") && capture["videoOnly"] is bool &&
+                        Check(capture.Count == 5 && capture.ContainsKey("videoOnly") && capture["videoOnly"] is bool &&
+                            capture.ContainsKey("sound") && capture["sound"] is bool &&
                             new[] { "30", "45", "60" }.Contains(Json.Text(capture, "fps")) &&
-                            new[] { "720", "1024", "1280" }.Contains(Json.Text(capture, "eyeWidth")) &&
+                            new[] { "720", "1024", "1280", "1536", "2048" }.Contains(Json.Text(capture, "eyeWidth")) &&
                             new[] { "auto", "steamvr", "simulator" }.Contains(Json.Text(capture, "source")), "invalid recording options sent");
                         RecordStarts++;
                         if (RejectRecordStart) return Reply(new { error = "Fixture recorder unavailable" }, HttpStatusCode.BadRequest);
@@ -1216,8 +1217,8 @@ public static class WindowTests
                 Field<ComboBox>(w, "size").SelectedIndex = 2; Field<ComboBox>(w, "purpose").SelectedIndex = 0;
                 Click(w, Button(w, "recordStart"));
                 var body = Json.Read<Dictionary<string, object>>(f.Http.RecordingBody);
-                Check(f.Http.RecordStarts == 1 && Json.Flag(body, "videoOnly") && Json.Text(body, "source") == "steamvr" && Json.Text(body, "fps") == "60" && Json.Text(body, "eyeWidth") == "1280",
-                    "recording controls sent different capture options");
+                Check(f.Http.RecordStarts == 1 && Json.Flag(body, "videoOnly") && Json.Text(body, "source") == "steamvr" && Json.Text(body, "fps") == "60" && Json.Text(body, "eyeWidth") == "1280" &&
+                    Json.Flag(body, "sound"), "recording controls sent different capture options (sound is on by default)");
                 Check(Field<TextBlock>(w, "recordingState").Text == new Strings()["recordingActive"] && !Button(w, "recordStart").IsEnabled && Button(w, "recordStop").IsEnabled,
                     "recording start did not expose its active state and stop action");
                 Check(Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed && !Field<ComboBox>(w, "source").IsEnabled, "recording offered launch cancellation or mutable capture options");

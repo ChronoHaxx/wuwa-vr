@@ -1,37 +1,37 @@
 {
   "schema": 3,
-  "build": "game-hotfix-1-2-4",
+  "build": "story-nudge-1-2-5",
   "privateCandidate": false,
-  "launcherVersion": "1.2.4",
+  "launcherVersion": "1.2.5",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "4c693d68c11987e4292c00f3f7023d52c192f05835a5413b87574466dd4695ad",
-  "frozenPatchSha256": "d4feab64c3550e85338398292bf66b87472d59520302cf263107ed7540074dd1",
-  "sourceReconstructedTree": "e8f5f5fdce9e94186df9b0a768650223b6de8bee",
-  "buildCompleted": "2026-10-16T22:29:06+0100",
+  "backendSha256": "8eb5151f6cb15f34fad3001797c0684e353889babcac3af0ba4e8087b4d8b980",
+  "frozenPatchSha256": "80c69edbfe795040a59890d0ecd7e481c2384278f0e775f3ca4b65090ba96c79",
+  "sourceReconstructedTree": "8c35eb2cc750ae9767024f3efa5414c7929be227",
+  "buildCompleted": "2026-10-18T17:30:39+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 52893341,
-    "sha256": "eba29c8babc189f5939863839d5068515c5b56a26481487ebee212c922b74e9c",
+    "bytes": 53054848,
+    "sha256": "f4868e2a5807269d731064721d6ffda44a2a34b5d4f689edc70da7f3800f86d0",
     "public": true
   },
-  "liveAcceptance": "1.2.0 and 1.2.1 played in the headset by the owner (1.2.1 with the Kuro launcher copy); test 17j of 1.2.3 played in the headset (SteamVR) with the Kuro launcher copy. 1.2.4 is 1.2.3 ported to game build 0x6ace6377 (16 Oct 2026 hotfix, both copies): all 211 pinned sites moved with unchanged code. Simulator passes on the updated game (testport1, this build): Kuro launcher copy with the controller smoke route in full VR, stereo screen and mono theatre, the stick cursor, the character screen (taller layout, live reflection) and the owner's mouse check; Steam copy with the five stereo code routes verified and the UI redirect installed (both-copies.json). Pending: headset play of 1.2.4, the character screen reflection on the Weapon/Echoes/Forte/Chain tabs, PlayStation hardware and broad headset compatibility.",
+  "liveAcceptance": "Tests 18 to 20b of 1.2.5 played in the headset by the owner (SteamVR, Bigscreen Beyond, Kuro launcher copy, 16-18 Oct): story camera nudge, showcase video, desktop HUD, first VR frame, recordings. This build (Test 20c) on the OpenXR simulator, game build 0x6ace6377: both copies with the five stereo code routes verified and the UI redirect installed (both-copies.json); full ground detail set in full VR and restored on the stereo screen and when off, eye LOD fields equal and the eye LOD sync applying (Test 20b, both copies); the stereo screen start-up pair covered by a unit test (the simulator shows no frames before the pair exists). Pending: headset play of the release build, dialogue letterbox bars on the full VR HUD, the full VR frame rate after many view switches, PlayStation hardware and broad headset compatibility.",
   "previousPublicRelease": {
-    "tag": "beta-1-2-3",
-    "backendSha256": "11ee60fed0371c03be178c1ba39fc59f66970bb45b93c6f90eefdc42dd904f39"
+    "tag": "beta-1-2-4",
+    "backendSha256": "4c693d68c11987e4292c00f3f7023d52c192f05835a5413b87574466dd4695ad"
   },
-  "sourceIdentity": "1.2.3 ported to game build 0x6ace6377 (the 16 Oct 2026 hotfix on Steam and the Kuro launcher): the pinned PE timestamp, LGUI identity and every route RVA moved by dev/wuwa_port_offsets.py, with code hashes re-derived where only relocations differ (utility/WuWaCodeCompatibility, WuWaLguiProbe, WuWaLguiCompatibility, WuWaLguiRedirect and the other route tables). See docs/launch-kit/GAME-HOTFIX-1.2.4.md. 1.2.3 features, 1.2.2 fixes, Steam identity, AO, VR menu, DX12 handoff and graphics policy retained.",
+  "sourceIdentity": "claude/1-2-5 at 517429d (Test 20c): tests 18 to 20c on top of 1.2.4 (game build 0x6ace6377), with the self-port (utility/WuWaSelfPort) that re-finds every build-pinned site in a new game build and keeps a route off when its code changed. See docs/launch-kit/STORY-NUDGE-1.2.5.md. 1.2.4 port, 1.2.3 features, 1.2.2 fixes, Steam identity, AO, VR menu, DX12 handoff and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "game-hotfix-1-2-4",
+  "rendererBuild": "story-nudge-1-2-5",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-1-2-4",
+  "releaseTag": "beta-1-2-5",
   "sdkPatchSha256": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
   "sdkReconstructedTree": "0ad1702a10fec58469ec88265fa7297365fffab6",
-  "launcherSha256": "2c5af80b0528ccdb46488a789432ceffcb478f063a1e519b598d81c5c94c18d3",
-  "setupSha256": "b99d5595a98c0df4d2468c9da373404952c7d1c455dfc2d8861b35aa32dcefcd"
+  "launcherSha256": "750f5150e84703985c85d43fa6611313c022ca2cbcebada1d926e0c56aec88ae",
+  "setupSha256": "0964ab70c7b59028df9a940909c2ab302c5b2ba5feebd6978d89175e3904b8a9"
 }

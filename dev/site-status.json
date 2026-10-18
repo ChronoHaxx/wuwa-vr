@@ -1,8 +1,8 @@
 {
-  "tag": "beta-1-2-4",
-  "previousTag": "beta-1-2-3",
+  "tag": "beta-1-2-5",
+  "previousTag": "beta-1-2-4",
   "game": "3.7",
-  "appVersion": "1.2.4",
-  "buildId": "game-hotfix-1-2-4",
+  "appVersion": "1.2.5",
+  "buildId": "story-nudge-1-2-5",
   "installer": "WuWa-VR-Setup.exe"
 }

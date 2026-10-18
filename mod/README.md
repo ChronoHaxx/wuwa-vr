@@ -1,13 +1,13 @@
-# Mod source — 1.2.4 beta
+# Mod source — 1.2.5 beta
 
 The release target is
-[beta-1-2-4](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-4),
-launcher **1.2.4**, backend/package build **game-hotfix-1-2-4**, for game
+[beta-1-2-5](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-5),
+launcher **1.2.5**, backend/package build **story-nudge-1-2-5**, for game
 **3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. Headset results and open checks are below.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill), 1.2.1 in the headset with the Kuro launcher copy of the game, and an earlier 1.2.3 test build in the headset (SteamVR) with the Kuro launcher copy. 1.2.4 is 1.2.3 moved to the game update of 16 October. It was tested on the OpenXR simulator with the updated game: on the Kuro launcher copy the HUD and menus in full VR, on the stereo screen and in mono theatre, the mouse, the controller and stick cursors and the character screen; on the Steam copy the UI redirect starts and the stereo fixes pass their code checks. The 1.2.4 release build has not been played in a headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot. See [the 1.2.4 release notes](../docs/launch-kit/GAME-HOTFIX-1.2.4.md).
+The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill), 1.2.1 and an earlier 1.2.3 test build in the headset with the Kuro launcher copy of the game, and the 1.2.5 test builds (story camera nudge, showcase video, recordings, desktop HUD, first VR frame) in the headset (SteamVR) with the Kuro launcher copy. The 1.2.5 release build was tested on the OpenXR simulator with both the Steam and the Kuro launcher copies: the UI redirect starts and the stereo fixes pass their code checks; full ground detail turns on in full VR and back off on the stereo screen. The stereo screen start-up fix is checked by a unit test only. The 1.2.5 release build has not been played in a headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot. See [the 1.2.5 release notes](../docs/launch-kit/STORY-NUDGE-1.2.5.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

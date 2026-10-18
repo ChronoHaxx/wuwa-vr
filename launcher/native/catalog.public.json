@@ -2,6 +2,18 @@
   "schema": 1,
   "releases": [
     {
+      "id": "beta-1-2-5",
+      "displayName": "1.2.5 beta · 18 Oct 18:16 BST",
+      "gameVersion": "3.7",
+      "buildId": "story-nudge-1-2-5",
+      "channel": "beta",
+      "published": "2026-10-18T17:18:48.065304+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-5/WuWa-VR-Launcher.zip",
+      "sha256": "f4868e2a5807269d731064721d6ffda44a2a34b5d4f689edc70da7f3800f86d0",
+      "size": 53054848,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-5"
+    },
+    {
       "id": "beta-1-2-4",
       "displayName": "1.2.4 beta · 17 Oct 00:04 BST",
       "gameVersion": "3.7",

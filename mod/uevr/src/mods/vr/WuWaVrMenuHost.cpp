@@ -1048,8 +1048,9 @@ Page fixes_page() {
         "they are hidden; the stereo and mono screens keep them. Recommended.",
         "WuWaStereo_HideCutsceneBars"));
     page.items.push_back(setting_toggle("Refresh far lighting automatically",
-        "After you start, load or teleport, refills the far lighting for both eyes, so distant hills and buildings are "
-        "lit the same in each eye. Turning it on also refills once. Each refill pauses the picture for a moment.",
+        "Refills the far lighting for both eyes after you start, load or teleport, and whenever the game rebuilds it in "
+        "one eye only, so distant hills and buildings are lit the same in each eye. Turning it on also refills once. "
+        "Each refill pauses the picture for a moment.",
         "WuWaStereo_RefillFarLighting"));
     page.items.push_back(action("Refill far lighting now",
         "Rebuilds the far lighting for both eyes now. Use it when distant hills or buildings look darker in one eye "

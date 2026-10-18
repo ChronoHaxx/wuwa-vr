@@ -346,5 +346,54 @@ int main() {
         expect(manual_off, fresh(1010, 1, false, 1, 90, false), Action::Start, Source::Manual,
             "the refill button did not work with automatic refill off");
     }
+    {
+        ++groups;
+        // One-eye rebuild detector: first eye rebuilt alone -> second eye stale after the window.
+        const std::array<std::uint64_t, 2> states{0x10, 0x20};
+        MismatchDetector d;
+        check(!d.observe(1, states, {5, 7}), "baseline reported a mismatch");
+        check(!d.observe(2, states, {5, 7}), "no change reported a mismatch");
+        check(!d.observe(3, states, {6, 7}), "mismatch reported before the window");
+        for (std::uint64_t pair = 4; pair < 3 + MismatchDetector::window_pairs; ++pair)
+            check(!d.observe(pair, states, {6, 7}), "mismatch reported inside the window");
+        auto stale = d.observe(3 + MismatchDetector::window_pairs, states, {6, 7});
+        check(stale && *stale == 1, "first eye rebuilt alone did not mark the second stale");
+        check(!d.observe(20, states, {6, 7}), "one rebuild was reported twice");
+
+        // Second eye alone -> first stale.
+        check(!d.observe(30, states, {6, 9}), "second-eye rebuild reported early");
+        stale = d.observe(30 + MismatchDetector::window_pairs, states, {6, 9});
+        check(stale && *stale == 0, "second eye rebuilt alone did not mark the first stale");
+
+        // Both in one pair (our refill, loading), and both a few pairs apart: no mismatch.
+        MismatchDetector both;
+        both.observe(1, states, {1, 2});
+        check(!both.observe(2, states, {3, 4}), "both eyes rebuilt together reported a mismatch");
+        check(!both.observe(3, states, {5, 4}), "first of a staggered pair reported early");
+        check(!both.observe(5, states, {5, 8}), "staggered pair reported");
+        for (std::uint64_t pair = 6; pair < 30; ++pair)
+            check(!both.observe(pair, states, {5, 8}), "matched rebuild reported later");
+
+        // A game refresh then our refill inside the window: the first eye changes twice, the second once.
+        MismatchDetector refill;
+        refill.observe(1, states, {1, 2});
+        refill.observe(2, states, {3, 2});
+        check(!refill.observe(4, states, {5, 6}), "refill after a one-eye rebuild reported");
+        for (std::uint64_t pair = 5; pair < 30; ++pair)
+            check(!refill.observe(pair, states, {5, 6}), "refilled pair reported later");
+
+        // New view states or unreadable volumes restart the baseline instead of reporting.
+        MismatchDetector reset;
+        reset.observe(1, states, {1, 2});
+        reset.observe(2, states, {3, 2});
+        check(!reset.observe(3, {0x30, 0x20}, {9, 2}), "new view state reported a mismatch");
+        for (std::uint64_t pair = 4; pair < 20; ++pair)
+            check(!reset.observe(pair, {0x30, 0x20}, {9, 2}), "baseline after new state reported");
+        check(!reset.observe(20, {0x30, 0x20}, {0, 2}), "unreadable volume reported");
+        check(!reset.observe(21, {0x30, 0x20}, {11, 2}), "first readable value after a gap reported");
+        for (std::uint64_t pair = 22; pair < 40; ++pair)
+            check(!reset.observe(pair, {0x30, 0x20}, {11, 2}), "re-baselined volume reported");
+        check(!reset.observe(41, {0x30, 0x30}, {11, 12}), "shared view state was watched");
+    }
     std::cout << "PASS " << checks << " checks in " << groups << " CLV scheduling groups\n";
 }

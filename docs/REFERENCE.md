@@ -243,9 +243,14 @@ saw everything as further away. If it returns, check the eye FOVs first, then th
 per view state, and its refresh filled only the first eye. The mod now pulses
 `r.CLV.RefreshEveryFrame` for one frame after starts, loading screens and
 teleports. Manual control: VR menu → Fixes → Refill far lighting now (from test
-21b; also WuWa Controls in the classic panel). A long glide with no loading
-screen or jump does not trigger a refill (18 Oct recording: right eye darker
-after a ~440 m glide). Related
+21b; also WuWa Controls in the classic panel). A game refresh outside loading
+(18 Oct recording: right eye darker after a ~440 m glide, no refill) rebuilds
+only the first-rendered eye: its volume (ViewState+0x27a8) replaces the cascade
+textures at +0xd0..+0x128 and the other eye's do not change. From test 21b
+`WuWaClvMismatch.hpp` reads both volumes each stereo pair and refills when one
+eye rebuilt alone (refill and loading change both; travel changes neither; off
+after 4 detector refills in 60 s, or on a game build without the code at
+0x3eaf373). Related
 cvars: `r.CLV.TriggerRefresh`, `r.CLV.UpdateEveryFrame`.
 
 **Shading on rocks and hills differs per eye (ambient occlusion).**

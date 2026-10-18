@@ -6,7 +6,8 @@
 // indirect light in that eye (they match up close). A refresh during a frame that renders
 // both eyes fills both, and they stay filled. This module turns r.CLV.RefreshEveryFrame on
 // for one game tick after stereo rendering starts or resumes after a gap, after a camera
-// teleport, and on request. Missing stereo pairs retain a bounded retry instead of losing
+// teleport, on request, and (18 Oct) when the game rebuilds only one eye's volume
+// (WuWaClvMismatch.hpp). Missing stereo pairs retain a bounded retry instead of losing
 // the request. A CPU-observed pair is not proof of GPU completion or of an NPC material fix.
 #include <atomic>
 #include <cmath>
@@ -27,6 +28,13 @@ inline constexpr float teleport_distance = 5000.f; // game units (cm) from every
 inline std::atomic<uint64_t> last_stereo_ms{}, pair_sequence{}, arm_sequence{1}, teleports{};
 inline std::atomic<uint32_t> stable_frames{}, requested_frames{};
 inline std::atomic<bool> armed{true};
+// One-eye rebuild detector (WuWaClvMismatch.hpp, game thread): the stale eye, 0 first / 1 second.
+inline std::atomic<int> stale_eye{-1};
+// 0 not checked yet, 1 watching, -1 game build without the checked code, -2 switched off after
+// refilling too often (a misread layout must not hitch every few seconds).
+inline std::atomic<int> detector_state{0};
+inline std::atomic<uint64_t> mismatches{};
+inline uint64_t detector_refills[3]{};          // game thread: times of the last three detector refills
 inline RefreshPolicy refresh_policy{};          // driven only by the game thread
 inline std::mutex policy_mutex{};               // diagnostics can read from another thread
 inline sdk::IConsoleVariable* refresh_var{};     // game thread; diagnostics under policy_mutex
@@ -103,6 +111,24 @@ inline void tick(bool automatic) {
     const std::scoped_lock lock{policy_mutex};
     if (const auto frames = requested_frames.exchange(0); frames != 0)
         refresh_policy.request_manual(frames);
+    if (const auto stale = stale_eye.exchange(-1); stale >= 0 && detector_state.load() == 1) {
+        ++mismatches;
+        const auto now = GetTickCount64();
+        if (!automatic) {
+            spdlog::info("[WuWaCLV] the game rebuilt far lighting in the {} eye only; automatic refresh is off",
+                stale ? "first" : "second");
+        } else if (detector_refills[0] != 0 && now - detector_refills[0] < 60000) {
+            detector_state = -2;
+            spdlog::warn("[WuWaCLV] one-eye rebuilds reported 4 times within 60 s; detector switched off for this session");
+        } else {
+            detector_refills[0] = detector_refills[1];
+            detector_refills[1] = detector_refills[2];
+            detector_refills[2] = now;
+            refresh_policy.request_manual(1);
+            spdlog::info("[WuWaCLV] the game rebuilt far lighting in the {} eye only ({} eye stale); refilling both",
+                stale ? "first" : "second", stale ? "second" : "first");
+        }
+    }
     const auto decision = refresh_policy.tick({GetTickCount64(), pair_sequence.load(),
         last_stereo_ms.load(), arm_sequence.load(), stable_frames.load(), armed.load(), automatic});
     if (decision.action == Action::Start) {
@@ -160,6 +186,7 @@ inline nlohmann::json status() {
         {"pair_observed_pulses", s.pair_observed_pulses}, {"missed_pair_pulses", s.missed_pair_pulses},
         {"exhausted_requests", s.exhausted_requests}, {"existing_value_skips", s.existing_value_skips},
         {"manual_pending", s.manual_pending || requested_frames.load() != 0},
+        {"detector", detector_state.load()}, {"mismatches", mismatches.load()},
         {"automatic_pending", s.automatic_pending}, {"owns_refresh", s.owns_refresh},
         {"observation", "CPU stereo pair submission only; GPU completion and visual outcome unverified"}};
 }

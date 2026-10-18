@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -186,6 +187,53 @@ private:
     std::optional<std::uint64_t> auto_consumed_{};
     bool awaiting_start_{}, awaiting_stop_{}, pair_observed_{}, pulse_auto_armed_{};
     bool have_auto_generation_{}, automatic_retired_{}, have_enabled_{}, last_enabled_{};
+};
+
+// One-eye rebuild detection over stereo pairs (18 Oct 2026). A game CLV refresh
+// rebuilds only the view state rendered first, so one eye's volume signature
+// changes and the other's does not; a refill or loading changes both, and travel
+// changes neither. observe() returns the stale eye (0 first, 1 second) once one
+// eye changed and the other did not within window_pairs. A signature of 0 means
+// unreadable; new view states start a new baseline.
+class MismatchDetector {
+public:
+    static constexpr std::uint64_t window_pairs = 6;
+
+    std::optional<int> observe(std::uint64_t pair, std::array<std::uint64_t, 2> states,
+        std::array<std::uint64_t, 2> signatures) noexcept {
+        if (!states[0] || !states[1] || states[0] == states[1] || !signatures[0] || !signatures[1]) {
+            have_baseline_ = false;
+            pending_.reset();
+            return std::nullopt;
+        }
+        if (!have_baseline_ || states != states_) {
+            have_baseline_ = true;
+            states_ = states;
+            signatures_ = signatures;
+            pending_.reset();
+            return std::nullopt;
+        }
+        const bool changed[2]{signatures[0] != signatures_[0], signatures[1] != signatures_[1]};
+        signatures_ = signatures;
+        if (changed[0] && changed[1]) pending_.reset();
+        else for (int eye = 0; eye < 2; ++eye) {
+            if (!changed[eye]) continue;
+            if (pending_ && pending_->eye != eye) pending_.reset(); // the other eye followed in time
+            else if (!pending_) pending_ = Pending{eye, pair};
+        }
+        if (pending_ && pair >= pending_->pair + window_pairs) {
+            const int stale = 1 - pending_->eye;
+            pending_.reset();
+            return stale;
+        }
+        return std::nullopt;
+    }
+
+private:
+    struct Pending { int eye; std::uint64_t pair; };
+    std::array<std::uint64_t, 2> states_{}, signatures_{};
+    std::optional<Pending> pending_{};
+    bool have_baseline_{};
 };
 
 } // namespace wuwa_clv

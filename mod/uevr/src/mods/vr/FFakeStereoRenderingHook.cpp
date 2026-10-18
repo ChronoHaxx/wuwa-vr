@@ -60,6 +60,7 @@
 #include "../../utility/WuWaLguiRoute.hpp"
 #include "../../utility/WuWaLguiRedirect.hpp"
 #include "../../utility/WuWaShadowPass.hpp"
+#include "../../utility/WuWaClvMismatch.hpp"
 #include "../../utility/WuWaClvRefresh.hpp"
 #include "../../utility/WuWaLodProbe.hpp"
 #include "../../utility/WuWaReflectionCapture.hpp"
@@ -4196,9 +4197,11 @@ void FFakeStereoRenderingHook::begin_render_viewfamily_real(void* render_module,
     if (prev_count == 2 && wuwa_test::is_wuwa())
         wuwa_dof_sync::sync(vr->get_wuwa_controls().stereo_dof(), vr->get_wuwa_controls().stereo_all_effects(),
             vr->get_wuwa_controls().stereo_dof_source(), views[0], views[1]);
-    // Far lighting fix: count eye pairs so a CLV refill can follow a start, a loading gap or a teleport.
+    // Far lighting fix: count eye pairs so a CLV refill can follow a start, a loading gap or a teleport,
+    // and watch for the game rebuilding one eye's far lighting alone.
     if (prev_count == 2) {
         wuwa_clv::on_stereo_frame();
+        if (wuwa_test::is_wuwa()) wuwa_clv::observe_pair(views[0], views[1]);
         wuwa_perf::on_frame();
     }
     wuwa_shadow::StateSwapScope state_swap{view_family,

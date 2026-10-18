@@ -145,9 +145,6 @@
   "Advanced rendering and script diagnostics": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "After you start, load or teleport, refills the far lighting for both eyes, so distant hills and buildings are lit the same in each eye. Turning it on also refills once. Each refill pauses the picture for a moment.": [
-    "mods/vr/WuWaVrMenuHost.cpp"
-  ],
   "After you switch views, a line shows for 3 seconds with how to go on or come back. It switches itself off after 5 switches.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2185,6 +2182,9 @@
   ],
   "Refill far lighting now": [
     "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Refills the far lighting for both eyes after you start, load or teleport, and whenever the game rebuilds it in one eye only, so distant hills and buildings are lit the same in each eye. Turning it on also refills once. Each refill pauses the picture for a moment.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Reflection capture correction stopped or could not verify this game build. See the diagnostic log.": [

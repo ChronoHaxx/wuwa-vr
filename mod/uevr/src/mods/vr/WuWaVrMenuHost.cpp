@@ -864,8 +864,8 @@ Page cinema_page() {
         "How strong the 3D is on the stereo screen. 1x matches the headset's eye distance to the lens; 0 is flat.",
         "VR_WuWaScreenDepth", 0.0f, 3.0f, 0.1f, "%.1fx"));
     page.items.push_back(paragraph(
-        "Black bars in cutscenes? In WuWa's graphics settings, change Cinematic from Cutscene to Fullscreen. "
-        "The bars go and cutscenes fill your view."));
+        "Black bars in story scenes on the stereo or mono screen? In WuWa's Graphics settings, set Cutscene Mode to "
+        "Full Screen. In full VR they are hidden for you (Fixes page)."));
     page.items.push_back(lens_slider());
     page.items.push_back(lens_nearest_slider());
     page.items.push_back(lens_subject_choice());
@@ -1042,6 +1042,10 @@ Page fixes_page() {
         "Keeps the ground near you as detailed as in the flat game, so stone steps and ledges are not covered by dirt "
         "and your feet do not sink in. Full VR only; the stereo and mono screens keep the game's setting. Recommended.",
         "WuWaStereo_FullTerrainDetail"));
+    page.items.push_back(setting_toggle("Hide cutscene bars in full VR",
+        "With the game's Cutscene Mode on letterbox, black bars cover the world above and below story scenes. In full VR "
+        "they are hidden; the stereo and mono screens keep them. Recommended.",
+        "WuWaStereo_HideCutsceneBars"));
     page.items.push_back(setting_toggle("Refresh far lighting",
         "Refreshes the far-lighting cache so distant lighting matches between eyes. A limited workaround.", "WuWaStereo_RefillFarLighting"));
     page.items.push_back(setting_toggle("Match cinematic framing",

@@ -147,8 +147,8 @@ REC badge with the elapsed time shows while recording.
    returns `VR_WuWaDioramaForwardOffset` / `RightOffset` / `UpOffset` instead of
    the normal offsets, which stay as they were. Holding RT in the classic menu
    nudges the diorama set while the diorama is on, and RT + B resets it.
-4. **Cinema:** view, the game's own fix for cutscene black bars (Cinematic:
-   Fullscreen in WuWa's graphics settings), close-up match and its closest
+4. **Cinema:** view, the game's own fix for cutscene black bars on the
+   screens (Graphics > Cutscene Mode: Full Screen), close-up match and its closest
    distance, **depth of field (experiment)**, the cinematic scene note,
    automatic cinematic screen and what story scenes and story pictures use
    (see below), matched framing.
@@ -167,7 +167,14 @@ REC badge with the elapsed time shows while recording.
    controls will go here.
 7. **Comfort:** decoupled pitch (and its HUD adjustment), smooth camera turns
    and tilt, walk by default, L3 + A also resets position.
-8. **Fixes:** matched far detail, far lighting, matched framing, **Ambient
+8. **Fixes:** matched far detail, **Full ground detail**
+   (`WuWaStereo_FullTerrainDetail`, from 1.2.5), **Hide cutscene bars in full
+   VR** (`WuWaStereo_HideCutsceneBars`, default on from test 21: with Cutscene
+   Mode on letterbox the game draws the bars as two textures,
+   `BlackTexture`/`BlackTexture1` in `UiView_BlackFadeScreen_Prefab`;
+   `mod/lua/wuwa_cutscene_bars.lua` sets their alpha to 0 in full VR while they
+   are letterbox-sized and gives the game's alpha back on the screens), far
+   lighting, matched framing, **Ambient
    occlusion** (`WuWaStereo_AmbientOcclusion`, default on from 1.2.2; while
    on it renders symmetric eye frustums so both eyes shade alike, about 7 %
    frame time; see REFERENCE.md), and

@@ -355,6 +355,10 @@ private:
     // player keeps the holes for stone steps and ledges; the screens keep the game's value.
     // Why and evidence: utility/WuWaTerrainLodPolicy.hpp (18 Oct 2026).
     const ModToggle::Ptr m_terrain_detail{ModToggle::create("WuWaStereo_FullTerrainDetail", true)};
+    // Full VR: the game's cutscene letterbox bars (Graphics > Cutscene Mode on letterbox) are two
+    // textures in UiView_BlackFadeScreen_Prefab; wuwa_cutscene_bars.lua sets their alpha to 0 while
+    // they are letterbox-sized. The screens keep the game's bars. Evidence: 18 Oct 2026 (Steam copy).
+    const ModToggle::Ptr m_hide_cutscene_bars{ModToggle::create("WuWaStereo_HideCutsceneBars", true)};
     struct RimToggle : ModToggle {
         RimToggle() : ModToggle{"WuWaStereo_SuppressNpcRim", false} {}
         std::atomic<bool> requested{false};

@@ -383,7 +383,7 @@ std::string WuWaControlsComponent::StoryValue::get() const {
 }
 
 WuWaControlsComponent::WuWaControlsComponent() {
-    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_keep_mouse, *m_sync_eye_lod, *m_refill_far_lighting, *m_ambient_occlusion, *m_ambient_occlusion_default, *m_terrain_detail, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
+    m_options = {*m_language, *m_enabled, *m_keep_camera, *m_keep_mouse, *m_sync_eye_lod, *m_refill_far_lighting, *m_ambient_occlusion, *m_ambient_occlusion_default, *m_terrain_detail, *m_hide_cutscene_bars, m_suppress_npc_rim, *m_recenter_position, *m_camera, *m_mesh, *m_mouse, *m_auto_mouse, *m_warn_hidden_ui, m_adjust, *m_walk, *m_fixed_distance,
         *m_fixed_height, *m_free_speed, *m_free_turn, *m_free_style, *m_drone_response, *m_plane_speed,
         *m_flight_roll, *m_acro_throttle, *m_acro_rate, *m_acro_yaw_rate, *m_acro_expo,
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
@@ -852,6 +852,8 @@ void WuWaControlsComponent::on_draw_ui() {
         wuwa_ui::TextWrapped("Keeps distant trees and props on the same level of detail in both eyes. This is the normal foliage repair; legacy comparison tests are separate.");
         wuwa_ui::draw(*m_terrain_detail,"Full ground detail");
         wuwa_ui::TextWrapped("Keeps the ground near you as detailed as in the flat game, so stone steps and ledges are not covered by dirt and your feet do not sink in. Full VR only; the stereo and mono screens keep the game's setting. Recommended.");
+        wuwa_ui::draw(*m_hide_cutscene_bars,"Hide cutscene bars in full VR");
+        wuwa_ui::TextWrapped("With the game's Cutscene Mode on letterbox, black bars cover the world above and below story scenes. In full VR they are hidden; the stereo and mono screens keep them. Recommended.");
         wuwa_ui::draw(*m_refill_far_lighting,"Refresh far-lighting cache (limited workaround)");
         if (wuwa_ui::Button("Refill far lighting now")) wuwa_clv::request();
         wuwa_ui::draw(*m_ambient_occlusion,"Ambient occlusion (soft contact shadows)");

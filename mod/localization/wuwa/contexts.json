@@ -307,7 +307,7 @@
   "Black bars": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Black bars in cutscenes? In WuWa's graphics settings, change Cinematic from Cutscene to Fullscreen. The bars go and cutscenes fill your view.": [
+  "Black bars in story scenes on the stereo or mono screen? In WuWa's Graphics settings, set Cutscene Mode to Full Screen. In full VR they are hidden for you (Fixes page).": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.": [
@@ -1180,6 +1180,10 @@
   ],
   "Hide characters at your eyes on / off": [
     "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Hide cutscene bars in full VR": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Hide head": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -3068,6 +3072,10 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "With the 16:9 layout on: the character screen (Resonators) uses the taller layout while it is open, so its floor reflection keeps showing the current character, then 16:9 comes back. Its icons look flatter there and the mouse can miss.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "With the game's Cutscene Mode on letterbox, black bars cover the world above and below story scenes. In full VR they are hidden; the stereo and mono screens keep them. Recommended.": [
+    "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Within a shot": [

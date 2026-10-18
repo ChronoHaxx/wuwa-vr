@@ -218,7 +218,7 @@ void CVarManager::on_pre_engine_tick(sdk::UGameEngine* engine, float delta) {
                 "VR_WuWaLguiRedirect", "VR_WuWaLguiMenuRedirect", "VR_WuWaUiWindowSize", "VR_WuWaUiStoryWindowSize", "VR_WuWaUiCharacterTall", "VR_WuWaNativeFrameTiming", "VR_WuWaWorldLabelsStereo",
                 "VR_WuWaDioramaScale", "VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset",
                 "VR_WuWaPlanarEyeParameters", "VR_WuWaStereoTranslucency",
-                "VR_WuWaHideKuroReflections", "VR_WuWaStereoBasePose", "WuWaStereo_SuppressNpcRim", "WuWaStereo_FullTerrainDetail",
+                "VR_WuWaHideKuroReflections", "VR_WuWaStereoBasePose", "WuWaStereo_SuppressNpcRim", "WuWaStereo_FullTerrainDetail", "WuWaStereo_HideCutsceneBars",
                 "VR_RenderingMethod", "VR_ExtremeCompatibilityMode",
                 "VR_NativeStereoFix", "VR_HorizontalProjectionOverride", "VR_VerticalProjectionOverride",
                 "VR_GrowRectangleForProjectionCropping", "VR_2DScreenMode", "VR_MonoTheatreMode", "VR_CinematicFramingFix",

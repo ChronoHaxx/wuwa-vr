@@ -248,6 +248,23 @@ local function cinema_tick()
     auto_cinema:tick()
 end
 
+-- Full VR: hide the game's cutscene letterbox bars (test 21). Inert with the setting off or on the
+-- stereo and mono screens; resolved now for the same package.path reason as the detector above.
+local cutscene_bars = {tick = function() end, reset = function() end}
+local bars_ok, bars_module = pcall(require, "wuwa_cutscene_bars")
+if bars_ok and type(bars_module) == "table" and type(bars_module.new) == "function" then
+    local ready, instance = pcall(bars_module.new, {api = uevr.api, types = uevr.types,
+        get = function(key) return vr:get_mod_value(key) end,
+        log = function(text) log.log_info(text) end})
+    if ready and type(instance) == "table" and type(instance.tick) == "function" and type(instance.reset) == "function" then
+        cutscene_bars = instance
+    else
+        log.log_error("WuWaBars: module initialization failed: " .. (ready and "invalid helper instance" or tostring(instance)))
+    end
+else
+    log.log_error("WuWaBars: module unavailable: " .. (bars_ok and ("invalid helper module (" .. type(bars_module) .. ")") or tostring(bars_module)))
+end
+
 -- Companion module is inert until a manual request or an observed 2D transition.
 local hud_refresh = {status = "HUD refresh module unavailable / HUD 刷新模块不可用"}
 function hud_refresh:request() end
@@ -420,6 +437,7 @@ end
 local last_mono_theatre = nil
 uevr.sdk.callbacks.on_pre_engine_tick(function(_, delta)
     cinema_tick()
+    cutscene_bars:tick()
     -- The native recovery button only posts a transient request; UObject work
     -- stays on this game-thread callback and never runs from the render UI.
     if status_bool("WuWaControls_ResetHudAspect") == true then

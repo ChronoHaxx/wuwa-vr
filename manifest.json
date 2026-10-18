@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-18T14:19:57.239259+00:00",
+  "updatedAt": "2026-10-18T14:34:59.578686+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -76,7 +76,7 @@
     "dev/merge-controls-l10n.py": "87acfd752d2c64a47fcd6a8b32541089cd6e19f2c016cefaedc4b3d334b944f2",
     "dev/package-beta.py": "655e7c5923159c5b637a0341735d3b4c945010b23174173f11683246afa4d533",
     "dev/publish-launcher-release.py": "573c8b06a9e2589194fb146b05055b572f0c6b906f3081c2faf387f8a6b0a026",
-    "dev/qa.py": "e4cebf3d1ccc9159eb00f401c34b87f9a3dd4e510a2c27485fbcd4d9a02317cd",
+    "dev/qa.py": "c64894685169104e01615fb40819076d07cf2a378b73a715d9054ca354e13e58",
     "dev/render-understanding.cjs": "26d151222ab7710eacd496245d4de3d8e0665c07f3952f56e4f268c5618a07ac",
     "dev/sim-helper/focus-guard.ps1": "9952d4294d1c727a6d3cd74eb75d4bcaf6933769fb8cf8e01a8f2feec0e7ebf5",
     "dev/sim-helper/helper.ps1": "a8c059d75ef7de63d7753861a9c74f5e17145711db4a90b44337d342ae5f671d",
@@ -130,7 +130,7 @@
     "dev/test_profile_upgrade.ps1": "96d12c8dd00bcaae22dfe0000da963dc3c9e6a6b83a1770d57a813d91cc676df",
     "dev/test_projection_test.cpp": "08c878d3589c9554ce7f25cce88a4dd24410ff822051c8f803f783876bcd263a",
     "dev/test_publish_launcher_release.py": "6201b693f800140a6612d155f1a775ad44f8756ad8550447d5857161056d7d35",
-    "dev/test_qa.py": "202780133b63adb20ba920dcd3a4f389bed8f5a3ba29ac6dda0cbc09e1b79954",
+    "dev/test_qa.py": "8627a0cedb35305daf4a633c63ee2bc112be83ad10c899a9eeb40dd6f3a0fc41",
     "dev/test_renderer_probe_dxgi.cpp": "70899337c3a925171603fca2d7daa9f96c791a2d4de97a3ce2a922e14add31f9",
     "dev/test_renderer_probe_dxgi.ps1": "048cd2b2835bcf0135f863d95602e1300831161aa20dd9aa61cf62375fc19ed2",
     "dev/test_rim_suppression.cpp": "7626c8c5e2b5a00a43be851d4a7749cff121e829db9ee58e5889ac87a0e88e13",

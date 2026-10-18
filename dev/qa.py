@@ -182,8 +182,9 @@ def session(text: str, known_off: list[dict] = ()) -> dict:
                               'ms': int(sp.group(7) or 0), 'ranges_ok': int(sp.group(8) or 0),
                               'ranges_changed': int(sp.group(9) or 0), 'ranges_missing': int(sp.group(10) or 0)}
             continue
+        # Test-control replies ([WuWaTest] {...}) are JSON whose field names include "refused".
         if re.search(r'unavailable|refused|code mismatch|code changed', msg) and re.search(r'\[WuWa\w*\]', msg) \
-                and 'WuWaCinema' not in msg and 'HUD refresh unavailable' not in msg:
+                and 'WuWaCinema' not in msg and 'HUD refresh unavailable' not in msg and '[WuWaTest] {' not in msg:
             text_ = re.sub(r'^\[[^\]]*\] ', '', msg)[:160]
             (s['known_off'] if any(k.search(msg) for k in pinned) else s['refused']).append(f'{clock} {text_}')
         v = re.search(r'\[WuWaLguiViewport\] .*pointer=(\d+)x\d+ pointer_rewrites=(\d+)', msg)

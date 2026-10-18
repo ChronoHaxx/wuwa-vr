@@ -102,6 +102,10 @@ class QaTests(unittest.TestCase):
         inv = {n: (r, d) for n, r, d in qa.invariants(qa.session(LOG + "\n" + missing))}
         self.assertEqual(inv["mouse-ray"][0], "fail")
 
+    def test_a_test_control_reply_is_not_a_refused_route(self):
+        reply = line("10:04:00", "info", '[WuWaTest] {"id":"2c7b","lod_probe":{"active":true,"refused":0,"unavailable":false}}')
+        self.assertEqual(len(qa.session(LOG + "\n" + reply, MATRIX["known_off"])["refused"]), 1)
+
     def test_a_layout_loop_or_an_unshared_camera_fails(self):
         log = LOG + "\n" + line("10:01:00", "info", "[Plugin] WuWaHud: Layout keeps changing; stopped checking") + "\n" + \
             line("10:01:01", "info", "[WuWaStereoBase] action=ignored reason=disabled caller_rva=0 verified_site=false source_call=0")

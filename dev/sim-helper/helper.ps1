@@ -69,6 +69,10 @@ function Invoke-Launch($request) {
         if ([Diagnostics.FileVersionInfo]::GetVersionInfo($injector).Comments -cne 'WUWA_INJECTOR_TARGET_PATH_V1') { throw 'this build has no Steam-aware injector' }
         $arguments = '--target-path "' + (Join-Path (Split-Path -Parent $game) 'Client\Binaries\Win64\Client-Win64-Shipping.exe') + '"'
     }
+    # The game takes the foreground while it loads; the guard hands it back to the owner's window.
+    # Its own process, because the task allows one instance and quit's runtime switch must still run.
+    $guard = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') -WindowStyle Hidden -PassThru `
+        -ArgumentList ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + (Join-Path $root 'focus-guard.ps1') + '" -Copy ' + $copy)
     $injectorProcess = Start-Process -FilePath $injector -WorkingDirectory $folder -ArgumentList $arguments -WindowStyle Hidden -PassThru
     Start-Sleep -Seconds 2
     if ($injectorProcess.HasExited) { throw ('the injector exited at once, code ' + $injectorProcess.ExitCode) }
@@ -76,7 +80,7 @@ function Invoke-Launch($request) {
     $gameArguments = [string]$config.($copy + 'Arguments')
     if ($gameArguments -notmatch '^-krqlv=[a-z]+$') { throw "unexpected pinned game argument: $gameArguments" }
     $gameProcess = Start-Process -FilePath $game -WorkingDirectory (Split-Path -Parent $game) -ArgumentList $gameArguments -PassThru
-    return [ordered]@{ copy = $copy; runtimeFolder = $folder; injectorPid = $injectorProcess.Id; gamePid = $gameProcess.Id }
+    return [ordered]@{ copy = $copy; runtimeFolder = $folder; injectorPid = $injectorProcess.Id; gamePid = $gameProcess.Id; focusGuardPid = $guard.Id }
 }
 
 $requestPath = Join-Path $config.requests 'request.json'

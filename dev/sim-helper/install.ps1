@@ -7,7 +7,9 @@
     C:\ProgramData\WuWaVR-DevHelper (writable by administrators only), pins the paths it may use in
     config.json there, and registers the scheduled task "WuWa VR dev helper", which runs that copy
     with highest privileges for this Windows user. dev/sim-session.py then switches the OpenXR
-    runtime and starts the injector and the game without a prompt.
+    runtime and starts the injector and the game without a prompt. While the game loads, the
+    helper's focus guard (focus-guard.ps1) hands the foreground back to the window you were using
+    whenever the game takes it; clicking or Alt-Tabbing into the game turns the guard off.
 
     Trade-off: any program running as this user can ask the task to switch the OpenXR runtime or to
     start the game with the applied build's injector, without a prompt. It cannot run anything else
@@ -83,7 +85,9 @@ try {
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule ([Security.Principal.SecurityIdentifier]$rule[0]), $rule[1], $inherit, 'None', 'Allow'))
     }
     Set-Acl -LiteralPath $target -AclObject $acl
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'helper.ps1') -Destination (Join-Path $target 'helper.ps1')
+    foreach ($script in 'helper.ps1', 'focus-guard.ps1') {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination (Join-Path $target $script)
+    }
     $config | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $target 'config.json') -Encoding UTF8
     New-Item -ItemType Directory -Path (Join-Path $target 'results') | Out-Null
 

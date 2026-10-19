@@ -21,6 +21,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import threading
@@ -1094,6 +1095,20 @@ def recording_target(pid=None):
 RECORD_EYE_WIDTHS = (720, 1024, 1280, 1536, 2048)
 
 
+# A recording runs in 5-minute parts until it is stopped. It ends early only when the drive holding the
+# recordings has less than this free (a part is up to ~1.7 GB at 2048 px per eye), never at a fixed length:
+# the one-hour bound of 11 Oct cut a session silently on 19 Oct and lost 19 minutes the owner wanted.
+RECORD_MIN_FREE_BYTES = 10 * 1024 ** 3
+
+
+def recording_space_left(folder):
+    """Free bytes on the drive the recording folder goes to (its nearest existing parent)."""
+    path = Path(folder)
+    while not path.exists() and path.parent != path:
+        path = path.parent
+    return shutil.disk_usage(path).free
+
+
 def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None, source='auto', style='sbs', pitch=None, sound=True):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
     if style not in ('sbs','showcase'): raise ValueError('Choose the side-by-side or the showcase video.')
@@ -1108,7 +1123,7 @@ def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None,
     if not any((config().app/'dev-tools'/name).is_file() for name in
                ('wuwa-recorder.exe','wuwa-simulator-recorder.exe')): raise ValueError('Recorder is not included in this package.')
     what='showcase video (one eye, steadied, 16:9)' if style=='showcase' else 'stereo video'
-    begin_job('recording',f'Recording {what} at a target of {fps} fps (5-minute parts until you stop it, up to an hour)',
+    begin_job('recording',f'Recording {what} at a target of {fps} fps (5-minute parts until you stop it)',
               lambda: record_playtest(video_only,fps,eye_width,source,style,pitch,sound),
               prepare=lambda: RECORDING.update(recording_target(pid)))
 
@@ -1130,7 +1145,7 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', sty
         RECORDING.update(recording_target())
     first=Path(RECORDING['folder'])
     stop_file=Path(RECORDING['stopFile'])
-    parts=[]
+    parts=[]; low_space=False
     try:
         spec=importlib.util.spec_from_file_location('wuwa_recording',config().app/'dev/record-wuwa.py')
         module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
@@ -1139,6 +1154,10 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', sty
         # one at once, with the same id and stop file, so a long session needs no restarts.
         while True:
             folder=first if not parts else first.with_name(f'{first.name}-part{len(parts)+1}')
+            if recording_space_left(folder)<RECORD_MIN_FREE_BYTES:
+                if not parts: raise ValueError('Less than 10 GB free on the drive for recordings; free some space to record.')
+                low_space=True
+                break
             with LOCK:
                 RECORDING['folder']=str(folder)
             args=argparse.Namespace(output=folder,seconds=300,stop_file=stop_file,video_only=video_only,
@@ -1155,9 +1174,10 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', sty
                 ended=json.loads((folder/'recording.json').read_text(encoding='utf-8')).get('end_reason')
             except (OSError,ValueError):
                 ended=None
-            if ended!='time_limit' or stop_file.exists() or RECORDING.get('stopping') or len(parts)>=12:
+            if ended!='time_limit' or stop_file.exists() or RECORDING.get('stopping'):
                 break
         where=str(first) if len(parts)==1 else f'{first} (+{len(parts)-1} more parts beside it)'
+        if low_space: where+='. Stopped early: less than 10 GB free on the drive for recordings'
         if style=='showcase':
             return 'Showcase video saved: showcase.mp4 in '+where
         return 'Recording saved. Open recordings, then replay.html for controller/camera annotations or clean-sbs.mp4 for clean footage. '+where

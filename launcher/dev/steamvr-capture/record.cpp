@@ -27,6 +27,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <functional>
 using Microsoft::WRL::ComPtr;
 using Json=nlohmann::json;
 static void check(HRESULT value) { if (FAILED(value)) throw std::runtime_error("HRESULT "+std::to_string(value)); }
@@ -44,8 +45,11 @@ struct Encoder {
     // high: H.264 High profile. sound_rate (44100 or 48000): adds a stereo AAC track fed by add_sound.
     void open(const std::filesystem::path& path,UINT width,UINT height,UINT fps,UINT bitrate=16000000,bool high=false,UINT sound_rate=0) {
         w=width; h=height;
-        ComPtr<IMFAttributes> attrs; check(MFCreateAttributes(&attrs,2));
+        ComPtr<IMFAttributes> attrs; check(MFCreateAttributes(&attrs,3));
         check(attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS,TRUE));
+        // Fragmented MP4 (19 Oct 2026): what was written stays playable if this process dies before Finalize.
+        // SteamVR quitting after the headset dropped out ended a recorder mid-part and left an mdat with no index.
+        check(attrs->SetGUID(MF_TRANSCODE_CONTAINERTYPE,MFTranscodeContainerType_FMPEG4));
         // A stream that runs ahead must not stall the other one; both arrive in real time anyway.
         check(attrs->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING,TRUE));
         check(MFCreateSinkWriterFromURL(path.c_str(),nullptr,attrs.Get(),&writer));
@@ -90,6 +94,52 @@ struct Encoder {
     void add_sound(const int16_t* frames,size_t count,LONGLONG timestamp,LONGLONG duration) { write(sound,frames,count*4,timestamp,duration); }
     void close() { std::lock_guard guard(lock); if (writer) { const auto result=writer->Finalize(); writer.Reset(); check(result); } }
 };
+// A capture call that never returns must not cost the part (19 Oct 2026: SteamVR lost the headset, the mirror
+// read blocked, the game closed unseen and SteamVR's shutdown ended the recorder before Finalize). The loop
+// beats once per pass, at most ~100 ms apart; after stall_ms without a beat, on_stall runs on this thread.
+struct Watchdog {
+    std::atomic<int64_t> beat{0}; std::atomic<uint64_t> frames{0}; std::atomic<bool> done{false};
+    std::thread worker; int64_t stall_ms{8000};
+    void start(std::function<void()> on_stall) {
+        beat=GetTickCount64();
+        worker=std::thread([this,on_stall] {
+            while (!done) {
+                Sleep(250);
+                if (!done && int64_t(GetTickCount64())-beat.load()>stall_ms) { on_stall(); return; }
+            }
+        });
+    }
+    void pulse() { beat=GetTickCount64(); }
+    void finish() { done=true; if (worker.joinable()) worker.join(); }
+    ~Watchdog() { finish(); }
+};
+// After a stall: the report first (the launcher reads it), then Finalize for at most 5 s (the fragments already
+// play without it), then exit. A blocked OpenVR or D3D call keeps the process from ending any other way.
+[[noreturn]] static void end_stalled(const std::filesystem::path& out,Json report,Encoder& encoder) {
+    report["status"]="recorded"; report["end_reason"]="recorder_stalled";
+    report["stall_note"]="The capture loop stopped responding (SteamVR or the headset went away); the video ends at the last saved fragment.";
+    try { std::ofstream(out/L"recording.json")<<report.dump(2)<<'\n'; } catch (...) {}
+    std::atomic<bool> closed{false};
+    std::thread([&encoder,&closed] { try { encoder.close(); } catch (...) {} closed=true; }).detach();
+    for (int i=0;i<50 && !closed;++i) Sleep(100);
+    std::cout<<report.dump()<<std::endl;
+    ExitProcess(0);
+}
+// The frames and sound samples a file gives back (self-tests: a recording whose writer was killed).
+static std::pair<uint64_t,uint64_t> readable_samples(const std::filesystem::path& path) {
+    uint64_t counts[2]{};
+    for (int i=0;i<2;++i) {
+        ComPtr<IMFSourceReader> reader; check(MFCreateSourceReaderFromURL(path.c_str(),nullptr,&reader));
+        const DWORD stream=i?DWORD(MF_SOURCE_READER_FIRST_AUDIO_STREAM):DWORD(MF_SOURCE_READER_FIRST_VIDEO_STREAM);
+        for (;;) {
+            DWORD actual{},flags{}; LONGLONG time{}; ComPtr<IMFSample> sample;
+            if (FAILED(reader->ReadSample(stream,0,&actual,&flags,&time,&sample))) break;
+            if (flags&(MF_SOURCE_READERF_ENDOFSTREAM|MF_SOURCE_READERF_ERROR)) break;
+            if (sample) ++counts[i];
+        }
+    }
+    return {counts[0],counts[1]};
+}
 // Now on the performance counter, in the 100-ns units WASAPI stamps each packet with.
 static LONGLONG qpc_100ns() {
     LARGE_INTEGER count{},frequency{}; QueryPerformanceCounter(&count); QueryPerformanceFrequency(&frequency);
@@ -437,6 +487,14 @@ static ShowcaseFrame showcase_frame(float left,float right,float top,float botto
     f.centre_y=std::clamp(std::tan(std::clamp(pitch,-1.0,1.0)),f.half_height-y_down,y_up-f.half_height);
     return f;
 }
+// SteamVR asks applications to quit before it shuts down, then ends those still running five seconds later.
+static bool steamvr_quitting(vr::IVRSystem* system) {
+    vr::VREvent_t event{};
+    while (system->PollNextEvent(&event,sizeof(event))) {
+        if (event.eventType==vr::VREvent_Quit) { system->AcknowledgeQuit_Exiting(); return true; }
+    }
+    return false;
+}
 static bool same_print(const std::vector<BYTE>& a,const std::vector<BYTE>& b) {
     if (a.size()!=b.size() || a.empty()) return false;
     for (size_t i=0;i<a.size();++i) if (std::abs(int(a[i])-int(b[i]))>2) return false;
@@ -599,6 +657,68 @@ int wmain(int argc,wchar_t** argv) {
             } else std::cout<<"Loopback: no output device to open ("<<sound.error<<"); the recorder would save the picture alone.\n";
             MFShutdown(); media=false; CoUninitialize(); com=false; return 0;
         }
+        if (argc==3 && (std::wstring_view(argv[1])==L"--self-test-writer" || std::wstring_view(argv[1])==L"--self-test-stall-child")) {
+            // Children of --self-test-kill / --self-test-stall: 640x480 at 30 fps with a 440 Hz tone, in real time.
+            // The writer runs until it is killed; the stall child writes 1.5 s, then blocks like a stuck capture call.
+            const bool stall=std::wstring_view(argv[1])==L"--self-test-stall-child";
+            out=argv[2];
+            const auto video=stall?out/L"clean-sbs.mp4":out;
+            if (stall) std::filesystem::create_directories(out);
+            check(CoInitializeEx(nullptr,COINIT_MULTITHREADED)); com=true; check(MFStartup(MF_VERSION)); media=true;
+            constexpr UINT fps=30, rate=48000;
+            encoder.open(video,640,480,fps,4000000,true,rate);
+            Watchdog watchdog; watchdog.stall_ms=3000;
+            if (stall) watchdog.start([&] { end_stalled(out,Json{{"frames",watchdog.frames.load()},{"width",640},{"height",480}},encoder); });
+            std::vector<BYTE> pixels(640*480*4); std::vector<int16_t> tone(rate/100*2); uint64_t tone_frames=0;
+            const auto start=std::chrono::steady_clock::now();
+            for (UINT frame=0;;++frame) {
+                if (stall && frame==fps*3/2) Sleep(INFINITE);
+                for (size_t i=0;i<pixels.size();i+=4) { pixels[i]=BYTE(frame*7); pixels[i+1]=BYTE(i/2560); pixels[i+2]=BYTE(i%2560/10); pixels[i+3]=255; }
+                encoder.add(pixels,LONGLONG(frame)*10000000/fps,10000000/fps);
+                while (tone_frames*fps<uint64_t(frame+1)*rate) {
+                    for (size_t i=0;i<tone.size()/2;++i) tone[i*2]=tone[i*2+1]=int16_t(8000*std::sin(2*std::acos(-1.0)*440*double(tone_frames+i)/rate));
+                    encoder.add_sound(tone.data(),tone.size()/2,LONGLONG(tone_frames*10000000/rate),LONGLONG(tone.size()/2*10000000/rate));
+                    tone_frames+=tone.size()/2;
+                }
+                watchdog.pulse(); watchdog.frames=frame+1;
+                std::this_thread::sleep_until(start+std::chrono::milliseconds((frame+1)*1000/fps));
+            }
+        }
+        if (argc==3 && (std::wstring_view(argv[1])==L"--self-test-kill" || std::wstring_view(argv[1])==L"--self-test-stall")) {
+            // Kill: a writer killed after 3.5 s must leave a file that plays its first seconds, picture and sound.
+            // Stall: a capture loop that blocks must be ended by the watchdog, with a report and a playable file.
+            const bool stall=std::wstring_view(argv[1])==L"--self-test-stall";
+            const std::filesystem::path target=argv[2];
+            if (std::filesystem::exists(target)) throw std::runtime_error("Self-test output exists");
+            wchar_t self[MAX_PATH]{}; GetModuleFileNameW(nullptr,self,MAX_PATH);
+            std::wstring line=L"\""+std::wstring(self)+L"\" "+(stall?L"--self-test-stall-child":L"--self-test-writer")+L" \""+target.wstring()+L"\"";
+            STARTUPINFOW startup{sizeof(startup)}; PROCESS_INFORMATION child{};
+            if (!CreateProcessW(nullptr,line.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&child))
+                throw std::runtime_error("Cannot start the self-test child");
+            DWORD code=STILL_ACTIVE;
+            if (stall) {
+                if (WaitForSingleObject(child.hProcess,20000)!=WAIT_OBJECT_0) { TerminateProcess(child.hProcess,1); throw std::runtime_error("Watchdog did not end a blocked recorder within 20 s"); }
+                GetExitCodeProcess(child.hProcess,&code);
+            } else {
+                Sleep(3500); TerminateProcess(child.hProcess,1); WaitForSingleObject(child.hProcess,5000);
+            }
+            CloseHandle(child.hThread); CloseHandle(child.hProcess);
+            check(CoInitializeEx(nullptr,COINIT_MULTITHREADED)); com=true; check(MFStartup(MF_VERSION)); media=true;
+            const auto video=stall?target/L"clean-sbs.mp4":target;
+            const auto [frames,sound_samples]=readable_samples(video);
+            MFShutdown(); media=false; CoUninitialize(); com=false;
+            if (stall) {
+                if (code!=0) throw std::runtime_error("Stalled recorder exited with code "+std::to_string(code));
+                std::ifstream report_file(target/L"recording.json"); Json report=Json::parse(report_file);
+                if (report.value("end_reason","")!="recorder_stalled") throw std::runtime_error("Stall report missing");
+                if (frames<40) throw std::runtime_error("Stalled recording kept "+std::to_string(frames)+" frames; expected about 45");
+                std::cout<<"Stalled loop: the watchdog wrote the report, closed the file and exited; "<<frames<<" frames, "<<sound_samples<<" sound samples readable.\n";
+            } else {
+                if (frames<60 || sound_samples==0) throw std::runtime_error("Killed recording kept "+std::to_string(frames)+" frames and "+std::to_string(sound_samples)+" sound samples");
+                std::cout<<"Killed writer: "<<frames<<" frames and "<<sound_samples<<" sound samples still readable after 3.5 s (fragmented MP4).\n";
+            }
+            return 0;
+        }
         if ((argc==3 || argc==4) && std::wstring_view(argv[1])==L"--self-test") {
             const UINT test_fps=argc==4 ? std::stoul(argv[3]) : 30;
             if (test_fps!=30 && test_fps!=45 && test_fps!=60) throw std::runtime_error("Self-test FPS must be 30, 45 or 60");
@@ -709,9 +829,14 @@ int wmain(int argc,wchar_t** argv) {
             uint64_t count=0,unsteadied=0,too_soon=0; uint32_t last_index=0; bool have_index=false; const auto start_ms=utc();
             double pending_t=-1, waiting_since=-1;
             std::string end_reason="time_limit"; Json pauses=Json::array(); double paused_at=-1, t=0;
+            Watchdog watchdog;
+            watchdog.start([&] { end_stalled(out,Json{{"style","showcase"},{"pid",pid},{"started_unix_ms",start_ms},
+                {"frames",watchdog.frames.load()},{"width",ow},{"height",oh},{"bitrate",bitrate},{"fps_target",fps}},encoder); });
             while (true) {
+                watchdog.pulse(); watchdog.frames=count;
                 t=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
                 if (t>=seconds) break;
+                if (steamvr_quitting(system)) { end_reason="steamvr_quit"; break; }
                 if (std::filesystem::exists(out/L"STOP") || (argc==8&&std::filesystem::exists(argv[7]))) { end_reason="stopped"; break; }
                 if (game && WaitForSingleObject(game,0)==WAIT_OBJECT_0) { end_reason="game_exited"; break; }
                 if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; Sleep(100); continue; }
@@ -749,6 +874,7 @@ int wmain(int argc,wchar_t** argv) {
                     {"steady",{view.w,view.x,view.y,view.z}}}.dump()<<'\n';
                 ++count; if (count%fps==0) frames.flush();
             }
+            watchdog.finish();
             if (pending_t>=0) encoder.add(pending,static_cast<LONGLONG>(pending_t*10000000),10000000/fps);
             sound.finish(); encoder.close(); timeEndPeriod(1);
             if (paused_at>=0) pauses.push_back({{"from_s",paused_at},{"to_s",t}});
@@ -783,10 +909,16 @@ int wmain(int argc,wchar_t** argv) {
             // then (another application is never captured); the video holds its last frame and resumes
             // when WuWa has the scene again, so one recording spans scene changes.
             std::string end_reason="time_limit"; Json pauses=Json::array(); double paused_at=-1, t=0;
+            Watchdog watchdog;
+            watchdog.start([&] { end_stalled(out,Json{{"pid",pid},{"started_unix_ms",start_ms},{"frames",watchdog.frames.load()},
+                {"width",ew*2},{"height",eh},{"bitrate",bitrate},{"fps_target",fps},
+                {"source_eye_size",{eyes[0].width,eyes[0].height}},{"method","OpenVR per-eye mirror; GPU SBS resize and one readback"}},encoder); });
             while (true) {
+                watchdog.pulse(); watchdog.frames=count;
                 const auto current=std::chrono::steady_clock::now();
                 t=std::chrono::duration<double>(current-start).count();
                 if (t>=seconds) break;
+                if (steamvr_quitting(system)) { end_reason="steamvr_quit"; break; }
                 if (std::filesystem::exists(out/L"STOP") || (argc==8&&std::filesystem::exists(argv[7]))) { end_reason="stopped"; break; }
                 if (game && WaitForSingleObject(game,0)==WAIT_OBJECT_0) { end_reason="game_exited"; break; }
                 if (compositor->GetCurrentSceneFocusProcess()!=pid) {
@@ -809,6 +941,7 @@ int wmain(int argc,wchar_t** argv) {
                 const auto remaining=std::chrono::duration_cast<std::chrono::milliseconds>(target-std::chrono::steady_clock::now()).count();
                 if (remaining>0) Sleep(static_cast<DWORD>(remaining));
             }
+            watchdog.finish();
             sound.finish(); encoder.close();
             if (paused_at>=0) pauses.push_back({{"from_s",paused_at},{"to_s",t}});
             const double elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();

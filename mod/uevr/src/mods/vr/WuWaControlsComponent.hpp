@@ -68,6 +68,9 @@ public:
     // with the saved recording settings.
     std::string menu_recording_state();
     void menu_recording_toggle();
+    // When the menu last asked the recorder to stop (GetTickCount64 ms, 0 never): a recording that ends
+    // otherwise gets a note in the headset.
+    uint64_t recording_stop_requested_ms() const { return m_recording_stop_asked.load(std::memory_order_relaxed); }
     // Privacy boxes: 0 off, 1 while the launcher records, 2 always.
     int privacy_mode() const { return m_privacy->value(); }
     bool recording_live() const { return m_recording_live.load(std::memory_order_relaxed); }
@@ -469,6 +472,7 @@ private:
     const ModCombo::Ptr m_privacy{ModCombo::create("WuWaPrivacy_Mode",{"Off","While recording","Always"},1)};
     // Set on the UI thread from the launcher's status, read by the render thread.
     std::atomic<bool> m_recording_live{false};
+    std::atomic<uint64_t> m_recording_stop_asked{0};
     void refresh_recording_live();
     const ModToggle::Ptr m_privacy_profile{ModToggle::create("WuWaPrivacy_ProfileID",true)};
     const ModCombo::Ptr m_privacy_profile_scope{ModCombo::create("WuWaPrivacy_ProfileScope", {"ESC / overlay menus (detected)", "All detected menus", "Always (manual mask)"},0)};

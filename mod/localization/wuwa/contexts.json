@@ -1384,6 +1384,12 @@
   "Invert pitch": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "It ended with an error; the WuWa VR app says why. Parts already saved are kept.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "It is saved. Start a new one on the WuWa VR menu's Record page.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Joint inspector (left-eye preview)": [
     "mods/vr/runtimes/OpenXR.cpp"
   ],
@@ -2174,6 +2180,9 @@
   "Recording saved. Use Open recordings in the launcher.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Recording stopped": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Recording video. Close the UEVR menu for a clear view.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -2728,6 +2737,9 @@
   "The Kuro material candidate stopped or could not verify this build. See the diagnostic log.": [
     "mods/VR.cpp"
   ],
+  "The WuWa VR app closed, which ends the recording. Parts already saved are kept.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "The card is blocked by FrameworkConfig > Always Show Cursor. Turn that off to display it.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -3131,6 +3143,9 @@
   ],
   "You are in the scene": [
     "utility/WuWaShortcutSheet.cpp"
+  ],
+  "You did not stop it, so this note tells you.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Your answer: ": [
     "mods/vr/WuWaVrMenuHost.cpp"

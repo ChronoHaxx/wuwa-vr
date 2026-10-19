@@ -78,7 +78,12 @@ constexpr int32_t near_note_count = 3;
 // ends after two minutes without story shots (owner, 17 Oct: so new players know they can move).
 CinemaHint story_hint{1500, 6000, 120000};
 constexpr int32_t story_note_count = 3;
-int hint_kind{}; // 1 cinematic scene, 2 someone at your eyes, 3 the story camera nudge
+int hint_kind{}; // 1 cinematic scene, 2 someone at your eyes, 3 the story camera nudge, 4 recording stopped
+// A recording that ends without the menu's stop (the drive nearly full, a stalled recorder, the WuWa VR app
+// closing) is noted in the headset for 8 s: on 19 Oct 2026 a session ended unseen and the footage after it
+// was never recorded. rec_note: 1 saved, 2 error, 3 the app closed.
+int rec_note{};
+std::uint64_t rec_note_until{};
 
 std::int64_t unix_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -1542,7 +1547,22 @@ bool hint_active() {
     auto* nudge = typed<bool>("WuWaControls_StoryNudge");
     const bool story_eligible = full_vr && story_note && story_note->value() && nudge && nudge->value();
     const bool nudged = !nudge_now.empty() && std::abs(std::atof(nudge_now.c_str())) >= 1.0;
+    static bool rec_was_live{};
+    const auto rec_now = vr->get_wuwa_controls().menu_recording_state();
+    const bool rec_live = rec_now == "starting" || rec_now == "recording" || rec_now == "finishing";
+    if (rec_now != "waiting") {
+        if (rec_was_live && !rec_live) {
+            const auto asked = vr->get_wuwa_controls().recording_stop_requested_ms();
+            if (asked == 0 || now < asked || now - asked > 30000) {
+                std::scoped_lock lock{hint_mutex};
+                rec_note = rec_now == "error" ? 2 : rec_now == "offline" ? 3 : 1;
+                rec_note_until = now + 8000;
+            }
+        }
+        rec_was_live = rec_live;
+    }
     std::scoped_lock lock{hint_mutex};
+    const bool rec_on = now < rec_note_until;
     const bool cinema_on = hint.update(cinematic, eligible, now);
     // One note at a time: the scene note first; this one waits rather than running unseen.
     const bool near_on = !cinema_on && near_hint.update(near_recent, near_eligible, now);
@@ -1591,7 +1611,7 @@ bool hint_active() {
         }
     }
     was_near = near_on;
-    hint_kind = cinema_on ? 1 : near_on ? 2 : story_on ? 3 : 0;
+    hint_kind = rec_on ? 4 : cinema_on ? 1 : near_on ? 2 : story_on ? 3 : 0;
     return hint_kind != 0;
 }
 
@@ -1606,6 +1626,27 @@ void draw_hint(ImDrawList* list, const ImVec2& size) {
     {
         std::scoped_lock lock{hint_mutex};
         kind = hint_kind;
+    }
+    if (kind == 4) {
+        int which{};
+        {
+            std::scoped_lock lock{hint_mutex};
+            which = rec_note;
+        }
+        if (which == 2) {
+            wuwa_menu::draw_note(list, size, font, "Recording stopped",
+                "It ended with an error; the WuWa VR app says why. Parts already saved are kept.",
+                "You did not stop it, so this note tells you.", true);
+        } else if (which == 3) {
+            wuwa_menu::draw_note(list, size, font, "Recording stopped",
+                "The WuWa VR app closed, which ends the recording. Parts already saved are kept.",
+                "You did not stop it, so this note tells you.", true);
+        } else {
+            wuwa_menu::draw_note(list, size, font, "Recording stopped",
+                "It is saved. Start a new one on the WuWa VR menu's Record page.",
+                "You did not stop it, so this note tells you.", true);
+        }
+        return;
     }
     if (kind == 2) {
         // Short and high: it shows during dialogue (test 16: the full note was in the way; 17p:

@@ -1248,7 +1248,10 @@ void WuWaControlsComponent::menu_recording_toggle() {
     const auto profile=Framework::get_persistent_dir();
     m_video.poll(profile,true);
     const auto state=m_video.state();
-    if (state=="starting" || state=="recording") { m_video.submit(profile,false); return; }
+    if (state=="starting" || state=="recording") {
+        m_recording_stop_asked.store(GetTickCount64(),std::memory_order_relaxed);
+        m_video.submit(profile,false); return;
+    }
     constexpr int rates[]{30,45,60},widths[]{720,1024,1280,1536,2048};
     // Cover the IDs from the request on, before the launcher reports "starting".
     if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],

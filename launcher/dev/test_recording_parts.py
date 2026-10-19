@@ -73,9 +73,24 @@ class RecordingParts(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.run_with(['time_limit'], fail_at=0)
 
-    def test_parts_are_bounded_to_an_hour(self):
-        self.run_with(['time_limit'] * 20)
-        self.assertEqual(len(self.calls), 12)
+    def test_long_sessions_are_not_cut_at_an_hour(self):
+        message = self.run_with(['time_limit'] * 19 + ['stopped'])
+        self.assertEqual(len(self.calls), 20)
+        self.assertIn('+19 more parts', message)
+
+    def test_low_space_ends_between_parts_and_keeps_them(self):
+        free = iter([50 * 1024 ** 3, 50 * 1024 ** 3, 5 * 1024 ** 3])
+        with patch.object(player, 'recording_space_left', lambda folder: next(free)):
+            message = self.run_with(['time_limit'] * 5)
+        self.assertEqual(len(self.calls), 2)
+        self.assertIn('less than 10 GB free', message)
+        self.assertIn('+1 more parts', message)
+
+    def test_low_space_before_the_first_part_is_an_error(self):
+        with patch.object(player, 'recording_space_left', lambda folder: 1024 ** 3):
+            with self.assertRaises(ValueError):
+                self.run_with(['time_limit'])
+        self.assertEqual(self.calls, [])
 
 
 if __name__ == '__main__':

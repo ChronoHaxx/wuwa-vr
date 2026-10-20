@@ -1098,10 +1098,12 @@ Page record_page() {
     page.items.push_back(std::move(profile));
     page.items.push_back(live_text([] { return recorder_line(); }));
     page.items.push_back(setting_choice("Video style",
-        "Showcase: the left eye as a normal 16:9 video, steadied, with the HUD where you see it, at the game's own "
-        "frame rate. Picture size 720, 1024, 1280 or 2048 px gives 720p, 1080p, 1440p or 2160p. Needs SteamVR. "
-        "Side by side: both eyes, the whole view of each.",
-        "WuWaRecording_Style", {"Both eyes, side by side", "Showcase: one eye, steady, 16:9"}));
+        "Side by side: both eyes, the whole view of each. Left or right eye: that eye's whole view as one video, as "
+        "wide as side by side, at the game's own frame rate, not steadied; picture size is its width. Showcase: the "
+        "left eye as a normal 16:9 video, steadied, with the HUD where you see it, a little narrower; 720, 1024, 1280 "
+        "or 2048 px gives 720p, 1080p, 1440p or 2160p. The eye and showcase videos need SteamVR.",
+        "WuWaRecording_Style", {"Both eyes, side by side", "Showcase: one eye, steady, 16:9", "Left eye, whole view",
+                                "Right eye, whole view"}));
     {
         auto height = setting_slider("Showcase view height",
             "Where the showcase video looks, in degrees from where your head points. People look a little below "

@@ -1099,6 +1099,8 @@ RECORD_EYE_WIDTHS = (720, 1024, 1280, 1536, 2048)
 # recordings has less than this free (a part is up to ~1.7 GB at 2048 px per eye), never at a fixed length:
 # the one-hour bound of 11 Oct cut a session silently on 19 Oct and lost 19 minutes the owner wanted.
 RECORD_MIN_FREE_BYTES = 10 * 1024 ** 3
+# Side by side, the showcase crop of the left eye, or one eye's whole view (left_eye / right_eye, SteamVR).
+RECORD_STYLES = ('sbs', 'showcase', 'left_eye', 'right_eye')
 
 
 def recording_space_left(folder):
@@ -1111,7 +1113,7 @@ def recording_space_left(folder):
 
 def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None, source='auto', style='sbs', pitch=None, sound=True):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
-    if style not in ('sbs','showcase'): raise ValueError('Choose the side-by-side or the showcase video.')
+    if style not in RECORD_STYLES: raise ValueError('Choose the side-by-side, showcase or one-eye video.')
     if pitch is not None and (type(pitch) is not int or not -40<=pitch<=20): raise ValueError('Choose a showcase view height of -40..20 degrees.')
     if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
     if type(eye_width) is not int or eye_width not in RECORD_EYE_WIDTHS: raise ValueError('Choose 720, 1024, 1280, 1536 or 2048 pixels per eye.')
@@ -1122,7 +1124,8 @@ def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None,
     if expected_pid is not None and expected_pid!=pid: raise ValueError('Game process changed before recording.')
     if not any((config().app/'dev-tools'/name).is_file() for name in
                ('wuwa-recorder.exe','wuwa-simulator-recorder.exe')): raise ValueError('Recorder is not included in this package.')
-    what='showcase video (one eye, steadied, 16:9)' if style=='showcase' else 'stereo video'
+    what={'showcase':'showcase video (one eye, steadied, 16:9)','left_eye':'left-eye video (its whole view)',
+          'right_eye':'right-eye video (its whole view)'}.get(style,'stereo video')
     begin_job('recording',f'Recording {what} at a target of {fps} fps (5-minute parts until you stop it)',
               lambda: record_playtest(video_only,fps,eye_width,source,style,pitch,sound),
               prepare=lambda: RECORDING.update(recording_target(pid)))
@@ -1138,7 +1141,7 @@ def stop_recording(expected_id=None):
 
 def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', style='sbs', pitch=None, sound=True):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
-    if style not in ('sbs','showcase'): raise ValueError('Choose the side-by-side or the showcase video.')
+    if style not in RECORD_STYLES: raise ValueError('Choose the side-by-side, showcase or one-eye video.')
     if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
     if type(eye_width) is not int or eye_width not in RECORD_EYE_WIDTHS: raise ValueError('Choose 720, 1024, 1280, 1536 or 2048 pixels per eye.')
     if not RECORDING['running']:
@@ -1180,6 +1183,9 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', sty
         if low_space: where+='. Stopped early: less than 10 GB free on the drive for recordings'
         if style=='showcase':
             return 'Showcase video saved: showcase.mp4 in '+where
+        if style in ('left_eye','right_eye'):
+            name=style.split('_')[0]
+            return f'{name.capitalize()}-eye video saved: {name}-eye.mp4 in '+where
         return 'Recording saved. Open recordings, then replay.html for controller/camera annotations or clean-sbs.mp4 for clean footage. '+where
     finally:
         RECORDING.update(running=False,stopFile='')

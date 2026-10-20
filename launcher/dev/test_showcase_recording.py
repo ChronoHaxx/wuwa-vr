@@ -1,4 +1,4 @@
-"""Showcase recording style: the in-game request, the launcher job and the recorder command."""
+"""Showcase and one-eye recording styles: the in-game request, the launcher job and the recorder command."""
 import argparse
 import importlib.util
 import json
@@ -76,6 +76,12 @@ class BridgeStyle(unittest.TestCase):
         reply = self.send(eye_width=1920, id='s4')
         self.assertFalse(reply['ok'])
 
+    def test_one_eye_reaches_the_launcher(self):
+        self.assertTrue(self.send(style='left_eye')['ok'])
+        self.assertTrue(self.send(style='right_eye', sound=False, eye_width=2048, id='e2')['ok'])
+        self.assertEqual(self.started, [((True, 60, 1280, 42), {'style': 'left_eye'}),
+                                        ((True, 60, 2048, 42), {'style': 'right_eye', 'sound': False})])
+
     def test_unknown_style_is_refused(self):
         reply = self.send(style='desktop')
         self.assertFalse(reply['ok'])
@@ -134,6 +140,26 @@ class RecorderCommand(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, '1280'):
                     recorder.recorder_command(self.args(Path(d), eye_width=1536, source='auto'), client)
 
+    def test_one_eye_flag_goes_first(self):
+        with tempfile.TemporaryDirectory() as d:
+            client = types.SimpleNamespace(pid=42, simulator=Path(d) / 'sim', created=0)
+            for style, flag in (('left_eye', '--eye=left'), ('right_eye', '--eye=right')):
+                source, command = recorder.recorder_command(self.args(Path(d), style=style, pitch=-15, sound=True), client)
+                self.assertEqual(source, 'steamvr')
+                # The one-eye video is not steadied: no showcase or pitch flags, sound after the eye.
+                self.assertEqual(command[1:3], [flag, '--sound'])
+                self.assertTrue(command[3].endswith('openvr_api.dll'))
+                self.assertFalse(any(c.startswith(('--showcase', '--pitch')) for c in command))
+
+    def test_simulator_refuses_one_eye(self):
+        with tempfile.TemporaryDirectory() as d:
+            client = types.SimpleNamespace(pid=42, simulator=Path(d) / 'sim', created=0)
+            client.simulator.mkdir()
+            (client.simulator / 'runtime_status.json').write_text('{}', encoding='utf-8')
+            with patch.object(recorder.live, 'fresh_json', return_value={'runtime_pid': 42, 'video_stream_version': 1}):
+                with self.assertRaisesRegex(RuntimeError, 'needs SteamVR'):
+                    recorder.recorder_command(self.args(Path(d), style='right_eye', source='auto'), client)
+
     def test_simulator_refuses_showcase(self):
         with tempfile.TemporaryDirectory() as d:
             client = types.SimpleNamespace(pid=42, simulator=Path(d) / 'sim', created=0)
@@ -169,8 +195,10 @@ class LauncherJob(unittest.TestCase):
                  patch.object(player.importlib.util, 'spec_from_file_location', return_value=types.SimpleNamespace(loader=loader)), \
                  patch.object(player.importlib.util, 'module_from_spec', return_value=types.SimpleNamespace()):
                 message = player.record_playtest(style='showcase')
-            self.assertEqual(seen, ['showcase'])
+                eye_message = player.record_playtest(style='right_eye')
+            self.assertEqual(seen, ['showcase', 'right_eye'])
             self.assertIn('showcase.mp4', message)
+            self.assertIn('right-eye.mp4', eye_message)
             with self.assertRaises(ValueError):
                 player.record_playtest(style='mono')
 

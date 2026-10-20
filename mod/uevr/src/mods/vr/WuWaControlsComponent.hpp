@@ -320,9 +320,10 @@ private:
     const ModToggle::Ptr m_video_telemetry{ModToggle::create("WuWaRecording_Telemetry", true)};
     // 1.2.5: what the PC plays, as the video's sound track (SteamVR recordings).
     const ModToggle::Ptr m_video_sound{ModToggle::create("WuWaRecording_Sound", true)};
-    // Side by side (both eyes, for finding problems) or showcase (the left eye as a steadied 16:9 video).
+    // Side by side (both eyes, for finding problems), showcase (the left eye as a steadied 16:9 video), or one eye's
+    // whole view (1.2.6: the side-by-side field of view in one picture; the showcase crop gives some up).
     const ModCombo::Ptr m_video_style{ModCombo::create("WuWaRecording_Style",
-        {"Both eyes, side by side", "Showcase: one eye, steady, 16:9"}, 0)};
+        {"Both eyes, side by side", "Showcase: one eye, steady, 16:9", "Left eye, whole view", "Right eye, whole view"}, 0)};
     // Where the showcase video looks, degrees from where the head points (negative lower). Test 18c: level with
     // the head read as too high, 23 degrees down as too low; people look a little below the head's direction.
     const ModSlider::Ptr m_showcase_pitch{ModSlider::create("WuWaRecording_ShowcasePitch", -40.0f, 20.0f, -12.0f)};

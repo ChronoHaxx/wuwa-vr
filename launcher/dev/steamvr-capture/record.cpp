@@ -456,6 +456,11 @@ float4 whole(V v):SV_Target { return float4(eye.Sample(smp,v.uv).rgb,1); }
         draw(context,eye,encoded,print_ps.Get(),print_linear.Get(),print_srgb.Get(),32,32);
         read_back(context,print_target.Get(),print_staging.Get(),32,32,out);
     }
+    // The whole eye, as the headset shows it, resized to the target (the one-eye video: no crop, no steadying).
+    void whole(ID3D11DeviceContext* context,ID3D11ShaderResourceView* eye,bool encoded,std::vector<BYTE>& out) {
+        draw(context,eye,encoded,print_ps.Get(),linear.Get(),srgb.Get(),width,height);
+        read_back(context,target.Get(),staging.Get(),width,height,out);
+    }
     void read(ID3D11DeviceContext* context,ID3D11ShaderResourceView* eye,bool encoded,const Constants& c,std::vector<BYTE>& out) {
         D3D11_MAPPED_SUBRESOURCE map{}; check(context->Map(constants.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&map));
         memcpy(map.pData,&c,sizeof(c)); context->Unmap(constants.Get(),0);
@@ -586,6 +591,15 @@ int wmain(int argc,wchar_t** argv) {
                 worst=std::max(worst,qangle(Quat{},steady.update(Quat{std::cos(yaw/2),0,std::sin(yaw/2),0},now,0.35,0.10)));
             }
             if (worst>=0.10 || worst<0.06) throw std::runtime_error("Steady lag left the eased margin");
+            {
+                // The one-eye video: the whole eye in place, each quadrant where it was (no crop, flip or turn).
+                ShowcaseCrop whole; whole.open(test_device.Get(),320,320);
+                std::vector<BYTE> w; whole.whole(test_context.Get(),view.Get(),false,w);
+                auto px=[&](int x,int y,int ch) { return int(w[(y*320+x)*4+ch]); };
+                if (px(40,40,0)>8 || px(40,40,1)>8 || px(280,40,0)<247 || px(280,40,1)>8 || px(40,280,0)>8 || px(40,280,1)<247
+                    || px(280,280,0)<247 || px(280,280,1)<247 || std::abs(px(160,20,2)-64)>3)
+                    throw std::runtime_error("One-eye view moved, cropped or flipped the eye image");
+            }
             if (argc==3) {
                 // The largest showcase video, with frames at uneven game times (25 and 41 ms apart).
                 check(CoInitializeEx(nullptr,COINIT_MULTITHREADED)); com=true; check(MFStartup(MF_VERSION)); media=true;
@@ -597,7 +611,7 @@ int wmain(int argc,wchar_t** argv) {
                 encoder.close(); MFShutdown(); media=false; CoUninitialize(); com=false;
                 std::cout<<"Showcase encoder: 60 frames, 2560x1440, 40 Mbps, uneven frame times ("<<at_time/10000<<" ms).\n";
             }
-            std::cout<<"Synthetic showcase view: asymmetric eye, centred, turned, fingerprint and steady checks passed; no game/VR access.\n"; return 0;
+            std::cout<<"Synthetic showcase view: asymmetric eye, centred, turned, fingerprint, steady and one-eye checks passed; no game/VR access.\n"; return 0;
         }
         if (argc==3 && std::wstring_view(argv[1])==L"--self-test-large") {
             // The largest side-by-side video, 2048 px per eye (4096x2048, the H.264 width limit), with a sound
@@ -765,12 +779,15 @@ int wmain(int argc,wchar_t** argv) {
         }
         // Options first: --showcase (the left eye as a steadied 16:9 camera, showcase.mp4, instead of both eyes
         // side by side), --pitch=<degrees> with it (where that view looks, below (negative) or above the head),
-        // and --sound (what the PC plays, as an AAC track).
-        bool showcase=false, with_sound=false, pitched=false; double pitch=showcase_default_pitch;
+        // --eye=left|right (that eye's whole view, left-eye.mp4 / right-eye.mp4: the side-by-side field of view in
+        // one picture, at the game's own frame rate, not steadied), and --sound (what the PC plays, as an AAC track).
+        bool showcase=false, with_sound=false, pitched=false; double pitch=showcase_default_pitch; int one_eye=-1;
         while (argc>1 && std::wstring_view(argv[1]).starts_with(L"--")) {
             const std::wstring_view option=argv[1];
             if (option==L"--showcase") showcase=true;
             else if (option==L"--sound") with_sound=true;
+            else if (option==L"--eye=left") one_eye=0;
+            else if (option==L"--eye=right") one_eye=1;
             else if (option.starts_with(L"--pitch=")) {
                 const double degrees=std::stod(std::wstring(option.substr(8)));
                 if (!(degrees>=-40 && degrees<=20)) throw std::runtime_error("Showcase pitch must be -40..20 degrees");
@@ -779,7 +796,8 @@ int wmain(int argc,wchar_t** argv) {
             ++argv; --argc;
         }
         if (pitched && !showcase) throw std::runtime_error("--pitch needs --showcase");
-        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES]] [--sound] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..2048), optional stop file");
+        if (showcase && one_eye>=0) throw std::runtime_error("Choose --showcase or --eye, not both");
+        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES] | --eye=left|right] [--sound] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..2048), optional stop file");
         const UINT pid=std::stoul(argv[2]), seconds=std::stoul(argv[4]), fps=std::stoul(argv[5]), ew=std::stoul(argv[6]); out=argv[3];
         if (!pid||seconds<1||seconds>300||fps<10||fps>60||ew<640||ew>2048||ew%2) throw std::runtime_error("Invalid recording bounds");
         // Ends the recording cleanly when the game exits (a crash included) instead of waiting out the time.
@@ -807,18 +825,26 @@ int wmain(int argc,wchar_t** argv) {
         // No output device (or an odd one): the picture is recorded alone and the report says why.
         const bool sounding=with_sound && sound.open();
         const auto sound_report=[&] { return report_sound(with_sound,sounding,sound); };
-        if (showcase) {
-            Eye eye; eye.open(compositor,device.Get(),0);
-            float tan_l{},tan_r{},tan_t{},tan_b{}; system->GetProjectionRaw(vr::Eye_Left,&tan_l,&tan_r,&tan_t,&tan_b);
-            const Quat eye_to_head=quat_from(system->GetEyeToHeadTransform(vr::Eye_Left));
+        if (showcase || one_eye>=0) {
+            // Showcase: the left eye cropped to 16:9 and steadied. One eye: the chosen eye whole, as the headset
+            // shows it (the side-by-side field of view), with the pose of each frame logged for steadying later.
+            const bool whole=one_eye>=0; const int eye_index=whole?one_eye:0;
+            const auto vr_eye=static_cast<vr::EVREye>(eye_index);
+            const std::string style=whole?(eye_index?"right_eye":"left_eye"):"showcase";
+            Eye eye; eye.open(compositor,device.Get(),eye_index);
+            float tan_l{},tan_r{},tan_t{},tan_b{}; system->GetProjectionRaw(vr_eye,&tan_l,&tan_r,&tan_t,&tan_b);
+            const Quat eye_to_head=quat_from(system->GetEyeToHeadTransform(vr_eye));
             constexpr double max_angle=0.10, tau=0.35;
-            const auto frame=showcase_frame(tan_l,tan_r,tan_t,tan_b,max_angle+0.02,pitch);
-            // Picture size 720 / 1024 / 1280 (or 1536) / 2048 px per eye maps to 720p / 1080p / 1440p / 2160p.
-            const UINT ow=ew<=720?1280u:ew<=1024?1920u:ew<=1536?2560u:3840u, oh=ow*9/16;
-            const UINT bitrate=oh>=2160?60000000u:oh>=1440?40000000u:oh>=1080?24000000u:12000000u;
+            const auto frame=whole?ShowcaseFrame{}:showcase_frame(tan_l,tan_r,tan_t,tan_b,max_angle+0.02,pitch);
+            // Showcase: picture size 720 / 1024 / 1280 (or 1536) / 2048 px per eye maps to 720p / 1080p / 1440p / 2160p.
+            // One eye: that width at the eye's own shape (square on most headsets), at the side-by-side bit density.
+            const UINT ow=whole?ew:ew<=720?1280u:ew<=1024?1920u:ew<=1536?2560u:3840u;
+            const UINT oh=whole?std::max(2u,static_cast<UINT>(std::lround(double(ew)*eye.height/eye.width/2))*2):ow*9/16;
+            const UINT bitrate=whole?sbs_bitrate(ow,oh,fps):oh>=2160?60000000u:oh>=1440?40000000u:oh>=1080?24000000u:12000000u;
+            const std::wstring video_name=whole?(eye_index?L"right-eye.mp4":L"left-eye.mp4"):L"showcase.mp4";
             if (!std::filesystem::create_directories(out)) throw std::runtime_error("Output appeared during startup; refusing to overwrite");
             output_created=true;
-            encoder.open(out/L"showcase.mp4",ow,oh,fps,bitrate,true,sounding?sound.rate:0);
+            encoder.open(out/video_name,ow,oh,fps,bitrate,true,sounding?sound.rate:0);
             std::ofstream frames(out/L"frames.jsonl",std::ios::binary);
             if (!frames) throw std::runtime_error("Cannot write frame sidecar");
             ShowcaseCrop crop; crop.open(device.Get(),ow,oh);
@@ -830,7 +856,7 @@ int wmain(int argc,wchar_t** argv) {
             double pending_t=-1, waiting_since=-1;
             std::string end_reason="time_limit"; Json pauses=Json::array(); double paused_at=-1, t=0;
             Watchdog watchdog;
-            watchdog.start([&] { end_stalled(out,Json{{"style","showcase"},{"pid",pid},{"started_unix_ms",start_ms},
+            watchdog.start([&] { end_stalled(out,Json{{"style",style},{"pid",pid},{"started_unix_ms",start_ms},
                 {"frames",watchdog.frames.load()},{"width",ow},{"height",oh},{"bitrate",bitrate},{"fps_target",fps}},encoder); });
             while (true) {
                 watchdog.pulse(); watchdog.frames=count;
@@ -852,16 +878,18 @@ int wmain(int argc,wchar_t** argv) {
                 waiting_since=-1; last_print=print;
                 if (timed) { last_index=timing.m_nFrameIndex; have_index=true; }
                 if (pending_t>=0 && t-pending_t<0.5/fps) { ++too_soon; continue; }  // the game runs faster than the video
-                Quat view{};
-                if (timed && timing.m_HmdPose.bPoseIsValid) {
-                    const Quat head=quat_from(timing.m_HmdPose.mDeviceToAbsoluteTracking);
-                    const Quat d=steady.update(qmul(head,eye_to_head),t,tau,max_angle);
-                    view=d;
+                Quat view{},eye_pose{}; const bool posed=timed && timing.m_HmdPose.bPoseIsValid;
+                if (posed) {
+                    eye_pose=qmul(quat_from(timing.m_HmdPose.mDeviceToAbsoluteTracking),eye_to_head);
+                    if (!whole) view=steady.update(eye_pose,t,tau,max_angle);
                 } else ++unsteadied;
-                ShowcaseCrop::Constants c{{tan_l,tan_r,tan_t,tan_b},{float(frame.half_width),float(frame.half_height),float(frame.centre_x),float(frame.centre_y)}};
-                qrows(view,c.rows);
                 const auto capture_begin=utc();
-                crop.read(context.Get(),eye.view,eye.srgb,c,pixels);
+                if (whole) crop.whole(context.Get(),eye.view,eye.srgb,pixels);
+                else {
+                    ShowcaseCrop::Constants c{{tan_l,tan_r,tan_t,tan_b},{float(frame.half_width),float(frame.half_height),float(frame.centre_x),float(frame.centre_y)}};
+                    qrows(view,c.rows);
+                    crop.read(context.Get(),eye.view,eye.srgb,c,pixels);
+                }
                 if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; continue; }  // frame discarded
                 if (paused_at>=0) { pauses.push_back({{"from_s",paused_at},{"to_s",t}}); paused_at=-1; }
                 bool nonblack=false; for (size_t i=0;i<pixels.size();i+=128) if (pixels[i]||pixels[i+1]||pixels[i+2]) { nonblack=true; break; }
@@ -869,9 +897,15 @@ int wmain(int argc,wchar_t** argv) {
                 // Each frame lasts until the next one arrives, so the video keeps the game's real timing.
                 if (pending_t>=0) encoder.add(pending,static_cast<LONGLONG>(pending_t*10000000),static_cast<LONGLONG>((t-pending_t)*10000000));
                 std::swap(pending,pixels); pending_t=t;
-                frames<<Json{{"frame",count},{"video_seconds",t},{"capture_begin_ms",capture_begin},{"capture_end_ms",utc()},
-                    {"clock_ms",GetTickCount64()},{"scene_frame",timed?Json(timing.m_nFrameIndex):Json(nullptr)},
-                    {"steady",{view.w,view.x,view.y,view.z}}}.dump()<<'\n';
+                Json row{{"frame",count},{"video_seconds",t},{"capture_begin_ms",capture_begin},{"capture_end_ms",utc()},
+                    {"clock_ms",GetTickCount64()},{"scene_frame",timed?Json(timing.m_nFrameIndex):Json(nullptr)}};
+                if (!whole) row["steady"]={view.w,view.x,view.y,view.z};
+                else if (posed) {
+                    // The pose this frame was rendered with (eye orientation, head position in metres).
+                    const auto& m=timing.m_HmdPose.mDeviceToAbsoluteTracking.m;
+                    row["eye_pose"]={eye_pose.w,eye_pose.x,eye_pose.y,eye_pose.z}; row["head_position"]={m[0][3],m[1][3],m[2][3]};
+                }
+                frames<<row.dump()<<'\n';
                 ++count; if (count%fps==0) frames.flush();
             }
             watchdog.finish();
@@ -879,15 +913,19 @@ int wmain(int argc,wchar_t** argv) {
             sound.finish(); encoder.close(); timeEndPeriod(1);
             if (paused_at>=0) pauses.push_back({{"from_s",paused_at},{"to_s",t}});
             const double elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
-            result={{"status","recorded"},{"style","showcase"},{"end_reason",end_reason},{"scene_pauses",pauses},
-                {"pid",pid},{"started_unix_ms",start_ms},{"frames",count},{"frames_unsteadied",unsteadied},
+            result={{"status","recorded"},{"style",style},{"end_reason",end_reason},{"scene_pauses",pauses},
+                {"pid",pid},{"started_unix_ms",start_ms},{"frames",count},
                 {"frames_faster_than_video",too_soon},{"width",ow},{"height",oh},{"bitrate",bitrate},
                 {"fps_target",fps},{"captured_fps",count/elapsed},{"wall_seconds",elapsed},
                 {"timing","one sample per new game frame at its arrival time (variable frame rate, no repeats)"},
                 {"source_eye_size",{eye.width,eye.height}},{"eye_tangents",{tan_l,tan_r,tan_t,tan_b}},
-                {"crop_half_tangents",{frame.half_width,frame.half_height}},{"crop_centre_tangents",{frame.centre_x,frame.centre_y}},{"pitch_degrees",pitch*180/std::acos(-1.0)},{"steady",{{"seconds",tau},{"margin_rad",max_angle}}},
-                {"method","OpenVR left-eye mirror; 16:9 view across the eye's width, lens shifted to the pitch, steadied with the pose each frame was rendered with"},
                 {"desktop_captured",false},{"input_sent",false}};
+            if (whole) result.update({{"eye",eye_index?"right":"left"},{"video",std::filesystem::path(video_name).string()},
+                {"frames_without_pose",unsteadied},
+                {"method",std::string("OpenVR ")+(eye_index?"right":"left")+"-eye mirror, whole, resized; eye pose per frame in frames.jsonl"}});
+            else result.update({{"frames_unsteadied",unsteadied},
+                {"crop_half_tangents",{frame.half_width,frame.half_height}},{"crop_centre_tangents",{frame.centre_x,frame.centre_y}},{"pitch_degrees",pitch*180/std::acos(-1.0)},{"steady",{{"seconds",tau},{"margin_rad",max_angle}}},
+                {"method","OpenVR left-eye mirror; 16:9 view across the eye's width, lens shifted to the pitch, steadied with the pose each frame was rendered with"}});
             result.update(sound_report());
             std::ofstream(out/L"recording.json")<<result.dump(2)<<'\n';
         } else {

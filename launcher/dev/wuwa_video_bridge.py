@@ -72,8 +72,8 @@ class Bridge:
             # Absent from older plugins: sound on (the recorder's default since 1.2.5).
             if type(request.get('sound', True)) is not bool:
                 raise ValueError('Choose whether to record sound')
-            # Absent from older plugins: the side-by-side recording.
-            if request.get('style', 'sbs') not in ('sbs', 'showcase'):
+            # Absent from older plugins: the side-by-side recording. left_eye / right_eye: one eye's whole view.
+            if request.get('style', 'sbs') not in ('sbs', 'showcase', 'left_eye', 'right_eye'):
                 raise ValueError('Unsupported recording style')
             # Absent from older plugins: the recorder's own default (12 degrees down).
             pitch = request.get('showcase_pitch', 0)
@@ -123,6 +123,9 @@ class Bridge:
                             extra.update(sound)
                             self.start(not request['telemetry'], request['fps'],
                                        request['eye_width'], game['pid'], style='showcase', **extra)
+                        elif request.get('style') in ('left_eye', 'right_eye'):
+                            self.start(not request['telemetry'], request['fps'],
+                                       request['eye_width'], game['pid'], style=request['style'], **sound)
                         else:
                             self.start(not request['telemetry'], request['fps'],
                                        request['eye_width'], game['pid'], **sound)

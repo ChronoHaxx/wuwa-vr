@@ -744,7 +744,7 @@ void WuWaControlsComponent::on_draw_recording() {
         constexpr int rates[]{30,45,60},widths[]{720,1024,1280,1536,2048};
         if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
                       widths[std::clamp(m_video_width->value(),0,4)],m_video_telemetry->value(),
-                      m_video_style->value()==1,static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value()))
+                      std::clamp(m_video_style->value(),0,3),static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value()))
             m_recording_live.store(true,std::memory_order_relaxed);
     }
     ImGui::EndDisabled();
@@ -1256,7 +1256,7 @@ void WuWaControlsComponent::menu_recording_toggle() {
     // Cover the IDs from the request on, before the launcher reports "starting".
     if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
                   widths[std::clamp(m_video_width->value(),0,4)],m_video_telemetry->value(),
-                  m_video_style->value()==1,static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value()))
+                  std::clamp(m_video_style->value(),0,3),static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value()))
         m_recording_live.store(true,std::memory_order_relaxed);
 }
 

@@ -192,8 +192,12 @@ REC badge with the elapsed time shows while recording.
    player IDs** directly below
    (`WuWaPrivacy_Mode`: Off, While recording, Always; default While
    recording, because the boxes are approximate and can cover useful HUD), the
-   profile-row option, recorder status, frame rate, picture size, telemetry,
-   and **Report a problem**. While recording means the launcher's recorder
+   profile-row option, recorder status, **Video style** (`WuWaRecording_Style`:
+   both eyes side by side; showcase, the left eye steadied and cropped to
+   16:9; or, since 1.2.6, the left or right eye's whole view as one video,
+   `left-eye.mp4` / `right-eye.mp4`, as wide as side by side, not steadied,
+   with each frame's eye pose in `frames.jsonl`; showcase and one-eye need
+   SteamVR), frame rate, picture size, telemetry, and **Report a problem**. While recording means the launcher's recorder
    reports starting, recording or finishing (polled twice a second, and set at
    once when this menu or the classic one sends the start request) or a
    treadmill run is on; OBS at other times needs Always. A profile that had test 2's

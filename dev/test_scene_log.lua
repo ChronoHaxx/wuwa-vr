@@ -83,6 +83,7 @@ check(M.clean("6568/6568") == nil and M.clean("518m<texture=/Game/A.A>") == nil 
 check(M.clean("User ID: 701123532") == "User ID: #########", "7+ digit runs are masked")
 check(M.clean("Talk to the Celestials\0garbage") == "Talk to the Celestials", "text ends at the first NUL")
 check(M.clean("  Head   to\nthe  anomaly ") == "Head to the anomaly", "whitespace collapses")
+check(M.clean("New Text") == nil, "LGUI's placeholder text is dropped")
 
 -- One pass (7 widgets < one scan step): the quest title and step, nothing else.
 local t = 0

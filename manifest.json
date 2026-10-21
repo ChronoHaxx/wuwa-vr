@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-21T09:05:56.597937+00:00",
+  "updatedAt": "2026-10-21T09:06:51.485937+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -136,7 +136,7 @@
     "dev/test_renderer_probe_dxgi.ps1": "048cd2b2835bcf0135f863d95602e1300831161aa20dd9aa61cf62375fc19ed2",
     "dev/test_rim_suppression.cpp": "7626c8c5e2b5a00a43be851d4a7749cff121e829db9ee58e5889ac87a0e88e13",
     "dev/test_run_tracker.cpp": "dbdeb0088e31ab61a7a04c7d406ec7e4f71d7055b886bf0a49790957c45deefa",
-    "dev/test_scene_log.lua": "8a064064a3e0d1842682bac2d1e600fe63be7e2535a0d64ee00370d771ff87b0",
+    "dev/test_scene_log.lua": "7a41852764bba1a30a2f45ae8594a8a816d32e8e0f52abe874acf43138e4ac3a",
     "dev/test_screen_composite.cpp": "f532ecbbd68c0595da65e65fe5019db8f4b2b0672de5bc77ce699c4f92d10251",
     "dev/test_screen_eye_order.cpp": "a3f277826793e04fc2fd5f5116cd80ad9e1cdc32b0fe124b2ccbb7f42ef84679",
     "dev/test_self_port.cpp": "f405edb7223af81418b805495fa997d541c2c038097da35fbade0201a6afd509",

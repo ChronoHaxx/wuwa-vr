@@ -210,6 +210,14 @@ def main() -> None:
         if branch_copy.exists() and sha(branch_copy) != sha(script):
             shutil.copy2(branch_copy, script)
             print('launcher script from branch:', script.name, flush=True)
+    # A launcher module the branch added (1.2.6: wuwa_scene.py, loaded by record-wuwa.py) is not in the base
+    # yet: ship it when a shipped script names it, so dev-only tools stay out.
+    shipped = '\n'.join(p.read_text(encoding='utf-8', errors='replace') for p in (out / 'app/dev').glob('*.py'))
+    for branch_copy in sorted((REPO / 'launcher/dev').glob('*.py')):
+        script = out / 'app/dev' / branch_copy.name
+        if not branch_copy.name.startswith('test_') and not script.exists() and branch_copy.name in shipped:
+            shutil.copy2(branch_copy, script)
+            print('new launcher script from branch:', script.name, flush=True)
     if a.recorder:
         shutil.copy2(a.recorder, out / 'app/dev-tools/wuwa-recorder.exe')
         print('recorder from', a.recorder, flush=True)

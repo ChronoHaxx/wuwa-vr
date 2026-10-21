@@ -17,7 +17,14 @@ LABELS = (
     ("PnlTitle/TxtTitle", "Quest"),
     ("PnlSubTitle/TxtParent", "Step"),
     ("TxtMissionUpdate", "Banner"),
+    ("PnlStepInfo/TxtStepTitle", "Goal"),
+    ("PnlOffset/TxtStepInfo", "Goal step"),
 )
+# Button hints next to the tracker: kept in scene.jsonl, left out of the readable timeline.
+HINTS = ("PnlHotkey/Txt", "BtnTrack/TxtTrack", "ShortcutNode/ShortCutKey")
+# The tracker blinks while it animates: the same text for the same item within this many seconds is not
+# listed again in scene.txt (scene.jsonl keeps every change).
+AGAIN_SECONDS = 30
 DIGITS = re.compile(r"\d{7,}")
 
 
@@ -34,7 +41,9 @@ def clock(t):
 
 
 def mask(text):
-    return DIGITS.sub(lambda m: "#" * len(m.group(0)), text) if isinstance(text, str) else None
+    if not isinstance(text, str) or text == "New Text":  # LGUI's placeholder (older builds logged it)
+        return None
+    return DIGITS.sub(lambda m: "#" * len(m.group(0)), text)
 
 
 def events(motion_path, started_ms):
@@ -52,12 +61,12 @@ def events(motion_path, started_ms):
                 continue
             t = (row["unix_ms"] - started_ms) / 1000.0
             if scene.get("full"):
-                texts = {k: mask(v) for k, v in (scene.get("texts") or {}).items() if isinstance(v, str)}
+                texts = {k: mask(v) for k, v in (scene.get("texts") or {}).items() if mask(v)}
                 set_ = {k: v for k, v in texts.items() if state.get(k) != v}
                 gone = sorted(k for k in state if k not in texts)
             else:
                 set_ = {k: mask(v) for k, v in (scene.get("set") or {}).items()
-                        if isinstance(v, str) and state.get(k) != mask(v)}
+                        if mask(v) and state.get(k) != mask(v)}
                 gone = sorted(k for k in (scene.get("gone") or []) if k in state)
             moved = {}
             for key in ("map", "pawn"):
@@ -73,7 +82,7 @@ def events(motion_path, started_ms):
 
 def write(folder):
     """Writes scene.jsonl and scene.txt into a recording folder; returns the number of changes (0: nothing written)."""
-    folder = Path(folder)
+    folder = Path(folder).resolve()
     motion, meta = folder / "motion.jsonl", folder / "recording.json"
     if not motion.is_file() or not meta.is_file():
         return 0
@@ -87,13 +96,21 @@ def write(folder):
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
     lines = [f"Scene info for {folder.name}: what the game showed, at video time. Your UID is never saved.", ""]
+    listed = {}
+    order = {"Quest": 0, "Step": 1, "Banner": 2, "Goal": 3, "Goal step": 4}
     for r in rows:
         at = clock(r["t"])
         if "map" in r:
             lines.append(f"{at}  Map        {r['map']}")
         if "pawn" in r:
             lines.append(f"{at}  Character  {r['pawn']}")
-        for key, text in sorted((r.get("set") or {}).items(), key=lambda kv: (label(kv[0]) not in ("Quest", "Step"), kv[0])):
+        for key, text in sorted((r.get("set") or {}).items(), key=lambda kv: (order.get(label(kv[0]), 9), kv[0])):
+            if key.endswith(HINTS) or key == "":
+                continue
+            seen = listed.get(key)
+            if seen and seen[0] == text and r["t"] - seen[1] < AGAIN_SECONDS:
+                continue
+            listed[key] = (text, r["t"])
             lines.append(f"{at}  {label(key):<10} {text}")
     (folder / "scene.txt").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     return len(rows)

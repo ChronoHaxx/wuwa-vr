@@ -28,6 +28,7 @@ function M.clean(text)
     text = text:gsub("%d%d%d%d%d%d%d+", function(d) return string.rep("#", #d) end)
     local words = text:gsub("[%d%s%p]", "")
     if words == "" or words == "m" or words == "ms" or words == "s" or words == "km" then return nil end
+    if text == "New Text" then return nil end -- LGUI's placeholder in unused template widgets
     if #text > MAX_LENGTH then text = text:sub(1, MAX_LENGTH) end
     return text
 end
@@ -43,7 +44,10 @@ function M.new(env)
         if not p or kind(p) ~= wanted then return nil end
         return o[name]
     end
-    local function name_of(o) return cut(property(o, "displayName", "StrProperty")) end
+    local function name_of(o)
+        local name = cut(property(o, "displayName", "StrProperty"))
+        return name ~= "" and name or nil
+    end
     -- LGUI's own rule for "shown": the item and all its parents active. Signature checked first.
     local function active(o)
         local fn = o:get_class():find_function("IsUIActiveInHierarchy")

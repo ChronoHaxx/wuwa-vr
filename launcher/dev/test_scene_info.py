@@ -61,6 +61,20 @@ class SceneInfo(unittest.TestCase):
         self.assertEqual(wuwa_scene.write(empty), 0)
         self.assertFalse((empty / "scene.txt").exists())
 
+    def test_readable_timeline_skips_hints_blinks_and_placeholders(self):
+        hint = "UiItem_HotKey/PnlHotkey/Txt"
+        rows = [row(1_000_000, {"full": True, "texts": {STEP: "Return to the Heart of Bloom", hint: "Map", "": "New Text"}}),
+                row(1_005_000, {"gone": [STEP]}), row(1_006_500, {"set": {STEP: "Return to the Heart of Bloom"}}),
+                row(1_050_000, {"gone": [STEP]}), row(1_051_000, {"set": {STEP: "Return to the Heart of Bloom"}})]
+        d = self.folder(rows)
+        wuwa_scene.write(d)
+        text = (d / "scene.txt").read_text(encoding="utf-8")
+        self.assertEqual(text.count("Return to the Heart of Bloom"), 2)  # at 0:00, and again at 0:51 (over 30 s later)
+        self.assertNotIn("New Text", text)
+        self.assertNotIn(" Map", text)
+        self.assertIn(d.name, text.splitlines()[0])
+        self.assertIn("UiItem_HotKey/PnlHotkey/Txt", (d / "scene.jsonl").read_text(encoding="utf-8"))
+
     def test_missing_files(self):
         d = Path(tempfile.mkdtemp())
         self.assertEqual(wuwa_scene.write(d), 0)

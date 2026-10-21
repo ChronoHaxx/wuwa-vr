@@ -300,7 +300,14 @@ def record(args):
                     source=Path(recording["path"]).resolve()
                     expected=(client.profile/"recordings").resolve()
                     if source.parent!=expected or source.suffix!=".jsonl": raise RuntimeError("Unexpected sidecar path")
-                    if source.is_file(): shutil.copyfile(source,args.output/"motion.jsonl")
+                    if source.is_file():
+                        shutil.copyfile(source,args.output/"motion.jsonl")
+                        # Scene info (1.2.6): what the game showed, as scene.txt; never fails the recording.
+                        try:
+                            scene_spec=importlib.util.spec_from_file_location("wuwa_scene",Path(__file__).with_name("wuwa_scene.py"))
+                            scene_module=importlib.util.module_from_spec(scene_spec); scene_spec.loader.exec_module(scene_module)
+                            scene_module.write(args.output)
+                        except (OSError,ValueError,AttributeError,ImportError): pass
                 if getattr(args,'style','sbs')!='sbs':
                     # The replay page reads a side-by-side video; a showcase or one-eye recording is the video itself.
                     report={'style':args.style,'video':VIDEO[args.style],'motion_sidecar':(args.output/'motion.jsonl').is_file(),

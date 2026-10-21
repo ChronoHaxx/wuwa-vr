@@ -197,7 +197,11 @@ REC badge with the elapsed time shows while recording.
    16:9; or, since 1.2.6, the left or right eye's whole view as one video,
    `left-eye.mp4` / `right-eye.mp4`, as wide as side by side, not steadied,
    with each frame's eye pose in `frames.jsonl`; showcase and one-eye need
-   SteamVR), frame rate, picture size, telemetry, and **Report a problem**. While recording means the launcher's recorder
+   SteamVR), frame rate, picture size, telemetry, **Scene info** (1.2.6,
+   `WuWaRecording_SceneInfo`, on, needs telemetry: `mod/lua/wuwa_scene_log.lua`
+   reads the game's shown LGUI text, map and character onto the telemetry rows,
+   never the UID widget, and the launcher writes `scene.txt` / `scene.jsonl`
+   next to the video), and **Report a problem**. While recording means the launcher's recorder
    reports starting, recording or finishing (polled twice a second, and set at
    once when this menu or the classic one sends the start request) or a
    treadmill run is on; OBS at other times needs Always. A profile that had test 2's

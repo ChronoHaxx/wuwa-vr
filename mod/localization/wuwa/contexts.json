@@ -1372,6 +1372,9 @@
   "Include camera and controller data": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Include scene info (quest, dialogue, place)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Input candidates start off. Their effect on WuWa's intermittent combinations is not confirmed.": [
     "mods/VR.cpp"
   ],
@@ -2372,11 +2375,17 @@
   "Saves this answer with the settings now in use, then shows the next step.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Saves what the game shows while you record (the quest and its step, dialogue lines with who speaks, place names and banners, the map and your character) as scene.txt next to the video, so you can find a moment by what was said. Your UID is never saved. Needs Camera and controller data.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Saving": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Scene ending; restoring previous view": [
     "utility/WuWaAutoCinema.hpp"
+  ],
+  "Scene info": [
+    "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Screen lens": [
     "mods/vr/WuWaVrMenuHost.cpp"

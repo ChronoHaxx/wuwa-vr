@@ -318,6 +318,9 @@ private:
     // 1536 and 2048 (1.2.5): SteamVR only; 2048 makes a 4096x2048 side-by-side video, the widest H.264 allows.
     const ModCombo::Ptr m_video_width{ModCombo::create("WuWaRecording_Width", {"720", "1024", "1280", "1536", "2048"}, 1)};
     const ModToggle::Ptr m_video_telemetry{ModToggle::create("WuWaRecording_Telemetry", true)};
+    // 1.2.6: what the game shows (quest, dialogue, banners, map, character) rides on the telemetry rows
+    // (mod/lua/wuwa_scene_log.lua); the launcher writes it as scene.txt next to the video. Never the UID.
+    const ModToggle::Ptr m_video_scene{ModToggle::create("WuWaRecording_SceneInfo", true)};
     // 1.2.5: what the PC plays, as the video's sound track (SteamVR recordings).
     const ModToggle::Ptr m_video_sound{ModToggle::create("WuWaRecording_Sound", true)};
     // Side by side (both eyes, for finding problems), showcase (the left eye as a steadied 16:9 video), or one eye's

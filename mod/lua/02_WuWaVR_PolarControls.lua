@@ -36,6 +36,18 @@ local function number(k, fallback, lo, hi)
     return math.max(lo, math.min(hi,n))
 end
 local function now() return number("WuWaControls_Clock",0,0,1e12) end
+-- Scene info for recordings (wuwa_scene_log.lua, 1.2.6). Resolved here: UEVR puts this script's folder on
+-- package.path only while the top-level chunk runs. Read-only, and idle unless a recording runs.
+local scene={recording=false,error=nil,log={tick=function() end,take=function() return nil end,reset=function() end}}
+do
+    local found,module=pcall(require,"wuwa_scene_log")
+    local ready,instance=false,nil
+    if found and type(module)=="table" and type(module.new)=="function" then
+        ready,instance=pcall(module.new,{api=uevr.api,types=uevr.types})
+    end
+    if ready and type(instance)=="table" then scene.log=instance
+    else functions.log_warn("[WuWaScene] module unavailable: "..tostring(found and instance or module)) end
+end
 local function set(k,v) vr.set_mod_value(k,tostring(v)) end
 local function has(b,mask) return b & mask ~= 0 end
 local function motion() return number("WuWaControls_FirstMotion",0,0,3) end
@@ -2092,7 +2104,21 @@ cb.on_pre_viewport_client_draw(function()
         pcall(hider.restore,"error")
         if hider.error~=tostring(hide_err) then hider.error=tostring(hide_err); functions.log_warn("[WuWaHide] "..hider.error:sub(1,200)) end
     end
-    if not enabled("WuWaControls_Recording") then return end
+    if not enabled("WuWaControls_Recording") then
+        if scene.recording then scene.recording=false; pcall(scene.log.reset,scene.log) end
+        return
+    end
+    -- Scene info (1.2.6): what the game shows (quest, dialogue, banners, map, character) rides on the
+    -- recording rows; wuwa_scene_log repeats each change on a few rows because the recorder drops some.
+    local scene_info=nil
+    if get("WuWaRecording_SceneInfo")~="false" then
+        scene.recording=true
+        local t=now()
+        local ticked,tick_err=pcall(scene.log.tick,scene.log,t)
+        if not ticked and scene.error~=tostring(tick_err) then scene.error=tostring(tick_err); functions.log_warn("[WuWaScene] "..scene.error:sub(1,200)) end
+        local took,taken=pcall(scene.log.take,scene.log,t)
+        if took then scene_info=taken end
+    end
     local ok,err=pcall(function()
         local pawn=api:get_local_pawn(0)
         local pc=api:get_player_controller(0)
@@ -2112,7 +2138,7 @@ cb.on_pre_viewport_client_draw(function()
             camera=frame,game=base,slot=selected,input=input and input.pad or nil,input_age=input and now()-input.at or nil,
             pawn=pawn and point(pawn:K2_GetActorLocation()) or nil,
             actor_yaw=pawn and math.deg(pawn_yaw(pawn)) or nil,
-            anchor=mesh_cache and mesh_cache.anchor_report or nil,status=status}
+            anchor=mesh_cache and mesh_cache.anchor_report or nil,status=status,scene=scene_info}
         functions.dispatch_custom_event("WuWaControls.Input.v1",json.dump_string({motion_only=true,motion=sample}))
     end)
     if not ok then functions.log_warn("WuWaControls recording sample unavailable: "..tostring(err)) end

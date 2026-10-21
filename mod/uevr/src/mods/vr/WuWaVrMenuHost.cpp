@@ -1121,6 +1121,15 @@ Page record_page() {
         "SteamVR recordings only.", "WuWaRecording_Sound"));
     page.items.push_back(setting_toggle("Camera and controller data",
         "Saves the camera and controller movement next to the video, to help find what went wrong.", "WuWaRecording_Telemetry"));
+    {
+        auto scene = setting_toggle("Scene info",
+            "Saves what the game shows while you record (the quest and its step, dialogue lines with who speaks, "
+            "place names and banners, the map and your character) as scene.txt next to the video, so you can find a "
+            "moment by what was said. Your UID is never saved. Needs Camera and controller data.",
+            "WuWaRecording_SceneInfo");
+        scene.enabled = [] { auto* on = typed<bool>("WuWaRecording_Telemetry"); return on && on->value(); };
+        page.items.push_back(std::move(scene));
+    }
     page.items.push_back(paragraph("Desktop window", true));
     page.items.push_back(setting_choice("HUD in the desktop window",
         "As in the headset: the HUD sits where you see it in VR, at its distance and size. Flat: the HUD fills the "

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-21T08:56:27.725589+00:00",
+  "updatedAt": "2026-10-21T08:57:16.950453+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -29,7 +29,7 @@
     "dev/build-recorder.py": "e9e27b7324f582a639ddc51a0bd308919c3599af25271af8c85a99b71400c6ec",
     "dev/build-site.cjs": "1d320bf568abed95e10bac0c93d73871ceb8669ccf2338a5957cc53a5ef4fc23",
     "dev/bundle-languages.py": "fb10335e7025580c3243b392a92677600c99ebe53baecccd4acdbce148227f62",
-    "dev/candidate.py": "6ab1d89895afca0db67f191b5cc5b2ce5d8188d439e516f31366d5a721e0356b",
+    "dev/candidate.py": "35672519f22b78d742c72f388c8c6b7887b848e2643484c0e4c2490aba6e6510",
     "dev/check-community.cjs": "5f2cf6c277cfbe8ac72b0376052b7f6f41b29218249d44711ec183a930bd88a8",
     "dev/check-site.cjs": "3e188904eeb36a5b0ac7e5de6fa0f1037a1a87173e2e351178e08b1072e88bd3",
     "dev/check-sums.py": "2250df1664f9dba786ddd6a9357e52100ea7260e7f2eb495699ad27378d318b6",

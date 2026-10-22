@@ -68,6 +68,8 @@ public:
     // with the saved recording settings.
     std::string menu_recording_state();
     void menu_recording_toggle();
+    // The microphones the launcher lists, for the Record page's choice (UI thread).
+    std::vector<wuwa_video::Microphone> menu_microphones() const { return m_video.microphones(); }
     // When the menu last asked the recorder to stop (GetTickCount64 ms, 0 never): a recording that ends
     // otherwise gets a note in the headset.
     uint64_t recording_stop_requested_ms() const { return m_recording_stop_asked.load(std::memory_order_relaxed); }
@@ -323,6 +325,11 @@ private:
     const ModToggle::Ptr m_video_scene{ModToggle::create("WuWaRecording_SceneInfo", true)};
     // 1.2.5: what the PC plays, as the video's sound track (SteamVR recordings).
     const ModToggle::Ptr m_video_sound{ModToggle::create("WuWaRecording_Sound", true)};
+    // 1.2.6: a microphone mixed into that track and saved alone as microphone.wav (SteamVR recordings). "" none (the
+    // default: never record a voice unasked), "default" the one Windows records from, or a Windows endpoint ID from
+    // the launcher's list (kept when the list changes); its level in percent, 100 as it comes.
+    const ModString::Ptr m_video_microphone{ModString::create("WuWaRecording_Microphone", "")};
+    const ModSlider::Ptr m_video_mic_volume{ModSlider::create("WuWaRecording_MicVolume", 0.0f, 300.0f, 100.0f)};
     // Side by side (both eyes, for finding problems), showcase (the left eye as a steadied 16:9 video), or one eye's
     // whole view (1.2.6: the side-by-side field of view in one picture; the showcase crop gives some up).
     const ModCombo::Ptr m_video_style{ModCombo::create("WuWaRecording_Style",

@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 #include <algorithm>
 
 namespace wuwa_video {
@@ -52,6 +53,14 @@ inline bool identity_matches(const nlohmann::json& value,uint32_t pid,int64_t cr
              state=="saved" || state=="busy" || state=="error");
     } catch (...) { return false; }
 }
+// A microphone the launcher lists (wuwa-recorder.exe --list-microphones): the Windows endpoint ID, its name,
+// and whether Windows records from it by default.
+struct Microphone { std::string id,name; bool preferred{}; };
+// What a recording request may carry: "default" or a Windows endpoint ID ({0.0.1.00000000}.{GUID}).
+inline bool microphone_choice_valid(const std::string& id) {
+    return id=="default" || (id.size()>=42 && id.size()<=200 && id.front()=='{' &&
+        id.find_first_not_of("0123456789abcdefABCDEF{}.-")==std::string::npos);
+}
 class Client {
 public:
     void poll(const std::filesystem::path& profile,bool force=false) noexcept {
@@ -86,11 +95,30 @@ public:
         return m_connected ? m_status.value("message",std::string{}) : "";
     }
     std::string folder() const { return m_connected ? m_status.value("folder",std::string{}) : ""; }
+    // The microphones the launcher lists (1.2.6; none from older launchers), at most 32.
+    std::vector<Microphone> microphones() const {
+        std::vector<Microphone> out;
+        if (!m_connected) return out;
+        try {
+            const auto it=m_status.find("microphones");
+            if (it==m_status.end() || !it->is_array()) return out;
+            for (const auto& item : *it) {
+                if (out.size()>=32) break;
+                if (!item.is_object() || !item.contains("id") || !item.contains("name") || !item.at("id").is_string() ||
+                    !item.at("name").is_string()) continue;
+                Microphone mic{item.at("id").get<std::string>(),item.at("name").get<std::string>(),
+                               item.contains("default") && item.at("default").is_boolean() && item.at("default").get<bool>()};
+                if (mic.id!="default" && microphone_choice_valid(mic.id) && mic.name.size()<=400) out.push_back(std::move(mic));
+            }
+        } catch (...) { out.clear(); }
+        return out;
+    }
     // style 0: both eyes side by side. 1 (showcase): the left eye as a steadied 16:9 video, looking pitch degrees
     // from where the head points (negative lower). 2 / 3: the left / right eye's whole view, not steadied (the
-    // side-by-side field of view in one picture). sound: what the PC plays, as a track.
+    // side-by-side field of view in one picture). sound: what the PC plays, as a track. microphone (1.2.6): none
+    // when empty, else "default" or an endpoint ID, mixed into that track at mic_volume percent.
     bool submit(const std::filesystem::path& profile,bool start,int fps=30,int width=1024,bool telemetry=true,
-                int style=0,int pitch=-12,bool sound=true) noexcept {
+                int style=0,int pitch=-12,bool sound=true,const std::string& microphone={},int mic_volume=100) noexcept {
         poll(profile,true);
         try {
             if (!available() || pending()) throw std::runtime_error("Wait for the recording launcher.");
@@ -100,13 +128,17 @@ public:
             if (!start && current!="starting" && current!="recording") throw std::runtime_error("No recording is active.");
             if ((fps!=30 && fps!=45 && fps!=60) || (width!=720 && width!=1024 && width!=1280 && width!=1536 && width!=2048))
                 throw std::runtime_error("Unsupported recording settings.");
+            if (start && !microphone.empty() && !microphone_choice_valid(microphone))
+                throw std::runtime_error("Choose the microphone again.");
             const auto id=std::to_string(GetCurrentProcessId())+"-"+std::to_string(GetTickCount64())+"-"+std::to_string(++m_serial);
             nlohmann::json request{{"version",1},{"session",m_status.at("session")},{"id",id},
                 {"pid",GetCurrentProcessId()},{"created_ms",process_created_ms()},
                 {"expires_ms",unix_ms()+4000},{"action",start?"start":"stop"}};
             if (start) { request["fps"]=fps;request["eye_width"]=width;request["telemetry"]=telemetry;request["sound"]=sound;
                          if (style==1) { request["style"]="showcase"; request["showcase_pitch"]=std::clamp(pitch,-40,20); }
-                         else if (style==2 || style==3) request["style"]=style==2?"left_eye":"right_eye"; }
+                         else if (style==2 || style==3) request["style"]=style==2?"left_eye":"right_eye";
+                         // Only when chosen: a launcher from before 1.2.6 refuses fields it does not know.
+                         if (!microphone.empty()) { request["microphone"]=microphone; request["mic_volume"]=std::clamp(mic_volume,0,300); } }
             else request["recording_id"]=m_status.at("recording_id");
             const auto target=m_directory/("request-"+std::to_string(GetCurrentProcessId())+".json");
             const auto temporary=m_directory/(id+".tmp");

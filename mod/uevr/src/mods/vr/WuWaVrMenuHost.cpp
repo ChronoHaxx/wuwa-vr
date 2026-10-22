@@ -1079,6 +1079,45 @@ Page fixes_page() {
     return page;
 }
 
+// 1.2.6: the microphone for recordings, by name from the launcher's list, saved as its Windows ID so the choice
+// stays when the list changes. One that is not plugged in now shows as not connected; recording then says so.
+Item microphone_choice() {
+    auto item = make(Kind::Choice, "Microphone",
+        "Your voice in the video, mixed with the game sound, and alone as microphone.wav next to it for editing. Off "
+        "records no microphone. Windows default is the microphone Windows records from. The list comes from the WuWa "
+        "VR app. SteamVR recordings only.");
+    std::vector<std::string> ids{"", "default"};
+    item.choices = {N_("Off"), N_("Windows default microphone")};
+    for (const auto& mic : VR::get()->get_wuwa_controls().menu_microphones()) {
+        ids.push_back(mic.id);
+        item.choices.push_back(mic.name);
+    }
+    auto* saved = typed<std::string>("WuWaRecording_Microphone");
+    const bool missing = saved && std::find(ids.begin(), ids.end(), saved->value()) == ids.end();
+    if (missing) {
+        ids.push_back(saved->value());
+        item.choices.push_back(N_("Chosen microphone (not connected)"));
+    }
+    const int names_end = static_cast<int>(item.choices.size()) - (missing ? 1 : 0);
+    item.choice_text = [choices = item.choices, names_end](int i) {
+        // Device names as they are; the rest is English to translate.
+        return i >= 2 && i < names_end ? wuwa_l10n::visual(choices[i]) : wuwa_l10n::text(choices[i]);
+    };
+    item.enabled = [] { return typed<std::string>("WuWaRecording_Microphone") != nullptr; };
+    item.get_int = [ids] {
+        auto* v = typed<std::string>("WuWaRecording_Microphone");
+        const auto at = std::find(ids.begin(), ids.end(), v ? v->value() : std::string{});
+        return at == ids.end() ? 0 : static_cast<int>(at - ids.begin());
+    };
+    item.set_int = [ids](int value) {
+        if (auto* v = typed<std::string>("WuWaRecording_Microphone")) v->value() = ids[std::clamp(value, 0, static_cast<int>(ids.size()) - 1)];
+    };
+    item.default_text = [] { return std::string{"Off"}; };
+    item.is_default = [] { auto* v = typed<std::string>("WuWaRecording_Microphone"); return !v || v->value().empty(); };
+    item.reset = [] { if (auto* v = typed<std::string>("WuWaRecording_Microphone")) v->value().clear(); };
+    return item;
+}
+
 Page record_page() {
     Page page{"Record"};
     page.items.push_back(record_toggle());
@@ -1119,6 +1158,15 @@ Page record_page() {
     page.items.push_back(setting_toggle("Record sound",
         "Everything your PC plays goes into the video: the game, and also voice chat and notifications. "
         "SteamVR recordings only.", "WuWaRecording_Sound"));
+    page.items.push_back(microphone_choice());
+    {
+        auto volume = setting_slider("Microphone volume",
+            "How loud your voice is in the video. At 100 it is as the microphone gives it; raise it if your voice is quiet "
+            "next to the game.",
+            "WuWaRecording_MicVolume", 0.0f, 300.0f, 10.0f, "%.0f%%");
+        volume.enabled = [] { auto* mic = typed<std::string>("WuWaRecording_Microphone"); return mic && !mic->value().empty(); };
+        page.items.push_back(std::move(volume));
+    }
     page.items.push_back(setting_toggle("Camera and controller data",
         "Saves the camera and controller movement next to the video, to help find what went wrong.", "WuWaRecording_Telemetry"));
     {
@@ -1249,13 +1297,22 @@ Page menu_page() {
     return page;
 }
 
+// The Record page's microphone list: the launcher's microphones and the saved choice (a choice not plugged in
+// has its own row until another is chosen).
+std::string microphones_key() {
+    std::string key{", microphones"};
+    for (const auto& mic : VR::get()->get_wuwa_controls().menu_microphones()) key += " " + mic.id + "=" + mic.name;
+    if (auto* saved = typed<std::string>("WuWaRecording_Microphone")) key += ", chosen " + saved->value();
+    return key;
+}
+
 // Pages follow the plan and the camera mode. After a rebuild the same page,
 // and the same row when it still exists, stay selected.
 std::string layout_key() {
     // The language picker lists names drawn for the current language.
     return (steps.loaded() ? "plan " + std::to_string(steps.revision()) : std::string{"no plan"}) + ", camera " +
         std::to_string(camera_mode()) + (camera_mode() == 2 ? ", flying " + std::to_string(free_style()) : std::string{}) +
-        ", language " + wuwa_l10n::language() +
+        ", language " + wuwa_l10n::language() + microphones_key() +
         (wuwa_lgui_viewport::installed() ? (VR::get()->is_wuwa_ui_window_size_enabled() ? ", window-size UI" : ", tall UI") : "");
 }
 

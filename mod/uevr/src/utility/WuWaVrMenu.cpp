@@ -36,7 +36,7 @@ std::string value_of(const Item& item) {
     case Kind::Choice:
         if (item.get_int && !item.choices.empty()) {
             const int index = std::clamp(item.get_int(), 0, static_cast<int>(item.choices.size()) - 1);
-            return tr(item.choices[index]);
+            return item.choice_text ? item.choice_text(index) : tr(item.choices[index]);
         }
         return {};
     case Kind::Slider:

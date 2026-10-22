@@ -31,6 +31,8 @@ struct Item {
     std::function<int()> get_int;
     std::function<void(int)> set_int;
     std::vector<std::string> choices; // English; translated when drawn
+    // Set when some choices are names (devices) that must not go through translation: the shown text of choice i.
+    std::function<std::string(int)> choice_text;
     std::function<float()> get_float;
     std::function<void(float)> set_float;
     float min{0.0f}, max{1.0f}, step{0.1f};

@@ -197,7 +197,14 @@ REC badge with the elapsed time shows while recording.
    16:9; or, since 1.2.6, the left or right eye's whole view as one video,
    `left-eye.mp4` / `right-eye.mp4`, as wide as side by side, not steadied,
    with each frame's eye pose in `frames.jsonl`; showcase and one-eye need
-   SteamVR), frame rate, picture size, telemetry, **Scene info** (1.2.6,
+   SteamVR), frame rate, picture size, sound, **Microphone** (1.2.6,
+   `WuWaRecording_Microphone`, Off by default: Windows' default microphone or
+   one by name from the launcher's list (`wuwa-recorder.exe --list-microphones`),
+   saved as its Windows endpoint ID; one not plugged in shows as not connected
+   and the launcher refuses to start until another is chosen. The recorder
+   places it by WASAPI's capture clock, mixes it into the video's sound and
+   saves it alone as `microphone.wav`; SteamVR only) with **Microphone volume**
+   (`WuWaRecording_MicVolume`, 0-300 %, 100), telemetry, **Scene info** (1.2.6,
    `WuWaRecording_SceneInfo`, on, needs telemetry: `mod/lua/wuwa_scene_log.lua`
    reads the game's shown LGUI text, map and character onto the telemetry rows,
    never the UID widget, and the launcher writes `scene.txt` / `scene.jsonl`

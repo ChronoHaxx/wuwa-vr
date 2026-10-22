@@ -36,7 +36,11 @@ namespace WuWaVR.Manager
         bool allowClose, closeChecking, unresolvedStartup;
         Func<string, bool> closeOnlyConfirmOverride;
         TimeSpan closeTimeout = TimeSpan.FromSeconds(6);
-        ComboBox languages, releases, installed, source, fps, size, purpose;
+        ComboBox languages, releases, installed, source, fps, size, purpose, recordMic, recordMicVolume;
+        // The microphone choices' Windows IDs ("" off, "default"), matching recordMic's items; the list as last shown.
+        readonly List<string> micIds = new List<string> { "", "default" };
+        string micList = "";
+        static readonly int[] MicVolumes = { 50, 75, 100, 150, 200, 300 };
         ContentControl pageHost;
         ScrollViewer setupPage, troubleshootingPage;
         bool troubleshootingVisible, riskRestored;
@@ -812,14 +816,47 @@ namespace WuWaVR.Manager
             // 1.2.5: the video's sound track, what the PC plays (SteamVR recordings).
             recordSound = new CheckBox { Content = Label(text["recordSound"], 12), Foreground = foreground, IsChecked = true, Margin = new Thickness(0, 10, 0, 0) };
             ((StackPanel)recordingOptions.Content).Children.Add(recordSound);
+            // 1.2.6: a microphone mixed into that sound and saved alone as microphone.wav (SteamVR recordings). The
+            // launcher lists the microphones; the choice is off until one is picked.
+            recordMic = Choice(text["micOff"], text["micDefault"]); recordMicVolume = Choice(MicVolumes.Select(v => v + "%").ToArray());
+            recordMicVolume.SelectedIndex = Array.IndexOf(MicVolumes, 100);
+            recordMic.SelectionChanged += (s, e) => { if (!rendering) ShowStatus(); };
+            ((StackPanel)recordingOptions.Content).Children.Add(CaptureFields("microphone", recordMic, "micVolume", recordMicVolume));
             panel.Children.Add(Card(text["record"], Label(text["recordDefaults"], 12, muted),
                 Wrap(Action("recordStart", async c =>
                 {
                     await EnsureConnected(c);
-                    await SubmitJob("/api/record-start", new { videoOnly = purpose.SelectedIndex == 0, fps = int.Parse((string)fps.SelectedItem), eyeWidth = int.Parse((string)size.SelectedItem), sound = recordSound.IsChecked == true, source = new[] { "auto", "steamvr", "simulator" }[source.SelectedIndex] }, c);
+                    await SubmitJob("/api/record-start", new { videoOnly = purpose.SelectedIndex == 0, fps = int.Parse((string)fps.SelectedItem), eyeWidth = int.Parse((string)size.SelectedItem), sound = recordSound.IsChecked == true, source = new[] { "auto", "steamvr", "simulator" }[source.SelectedIndex],
+                        microphone = micIds[Math.Max(0, recordMic.SelectedIndex)], micVolume = MicVolumes[Math.Max(0, recordMicVolume.SelectedIndex)] }, c);
                 }, true), Action("recordStop", async c => { await EnsureConnected(c); await bridge.Post("/api/record-stop", new { }, c); }),
                 Action("openRecordings", async c => { await EnsureConnected(c); await bridge.Post("/api/open", new { folder = "recordings" }, c); operationText.Text = text["folderOpened"]; })), recordingOptions));
             panel.Children.Add(Label(text["recordPrivacy"], 12, muted)); return panel;
+        }
+        // The launcher's microphones (status.recording.microphones) into the choice, keeping the chosen one by its ID;
+        // one that went away stays chosen as not connected, and the launcher then explains when recording starts.
+        void ShowMicrophones(Dictionary<string, object> capture)
+        {
+            object value; var listed = new List<KeyValuePair<string, string>>();
+            if (capture.TryGetValue("microphones", out value) && value is System.Collections.IList)
+                foreach (object entry in (System.Collections.IList)value)
+                {
+                    var mic = Json.Object(entry); string id = Json.Text(mic, "id"), name = Json.Text(mic, "name");
+                    if (Regex.IsMatch(id, @"^\{[0-9.]{1,40}\}\.\{[0-9A-Fa-f-]{36}\}$") && listed.Count < 32)
+                        listed.Add(new KeyValuePair<string, string>(id, name.Length > 0 ? name : id));
+                }
+            string chosen = micIds[Math.Max(0, recordMic.SelectedIndex)];
+            string key = string.Join("|", listed.Select(m => m.Key + "=" + m.Value)) + "|" + chosen;
+            if (key == micList || recordMic.IsDropDownOpen) return;
+            micList = key; bool was = rendering; rendering = true;
+            try
+            {
+                micIds.RemoveRange(2, micIds.Count - 2);
+                while (recordMic.Items.Count > 2) recordMic.Items.RemoveAt(2);
+                foreach (var mic in listed) { micIds.Add(mic.Key); recordMic.Items.Add(mic.Value); }
+                if (!micIds.Contains(chosen)) { micIds.Add(chosen); recordMic.Items.Add(text["micMissing"]); }
+                recordMic.SelectedIndex = micIds.IndexOf(chosen);
+            }
+            finally { rendering = was; }
         }
         UIElement CaptureFields(string leftLabel, ComboBox left, string rightLabel, ComboBox right)
         {
@@ -1663,6 +1700,7 @@ namespace WuWaVR.Manager
             for (int index = 0; index < done.Length; ++index)
                 ShowStep(index, done[index] ? StepState.Done : index == currentStep ? StepState.Current : StepState.Pending);
             var capture = Json.Child(status, "recording");
+            ShowMicrophones(capture);
             bool canRecord = CaptureAvailability.HasSource(status, new[] { "auto", "steamvr", "simulator" }[Math.Max(0, source.SelectedIndex)]);
             recordingState.Text = text[!hasPackage ? "chooseVersion" : !connectionReady ? "connectionRequired" : recording ? "recordingActive" : !gameRunning ? "recordNeedsGame" : !canRecord ? "recordUnavailable" : "recordReady"];
             foreach (var button in actions)
@@ -1719,6 +1757,7 @@ namespace WuWaVR.Manager
             UpdateProcessRecovery();
             foreach (var choice in new[] { releases, installed, source, fps, size, purpose, gameLocations }) choice.IsEnabled = operation == null && !running;
             if (recordSound != null) recordSound.IsEnabled = operation == null && !running;
+            if (recordMic != null) { recordMic.IsEnabled = operation == null && !running; recordMicVolume.IsEnabled = recordMic.IsEnabled && recordMic.SelectedIndex > 0; }
             bool active = operation != null || running;
             recoveryShortcut.Visibility = unresolvedStartup || (hasPackage && !connectionReady) || workerFailed ? Visibility.Visible : Visibility.Collapsed;
             bool canCancel = operation != null || (bridge.Address != null && LauncherBridge.CanCancelLaunch(status));

@@ -60,7 +60,13 @@
     "Loading…": "불러오는 중…",
     "Use at your own risk.": "사용에 따른 위험은 본인에게 있습니다.",
     "I have read the account-risk notice and accept the risk.": "계정 위험 안내를 읽었으며 위험에 동의합니다.",
-    "Play Wuthering Waves in VR": "명조를 VR로 플레이"
+    "Play Wuthering Waves in VR": "명조를 VR로 플레이",
+    "Microphone (SteamVR)": "마이크 (SteamVR)",
+    "Off": "끔",
+    "Windows default microphone": "Windows 기본 마이크",
+    "Microphone volume": "마이크 볼륨",
+    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "내 목소리는 영상 소리에 섞이고, microphone.wav로 따로도 저장됩니다. 끔이면 마이크를 녹음하지 않습니다.",
+    "Chosen microphone (not connected)": "선택한 마이크 (연결 안 됨)"
   },
   "guide": {
     "title": "WuWa VR — 빠른 설정",

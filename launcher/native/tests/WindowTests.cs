@@ -204,8 +204,10 @@ public static class WindowTests
                         Check(AllowRecordStart || RejectRecordStart, "recording route was not enabled for this test");
                         RecordingBody = request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                         var capture = Json.Read<Dictionary<string, object>>(RecordingBody);
-                        Check(capture.Count == 5 && capture.ContainsKey("videoOnly") && capture["videoOnly"] is bool &&
+                        Check(capture.Count == 7 && capture.ContainsKey("videoOnly") && capture["videoOnly"] is bool &&
                             capture.ContainsKey("sound") && capture["sound"] is bool &&
+                            capture.ContainsKey("microphone") && capture["microphone"] is string &&
+                            new[] { "50", "75", "100", "150", "200", "300" }.Contains(Json.Text(capture, "micVolume")) &&
                             new[] { "30", "45", "60" }.Contains(Json.Text(capture, "fps")) &&
                             new[] { "720", "1024", "1280", "1536", "2048" }.Contains(Json.Text(capture, "eyeWidth")) &&
                             new[] { "auto", "steamvr", "simulator" }.Contains(Json.Text(capture, "source")), "invalid recording options sent");
@@ -1215,10 +1217,24 @@ public static class WindowTests
                 f.Http.Status["gameRunning"] = true; Refresh(w);
                 Field<ComboBox>(w, "source").SelectedIndex = 1; Field<ComboBox>(w, "fps").SelectedIndex = 2;
                 Field<ComboBox>(w, "size").SelectedIndex = 2; Field<ComboBox>(w, "purpose").SelectedIndex = 0;
+                // 1.2.6: the launcher's microphones fill the choice by name; Off stays chosen until one is picked.
+                const string beyond = "{0.0.1.00000000}.{75b22807-fd1e-4d5f-b0de-9166b18ff01d}";
+                Json.Child(f.Http.Status, "recording")["microphones"] = new object[] {
+                    new Dictionary<string, object> { { "id", beyond }, { "name", "Microphone (Beyond)" }, { "default", true } },
+                    new Dictionary<string, object> { { "id", "--sound" }, { "name", "not an ID the launcher sends" } } };
+                Refresh(w);
+                var mic = Field<ComboBox>(w, "recordMic");
+                Check(mic.Items.Count == 3 && (string)mic.Items[2] == "Microphone (Beyond)" && mic.SelectedIndex == 0 && !Field<ComboBox>(w, "recordMicVolume").IsEnabled,
+                    "microphone list did not reach the choice, kept a malformed ID, or a microphone was chosen unasked");
+                mic.SelectedIndex = 2; Field<ComboBox>(w, "recordMicVolume").SelectedIndex = 3;
                 Click(w, Button(w, "recordStart"));
                 var body = Json.Read<Dictionary<string, object>>(f.Http.RecordingBody);
                 Check(f.Http.RecordStarts == 1 && Json.Flag(body, "videoOnly") && Json.Text(body, "source") == "steamvr" && Json.Text(body, "fps") == "60" && Json.Text(body, "eyeWidth") == "1280" &&
                     Json.Flag(body, "sound"), "recording controls sent different capture options (sound is on by default)");
+                Check(Json.Text(body, "microphone") == beyond && Json.Text(body, "micVolume") == "150", "the chosen microphone or its volume was not sent");
+                // Unplugged while chosen: it stays chosen, shown as not connected.
+                Json.Child(f.Http.Status, "recording")["microphones"] = new object[0]; Refresh(w);
+                Check(mic.Items.Count == 3 && (string)mic.Items[2] == new Strings()["micMissing"] && mic.SelectedIndex == 2, "an unplugged microphone lost the choice");
                 Check(Field<TextBlock>(w, "recordingState").Text == new Strings()["recordingActive"] && !Button(w, "recordStart").IsEnabled && Button(w, "recordStop").IsEnabled,
                     "recording start did not expose its active state and stop action");
                 Check(Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed && !Field<ComboBox>(w, "source").IsEnabled, "recording offered launch cancellation or mutable capture options");

@@ -5,7 +5,7 @@
 
 Builds in %TEMP%/wuwa-recorder-build (the system SSD, not the USB drive), then runs the GPU and encoder
 self-tests: side by side, the showcase view, a 1440p High-profile encode, and the largest side-by-side
-video (4096x2048) with a sound track, then crash safety: a killed writer and a blocked capture loop must
+video (4096x2048) with a sound track, the sound mixer and the microphone list, then crash safety: a killed writer and a blocked capture loop must
 leave playable files (checked with ffprobe when present). With --out, the tested
 wuwa-recorder.exe is copied there (for dev/candidate.py --recorder or a release). No game or VR access.
 """
@@ -44,6 +44,10 @@ def main(argv=None) -> int:
         run(exe, '--self-test-showcase', Path(scratch) / 'showcase.mp4')
         # 2048 px per eye (4096x2048) with a sound track, and 1.2 s of real loopback when there is an output.
         run(exe, '--self-test-large', Path(scratch) / 'large.mp4')
+        # The sound mixer (1.2.6): what the PC plays and a microphone, placed by time; synthetic, no devices.
+        run(exe, '--self-test-mixer')
+        # The microphone list the launcher shows (it may be empty).
+        run(exe, '--list-microphones')
         # Crash safety (19 Oct 2026): a recorder killed mid-part, and one whose capture loop blocks, still leave a
         # playable file (fragmented MP4; the watchdog closes the file and writes the report).
         run(exe, '--self-test-kill', Path(scratch) / 'killed.mp4')

@@ -60,7 +60,13 @@
     "Loading…": "جارٍ التحميل…",
     "Use at your own risk.": "استخدمه على مسؤوليتك.",
     "I have read the account-risk notice and accept the risk.": "قرأت إشعار مخاطر الحساب وأقبل المخاطر.",
-    "Play Wuthering Waves in VR": "العب Wuthering Waves بالواقع الافتراضي"
+    "Play Wuthering Waves in VR": "العب Wuthering Waves بالواقع الافتراضي",
+    "Microphone (SteamVR)": "الميكروفون (SteamVR)",
+    "Off": "إيقاف",
+    "Windows default microphone": "ميكروفون Windows الافتراضي",
+    "Microphone volume": "مستوى صوت الميكروفون",
+    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "يُمزج صوتك مع صوت الفيديو ويُحفظ أيضًا وحده في microphone.wav. خيار «إيقاف» لا يسجّل أي ميكروفون.",
+    "Chosen microphone (not connected)": "الميكروفون المختار (غير متصل)"
   },
   "guide": {
     "title": "WuWa VR — الإعداد السريع",

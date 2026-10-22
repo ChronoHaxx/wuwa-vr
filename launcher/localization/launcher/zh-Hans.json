@@ -60,7 +60,13 @@
     "Loading…": "加载中…",
     "Use at your own risk.": "使用风险自行承担。",
     "I have read the account-risk notice and accept the risk.": "我已阅读账号风险说明并接受风险。",
-    "Play Wuthering Waves in VR": "在 VR 中游玩鸣潮"
+    "Play Wuthering Waves in VR": "在 VR 中游玩鸣潮",
+    "Microphone (SteamVR)": "麦克风（SteamVR）",
+    "Off": "关闭",
+    "Windows default microphone": "Windows 默认麦克风",
+    "Microphone volume": "麦克风音量",
+    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "你的声音会混入视频的声音，并单独保存为 microphone.wav。选择“关闭”则不录麦克风。",
+    "Chosen microphone (not connected)": "已选麦克风（未连接）"
   },
   "guide": {
     "title": "WuWa VR — 快速设置",

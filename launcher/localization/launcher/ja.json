@@ -60,7 +60,13 @@
     "Loading…": "読み込み中…",
     "Use at your own risk.": "自己責任で使用してください。",
     "I have read the account-risk notice and accept the risk.": "アカウントのリスク説明を読み、同意します。",
-    "Play Wuthering Waves in VR": "鳴潮をVRでプレイ"
+    "Play Wuthering Waves in VR": "鳴潮をVRでプレイ",
+    "Microphone (SteamVR)": "マイク（SteamVR）",
+    "Off": "オフ",
+    "Windows default microphone": "Windows の既定のマイク",
+    "Microphone volume": "マイク音量",
+    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "あなたの声は動画の音声にミックスされ、microphone.wav として単独でも保存されます。オフにするとマイクは録音しません。",
+    "Chosen microphone (not connected)": "選んだマイク（未接続）"
   },
   "guide": {
     "title": "WuWa VR — かんたん設定",

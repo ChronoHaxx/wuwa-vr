@@ -60,7 +60,13 @@
     "Loading…": "Loading…",
     "Use at your own risk.": "Use at your own risk.",
     "I have read the account-risk notice and accept the risk.": "I have read the account-risk notice and accept the risk.",
-    "Play Wuthering Waves in VR": "Play Wuthering Waves in VR"
+    "Play Wuthering Waves in VR": "Play Wuthering Waves in VR",
+    "Microphone (SteamVR)": "Microphone (SteamVR)",
+    "Off": "Off",
+    "Windows default microphone": "Windows default microphone",
+    "Microphone volume": "Microphone volume",
+    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.",
+    "Chosen microphone (not connected)": "Chosen microphone (not connected)"
   },
   "guide": {
     "title": "WuWa VR — quick setup",

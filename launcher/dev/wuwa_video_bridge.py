@@ -45,7 +45,8 @@ class Bridge:
 
     def validate(self, request, game):
         allowed = {'version', 'session', 'id', 'pid', 'created_ms', 'expires_ms',
-                   'action', 'fps', 'eye_width', 'telemetry', 'recording_id', 'style', 'showcase_pitch', 'sound'}
+                   'action', 'fps', 'eye_width', 'telemetry', 'recording_id', 'style', 'showcase_pitch', 'sound',
+                   'microphone', 'mic_volume'}
         if set(request) - allowed:
             raise ValueError('Unknown recording request field')
         if type(request.get('version')) is not int or request['version'] != 1 or request.get('session') != self.session:
@@ -72,6 +73,13 @@ class Bridge:
             # Absent from older plugins: sound on (the recorder's default since 1.2.5).
             if type(request.get('sound', True)) is not bool:
                 raise ValueError('Choose whether to record sound')
+            # Absent: no microphone (1.2.6). 'default' or a Windows endpoint ID; the launcher checks it is connected.
+            microphone = request.get('microphone', '')
+            if not isinstance(microphone, str) or len(microphone) > 200 or not re.fullmatch(r'|default|\{[0-9.]{1,40}\}\.\{[0-9A-Fa-f-]{36}\}', microphone):
+                raise ValueError('Choose a microphone from the list')
+            volume = request.get('mic_volume', 100)
+            if type(volume) is not int or not 0 <= volume <= 300:
+                raise ValueError('Unsupported microphone volume')
             # Absent from older plugins: the side-by-side recording. left_eye / right_eye: one eye's whole view.
             if request.get('style', 'sbs') not in ('sbs', 'showcase', 'left_eye', 'right_eye'):
                 raise ValueError('Unsupported recording style')
@@ -118,6 +126,8 @@ class Bridge:
                     self.seen.add(identity)
                     if request['action'] == 'start':
                         sound = {'sound': request['sound']} if 'sound' in request else {}
+                        if request.get('microphone'):
+                            sound.update(microphone=request['microphone'], mic_volume=request.get('mic_volume', 100))
                         if request.get('style', 'sbs') == 'showcase':
                             extra = {'pitch': request['showcase_pitch']} if 'showcase_pitch' in request else {}
                             extra.update(sound)

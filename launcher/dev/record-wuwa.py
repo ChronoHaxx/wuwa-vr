@@ -13,12 +13,15 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 import time
 
 ROOT=Path(__file__).resolve().parent.parent
+# A microphone the recorder may open: Windows' default one, or an endpoint ID from wuwa-recorder.exe --list-microphones.
+MICROPHONE=re.compile(r'default|\{[0-9.]{1,40}\}\.\{[0-9A-Fa-f-]{36}\}')
 SIDECAR_BYTE_LIMIT=64*1024*1024
 MOTION_OUTPUT_BYTE_LIMIT=60*1024*1024
 # Source captures can exceed encoded FPS (and 300 s at 60 FPS is already
@@ -236,6 +239,13 @@ def recorder_command(args, client):
         if style in ('left_eye','right_eye'): flags=['--eye='+style.split('_')[0]]
         # --sound: what the PC plays (the headset's output while SteamVR runs) as an AAC track.
         if getattr(args,'sound',False): flags.append('--sound')
+        # --microphone: a microphone mixed into that track, and alone as microphone.wav ('default' or a Windows ID).
+        microphone=getattr(args,'microphone','') or ''
+        if microphone:
+            volume=getattr(args,'mic_volume',100)
+            if not MICROPHONE.fullmatch(microphone): raise ValueError('Choose a microphone from the list')
+            if type(volume) is not int or not 0<=volume<=300: raise ValueError('Choose a microphone volume of 0..300 percent')
+            flags+=['--microphone='+microphone,f'--mic-volume={volume}']
         prefix=[str(exe)]+flags+[str(openvr)]; source='steamvr'
     return source, prefix+[str(client.pid),str(args.output.resolve()),str(args.seconds),
         str(args.fps),str(args.eye_width),str(args.stop_file.resolve())]
@@ -328,6 +338,8 @@ def main(argv=None):
     p.add_argument("--fps",type=int,choices=(30,45,60),default=30)
     p.add_argument("--eye-width",type=int,choices=EYE_WIDTHS,default=1024)
     p.add_argument("--sound",action="store_true",help="SteamVR: record what the PC plays (game, voice chat, notifications) as an AAC track")
+    p.add_argument("--microphone",default='',help="SteamVR: also record a microphone ('default' or an ID from wuwa-recorder.exe --list-microphones), mixed in and alone as microphone.wav")
+    p.add_argument("--mic-volume",type=int,choices=range(0,301),metavar="0..300",default=100,help="the microphone's level in percent")
     p.add_argument("--source",choices=('auto','steamvr','simulator'),default='auto')
     p.add_argument("--style",choices=STYLES,default='sbs',
                    help="showcase: the left eye as a steadied 16:9 video; left_eye / right_eye: that eye's whole view, "

@@ -102,6 +102,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
 <p><label>Capture source <select id="recordSource"><option value="auto">Detect automatically</option><option value="simulator">OpenXR Simulator</option><option value="steamvr">SteamVR</option></select></label></p>
 <p><label>Target frame rate <select id="recordFps"><option value="30">30 fps</option><option value="45">45 fps</option><option value="60">60 fps</option></select></label> <label>Resolution per eye <select id="recordSize"><option value="720">720 px - lighter</option><option value="1024" selected>1024 px - balanced</option><option value="1280">1280 px - larger</option><option value="1536">1536 px - SteamVR</option><option value="2048">2048 px - SteamVR</option></select></label></p>
 <p><label><input type="checkbox" id="recordSound" checked> Record sound (SteamVR): everything your PC plays, voice chat and notifications included</label></p>
+<p><label>Microphone (SteamVR) <select id="recordMic"><option value="">Off</option><option value="default">Windows default microphone</option></select></label> <label>Microphone volume <select id="recordMicVolume" disabled><option value="50">50%</option><option value="75">75%</option><option value="100" selected>100%</option><option value="150">150%</option><option value="200">200%</option><option value="300">300%</option></select></label></p>
+<p class="small">Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.</p>
 <p class="small">Choose content creation for older builds without camera/controller recording.</p>
 <p class="small">30 fps is a useful starting point for 30-45 fps gameplay. Higher targets need more headroom. The recorder reports its measured capture rate; choosing 60 cannot create game frames that were never rendered. Video has no diagnostic labels burned in, in either mode.</p>
 <div class="actions"><button id="recordStart" type="button">Start recording</button><button id="recordStop" type="button" disabled>Stop recording</button><button id="openRecordings" type="button">Open recordings</button></div>
@@ -270,6 +272,7 @@ function render(s) {
   const job = s.job, busy = job.running || s.launch?.running || s.gameRunning || s.injectorRunning;
   $("recordStart").disabled = job.running || !s.gameRunning || !s.recording?.available || (s.openxr.isSimulator && !s.recording?.sources?.simulator);
   $("recordStop").disabled = !s.recording?.running;
+  showMicrophones(s.recording?.microphones || []);
   $("compareGraphics").disabled = job.running || !s.gameRunning || s.openxr.isSimulator || !s.comparisons?.available;
   $("useHeadset").disabled = busy || !s.openxr.canHeadset || !s.openxr.isSimulator;
   $("useSimulator").disabled = busy || !s.openxr.canSimulator || s.openxr.isBundledSimulator;
@@ -289,6 +292,21 @@ function render(s) {
   else if (s.game.problem) { text = s.game.problem; isError = true; }
   else text = s.riskAcknowledged ? "Ready. Choose Apply & launch when your headset software is running." : "Tick the account-risk box, choose a build, then Apply & launch.";
   setProgress(text, isError);
+}
+// The launcher's microphones, keeping the chosen one by its Windows ID; device names are not translated.
+let micList = "";
+function showMicrophones(list) {
+  const select = $("recordMic"), chosen = select.value, key = JSON.stringify(list) + "|" + chosen;
+  if (key === micList || document.activeElement === select) return;
+  micList = key;
+  while (select.options.length > 2) select.remove(2);
+  for (const mic of list) {
+    if (typeof mic?.id !== "string" || !mic.id || mic.id === "default") continue;
+    const option = new Option(String(mic.name || mic.id), mic.id); option.dataset.noTranslate = ""; select.add(option);
+  }
+  if (![...select.options].some(option => option.value === chosen)) select.add(new Option("Chosen microphone (not connected)", chosen));
+  select.value = chosen;
+  $("recordMicVolume").disabled = !select.value;
 }
 async function refresh() {
   try {
@@ -319,7 +337,8 @@ $("reset").addEventListener("click", () => { if (confirm("Replace this build's c
 $("restore").addEventListener("click", () => { if (confirm("Restore your UEVR settings from before WuWa VR? The mod's settings are backed up first.")) act("/api/restore", {}, "Restoring…"); });
 $("verify").addEventListener("click", () => act("/api/verify", {}, "Checking package files…"));
 $("openData").addEventListener("click", () => act("/api/open", {folder: "data"}));
-$("recordStart").addEventListener("click", () => act("/api/record-start", {videoOnly: $("recordPurpose").value === "content", fps: Number($("recordFps").value), eyeWidth: Number($("recordSize").value), sound: $("recordSound").checked, source: $("recordSource").value}, "Starting recording…"));
+$("recordStart").addEventListener("click", () => act("/api/record-start", {videoOnly: $("recordPurpose").value === "content", fps: Number($("recordFps").value), eyeWidth: Number($("recordSize").value), sound: $("recordSound").checked, source: $("recordSource").value, microphone: $("recordMic").value, micVolume: Number($("recordMicVolume").value)}, "Starting recording…"));
+$("recordMic").addEventListener("change", () => { $("recordMicVolume").disabled = !$("recordMic").value; });
 $("recordStop").addEventListener("click", () => act("/api/record-stop", {}, "Finishing recording…"));
 $("openRecordings").addEventListener("click", () => act("/api/open", {folder: "recordings"}));
 $("compareGraphics").addEventListener("click", () => act("/api/compare-graphics", {}, "Waiting for WuWa focus…"));

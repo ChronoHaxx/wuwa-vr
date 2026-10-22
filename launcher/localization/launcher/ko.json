@@ -65,7 +65,8 @@
     "Off": "끔",
     "Windows default microphone": "Windows 기본 마이크",
     "Microphone volume": "마이크 볼륨",
-    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "내 목소리는 영상 소리에 섞이고, microphone.wav로 따로도 저장됩니다. 끔이면 마이크를 녹음하지 않습니다.",
+    "Your voice is mixed into the video's sound. Off records no microphone.": "내 목소리는 영상 소리에 섞입니다. 끔이면 마이크를 녹음하지 않습니다.",
+    "Separate sound files: also save the game sound and your microphone alone (game.wav, microphone.wav) for editing": "소리 파일 분리: 게임 소리와 마이크를 각각 따로도 저장합니다 (game.wav, microphone.wav). 편집용입니다",
     "Chosen microphone (not connected)": "선택한 마이크 (연결 안 됨)"
   },
   "guide": {

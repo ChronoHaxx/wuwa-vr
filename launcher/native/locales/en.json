@@ -70,6 +70,7 @@
   "micOff": "Off",
   "micDefault": "Windows default microphone",
   "micMissing": "Chosen microphone (not connected)",
+  "recordSoundFiles": "Separate sound files: also save the game sound and your microphone alone (game.wav, microphone.wav) for editing",
   "purpose": "Recording mode",
   "videoOnly": "Clean video",
   "playtest": "Video + playtest data",

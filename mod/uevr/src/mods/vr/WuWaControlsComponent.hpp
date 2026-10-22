@@ -330,6 +330,9 @@ private:
     // the launcher's list (kept when the list changes); its level in percent, 100 as it comes.
     const ModString::Ptr m_video_microphone{ModString::create("WuWaRecording_Microphone", "")};
     const ModSlider::Ptr m_video_mic_volume{ModSlider::create("WuWaRecording_MicVolume", 0.0f, 300.0f, 100.0f)};
+    // 1.2.6: each source also alone beside the video, raw, for edits: game.wav (what the PC plays) and microphone.wav.
+    // On by default (owner, 22 Oct: more to work with after recording); about 60 MB per 5-minute part.
+    const ModToggle::Ptr m_video_sound_files{ModToggle::create("WuWaRecording_SoundFiles", true)};
     // Side by side (both eyes, for finding problems), showcase (the left eye as a steadied 16:9 video), or one eye's
     // whole view (1.2.6: the side-by-side field of view in one picture; the showcase crop gives some up).
     const ModCombo::Ptr m_video_style{ModCombo::create("WuWaRecording_Style",

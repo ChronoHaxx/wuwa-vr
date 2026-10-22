@@ -70,6 +70,7 @@
   "micOff": "オフ",
   "micDefault": "Windows の既定のマイク",
   "micMissing": "選んだマイク（未接続）",
+  "recordSoundFiles": "音声を別ファイルに：ゲーム音とマイクをそれぞれ単独でも保存します（game.wav、microphone.wav）。編集用です",
   "purpose": "録画モード",
   "videoOnly": "映像のみ",
   "playtest": "映像＋プレイテストデータ",

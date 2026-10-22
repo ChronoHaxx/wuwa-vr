@@ -70,6 +70,7 @@
   "micOff": "Desactivado",
   "micDefault": "Micrófono predeterminado de Windows",
   "micMissing": "Micrófono elegido (no conectado)",
+  "recordSoundFiles": "Archivos de sonido separados: guarda también el sonido del juego y tu micrófono por separado (game.wav, microphone.wav) para editar",
   "purpose": "Modo de grabación",
   "videoOnly": "Vídeo limpio",
   "playtest": "Vídeo + datos de prueba",

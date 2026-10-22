@@ -1167,7 +1167,7 @@ def recording_space_left(folder):
 
 
 def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None, source='auto', style='sbs', pitch=None, sound=True,
-                    microphone='', mic_volume=100):
+                    microphone='', mic_volume=100, sound_files=True):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
     if style not in RECORD_STYLES: raise ValueError('Choose the side-by-side, showcase or one-eye video.')
     if pitch is not None and (type(pitch) is not int or not -40<=pitch<=20): raise ValueError('Choose a showcase view height of -40..20 degrees.')
@@ -1175,6 +1175,7 @@ def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None,
     if type(eye_width) is not int or eye_width not in RECORD_EYE_WIDTHS: raise ValueError('Choose 720, 1024, 1280, 1536 or 2048 pixels per eye.')
     if type(sound) is not bool: raise ValueError('Choose whether to record sound.')
     check_microphone(microphone, mic_volume)
+    if type(sound_files) is not bool: raise ValueError('Choose whether to save the sound as separate files.')
     games=[p for p in processes() if p['name'].lower() in ('client-win64-shipping','client-win64-shipping.exe')]
     if len(games)!=1: raise ValueError('Launch one WuWa instance through SteamVR or the updated simulator before recording.')
     pid=games[0]['pid']
@@ -1184,7 +1185,7 @@ def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None,
     what={'showcase':'showcase video (one eye, steadied, 16:9)','left_eye':'left-eye video (its whole view)',
           'right_eye':'right-eye video (its whole view)'}.get(style,'stereo video')
     begin_job('recording',f'Recording {what} at a target of {fps} fps (5-minute parts until you stop it)',
-              lambda: record_playtest(video_only,fps,eye_width,source,style,pitch,sound,microphone,mic_volume),
+              lambda: record_playtest(video_only,fps,eye_width,source,style,pitch,sound,microphone,mic_volume,sound_files),
               prepare=lambda: RECORDING.update(recording_target(pid)))
 
 
@@ -1197,7 +1198,7 @@ def stop_recording(expected_id=None):
 
 
 def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', style='sbs', pitch=None, sound=True,
-                    microphone='', mic_volume=100):
+                    microphone='', mic_volume=100, sound_files=True):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
     if style not in RECORD_STYLES: raise ValueError('Choose the side-by-side, showcase or one-eye video.')
     if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
@@ -1225,7 +1226,7 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', sty
                 recorder=config().app/'dev-tools/wuwa-recorder.exe',openvr=config().app/'dev-tools/openvr_api.dll',
                 simulator_recorder=config().app/'dev-tools/wuwa-simulator-recorder.exe',source=source,
                 pid=RECORDING.get('pid'),fps=fps,eye_width=eye_width,profile=config().profile,style=style,pitch=pitch,sound=sound,
-                microphone=microphone,mic_volume=mic_volume)
+                microphone=microphone,mic_volume=mic_volume,sound_files=sound_files)
             try:
                 module.record(args)
             except Exception:
@@ -1499,7 +1500,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/record-start":
             fps,eye_width=body.get('fps',30),body.get('eyeWidth',1024)
             start_recording(body.get('videoOnly') is True,fps,eye_width,source=body.get('source','auto'),sound=body.get('sound',True),
-                            style=body.get('style','sbs'),microphone=body.get('microphone',''),mic_volume=body.get('micVolume',100))
+                            style=body.get('style','sbs'),microphone=body.get('microphone',''),mic_volume=body.get('micVolume',100),
+                            sound_files=body.get('soundFiles',True))
             return True
         if path == "/api/record-stop":
             stop_recording()

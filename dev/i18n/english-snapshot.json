@@ -371,6 +371,7 @@
   ".recordPrivacy": "d8f51bb8537d",
   ".recordReady": "78d721b7372a",
   ".recordSound": "de1893fa9b1d",
+  ".recordSoundFiles": "47051f9194e7",
   ".recordStart": "e92d02d3d165",
   ".recordStop": "ee0d9dc8eb5e",
   ".recordUnavailable": "11a568b40a1c",
@@ -576,6 +577,7 @@
   ".messages.Restore my settings from before WuWa VR": "6a76390dbe00",
   ".messages.Right now": "afc65daa8ffa",
   ".messages.Running": "73989d9c5926",
+  ".messages.Separate sound files: also save the game sound and your microphone alone (game.wav, microphone.wav) for editing": "47051f9194e7",
   ".messages.Setup instructions": "12abb2344c17",
   ".messages.Start recording": "e92d02d3d165",
   ".messages.Stop launcher": "9f7a602a15d6",
@@ -589,7 +591,7 @@
   ".messages.Use this package's simulator": "4339126bdede",
   ".messages.Use this path": "5a33c459996e",
   ".messages.Windows default microphone": "9c51132d8cbe",
-  ".messages.Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "04a437e8d9b9",
+  ".messages.Your voice is mixed into the video's sound. Off records no microphone.": "f88ee1ca3623",
   ".name": "649df08a448e",
   ".status": "828d338a9b04"
  }

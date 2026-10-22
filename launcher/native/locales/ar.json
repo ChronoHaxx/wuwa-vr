@@ -70,6 +70,7 @@
   "micOff": "إيقاف",
   "micDefault": "ميكروفون Windows الافتراضي",
   "micMissing": "الميكروفون المختار (غير متصل)",
+  "recordSoundFiles": "ملفات صوت منفصلة: احفظ أيضًا صوت اللعبة والميكروفون كلًّا وحده (game.wav وmicrophone.wav) للمونتاج",
   "purpose": "وضع التسجيل",
   "videoOnly": "فيديو نظيف",
   "playtest": "فيديو + بيانات اختبار اللعب",

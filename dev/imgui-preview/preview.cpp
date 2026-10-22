@@ -68,6 +68,7 @@ struct Sample {
     int view{0}, camera{2}, style{0}, fps{2}, size{1}, kind{1}, step{1}, privacy{1}, resolution{3}, sharing{0}, slot{0};
     bool run{true}, auto_run{true}, ambient{false};
     int mic{4};
+    bool sound_files{true};
     float mic_volume{150.0f};
     float hud_size{1.1f}, hud_distance{2.0f}, hud_shape{1.33f}, hud_up{-0.15f}, hud_side{0.0f}, speed{600.0f}, turn{90.0f}, scale{0.875f},
         lens{75.0f}, nearest{30.0f};
@@ -215,12 +216,13 @@ std::vector<wuwa_menu::Page> sample_pages() {
         choice("Picture size", "Width per eye.", &sample.size, {"720 px", "1024 px", "1280 px"}),
         [&] {
             // Device names as the launcher lists them on the owner's PC: the longest one shown.
-            auto item = choice("Microphone", "Your voice in the video, mixed with the game sound, and alone as microphone.wav next to it for editing. Off records no microphone. Windows default is the microphone Windows records from. The list comes from the WuWa VR app. SteamVR recordings only.",
+            auto item = choice("Microphone", "Your voice in the video, mixed with the game sound. Off records no microphone. Windows default is the microphone Windows records from. The list comes from the WuWa VR app. SteamVR recordings only.",
                 &sample.mic, {"Off", "Windows default microphone", "Microphone (Beyond)", "Microphone (NVIDIA Broadcast)", "Microphone (Steam Streaming Microphone)"});
             item.choice_text = [choices = item.choices](int i) { return i >= 2 ? wuwa_l10n::visual(choices[i]) : wuwa_l10n::text(choices[i]); };
             return item;
         }(),
         slider("Microphone volume", "How loud your voice is in the video. At 100 it is as the microphone gives it; raise it if your voice is quiet next to the game.", &sample.mic_volume, 0.0f, 300.0f, 10.0f, "%.0f%%"),
+        toggle("Separate sound files", "Besides the video with everything mixed, saves each sound alone next to it: game.wav (everything the PC plays) and microphone.wav (your voice), at the video's timing. In an edit you can then change either level or leave one out. About 60 MB per 5 minutes.", &sample.sound_files),
         toggle("Camera and controller data", "Saves the camera and controller movement next to the video.", &sample.telemetry),
         paragraph("Report a problem", true),
         paragraph("Pick what went wrong and save. The time, the video position and your settings go into the wuwa-reports folder of the UEVR profile. Share it together with the video."),

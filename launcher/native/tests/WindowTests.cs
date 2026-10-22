@@ -204,7 +204,8 @@ public static class WindowTests
                         Check(AllowRecordStart || RejectRecordStart, "recording route was not enabled for this test");
                         RecordingBody = request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                         var capture = Json.Read<Dictionary<string, object>>(RecordingBody);
-                        Check(capture.Count == 7 && capture.ContainsKey("videoOnly") && capture["videoOnly"] is bool &&
+                        Check(capture.Count == 8 && capture.ContainsKey("videoOnly") && capture["videoOnly"] is bool &&
+                            capture.ContainsKey("soundFiles") && capture["soundFiles"] is bool &&
                             capture.ContainsKey("sound") && capture["sound"] is bool &&
                             capture.ContainsKey("microphone") && capture["microphone"] is string &&
                             new[] { "50", "75", "100", "150", "200", "300" }.Contains(Json.Text(capture, "micVolume")) &&
@@ -1232,6 +1233,7 @@ public static class WindowTests
                 Check(f.Http.RecordStarts == 1 && Json.Flag(body, "videoOnly") && Json.Text(body, "source") == "steamvr" && Json.Text(body, "fps") == "60" && Json.Text(body, "eyeWidth") == "1280" &&
                     Json.Flag(body, "sound"), "recording controls sent different capture options (sound is on by default)");
                 Check(Json.Text(body, "microphone") == beyond && Json.Text(body, "micVolume") == "150", "the chosen microphone or its volume was not sent");
+                Check(Json.Flag(body, "soundFiles"), "separate sound files are not on by default");
                 // Unplugged while chosen: it stays chosen, shown as not connected.
                 Json.Child(f.Http.Status, "recording")["microphones"] = new object[0]; Refresh(w);
                 Check(mic.Items.Count == 3 && (string)mic.Items[2] == new Strings()["micMissing"] && mic.SelectedIndex == 2, "an unplugged microphone lost the choice");

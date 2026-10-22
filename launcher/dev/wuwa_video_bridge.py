@@ -46,7 +46,7 @@ class Bridge:
     def validate(self, request, game):
         allowed = {'version', 'session', 'id', 'pid', 'created_ms', 'expires_ms',
                    'action', 'fps', 'eye_width', 'telemetry', 'recording_id', 'style', 'showcase_pitch', 'sound',
-                   'microphone', 'mic_volume'}
+                   'microphone', 'mic_volume', 'sound_files'}
         if set(request) - allowed:
             raise ValueError('Unknown recording request field')
         if type(request.get('version')) is not int or request['version'] != 1 or request.get('session') != self.session:
@@ -80,6 +80,9 @@ class Bridge:
             volume = request.get('mic_volume', 100)
             if type(volume) is not int or not 0 <= volume <= 300:
                 raise ValueError('Unsupported microphone volume')
+            # Absent: on (each sound source also alone beside the video).
+            if type(request.get('sound_files', True)) is not bool:
+                raise ValueError('Choose whether to save the sound as separate files')
             # Absent from older plugins: the side-by-side recording. left_eye / right_eye: one eye's whole view.
             if request.get('style', 'sbs') not in ('sbs', 'showcase', 'left_eye', 'right_eye'):
                 raise ValueError('Unsupported recording style')
@@ -128,6 +131,8 @@ class Bridge:
                         sound = {'sound': request['sound']} if 'sound' in request else {}
                         if request.get('microphone'):
                             sound.update(microphone=request['microphone'], mic_volume=request.get('mic_volume', 100))
+                        if 'sound_files' in request:
+                            sound['sound_files'] = request['sound_files']
                         if request.get('style', 'sbs') == 'showcase':
                             extra = {'pitch': request['showcase_pitch']} if 'showcase_pitch' in request else {}
                             extra.update(sound)

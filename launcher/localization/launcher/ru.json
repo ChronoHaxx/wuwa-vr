@@ -65,7 +65,8 @@
     "Off": "Выкл.",
     "Windows default microphone": "Микрофон Windows по умолчанию",
     "Microphone volume": "Громкость микрофона",
-    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "Ваш голос смешивается со звуком видео и также сохраняется отдельно в microphone.wav. «Выкл.» — микрофон не записывается.",
+    "Your voice is mixed into the video's sound. Off records no microphone.": "Ваш голос смешивается со звуком видео. «Выкл.» — микрофон не записывается.",
+    "Separate sound files: also save the game sound and your microphone alone (game.wav, microphone.wav) for editing": "Отдельные звуковые файлы: дополнительно сохранять звук игры и микрофон по отдельности (game.wav, microphone.wav) для монтажа",
     "Chosen microphone (not connected)": "Выбранный микрофон (не подключён)"
   },
   "guide": {

@@ -246,6 +246,8 @@ def recorder_command(args, client):
             if not MICROPHONE.fullmatch(microphone): raise ValueError('Choose a microphone from the list')
             if type(volume) is not int or not 0<=volume<=300: raise ValueError('Choose a microphone volume of 0..300 percent')
             flags+=['--microphone='+microphone,f'--mic-volume={volume}']
+        # --sound-files: each source also alone beside the video (game.wav, microphone.wav), raw, for edits.
+        if getattr(args,'sound_files',False) and (getattr(args,'sound',False) or microphone): flags.append('--sound-files')
         prefix=[str(exe)]+flags+[str(openvr)]; source='steamvr'
     return source, prefix+[str(client.pid),str(args.output.resolve()),str(args.seconds),
         str(args.fps),str(args.eye_width),str(args.stop_file.resolve())]
@@ -340,6 +342,7 @@ def main(argv=None):
     p.add_argument("--sound",action="store_true",help="SteamVR: record what the PC plays (game, voice chat, notifications) as an AAC track")
     p.add_argument("--microphone",default='',help="SteamVR: also record a microphone ('default' or an ID from wuwa-recorder.exe --list-microphones), mixed in and alone as microphone.wav")
     p.add_argument("--mic-volume",type=int,choices=range(0,301),metavar="0..300",default=100,help="the microphone's level in percent")
+    p.add_argument("--sound-files",action="store_true",help="SteamVR: also save each sound source alone, raw (game.wav, microphone.wav)")
     p.add_argument("--source",choices=('auto','steamvr','simulator'),default='auto')
     p.add_argument("--style",choices=STYLES,default='sbs',
                    help="showcase: the left eye as a steadied 16:9 video; left_eye / right_eye: that eye's whole view, "

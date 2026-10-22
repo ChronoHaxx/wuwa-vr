@@ -304,6 +304,9 @@
   "Bank the view": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Besides the video with everything mixed, saves each sound alone next to it: game.wav (everything the PC plays) and microphone.wav (your voice), at the video's timing. In an edit you can then change either level or leave one out. About 60 MB per 5 minutes.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Black bars": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -2438,6 +2441,12 @@
   "Selected build: %s": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
+  "Separate sound files": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Separate sound files (game.wav, microphone.wav)": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
   "Separate-eye rendering produced a black scene with HUD in the September 26 playtest. Native stereo is the working baseline. Submission metadata has been repaired, but separate-eye rendering is still an experiment, not a fix for labels/reflections/materials. Return to Native if the scene disappears.": [
     "mods/VR.cpp"
   ],
@@ -3203,7 +3212,7 @@
   "Your unsent note is retained in this menu until the game closes.": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
-  "Your voice in the video, mixed with the game sound, and alone as microphone.wav next to it for editing. Off records no microphone. Windows default is the microphone Windows records from. The list comes from the WuWa VR app. SteamVR recordings only.": [
+  "Your voice in the video, mixed with the game sound. Off records no microphone. Windows default is the microphone Windows records from. The list comes from the WuWa VR app. SteamVR recordings only.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "depth of field forced on": [

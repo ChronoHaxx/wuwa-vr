@@ -1083,9 +1083,8 @@ Page fixes_page() {
 // stays when the list changes. One that is not plugged in now shows as not connected; recording then says so.
 Item microphone_choice() {
     auto item = make(Kind::Choice, "Microphone",
-        "Your voice in the video, mixed with the game sound, and alone as microphone.wav next to it for editing. Off "
-        "records no microphone. Windows default is the microphone Windows records from. The list comes from the WuWa "
-        "VR app. SteamVR recordings only.");
+        "Your voice in the video, mixed with the game sound. Off records no microphone. Windows default is the "
+        "microphone Windows records from. The list comes from the WuWa VR app. SteamVR recordings only.");
     std::vector<std::string> ids{"", "default"};
     item.choices = {N_("Off"), N_("Windows default microphone")};
     for (const auto& mic : VR::get()->get_wuwa_controls().menu_microphones()) {
@@ -1166,6 +1165,17 @@ Page record_page() {
             "WuWaRecording_MicVolume", 0.0f, 300.0f, 10.0f, "%.0f%%");
         volume.enabled = [] { auto* mic = typed<std::string>("WuWaRecording_Microphone"); return mic && !mic->value().empty(); };
         page.items.push_back(std::move(volume));
+        auto files = setting_toggle("Separate sound files",
+            "Besides the video with everything mixed, saves each sound alone next to it: game.wav (everything the PC "
+            "plays) and microphone.wav (your voice), at the video's timing. In an edit you can then change either level "
+            "or leave one out. About 60 MB per 5 minutes.",
+            "WuWaRecording_SoundFiles");
+        files.enabled = [] {
+            auto* sound = typed<bool>("WuWaRecording_Sound");
+            auto* mic = typed<std::string>("WuWaRecording_Microphone");
+            return typed<bool>("WuWaRecording_SoundFiles") && ((sound && sound->value()) || (mic && !mic->value().empty()));
+        };
+        page.items.push_back(std::move(files));
     }
     page.items.push_back(setting_toggle("Camera and controller data",
         "Saves the camera and controller movement next to the video, to help find what went wrong.", "WuWaRecording_Telemetry"));

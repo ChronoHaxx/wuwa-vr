@@ -70,6 +70,7 @@
   "micOff": "关闭",
   "micDefault": "Windows 默认麦克风",
   "micMissing": "已选麦克风（未连接）",
+  "recordSoundFiles": "单独的声音文件：另外单独保存游戏声音和你的麦克风（game.wav、microphone.wav），方便剪辑",
   "purpose": "录制模式",
   "videoOnly": "纯视频",
   "playtest": "视频与测试数据",

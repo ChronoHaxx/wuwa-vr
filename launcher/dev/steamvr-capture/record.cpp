@@ -190,9 +190,10 @@ struct Mixer {
     static constexpr double lag_seconds=0.3;
     struct Lane { std::vector<float> frames; float gain{1},peak{}; uint64_t heard{},late{}; };  // frames[2*(track frame-written)+side]
     UINT rate{48000}; Lane lanes[2]; uint64_t written{};
-    // out: the mix, stereo 16-bit frames from track frame `first`. voice: the microphone lane alone (mono, no gain).
-    std::function<void(const int16_t*,size_t,uint64_t)> out; std::function<void(const int16_t*,size_t)> voice;
-    std::mutex lock; std::vector<int16_t> mixed,alone;
+    // out: the mix, stereo 16-bit frames from track frame `first`. game: what the PC plays alone (stereo); voice: the
+    // microphone alone (mono). Both raw, without the microphone's gain, for Separate sound files.
+    std::function<void(const int16_t*,size_t,uint64_t)> out; std::function<void(const int16_t*,size_t)> game,voice;
+    std::mutex lock; std::vector<int16_t> mixed,alone,game_alone;
     static float limit(float v) { const float a=std::fabs(v); return a<=0.9f?v:std::copysign(0.9f+0.1f*std::tanh((a-0.9f)/0.1f),v); }
     static int16_t pcm(float v) { return static_cast<int16_t>(std::lround(limit(v)*32767.0f)); }
     void place(int lane,int64_t at,const float* stereo,size_t count) {
@@ -217,10 +218,12 @@ struct Mixer {
             float v=0; for (const auto& l:lanes) if (i<l.frames.size()) v+=l.frames[i]*l.gain;
             mixed[i]=pcm(v);
         }
+        if (game) { const auto& g=lanes[0].frames; game_alone.resize(count*2); for (size_t i=0;i<count*2;++i) game_alone[i]=pcm(i<g.size()?g[i]:0.0f); }
         if (voice) { const auto& m=lanes[1].frames; alone.resize(count); for (size_t i=0;i<count;++i) alone[i]=pcm(i*2<m.size()?m[i*2]:0.0f); }
         for (auto& l:lanes) l.frames.erase(l.frames.begin(),l.frames.begin()+ptrdiff_t(std::min(l.frames.size(),count*2)));
         const auto first=written; written=upto;
         if (out) out(mixed.data(),count,first);
+        if (game) game(game_alone.data(),count);
         if (voice) voice(alone.data(),count);
     }
 };
@@ -330,32 +333,35 @@ struct SoundSource {
     }
     void stop() { stopping=true; if (worker.joinable()) worker.join(); }
 };
-// The microphone alone, 16-bit mono at the track's rate and timing, beside the video: an edit can change its level or
-// leave it out. The header is rewritten every second, so a recorder that dies still leaves a file that plays.
+// One source alone, 16-bit at the track's rate and timing, beside the video (Separate sound files): game.wav (what the
+// PC plays, stereo) and microphone.wav (mono), so an edit can change either level or leave one out. The header is
+// rewritten every second, so a recorder that dies still leaves a file that plays.
 struct Wav {
-    std::ofstream file; UINT rate{}; uint64_t frames{},unsaved{};
-    bool open(const std::filesystem::path& path,UINT sample_rate) {
-        rate=sample_rate; file.open(path,std::ios::binary); if (!file) return false;
+    std::ofstream file; UINT rate{},channels{1}; uint64_t frames{},unsaved{};
+    bool open(const std::filesystem::path& path,UINT sample_rate,UINT channel_count) {
+        rate=sample_rate; channels=channel_count; file.open(path,std::ios::binary); if (!file) return false;
         header(); return bool(file);
     }
     void header() {
-        const auto data=static_cast<uint32_t>(std::min<uint64_t>(frames*2,0xFFFFFF00ull));
+        const auto data=static_cast<uint32_t>(std::min<uint64_t>(frames*2*channels,0xFFFFFF00ull));
         const auto u32=[&](uint32_t v) { file.write(reinterpret_cast<const char*>(&v),4); };
         const auto u16=[&](uint16_t v) { file.write(reinterpret_cast<const char*>(&v),2); };
-        file.seekp(0); file.write("RIFF",4); u32(36+data); file.write("WAVEfmt ",8); u32(16); u16(1); u16(1); u32(rate); u32(rate*2);
-        u16(2); u16(16); file.write("data",4); u32(data); file.seekp(0,std::ios::end); file.flush(); unsaved=0;
+        file.seekp(0); file.write("RIFF",4); u32(36+data); file.write("WAVEfmt ",8); u32(16); u16(1); u16(static_cast<uint16_t>(channels));
+        u32(rate); u32(rate*2*channels); u16(static_cast<uint16_t>(2*channels)); u16(16); file.write("data",4); u32(data);
+        file.seekp(0,std::ios::end); file.flush(); unsaved=0;
     }
+    // count frames of `channels` interleaved samples.
     void add(const int16_t* samples,size_t count) {
         if (!file.is_open()) return;
-        file.write(reinterpret_cast<const char*>(samples),static_cast<std::streamsize>(count*2)); frames+=count;
+        file.write(reinterpret_cast<const char*>(samples),static_cast<std::streamsize>(count*2*channels)); frames+=count;
         if ((unsaved+=count)>=rate) header();
     }
     void close() { if (file.is_open()) { header(); file.close(); } }
 };
 // What the video's sound track records: what the PC plays and/or a microphone, mixed (see Mixer).
 struct Sound {
-    Mixer mixer; SoundSource pc,mic; Wav voice;
-    bool pc_on{},mic_on{},begun{}; int volume{100}; std::string error,voice_file;
+    Mixer mixer; SoundSource pc,mic; Wav game,voice;
+    bool pc_on{},mic_on{},begun{}; int volume{100}; std::string error,game_file,voice_file;
     std::thread pump; std::atomic<bool> stopping{false}; LONGLONG started{};
     ~Sound() { stop(); }
     // with_pc: what the PC plays. microphone: empty for none, "default" or an endpoint ID; mic_volume in percent.
@@ -368,10 +374,14 @@ struct Sound {
         volume=mic_volume; mixer.lanes[1].gain=float(mic_volume)/100.0f;
         return pc_on || mic_on;
     }
-    // out: where the mix goes. voice_path: the microphone's own file (none when empty).
-    void begin(std::function<void(const int16_t*,size_t,uint64_t)> out,LONGLONG start,const std::filesystem::path& voice_path={}) {
+    // out: where the mix goes. game_path / voice_path: each source's own file (none when empty).
+    void begin(std::function<void(const int16_t*,size_t,uint64_t)> out,LONGLONG start,const std::filesystem::path& game_path={},
+               const std::filesystem::path& voice_path={}) {
         mixer.out=std::move(out); started=start; begun=true;
-        if (mic_on && !voice_path.empty() && voice.open(voice_path,mixer.rate)) {
+        if (pc_on && !game_path.empty() && game.open(game_path,mixer.rate,2)) {
+            game_file=game_path.filename().string(); mixer.game=[this](const int16_t* frames,size_t count) { game.add(frames,count); };
+        }
+        if (mic_on && !voice_path.empty() && voice.open(voice_path,mixer.rate,1)) {
             voice_file=voice_path.filename().string(); mixer.voice=[this](const int16_t* samples,size_t count) { voice.add(samples,count); };
         }
         if (pc_on) pc.begin(mixer,0,start);
@@ -386,10 +396,10 @@ struct Sound {
             } catch (const std::exception& e) { error=e.what(); }
         });
     }
-    void begin(Encoder& encoder,LONGLONG start,const std::filesystem::path& voice_path={}) {
+    void begin(Encoder& encoder,LONGLONG start,const std::filesystem::path& game_path={},const std::filesystem::path& voice_path={}) {
         begin([this,&encoder](const int16_t* frames,size_t count,uint64_t first) {
             encoder.add_sound(frames,count,static_cast<LONGLONG>(double(first)*1e7/mixer.rate),static_cast<LONGLONG>(double(count)*1e7/mixer.rate));
-        },start,voice_path);
+        },start,game_path,voice_path);
     }
     void stop() { pc.stop(); mic.stop(); stopping=true; if (pump.joinable()) pump.join(); }
     // Before the encoder closes: everything placed, then silence up to now, so the track lasts as long as the picture
@@ -401,7 +411,7 @@ struct Sound {
             try { mixer.mix_until(static_cast<uint64_t>(std::max(0.0,double(qpc_100ns()-started)*mixer.rate/1e7))); }
             catch (const std::exception& e) { error=e.what(); }
         }
-        voice.close();
+        game.close(); voice.close();
     }
     double seconds() const { return double(mixer.written)/mixer.rate; }
 };
@@ -669,6 +679,11 @@ static Json report_sound(bool asked_pc,bool asked_mic,bool opened,Sound& sound) 
             {"audio_error",!sound.error.empty()?sound.error:sound.pc.error}});
         if (sound.pc_on) report.update({{"audio_device_rate",sound.pc.source_rate},{"audio_silence_seconds",std::max(0.0,seconds-pc_seconds)},
             {"audio_discontinuities",sound.pc.discontinuities}});
+        // Separate sound files: each source alone, raw, at the video's timing (empty when they were not asked for).
+        Json files=Json::array();
+        if (!sound.game_file.empty()) files.push_back(sound.game_file);
+        if (!sound.voice_file.empty()) files.push_back(sound.voice_file);
+        report["sound_files"]=files;
     }
     if (asked_mic) {
         const auto& lane=sound.mixer.lanes[1];
@@ -694,15 +709,16 @@ int wmain(int argc,wchar_t** argv) {
         }
         if (argc==2 && std::wstring_view(argv[1])==L"--self-test-mixer") {
             // Synthetic lanes, no devices: placement by time, a packet before the start, a late one, a gap, the
-            // microphone's gain, the soft limit, and the microphone's own file (raw, no gain).
-            Mixer m; m.rate=48000; m.lanes[1].gain=2.0f; std::vector<int16_t> track,alone;
+            // microphone's gain, the soft limit, and each source's own file (raw, no gain).
+            Mixer m; m.rate=48000; m.lanes[1].gain=2.0f; std::vector<int16_t> track,alone,game;
             m.out=[&](const int16_t* f,size_t n,uint64_t first) {
                 if (first*2!=track.size()) throw std::runtime_error("Mixer skipped or repeated track frames");
                 track.insert(track.end(),f,f+n*2);
             };
             m.voice=[&](const int16_t* f,size_t n) { alone.insert(alone.end(),f,f+n); };
-            const std::vector<float> game(4800*2,0.25f),voice(480*2,0.1f),loud(480*2,0.8f);
-            m.place(0,-2400,game.data(),4800);  // half of it before the start: frames 0..2399
+            m.game=[&](const int16_t* f,size_t n) { game.insert(game.end(),f,f+n*2); };
+            const std::vector<float> played(4800*2,0.25f),voice(480*2,0.1f),loud(480*2,0.8f);
+            m.place(0,-2400,played.data(),4800);  // half of it before the start: frames 0..2399
             m.place(1,1000,voice.data(),480);   // 1000..1479
             m.mix_until(1200);
             m.place(1,1100,voice.data(),480);   // 1100..1199 too late, 1200..1579 placed
@@ -710,22 +726,29 @@ int wmain(int argc,wchar_t** argv) {
             m.mix_until(12000);
             const auto at=[&](size_t frame) { return int(track[frame*2]); };
             const auto about=[](int value,double want) { return std::abs(value-want*32767)<=2; };
-            if (track.size()!=12000*2 || alone.size()!=12000) throw std::runtime_error("Mixer track has the wrong length");
+            if (track.size()!=12000*2 || alone.size()!=12000 || game.size()!=12000*2) throw std::runtime_error("Mixer track has the wrong length");
             if (!about(at(0),0.25) || !about(at(999),0.25) || !about(at(1000),0.45) || !about(at(1500),0.45) || !about(at(1700),0.25) || at(3000)!=0)
                 throw std::runtime_error("Mixer placed a lane at the wrong time or level");
             if (m.lanes[1].late!=100 || at(9700)<=int(0.9*32767) || at(9700)>32767 || track[9700*2+1]!=track[9700*2])
                 throw std::runtime_error("Mixer late count, soft limit or sides are wrong");
             if (!about(alone[1000],0.1) || !about(alone[9700],0.8) || alone[3000]!=0) throw std::runtime_error("Microphone file is not the raw voice");
+            if (!about(game[0],0.25) || !about(game[1000*2],0.25) || game[3000*2]!=0 || !about(game[9700*2],0.8) || !about(game[9700*2+1],0.8))
+                throw std::runtime_error("Game file is not the game sound alone");
             std::cout<<"Mixer: lanes placed by time, early and late packets cut, silent gap, gain, soft limit ("<<at(9700)
-                <<"), raw microphone file; no devices.\n"; return 0;
+                <<"), raw game and microphone files; no devices.\n"; return 0;
         }
         if ((argc==2 || argc==3) && std::wstring_view(argv[1]).starts_with(L"--self-test-sound=")) {
             // Real devices, no VR: 2 s of what the PC plays and the chosen microphone ("default", an ID, or "none")
-            // into a small black video, with the microphone's file beside it when a path is given.
+            // into a small black video, with each source's own file beside it when a path is given.
             const std::wstring choice{std::wstring_view(argv[1]).substr(18)};
             const std::filesystem::path video=argc==3?std::filesystem::path(argv[2]):std::filesystem::path{};
-            auto beside=video; if (!video.empty()) beside.replace_filename(video.stem().wstring()+L"-microphone.wav");
-            if (!video.empty() && (std::filesystem::exists(video) || std::filesystem::exists(beside))) throw std::runtime_error("Self-test output exists");
+            auto beside=video,game_beside=video;
+            if (!video.empty()) {
+                beside.replace_filename(video.stem().wstring()+L"-microphone.wav");
+                game_beside.replace_filename(video.stem().wstring()+L"-game.wav");
+            }
+            if (!video.empty() && (std::filesystem::exists(video) || std::filesystem::exists(beside) || std::filesystem::exists(game_beside)))
+                throw std::runtime_error("Self-test output exists");
             check(CoInitializeEx(nullptr,COINIT_MULTITHREADED)); com=true; check(MFStartup(MF_VERSION)); media=true;
             const bool asked_mic=choice!=L"none";
             const bool opened=sound.open(true,asked_mic?choice:std::wstring{},100);
@@ -735,7 +758,7 @@ int wmain(int argc,wchar_t** argv) {
             if (!video.empty()) encoder.open(video,320,240,fps,2000000,true,sound.mixer.rate);
             const auto start=std::chrono::steady_clock::now();
             if (video.empty()) sound.begin([](const int16_t*,size_t,uint64_t) {},qpc_100ns());
-            else sound.begin(encoder,qpc_100ns(),beside);
+            else sound.begin(encoder,qpc_100ns(),game_beside,beside);
             for (UINT frame=0;frame<fps*2;++frame) {
                 if (!video.empty()) encoder.add(black,LONGLONG(frame)*10000000/fps,10000000/fps);
                 std::this_thread::sleep_until(start+std::chrono::milliseconds((frame+1)*1000/fps));
@@ -1012,14 +1035,16 @@ int wmain(int argc,wchar_t** argv) {
         // side by side), --pitch=<degrees> with it (where that view looks, below (negative) or above the head),
         // --eye=left|right (that eye's whole view, left-eye.mp4 / right-eye.mp4: the side-by-side field of view in
         // one picture, at the game's own frame rate, not steadied), --sound (what the PC plays, as an AAC track),
-        // --microphone=default|<endpoint ID> (a microphone mixed into that track and saved alone as microphone.wav)
-        // and --mic-volume=<0..300> (its level in percent, 100 as it comes).
-        bool showcase=false, with_sound=false, pitched=false; double pitch=showcase_default_pitch; int one_eye=-1;
+        // --microphone=default|<endpoint ID> (a microphone mixed into that track), --mic-volume=<0..300> (its level in
+        // percent, 100 as it comes) and --sound-files (each source also alone beside the video, raw, at its timing:
+        // game.wav for what the PC plays, microphone.wav for the microphone).
+        bool showcase=false, with_sound=false, pitched=false, sound_files=false; double pitch=showcase_default_pitch; int one_eye=-1;
         std::wstring microphone; int mic_volume=100;
         while (argc>1 && std::wstring_view(argv[1]).starts_with(L"--")) {
             const std::wstring_view option=argv[1];
             if (option==L"--showcase") showcase=true;
             else if (option==L"--sound") with_sound=true;
+            else if (option==L"--sound-files") sound_files=true;
             else if (option.starts_with(L"--microphone=")) {
                 microphone=std::wstring(option.substr(13));
                 if (microphone.empty() || microphone.size()>200) throw std::runtime_error("Choose a microphone");
@@ -1038,7 +1063,7 @@ int wmain(int argc,wchar_t** argv) {
         }
         if (pitched && !showcase) throw std::runtime_error("--pitch needs --showcase");
         if (showcase && one_eye>=0) throw std::runtime_error("Choose --showcase or --eye, not both");
-        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES] | --eye=left|right] [--sound] [--microphone=default|ID [--mic-volume=PERCENT]] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..2048), optional stop file");
+        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES] | --eye=left|right] [--sound] [--microphone=default|ID [--mic-volume=PERCENT]] [--sound-files] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..2048), optional stop file");
         const UINT pid=std::stoul(argv[2]), seconds=std::stoul(argv[4]), fps=std::stoul(argv[5]), ew=std::stoul(argv[6]); out=argv[3];
         if (!pid||seconds<1||seconds>300||fps<10||fps>60||ew<640||ew>2048||ew%2) throw std::runtime_error("Invalid recording bounds");
         // Ends the recording cleanly when the game exits (a crash included) instead of waiting out the time.
@@ -1067,6 +1092,7 @@ int wmain(int argc,wchar_t** argv) {
         // did, and the report says why.
         const bool sounding=(with_sound || !microphone.empty()) && sound.open(with_sound,microphone,mic_volume);
         const auto sound_report=[&] { return report_sound(with_sound,!microphone.empty(),sounding,sound); };
+        const auto sound_file=[&](const wchar_t* name) { return sound_files ? out/name : std::filesystem::path{}; };
         if (showcase || one_eye>=0) {
             // Showcase: the left eye cropped to 16:9 and steadied. One eye: the chosen eye whole, as the headset
             // shows it (the side-by-side field of view), with the pose of each frame logged for steadying later.
@@ -1093,7 +1119,7 @@ int wmain(int argc,wchar_t** argv) {
             timeBeginPeriod(1);  // 2 ms polls: a new game frame is noticed within a few ms of arriving
             Steady steady; std::vector<BYTE> pixels,pending,print,last_print;
             Sleep(250); const auto start=std::chrono::steady_clock::now();
-            if (sounding) sound.begin(encoder,qpc_100ns(),out/L"microphone.wav");
+            if (sounding) sound.begin(encoder,qpc_100ns(),sound_file(L"game.wav"),sound_file(L"microphone.wav"));
             uint64_t count=0,unsteadied=0,too_soon=0; uint32_t last_index=0; bool have_index=false; const auto start_ms=utc();
             double pending_t=-1, waiting_since=-1;
             std::string end_reason="time_limit"; Json pauses=Json::array(); double paused_at=-1, t=0;
@@ -1183,7 +1209,7 @@ int wmain(int argc,wchar_t** argv) {
             std::vector<BYTE> pixels(static_cast<size_t>(ew)*2*eh*4);
             StereoResize resize; resize.open(device.Get(),ew,eh);
             Sleep(250); const auto start=std::chrono::steady_clock::now();
-            if (sounding) sound.begin(encoder,qpc_100ns(),out/L"microphone.wav");
+            if (sounding) sound.begin(encoder,qpc_100ns(),sound_file(L"game.wav"),sound_file(L"microphone.wav"));
             uint64_t count=0; const auto start_ms=utc();
             // A hitch, loading stall or hang can hand SteamVR's scene to another process. Nothing is read
             // then (another application is never captured); the video holds its last frame and resumes

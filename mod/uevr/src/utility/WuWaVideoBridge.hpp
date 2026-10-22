@@ -116,9 +116,11 @@ public:
     // style 0: both eyes side by side. 1 (showcase): the left eye as a steadied 16:9 video, looking pitch degrees
     // from where the head points (negative lower). 2 / 3: the left / right eye's whole view, not steadied (the
     // side-by-side field of view in one picture). sound: what the PC plays, as a track. microphone (1.2.6): none
-    // when empty, else "default" or an endpoint ID, mixed into that track at mic_volume percent.
+    // when empty, else "default" or an endpoint ID, mixed into that track at mic_volume percent. sound_files: each
+    // source also alone beside the video (game.wav, microphone.wav).
     bool submit(const std::filesystem::path& profile,bool start,int fps=30,int width=1024,bool telemetry=true,
-                int style=0,int pitch=-12,bool sound=true,const std::string& microphone={},int mic_volume=100) noexcept {
+                int style=0,int pitch=-12,bool sound=true,const std::string& microphone={},int mic_volume=100,
+                bool sound_files=true) noexcept {
         poll(profile,true);
         try {
             if (!available() || pending()) throw std::runtime_error("Wait for the recording launcher.");
@@ -138,7 +140,8 @@ public:
                          if (style==1) { request["style"]="showcase"; request["showcase_pitch"]=std::clamp(pitch,-40,20); }
                          else if (style==2 || style==3) request["style"]=style==2?"left_eye":"right_eye";
                          // Only when chosen: a launcher from before 1.2.6 refuses fields it does not know.
-                         if (!microphone.empty()) { request["microphone"]=microphone; request["mic_volume"]=std::clamp(mic_volume,0,300); } }
+                         if (!microphone.empty()) { request["microphone"]=microphone; request["mic_volume"]=std::clamp(mic_volume,0,300); }
+                         if (!sound_files) request["sound_files"]=false; }
             else request["recording_id"]=m_status.at("recording_id");
             const auto target=m_directory/("request-"+std::to_string(GetCurrentProcessId())+".json");
             const auto temporary=m_directory/(id+".tmp");

@@ -65,7 +65,8 @@
     "Off": "关闭",
     "Windows default microphone": "Windows 默认麦克风",
     "Microphone volume": "麦克风音量",
-    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "你的声音会混入视频的声音，并单独保存为 microphone.wav。选择“关闭”则不录麦克风。",
+    "Your voice is mixed into the video's sound. Off records no microphone.": "你的声音会混入视频的声音。选择“关闭”则不录麦克风。",
+    "Separate sound files: also save the game sound and your microphone alone (game.wav, microphone.wav) for editing": "单独的声音文件：另外单独保存游戏声音和你的麦克风（game.wav、microphone.wav），方便剪辑",
     "Chosen microphone (not connected)": "已选麦克风（未连接）"
   },
   "guide": {

@@ -83,7 +83,7 @@ namespace WuWaVR.Manager
         FrameworkElement versionConsent;
         Border connectionPanel;
         TextBlock connectionMessage;
-        CheckBox compatible, risk, recordSound;
+        CheckBox compatible, risk, recordSound, recordSoundFiles;
         TextBlock gamePath, gameHint, runtime, runtimeHint, packageState, launchState, catalogState, operationText, gameVersion, recordingState, riskNotice;
         GameDiscovery.Result discovery;
         StackPanel gameLocationOptions;
@@ -816,18 +816,21 @@ namespace WuWaVR.Manager
             // 1.2.5: the video's sound track, what the PC plays (SteamVR recordings).
             recordSound = new CheckBox { Content = Label(text["recordSound"], 12), Foreground = foreground, IsChecked = true, Margin = new Thickness(0, 10, 0, 0) };
             ((StackPanel)recordingOptions.Content).Children.Add(recordSound);
-            // 1.2.6: a microphone mixed into that sound and saved alone as microphone.wav (SteamVR recordings). The
-            // launcher lists the microphones; the choice is off until one is picked.
+            // 1.2.6: a microphone mixed into that sound (SteamVR recordings). The launcher lists the microphones; the
+            // choice is off until one is picked. Separate sound files: each source also alone (game.wav, microphone.wav).
             recordMic = Choice(text["micOff"], text["micDefault"]); recordMicVolume = Choice(MicVolumes.Select(v => v + "%").ToArray());
             recordMicVolume.SelectedIndex = Array.IndexOf(MicVolumes, 100);
             recordMic.SelectionChanged += (s, e) => { if (!rendering) ShowStatus(); };
             ((StackPanel)recordingOptions.Content).Children.Add(CaptureFields("microphone", recordMic, "micVolume", recordMicVolume));
+            recordSoundFiles = new CheckBox { Content = Label(text["recordSoundFiles"], 12), Foreground = foreground, IsChecked = true, Margin = new Thickness(0, 10, 0, 0) };
+            ((StackPanel)recordingOptions.Content).Children.Add(recordSoundFiles);
             panel.Children.Add(Card(text["record"], Label(text["recordDefaults"], 12, muted),
                 Wrap(Action("recordStart", async c =>
                 {
                     await EnsureConnected(c);
                     await SubmitJob("/api/record-start", new { videoOnly = purpose.SelectedIndex == 0, fps = int.Parse((string)fps.SelectedItem), eyeWidth = int.Parse((string)size.SelectedItem), sound = recordSound.IsChecked == true, source = new[] { "auto", "steamvr", "simulator" }[source.SelectedIndex],
-                        microphone = micIds[Math.Max(0, recordMic.SelectedIndex)], micVolume = MicVolumes[Math.Max(0, recordMicVolume.SelectedIndex)] }, c);
+                        microphone = micIds[Math.Max(0, recordMic.SelectedIndex)], micVolume = MicVolumes[Math.Max(0, recordMicVolume.SelectedIndex)],
+                        soundFiles = recordSoundFiles.IsChecked == true }, c);
                 }, true), Action("recordStop", async c => { await EnsureConnected(c); await bridge.Post("/api/record-stop", new { }, c); }),
                 Action("openRecordings", async c => { await EnsureConnected(c); await bridge.Post("/api/open", new { folder = "recordings" }, c); operationText.Text = text["folderOpened"]; })), recordingOptions));
             panel.Children.Add(Label(text["recordPrivacy"], 12, muted)); return panel;
@@ -1758,6 +1761,7 @@ namespace WuWaVR.Manager
             foreach (var choice in new[] { releases, installed, source, fps, size, purpose, gameLocations }) choice.IsEnabled = operation == null && !running;
             if (recordSound != null) recordSound.IsEnabled = operation == null && !running;
             if (recordMic != null) { recordMic.IsEnabled = operation == null && !running; recordMicVolume.IsEnabled = recordMic.IsEnabled && recordMic.SelectedIndex > 0; }
+            if (recordSoundFiles != null) recordSoundFiles.IsEnabled = operation == null && !running;
             bool active = operation != null || running;
             recoveryShortcut.Visibility = unresolvedStartup || (hasPackage && !connectionReady) || workerFailed ? Visibility.Visible : Visibility.Collapsed;
             bool canCancel = operation != null || (bridge.Address != null && LauncherBridge.CanCancelLaunch(status));

@@ -65,7 +65,8 @@
     "Off": "Désactivé",
     "Windows default microphone": "Micro par défaut de Windows",
     "Microphone volume": "Volume du micro",
-    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "Votre voix est mélangée au son de la vidéo et aussi enregistrée seule dans microphone.wav. Désactivé n'enregistre aucun micro.",
+    "Your voice is mixed into the video's sound. Off records no microphone.": "Votre voix est mélangée au son de la vidéo. Désactivé n'enregistre aucun micro.",
+    "Separate sound files: also save the game sound and your microphone alone (game.wav, microphone.wav) for editing": "Fichiers son séparés : enregistre aussi le son du jeu et votre micro à part (game.wav, microphone.wav) pour le montage",
     "Chosen microphone (not connected)": "Micro choisi (non connecté)"
   },
   "guide": {

@@ -65,7 +65,8 @@
     "Off": "オフ",
     "Windows default microphone": "Windows の既定のマイク",
     "Microphone volume": "マイク音量",
-    "Your voice is mixed into the video's sound and also saved alone as microphone.wav. Off records no microphone.": "あなたの声は動画の音声にミックスされ、microphone.wav として単独でも保存されます。オフにするとマイクは録音しません。",
+    "Your voice is mixed into the video's sound. Off records no microphone.": "あなたの声は動画の音声にミックスされます。オフにするとマイクは録音しません。",
+    "Separate sound files: also save the game sound and your microphone alone (game.wav, microphone.wav) for editing": "音声を別ファイルに：ゲーム音とマイクをそれぞれ単独でも保存します（game.wav、microphone.wav）。編集用です",
     "Chosen microphone (not connected)": "選んだマイク（未接続）"
   },
   "guide": {

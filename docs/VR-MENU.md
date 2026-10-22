@@ -202,9 +202,12 @@ REC badge with the elapsed time shows while recording.
    one by name from the launcher's list (`wuwa-recorder.exe --list-microphones`),
    saved as its Windows endpoint ID; one not plugged in shows as not connected
    and the launcher refuses to start until another is chosen. The recorder
-   places it by WASAPI's capture clock, mixes it into the video's sound and
-   saves it alone as `microphone.wav`; SteamVR only) with **Microphone volume**
-   (`WuWaRecording_MicVolume`, 0-300 %, 100), telemetry, **Scene info** (1.2.6,
+   places it by WASAPI's capture clock and mixes it into the video's sound;
+   SteamVR only) with **Microphone volume** (`WuWaRecording_MicVolume`, 0-300 %,
+   100), **Separate sound files** (`WuWaRecording_SoundFiles`, on: each source
+   also alone beside the video, raw and at its timing, `game.wav` stereo and
+   `microphone.wav` mono, about 60 MB per 5 minutes; recording.json lists them
+   under `sound_files`), telemetry, **Scene info** (1.2.6,
    `WuWaRecording_SceneInfo`, on, needs telemetry: `mod/lua/wuwa_scene_log.lua`
    reads the game's shown LGUI text, map and character onto the telemetry rows,
    never the UID widget, and the launcher writes `scene.txt` / `scene.jsonl`

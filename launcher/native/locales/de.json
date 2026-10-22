@@ -70,6 +70,7 @@
   "micOff": "Aus",
   "micDefault": "Windows-Standardmikrofon",
   "micMissing": "Gewähltes Mikrofon (nicht verbunden)",
+  "recordSoundFiles": "Getrennte Tondateien: Spielton und Mikrofon zusätzlich einzeln speichern (game.wav, microphone.wav), zum Schneiden",
   "purpose": "Aufnahmemodus",
   "videoOnly": "Sauberes Video",
   "playtest": "Video + Spieltestdaten",

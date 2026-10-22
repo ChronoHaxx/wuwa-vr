@@ -70,6 +70,7 @@
   "micOff": "끔",
   "micDefault": "Windows 기본 마이크",
   "micMissing": "선택한 마이크 (연결 안 됨)",
+  "recordSoundFiles": "소리 파일 분리: 게임 소리와 마이크를 각각 따로도 저장합니다 (game.wav, microphone.wav). 편집용입니다",
   "purpose": "녹화 모드",
   "videoOnly": "깔끔한 영상",
   "playtest": "영상 + 플레이 테스트 데이터",

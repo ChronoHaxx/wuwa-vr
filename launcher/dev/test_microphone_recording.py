@@ -64,6 +64,16 @@ class BridgeMicrophone(unittest.TestCase):
         self.assertTrue(self.send(microphone='')['ok'])
         self.assertEqual(self.started, [((False, 30, 1024, 42), {'sound': True})] * 2)
 
+    def test_separate_sound_files_reach_the_launcher(self):
+        self.assertTrue(self.send(sound_files=False)['ok'])
+        self.assertTrue(self.send(microphone='default', sound_files=True)['ok'])
+        self.assertEqual(self.started, [
+            ((False, 30, 1024, 42), {'sound': True, 'sound_files': False}),
+            ((False, 30, 1024, 42), {'sound': True, 'microphone': 'default', 'mic_volume': 100, 'sound_files': True})])
+        reply = self.send(sound_files='yes')
+        self.assertFalse(reply['ok'])
+        self.assertIn('separate files', reply['message'])
+
     def test_bad_microphone_or_volume_is_refused(self):
         for bad in ('--sound', 'a b', 7, 'x' * 201):
             reply = self.send(microphone=bad)
@@ -95,6 +105,15 @@ class RecorderCommand(unittest.TestCase):
         # The voice alone (game sound off) and the showcase view.
         command = self.command(style='showcase', microphone='default')
         self.assertEqual(command[1:4], ['--showcase', '--microphone=default', '--mic-volume=100'])
+
+    def test_sound_files_flag_only_with_a_sound_source(self):
+        command = self.command(sound=True, microphone='default', sound_files=True)
+        self.assertEqual(command[1:5], ['--sound', '--microphone=default', '--mic-volume=100', '--sound-files'])
+        self.assertIn('--sound-files', self.command(sound=True, sound_files=True))
+        self.assertIn('--sound-files', self.command(microphone='default', sound_files=True))
+        # Nothing to save alone without a sound source, and off when not asked.
+        self.assertNotIn('--sound-files', self.command(sound=False, sound_files=True))
+        self.assertNotIn('--sound-files', self.command(sound=True, microphone='default', sound_files=False))
 
     def test_no_microphone_no_flags(self):
         for extra in ({}, {'microphone': ''}, {'microphone': None}):

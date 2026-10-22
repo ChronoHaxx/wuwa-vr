@@ -240,9 +240,21 @@ void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVe
             };
             arrow(widget_left, enabled && current > 0, true);
             arrow(widget_right - 44.0f, enabled && current < last, false);
-            const auto text = value_of(item);
-            const float w = measure(26.0f, text).x / s;
-            write(at((widget_left + widget_right) * 0.5f - w * 0.5f, mid - 13.0f), 26.0f, enabled ? gold_bright : faint, text);
+            // The value fits between the arrows: smaller type for a long one (a device name, a long translation),
+            // then cut at the end.
+            constexpr float room = widget_right - widget_left - 2.0f * 44.0f - 20.0f;
+            auto text = value_of(item);
+            float size = 26.0f, w = measure(size, text).x / s;
+            if (w > room) { size = (std::max)(18.0f, size * room / w); w = measure(size, text).x / s; }
+            if (w > room) {
+                while (!text.empty() && measure(size, text + "...").x / s > room) {
+                    unsigned char last{};
+                    do { last = static_cast<unsigned char>(text.back()); text.pop_back(); } while (!text.empty() && (last & 0xC0) == 0x80);
+                }
+                text += "...";
+                w = measure(size, text).x / s;
+            }
+            write(at((widget_left + widget_right) * 0.5f - w * 0.5f, mid - size * 0.5f), size, enabled ? gold_bright : faint, text);
             break;
         }
         case Kind::Slider: {

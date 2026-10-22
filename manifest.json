@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-22T18:35:47.518251+00:00",
+  "updatedAt": "2026-10-22T18:43:15.003512+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -70,7 +70,7 @@
     "dev/i18n/missing_report.py": "8bb25b1c3622eb7dfeda733b6f3675da2ccb51c39f608c38b845541a89eb4d8a",
     "dev/i18n/mod_strings.py": "fdffc155463fa12537cf1ced942421e6a728a1ed5a157c2c8b4b7989b2dd2b2b",
     "dev/imgui-preview/build.cmd": "8de1649c84e712732d877168a5683f4f6fd545cb4d0c2313a50c6f06c599d610",
-    "dev/imgui-preview/preview.cpp": "45d8f7ac5961654bb1c184db3c7d154fa547ca04f0d7bc3216052deab0342f72",
+    "dev/imgui-preview/preview.cpp": "e3eff5d47f5e795484f8e0afb6f52ccd32e33d44869615c1434cd126525d80d3",
     "dev/install-candidate.ps1": "e765683cdb5f259e31e3cfd62de1067dfd5ee03219c7aa9487492cbe3b5b88ee",
     "dev/key-enum-fixture.inc": "ba8ff6ee21b4744b86b5deec14ada22bd5e6d03871266a7fdd27e08a3c338fc6",
     "dev/merge-controls-l10n.py": "87acfd752d2c64a47fcd6a8b32541089cd6e19f2c016cefaedc4b3d334b944f2",
@@ -592,7 +592,7 @@
     "mod/uevr/src/utility/WuWaTreadmillApp.hpp": "aea9df63f94066f506f2c9175235243124894675779e6c7fb1a8d0a627bb9ad2",
     "mod/uevr/src/utility/WuWaVideoBridge.hpp": "50929a7dc3fb06c27ea5c9ed9c9acfc0183e0f2627b51f6736371e0d10df34c6",
     "mod/uevr/src/utility/WuWaViewUbTrace.hpp": "7ba94a8c8ff7dc7d0748d9f3c1ea6e03bb2fefbc905dd3b0260377938f1adbf9",
-    "mod/uevr/src/utility/WuWaVrMenu.cpp": "67dd8fd0e558be12e85648d0e98dd9eada95448393e3f0766efe5c5004b721f0",
+    "mod/uevr/src/utility/WuWaVrMenu.cpp": "e794b0af15b0ea8f777b667e02c304b9a84a6f1f5ed25a24ef95547ae9d5fecd",
     "mod/uevr/src/utility/WuWaVrMenu.hpp": "b3dbea37a3a26ef026146228b46eac0568f2414691c0bc9824f47ed7f0dbefbd",
     "mod/uevr/src/utility/WuWaWaterObservation.hpp": "429c6402f23127a4c857f7a2529eb3e61ab66ab2c8386671e46ac10ea38e5306",
     "mod/uevr/src/utility/WuWaWaterStereoLoop.hpp": "5410f481199d9a451baf41e9aa951d9ab1aeb8443897728bb977139488a750c1",

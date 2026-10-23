@@ -389,7 +389,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_card_below, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
+        *m_card_below, *m_card_place, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_first_person_camera, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_scene, *m_video_sound, *m_video_microphone, *m_video_mic_volume, *m_video_sound_files, *m_video_style, *m_showcase_pitch, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
@@ -594,6 +594,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
     wuwa_ui::draw(*m_cards,"Controls cards (hold L3, or LT + RT)");
     wuwa_ui::draw(*m_pin_card,"Keep the controls card open");
     wuwa_ui::draw(*m_card_width,"Card width (meters)");
+    wuwa_ui::draw(*m_card_place,"Card place");
     wuwa_ui::draw(*m_card_below,"Card height");
     wuwa_ui::draw(*m_card_distance,"Card distance");
     wuwa_ui::draw(*m_view_hints,"View hints");
@@ -1181,8 +1182,8 @@ bool WuWaControlsComponent::card_visible() const {
 
 Matrix4x4f WuWaControlsComponent::card_anchor(glm::vec3& out_back) const {
     // Where the head faces when the card is called up, level, below the line of
-    // sight (Card height) and tilted to face the eyes. It then stays put, so a
-    // glance down reads it and looking around leaves it behind.
+    // sight (Card height; above it with Card place) and tilted to face the eyes. It
+    // then stays put, so a glance down (or up) reads it and looking around leaves it behind.
     auto& vr = VR::get();
     const auto head = vr->get_transform(vr->get_hmd_index());
     glm::vec3 back{head[2].x, 0.0f, head[2].z};
@@ -1196,7 +1197,8 @@ Matrix4x4f WuWaControlsComponent::card_anchor(glm::vec3& out_back) const {
     basis[0] = glm::vec4{right, 0.0f};
     basis[1] = glm::vec4{up, 0.0f};
     basis[2] = glm::vec4{back, 0.0f};
-    const float distance = m_card_distance->value(), below = glm::radians(m_card_below->value());
+    const float above = m_card_place->value() == 1 ? -1.0f : 1.0f;
+    const float distance = m_card_distance->value(), below = above * glm::radians(m_card_below->value());
     auto transform = basis * glm::rotate(-below, glm::vec3{1.0f, 0.0f, 0.0f});
     const glm::vec3 eye{head[3]};
     transform[3] = glm::vec4{eye - back * (distance * std::cos(below)) - up * (distance * std::sin(below)), 1.0f};
@@ -1302,7 +1304,8 @@ Matrix4x4f WuWaControlsComponent::floor_transform() const {
         float lower = released != 0 ? std::clamp((now - released) / float(card_sink_ms), 0.0f, 1.0f)
             : 1.0f - std::clamp((now - since) / float(card_rise_ms), 0.0f, 1.0f);
         lower = lower * lower * (3.0f - 2.0f * lower);
-        anchor[3] -= glm::vec4{0.0f, 0.12f * lower, 0.0f, 0.0f};
+        // Below the view it rises into place; above, it comes down into place.
+        anchor[3] -= glm::vec4{0.0f, (m_card_place->value() == 1 ? -0.12f : 0.12f) * lower, 0.0f, 0.0f};
         return anchor;
     }
     // A test plan's step card: below the recentered headset origin, tilted up.

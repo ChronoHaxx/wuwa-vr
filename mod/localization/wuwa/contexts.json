@@ -112,6 +112,10 @@
     "mods/VR.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Above your view": [
+    "mods/vr/WuWaControlsComponent.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Acro drone": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -304,6 +308,13 @@
   "Bank the view": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
+  "Below your view": [
+    "mods/vr/WuWaControlsComponent.hpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Below your view, or above it if the card is in your way down there. Card height sets how far from your line of sight.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
   "Besides the video with everything mixed, saves each sound alone next to it: game.wav (everything the PC plays) and microphone.wav (your voice), at the video's timing. In an edit you can then change either level or leave one out. About 60 MB per 5 minutes.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -417,6 +428,10 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Card height": [
+    "mods/vr/WuWaControlsComponent.cpp",
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Card place": [
     "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -599,7 +614,7 @@
   "Degrees above straight ahead (below is negative).": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Degrees below your line of sight. More puts the card lower, out of the way of the HUD.": [
+  "Degrees from your line of sight, below or above it (Card place). More puts the card farther out of the way of the HUD.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Degrees to the right of straight ahead (left is negative).": [
@@ -2972,7 +2987,7 @@
   "Use this menu when opening UEVR": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Used instead of the offsets above while the diorama is on. The diorama makes your eyes far apart, so a camera that suits normal play puts the character too close and crosses your eyes. The default, 5 m back, shows it about an arm's length away at 10x.": [
+  "Used instead of the offsets above while the diorama is on. The diorama makes your eyes far apart, so a camera that suits normal play puts the character too close and crosses your eyes. The default, 5 m back, shows it about an arm's length away at 10x. First person keeps your view in your character's head, with the world made small around you.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Uses one game camera pose for both eyes during the same frame, while preserving headset movement and eye separation. Requires Native Stereo Fix. The owner confirmed the ultimate return-to-gameplay fix. Other scene transitions remain under test; this does not repair foliage.": [

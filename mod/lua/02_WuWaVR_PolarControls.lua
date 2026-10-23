@@ -13,6 +13,8 @@ local context_mouse, focused, camera_active = false, false, false
 local game_menu = false
 -- The controls card the held buttons call up, as last reported to the overlay.
 local card_sent = ""
+-- First person placing the camera, as last told to the plugin (the diorama keeps its own camera out of it).
+local first_person_sent = false
 local status, last_error = "Polar controls ready; game camera unchanged.", nil
 local mesh_mode, camera_mode, last_pawn, mesh_revision = -1, -1, nil, -1
 local camera_late=false
@@ -1083,6 +1085,8 @@ local function tick(_,delta)
     local held=selected and slots[selected]
     local card_now=(held and held.card and held.card_at and t-held.card_at<=0.25) and held.card or ""
     if card_now~=card_sent then set("WuWaControls_Card",card_now); card_sent=card_now end
+    local first_person_now=camera_active and number("WuWaControls_CameraMode",0,0,3)==3
+    if first_person_now~=first_person_sent then set("WuWaControls_FirstPersonCamera",first_person_now); first_person_sent=first_person_now end
     if not camera_active then
         frame=nil; free=nil; context_mouse=false
         if mesh_cache then mesh_cache.look_blend=nil end
@@ -2172,6 +2176,7 @@ cb.on_script_reset(function()
     game_menu=false
     if mesh_cache then mesh_cache.look_blend=nil end
     restore_mesh(); frame=nil; input=nil; slots={}; actions={}; focused=false; camera_active=false; camera_late=false
+    set("WuWaControls_FirstPersonCamera",false); first_person_sent=false
     story.offset=0; story.applied=0; story.active=false; set("WuWaControls_StoryNudgeNow","")
     status="Polar controls stopped; camera and owned visibility released."; emit(nil,false)
 end)

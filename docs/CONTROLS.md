@@ -69,8 +69,9 @@ nothing.
   HUD, and moves in front of you again when you turn well away. **L3 + Menu**
   hides it, and pressing it again pins it back.
 - The WuWa VR menu's **HUD** page has **Controls cards** (on / off), **Keep the
-  controls card open**, **Card size**, **Card height** (degrees below your line
-  of sight; more is lower) and **Card distance**.
+  controls card open**, **Card size**, **Card place** (below your view, or
+  above it; 1.2.6), **Card height** (degrees from your line of sight; more is
+  farther out) and **Card distance**.
 - **Y / X** move the camera up and down in first person and the fixed camera;
   **Y + X together** put that camera's height back to its default (first
   person 0, fixed camera 30). In the game camera they do nothing (the card greys
@@ -361,8 +362,9 @@ diorama has its own camera offsets (WuWa VR menu, Camera page, **Diorama
 camera**; `VR_WuWaDioramaForwardOffset` / `RightOffset` / `UpOffset`, default
 5 m back, centred): it multiplies how far apart your eyes are, so the offsets of
 a close game camera put the miniature character inside your eyes. They apply only
-while the diorama is on, never change your normal offsets, and close-up match
-pauses meanwhile. The scale and the diorama camera are saved; the diorama switch
+while the diorama is on and first person is not placing the camera (first person
+keeps your view in your character's head, the world made small around you),
+never change your normal offsets, and close-up match pauses meanwhile. The scale and the diorama camera are saved; the diorama switch
 itself is not. It requires Native Stereo; AFR
 disables it. No new keyboard binding is added.
 

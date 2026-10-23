@@ -143,9 +143,12 @@ REC badge with the elapsed time shows while recording.
    left and up / down, default 5 m back and centred, and reset), and recenter.
    The diorama multiplies eye separation by its scale, so a camera that suits
    normal play puts the character too close and crosses the eyes there; while
-   the diorama is shown (per draw, `Scale::shown()`), `VR::get_camera_*_offset`
-   returns `VR_WuWaDioramaForwardOffset` / `RightOffset` / `UpOffset` instead of
-   the normal offsets, which stay as they were. Holding RT in the classic menu
+   the diorama is shown (per draw, `Scale::shown()`) and first person is not
+   placing the camera (the camera script reports `WuWaControls_FirstPersonCamera`;
+   1.2.6, Lelouche 23 Oct: 5 m back showed the headless body from afar),
+   `VR::get_camera_*_offset` returns `VR_WuWaDioramaForwardOffset` /
+   `RightOffset` / `UpOffset` instead of the normal offsets, which stay as they
+   were. Holding RT in the classic menu
    nudges the diorama set while the diorama is on, and RT + B resets it.
 4. **Cinema:** view, the game's own fix for cutscene black bars on the
    screens (Graphics > Cutscene Mode: Full Screen), close-up match and its closest

@@ -843,7 +843,8 @@ Page camera_page() {
     page.items.push_back(paragraph("Diorama camera", true));
     page.items.push_back(paragraph("Used instead of the offsets above while the diorama is on. The diorama makes your eyes "
         "far apart, so a camera that suits normal play puts the character too close and crosses your eyes. "
-        "The default, 5 m back, shows it about an arm's length away at 10x."));
+        "The default, 5 m back, shows it about an arm's length away at 10x. First person keeps your view in your "
+        "character's head, with the world made small around you."));
     page.items.push_back(setting_slider("Diorama: forward / back",
         "Where your viewpoint sits in the diorama, from the game camera. Back (minus) moves the miniature farther away.",
         "VR_WuWaDioramaForwardOffset", -1500.0f, 300.0f, 10.0f, "%+.0f cm"));
@@ -1002,8 +1003,12 @@ Page hud_page() {
         "Shows the L3 card without holding anything. Shortcut: L3 + Menu. A loaded test plan shows its step there instead.",
         "WuWaControls_PinCard"));
     page.items.push_back(setting_slider("Card size", "How wide the controls card is.", "WuWaControls_CardWidth", 0.5f, 1.6f, 0.05f, "%.2f m"));
+    page.items.push_back(setting_choice("Card place",
+        "Below your view, or above it if the card is in your way down there. Card height sets how far from your line "
+        "of sight.", "WuWaControls_CardPlace", {"Below your view", "Above your view"}));
     page.items.push_back(setting_slider("Card height",
-        "Degrees below your line of sight. More puts the card lower, out of the way of the HUD.",
+        "Degrees from your line of sight, below or above it (Card place). More puts the card farther out of the way "
+        "of the HUD.",
         "WuWaControls_CardBelow", 15.0f, 75.0f, 1.0f, "%.0f\xC2\xB0"));
     page.items.push_back(setting_slider("Card distance", "How far away the card is.", "WuWaControls_CardDistance",
         0.5f, 1.5f, 0.05f, "%.2f m"));

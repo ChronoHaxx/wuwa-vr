@@ -68,6 +68,8 @@ public:
     // with the saved recording settings.
     std::string menu_recording_state();
     void menu_recording_toggle();
+    // First person is placing the camera now (any thread; the camera script reports it).
+    bool first_person_camera() const { return m_first_person_camera.on.load(std::memory_order_relaxed); }
     // The microphones the launcher lists, for the Record page's choice (UI thread).
     std::vector<wuwa_video::Microphone> menu_microphones() const { return m_video.microphones(); }
     // When the menu last asked the recorder to stop (GetTickCount64 ms, 0 never): a recording that ends
@@ -438,6 +440,8 @@ private:
     const ModSlider::Ptr m_card_width{ModSlider::create("WuWaControls_CardWidth", 0.5f, 1.6f, 0.9f)};
     // Where the card rises: degrees below the line of sight, and how far away.
     const ModSlider::Ptr m_card_below{ModSlider::create("WuWaControls_CardBelow", 15.0f, 75.0f, 50.0f)};
+    // 1.2.6 (Lelouche, 23 Oct: keep the card but out of the way): below the line of sight, or the same angle above.
+    const ModCombo::Ptr m_card_place{ModCombo::create("WuWaControls_CardPlace", {"Below your view", "Above your view"}, 0)};
     const ModSlider::Ptr m_card_distance{ModSlider::create("WuWaControls_CardDistance", 0.5f, 1.5f, 0.9f)};
     // The line after a view switch shows for five switches, then stays off
     // until turned back on.
@@ -457,6 +461,16 @@ private:
         void config_load(const utility::Config&, bool) override { set(""); }
         void config_save(utility::Config&) override {}
     } m_card;
+    // What the camera script reports: true while first person places the camera. The diorama then keeps the view
+    // in the character's head instead of using its own camera offsets (VR::diorama_camera). Session only.
+    struct FirstPersonCameraValue : ModString {
+        FirstPersonCameraValue() : ModString{"WuWaControls_FirstPersonCamera", ""} {}
+        std::atomic<bool> on{false};
+        std::string get() const override { return on.load(std::memory_order_relaxed) ? "true" : "false"; }
+        void set(const std::string& text) override { on.store(text == "true" || text == "1", std::memory_order_relaxed); }
+        void config_load(const utility::Config&, bool) override { on.store(false, std::memory_order_relaxed); }
+        void config_save(utility::Config&) override {}
+    } m_first_person_camera;
     // Asked by the overlay and the UI frame (both on the present thread).
     mutable std::mutex m_card_mutex;
     mutable bool m_card_up{};

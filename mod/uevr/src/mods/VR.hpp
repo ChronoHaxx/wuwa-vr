@@ -473,17 +473,21 @@ public:
     }
 
     // The diorama has its own camera offsets (saved; Camera page), used while it is
-    // shown; the normal offsets are never written by it.
+    // shown; the normal offsets are never written by it. Not while first person places
+    // the camera: that view stays in the character's head with the world made small, as
+    // before the diorama had a camera (Lelouche, 23 Oct: 5 m back showed the headless body).
+    bool diorama_camera() const { return m_diorama.shown() && !m_wuwa_controls.first_person_camera(); }
+
     auto get_camera_forward_offset() const {
-        return m_diorama.shown() ? m_diorama_forward_offset->value() : m_camera_forward_offset->value();
+        return diorama_camera() ? m_diorama_forward_offset->value() : m_camera_forward_offset->value();
     }
 
     auto get_camera_right_offset() const {
-        return m_diorama.shown() ? m_diorama_right_offset->value() : m_camera_right_offset->value();
+        return diorama_camera() ? m_diorama_right_offset->value() : m_camera_right_offset->value();
     }
 
     auto get_camera_up_offset() const {
-        return m_diorama.shown() ? m_diorama_up_offset->value() : m_camera_up_offset->value();
+        return diorama_camera() ? m_diorama_up_offset->value() : m_camera_up_offset->value();
     }
 
     auto get_world_scale() const {

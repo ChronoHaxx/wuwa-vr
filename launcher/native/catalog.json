@@ -2,6 +2,18 @@
   "schema": 1,
   "releases": [
     {
+      "id": "beta-1-2-6",
+      "displayName": "1.2.6 beta · 25 Oct 14:18 GMT",
+      "gameVersion": "3.7",
+      "buildId": "recording-voice-1-2-6",
+      "channel": "beta",
+      "published": "2026-10-25T14:19:25.162295+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-6/WuWa-VR-Launcher.zip",
+      "sha256": "7c2affee0c0ba991858263ccf4d84bd2195ee949a1b2d3d8b06e54412013b7e5",
+      "size": 53141327,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-6"
+    },
+    {
       "id": "beta-1-2-5",
       "displayName": "1.2.5 beta · 18 Oct 18:16 BST",
       "gameVersion": "3.7",

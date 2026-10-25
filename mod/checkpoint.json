@@ -1,37 +1,37 @@
 {
   "schema": 3,
-  "build": "story-nudge-1-2-5",
+  "build": "recording-voice-1-2-6",
   "privateCandidate": false,
-  "launcherVersion": "1.2.5",
+  "launcherVersion": "1.2.6",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "8eb5151f6cb15f34fad3001797c0684e353889babcac3af0ba4e8087b4d8b980",
-  "frozenPatchSha256": "80c69edbfe795040a59890d0ecd7e481c2384278f0e775f3ca4b65090ba96c79",
-  "sourceReconstructedTree": "8c35eb2cc750ae9767024f3efa5414c7929be227",
-  "buildCompleted": "2026-10-18T17:30:39+0100",
+  "backendSha256": "652291444b4e0086642a7d2c457e1bff8da02e18e0246e8dcc6a96b3d8ff2ac9",
+  "frozenPatchSha256": "ddcf74ff3aa945218a0fd3e18798247c2476b1167e1256a9a607f4277a026e84",
+  "sourceReconstructedTree": "101fa92fe468a03063be7360788cdb3f791056bb",
+  "buildCompleted": "2026-10-23T13:41:38+0100",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 53054848,
-    "sha256": "f4868e2a5807269d731064721d6ffda44a2a34b5d4f689edc70da7f3800f86d0",
+    "bytes": 53141327,
+    "sha256": "7c2affee0c0ba991858263ccf4d84bd2195ee949a1b2d3d8b06e54412013b7e5",
     "public": true
   },
-  "liveAcceptance": "Tests 18 to 20b of 1.2.5 played in the headset by the owner (SteamVR, Bigscreen Beyond, Kuro launcher copy, 16-18 Oct): story camera nudge, showcase video, desktop HUD, first VR frame, recordings. This build (Test 20c) on the OpenXR simulator, game build 0x6ace6377: both copies with the five stereo code routes verified and the UI redirect installed (both-copies.json); full ground detail set in full VR and restored on the stereo screen and when off, eye LOD fields equal and the eye LOD sync applying (Test 20b, both copies); the stereo screen start-up pair covered by a unit test (the simulator shows no frames before the pair exists). Pending: headset play of the release build, dialogue letterbox bars on the full VR HUD, the full VR frame rate after many view switches, PlayStation hardware and broad headset compatibility.",
+  "liveAcceptance": "Test 21j, this exact build, played in the headset by the owner on 25 Oct (SteamVR, Bigscreen Beyond, Kuro launcher copy): the controls card above the view and recordings with the Beyond microphone (game.wav and microphone.wav beside the video). On the OpenXR simulator, game build 0x6ace6377 with the 3.7.16 resource update: both copies with the five stereo code routes verified and the UI redirect installed (both-copies.json: Kuro from the 25 Oct headset session, Steam on the simulator the same day); first person with the diorama stays in the head while the diorama camera still applies to the other camera modes (23 Oct); cutscene letterbox bars hidden in full VR on the Steam copy (Test 21); the far lighting refilled when the game rebuilt one eye alone (Test 21b). Recorder self-tests: mixer timing, microphone and game files, forced stops, one-eye pictures. Pending: the far lighting refill after a real long glide in the headset, the full VR frame rate after many view switches, PlayStation hardware and broad headset compatibility.",
   "previousPublicRelease": {
-    "tag": "beta-1-2-4",
-    "backendSha256": "4c693d68c11987e4292c00f3f7023d52c192f05835a5413b87574466dd4695ad"
+    "tag": "beta-1-2-5",
+    "backendSha256": "8eb5151f6cb15f34fad3001797c0684e353889babcac3af0ba4e8087b4d8b980"
   },
-  "sourceIdentity": "claude/1-2-5 at 517429d (Test 20c): tests 18 to 20c on top of 1.2.4 (game build 0x6ace6377), with the self-port (utility/WuWaSelfPort) that re-finds every build-pinned site in a new game build and keeps a route off when its code changed. See docs/launch-kit/STORY-NUDGE-1.2.5.md. 1.2.4 port, 1.2.3 features, 1.2.2 fixes, Steam identity, AO, VR menu, DX12 handoff and graphics policy retained.",
+  "sourceIdentity": "claude/1-2-6 at 67239a7 (Test 21j): tests 21 to 21j on top of 1.2.5 (game build 0x6ace6377): microphone and separate sound files in recordings, one-eye recordings, scene info, recordings without the hour limit and crash-safe, the far lighting refill, cutscene bars hidden in full VR, the controls card above the view, first person in the diorama. See docs/launch-kit/RECORDING-VOICE-1.2.6.md. 1.2.5 story nudge, self-port, 1.2.4 port, 1.2.3 features, 1.2.2 fixes, Steam identity, AO, VR menu, DX12 handoff and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "story-nudge-1-2-5",
+  "rendererBuild": "recording-voice-1-2-6",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-1-2-5",
+  "releaseTag": "beta-1-2-6",
   "sdkPatchSha256": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
   "sdkReconstructedTree": "0ad1702a10fec58469ec88265fa7297365fffab6",
-  "launcherSha256": "750f5150e84703985c85d43fa6611313c022ca2cbcebada1d926e0c56aec88ae",
-  "setupSha256": "0964ab70c7b59028df9a940909c2ab302c5b2ba5feebd6978d89175e3904b8a9"
+  "launcherSha256": "89b21b07b9cbaf2a50b1a17b43b2f86baadc9b32d6a8092a8adbab1730ddfaee",
+  "setupSha256": "a3cabd36bebd48f98db337bd5b14e8717c4c49f67c3dd44237fcba54689c2127"
 }

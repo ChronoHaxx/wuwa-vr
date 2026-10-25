@@ -1,12 +1,12 @@
-WUWA VR — 1.2.5 BETA / GAME 3.7
-Release: beta-1-2-5 | VR build: story-nudge-1-2-5
+WUWA VR — 1.2.6 BETA / GAME 3.7
+Release: beta-1-2-6 | VR build: recording-voice-1-2-6
 
 Run WuWa-VR-Setup.exe, then open WuWa VR from the Start menu.
 First VR installation needs internet; no separate Python install is needed.
 
 01 Game: choose your Steam or Kuro installation. For Steam, select
    Wuthering Waves.exe if browsing and sign into Steam first.
-02 WuWa VR: accept the account-risk notice and install 1.2.5 beta.
+02 WuWa VR: accept the account-risk notice and install 1.2.6 beta.
 03 Headset or simulator: start your headset software and select a valid
    OpenXR runtime, or explicitly choose Use bundled simulator.
    Select Launch in VR. Steam opens through Steam; for Kuro, press Play.
@@ -35,7 +35,7 @@ launcher workers requires explicit selection and confirmation. Game, Steam,
 headset/runtime and injector processes are excluded. Close launcher only does
 not claim that background work stopped. Developer tools holds recording.
 
-The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill), 1.2.1 and an earlier 1.2.3 test build in the headset with the Kuro launcher copy of the game, and the 1.2.5 test builds (story camera nudge, showcase video, recordings, desktop HUD, first VR frame) in the headset (SteamVR) with the Kuro launcher copy. The 1.2.5 release build was tested on the OpenXR simulator with both the Steam and the Kuro launcher copies: the UI redirect starts and the stereo fixes pass their code checks; full ground detail turns on in full VR and back off on the stereo screen. The stereo screen start-up fix is checked by a unit test only. The 1.2.5 release build has not been played in a headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
+The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill), 1.2.1, an earlier 1.2.3 test build and the 1.2.5 test builds in the headset with the Kuro launcher copy of the game, and the 1.2.6 release build in the headset (SteamVR, Bigscreen Beyond, Kuro launcher copy), including the controls card above the view and a recording with the microphone. On the OpenXR simulator, with both the Steam and the Kuro launcher copies and the game's 3.7.16 update: the UI redirect starts and the stereo fixes pass their code checks; first person with the diorama stays in the head; the cutscene bars are hidden in full VR; the far lighting is refilled when the game rebuilds it in one eye. The far lighting refill after a real long glide has not been seen in the headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot.
 
 The desktop launcher is MIT open source. Mod source changes are public;
 upstream and community components retain their own licences. Read LICENSE.txt
@@ -47,10 +47,10 @@ Not approved by Kuro Games. Do not disable security software.
 Website: https://chronohaxx.github.io/wuwa-vr/
 Source: https://github.com/ChronoHaxx/wuwa-vr
 
-鸣潮 VR — 1.2.5 测试版 / 游戏 3.7
+鸣潮 VR — 1.2.6 测试版 / 游戏 3.7
 
 运行安装程序后，从开始菜单打开 WuWa VR。首次安装 VR 包需要网络，无需另装 Python。
-01 选择 Steam 或库洛游戏；02 阅读风险提示并安装 1.2.5 beta；
+01 选择 Steam 或库洛游戏；02 阅读风险提示并安装 1.2.6 beta；
 03 启动头显软件并选择有效运行时，或明确选择内置模拟器，然后启动 VR。
 Steam 通过 Steam 启动；库洛用户还需在库洛启动器点击开始游戏。
 
@@ -70,7 +70,7 @@ L3 + R3 打开鸣潮 VR 菜单（激光、手柄或鼠标）；UEVR 完整设置
 注入器不在停止目标内。仅关闭启动器窗口不表示后台任务已停止。
 开发工具保存录像和高级诊断功能。
 
-开发者已在头显中（Valve Index 手柄配 Bigscreen Beyond；Meta Quest Pro 配 Reality Runner 跑步机）试玩 1.2.0，用库洛官方启动器版本的游戏在头显中试玩了 1.2.1 和较早的 1.2.3 测试版，并用库洛版在头显（SteamVR）中试玩了 1.2.5 的测试版（剧情镜头微调、展示视频、录制、桌面 HUD、VR 首帧）。1.2.5 正式版已在 OpenXR 模拟器中用 Steam 版和库洛官方启动器版测试：UI 重定向能启动，立体修复通过代码校验；完整地面细节在完整 VR 中开启，切到立体屏幕后恢复。立体屏幕的启动修复仅由单元测试检查。1.2.5 正式版尚未在头显中试玩。“移动菜单”时 VR 摇杆暂时无法调节距离（请用“菜单距离”）。许多对话特写仍比 2D 镜头更远。
+开发者已在头显中（Valve Index 手柄配 Bigscreen Beyond；Meta Quest Pro 配 Reality Runner 跑步机）试玩 1.2.0，用库洛官方启动器版本的游戏在头显中试玩了 1.2.1、较早的 1.2.3 测试版和 1.2.5 的测试版，并在头显（SteamVR，Bigscreen Beyond，库洛版）中试玩了 1.2.6 正式版，包括放在视线上方的操作卡片和带麦克风的录制。在 OpenXR 模拟器中用 Steam 版和库洛官方启动器版（含游戏 3.7.16 更新）测试：UI 重定向能启动，立体修复通过代码校验；第一人称配合微缩模式时视角留在角色头部；完整 VR 中隐藏过场黑边；游戏只在一只眼中重建远景光照时会重新填充。长距离滑翔后的远景光照重新填充尚未在头显中见到。“移动菜单”时 VR 摇杆暂时无法调节距离（请用“菜单距离”）。许多对话特写仍比 2D 镜头更远。
 启动器采用 MIT 开源许可；模组改动源代码公开，上游组件保留各自许可。
 病毒扫描报告针对精确文件哈希，不保证安全或账号兼容性。
 非官方注入可能导致反作弊或账号限制，未经库洛批准。不要禁用安全软件。

@@ -1,19 +1,20 @@
-WUWA VR — 1.2.5 BETA / FOCUSED USER CHECKS
-App 1.2.5 | Package beta-1-2-5 | Build story-nudge-1-2-5 | Game 3.7 (16 Oct update) | 18 Oct 18:16 BST
+WUWA VR — 1.2.6 BETA / FOCUSED USER CHECKS
+App 1.2.6 | Package beta-1-2-6 | Build recording-voice-1-2-6 | Game 3.7 (16 Oct update, 3.7.16) | 25 Oct 14:18 GMT
 
 Record Pass / Fail / Blocked / Not tested. Automated checks are not user results.
 Close game and injector before updating package or changing runtime.
 
-[ ] Update app to 1.2.5 and restart it with the game closed: step 02 shows
-    VR package 1.2.5 beta, installed by itself, and offers Back to 1.2.4.
+[ ] Update app to 1.2.6 and restart it with the game closed: step 02 shows
+    VR package 1.2.6 beta, installed by itself, and offers Back to 1.2.5.
     If using simulator, explicitly choose Use bundled simulator. Confirm ready.
-[ ] Start the game in full VR, then once on the stereo screen: no black right
-    eye in the first seconds.
-[ ] Full VR, stone steps or a ledge in grass: the steps show and your feet
-    stand on them. Fixes page, Full ground detail off brings the dirt back.
-[ ] A story shot in full VR: L3 + Y moves nearer, L3 + X back, L3 + Y + X
-    resets; the next cut resets it.
-[ ] Record page: a recording with sound; a showcase video.
+[ ] Record page: pick your headset's microphone and record a minute while
+    talking: the video has your voice with the game, in sync; game.wav and
+    microphone.wav sit next to it.
+[ ] Record page, Video style "Left eye, whole view": a square video of one eye.
+[ ] A story scene in full VR with the game's Cutscene Mode on letterbox: no
+    black bars in full VR; the stereo screen still shows them.
+[ ] HUD page, Card place: Above your view puts the controls card above the HUD.
+[ ] First person, then the diorama: your view stays in your character's head.
 [ ] Steam copy and Kuro launcher copy: the HUD and menus sit on the VR panel
     in the 16:9 layout.
 

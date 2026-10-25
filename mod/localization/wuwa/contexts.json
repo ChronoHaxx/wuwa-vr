@@ -60,6 +60,9 @@
   "05  WUWA VR MENU": [
     "mod/controls.json"
   ],
+  "06  KEYBOARD & MOUSE": [
+    "mod/controls.json"
+  ],
   "1024 px": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -340,6 +343,7 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Blur (depth of field)": [
+    "mod/controls.json",
     "mods/vr/WuWaControlsComponent.cpp",
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -580,6 +584,7 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Ctrl": [
+    "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Current renderer: %s": [
@@ -733,6 +738,7 @@
     "utility/WuWaPlayStationHid.hpp"
   ],
   "E + Q together: back to default": [
+    "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
   "E + Q together: back to the game's spot": [
@@ -881,6 +887,7 @@
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Fixed camera closer / farther": [
+    "mod/controls.json",
     "mods/vr/WuWaControlsComponent.cpp",
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -1025,6 +1032,7 @@
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Full VR / stereo screen": [
+    "mod/controls.json",
     "mods/vr/WuWaControlsComponent.cpp",
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -1245,6 +1253,7 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Hide characters at your eyes": [
+    "mod/controls.json",
     "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp",
     "utility/WuWaShortcutSheet.cpp"
@@ -1327,6 +1336,9 @@
   ],
   "Hold the VR key and press a key, as L3 + a button on a controller: 1 full VR / stereo screen, 2 mono theatre, 3 portal, 4 diorama, H game UI, R recenter, F first person, T fixed camera, C freecam. Hold it for half a second to see them all on a card. Insert opens this menu.": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Hold the key left of 1, then press a key": [
+    "mod/controls.json"
   ],
   "Hold {L3} for everything else": [
     "utility/WuWaShortcutSheet.cpp"
@@ -1477,6 +1489,7 @@
     "mods/vr/WuWaControlsComponent.cpp"
   ],
   "Insert": [
+    "mod/controls.json",
     "mods/vr/WuWaControlsComponent.cpp",
     "utility/WuWaShortcutSheet.cpp"
   ],
@@ -1890,6 +1903,7 @@
     "mods/VR.cpp"
   ],
   "Mono theatre": [
+    "mod/controls.json",
     "mods/VR.hpp",
     "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp",
@@ -1903,6 +1917,9 @@
   ],
   "Motion": [
     "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Mouse": [
+    "mod/controls.json"
   ],
   "Mouse look speed": [
     "mods/vr/WuWaVrMenuHost.cpp"
@@ -2593,6 +2610,7 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Shift": [
+    "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Shortcut: hold LT + RT, then click L3 to turn the blur on or off.": [
@@ -2720,6 +2738,7 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Space": [
+    "mod/controls.json",
     "utility/WuWaShortcutSheet.cpp"
   ],
   "Speed": [
@@ -3145,6 +3164,7 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "VR key": [
+    "mod/controls.json",
     "mods/vr/WuWaControlsComponent.cpp",
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
@@ -3228,6 +3248,7 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Wheel": [
+    "mod/controls.json",
     "mods/vr/WuWaControlsComponent.cpp",
     "utility/WuWaShortcutSheet.cpp"
   ],

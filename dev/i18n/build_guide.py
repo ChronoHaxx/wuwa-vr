@@ -45,7 +45,10 @@ CONTROLS = ROOT / 'mod/controls.json'
 CATALOGS = ROOT / 'mod/localization/wuwa'
 HOME = ROOT / 'dev/i18n/home'
 # Rows that only apply in a mode get a heading naming it and its shortcut, as on the website.
-CONTEXT = {'freecam': ('freecam', 'Double R3'), 'mouse': ('mouse', 'L3 + LB'), 'uevr': ('uevr', 'L3 + R3')}
+CONTEXT = {'freecam': ('freecam', 'Double R3'), 'mouse': ('mouse', 'L3 + LB'), 'uevr': ('uevr', 'L3 + R3'),
+           'keyboard-freecam': ('freecam', 'VR key + C')}
+# The keyboard group's named keys, each its own catalog entry (as in dev/controls-section.cjs).
+NAMED_KEYS = ('VR key', 'Wheel', 'Mouse', 'Insert', 'Space', 'Ctrl', 'Shift')
 
 
 def load(code):
@@ -66,16 +69,28 @@ def controls_tables(code):
     words = {} if code == 'en' else json.loads((CATALOGS / f'{code}.json').read_text(encoding='utf-8'))['strings']
     pad = json.loads((HOME / f'{code}.json').read_text(encoding='utf-8'))['pad']
     t = lambda english: html.escape(words.get(english) or english)
+
+    def key_words(keys):
+        # "VR key + E / Q", "Shift / Double Shift": each named key translated, "Double X" as "X ×2".
+        def one(part):
+            double = part.startswith('Double ')
+            name = part[len('Double '):] if double else part
+            name = words.get(name) or name if name in NAMED_KEYS else name
+            return name + (' ×2' if double else '')
+        return html.escape(' + '.join(' / '.join(one(p) for p in step.split(' / ')) for step in keys.split(' + ')))
     out = []
     for group in json.loads(CONTROLS.read_text(encoding='utf-8'))['groups']:
+        keyboard = group.get('device') == 'keyboard'
         rows, context = [], None
         for row in group['rows']:
             if row.get('when') != context:
                 context = row.get('when')
                 if context:
                     label, keys = CONTEXT[context]
-                    rows.append(f'<tr><th class="when" colspan="2">{html.escape(pad[label])} · <bdi dir="ltr">{t(keys)}</bdi></th></tr>')
-            rows.append(f'<tr><td><bdi dir="ltr">{t(row["keys"])}</bdi></td><td>{t(row["action"])}</td></tr>')
+                    keys = key_words(keys) if keyboard else t(keys)
+                    rows.append(f'<tr><th class="when" colspan="2">{html.escape(pad[label])} · <bdi dir="ltr">{keys}</bdi></th></tr>')
+            keys = key_words(row['keys']) if keyboard else t(row['keys'])
+            rows.append(f'<tr><td><bdi dir="ltr">{keys}</bdi></td><td>{t(row["action"])}</td></tr>')
         title = re.sub(r'^\d+\s+', '', words.get(group['title']) or group['title'])
         out.append(f'<h3 class="group">{html.escape(title)}</h3>\n<table><tbody>\n' + '\n'.join(rows) + '\n</tbody></table>')
     return '\n'.join(out)

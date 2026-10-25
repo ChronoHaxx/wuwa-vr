@@ -316,10 +316,17 @@ def extract():
     controls = json.loads((ROOT / 'mod/controls.json').read_text(encoding='utf-8'))
     button = r'(?<![A-Za-z])(L3|R3|LB|RB|LT|RT|View|Menu|F7|A|B|X|Y)(?![A-Za-z])'
     found.setdefault('D-pad', set()).add('mod/controls.json')
+    named_keys = ('VR key', 'Wheel', 'Mouse', 'Insert', 'Space', 'Ctrl', 'Shift')
     for group in controls['groups']:
         found.setdefault(group['title'], set()).add('mod/controls.json')
         for row in group['rows']:
             found.setdefault(row['action'], set()).add('mod/controls.json')
+            if group.get('device') == 'keyboard':
+                # Keys, not buttons: each named key is its own catalog entry (controls-section.cjs).
+                for name in named_keys:
+                    if name in row['keys']:
+                        found.setdefault(name, set()).add('mod/controls.json')
+                continue
             words = re.sub(button, '', row['keys']).replace('0.8 s', '')
             if re.search(r'[a-z]{2,}', words) and not re.fullmatch(r'Double (L3|R3)', row['keys']):
                 found.setdefault(row['keys'], set()).add('mod/controls.json')

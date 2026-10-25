@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "about": "Every controller shortcut, grouped like the in-VR controls cards (hold L3, or LT + RT, for half a second). The website's tables and controller diagram are built from this file. 'title', 'keys' and 'action' are English keys in mod/localization/wuwa/<lang>.json, the catalogs the VR mod reads; dev/i18n/mod_strings.py adds them and its check fails while any language lacks one. Button names follow Xbox; the website maps them to PlayStation. 'button' places the shortcut on the 'hold L3, then press' diagram. Keep in step with mod/lua/02_WuWaVR_PolarControls.lua, utility/WuWaShortcutSheet.cpp and docs/CONTROLS.md.",
+  "about": "Every controller shortcut, grouped like the in-VR controls cards (hold L3, or LT + RT, for half a second), then the keyboard and mouse shortcuts (device keyboard: hold the VR key, the key left of 1). The website's tables and controller diagram are built from this file. 'title', 'keys' and 'action' are English keys in mod/localization/wuwa/<lang>.json, the catalogs the VR mod reads; dev/i18n/mod_strings.py adds them and its check fails while any language lacks one. Button names follow Xbox; the website maps them to PlayStation, except in the keyboard group, where letters are keys and each named key (VR key, Wheel, Mouse...) is its own catalog entry. 'button' places the shortcut on the 'hold L3, then press' diagram. Keep in step with mod/lua/02_WuWaVR_PolarControls.lua, utility/WuWaShortcutSheet.cpp and docs/CONTROLS.md.",
   "groups": [
     {
       "id": "l3",
@@ -66,6 +66,36 @@
         {"keys": "D-pad / A / B", "action": "Navigate / activate / back", "when": "uevr"},
         {"keys": "LB / RB", "action": "Change page", "when": "uevr"},
         {"keys": "Y", "action": "Move menu", "when": "uevr"}
+      ]
+    },
+    {
+      "id": "keyboard",
+      "title": "06  KEYBOARD & MOUSE",
+      "device": "keyboard",
+      "rows": [
+        {"keys": "VR key", "action": "Hold the key left of 1, then press a key"},
+        {"keys": "VR key + 1", "action": "Full VR / stereo screen"},
+        {"keys": "VR key + 2", "action": "Mono theatre"},
+        {"keys": "VR key + 3", "action": "Portal window"},
+        {"keys": "VR key + 4", "action": "Diorama (10×)"},
+        {"keys": "VR key + B", "action": "Blur (depth of field)"},
+        {"keys": "VR key + N", "action": "Hide characters at your eyes"},
+        {"keys": "VR key + H", "action": "Show / hide game UI"},
+        {"keys": "VR key + R", "action": "Recenter view"},
+        {"keys": "VR key + P", "action": "Screenshot"},
+        {"keys": "VR key + F", "action": "First person"},
+        {"keys": "VR key + T", "action": "Game / fixed camera"},
+        {"keys": "VR key + C", "action": "Freecam"},
+        {"keys": "VR key + G", "action": "First person: full animation"},
+        {"keys": "VR key + E / Q", "action": "Camera up / down"},
+        {"keys": "VR key + E + Q", "action": "E + Q together: back to default"},
+        {"keys": "VR key + Wheel", "action": "Fixed camera closer / farther"},
+        {"keys": "VR key + M", "action": "HUD / mouse mode"},
+        {"keys": "VR key + K", "action": "Keep this card open"},
+        {"keys": "Insert", "action": "Open / close the WuWa VR menu"},
+        {"keys": "W A S D / Mouse", "action": "Freecam: move / look", "when": "keyboard-freecam"},
+        {"keys": "Space / Ctrl", "action": "Freecam: rise / descend", "when": "keyboard-freecam"},
+        {"keys": "Shift / Double Shift", "action": "Freecam: boost / turbo", "when": "keyboard-freecam"}
       ]
     }
   ]

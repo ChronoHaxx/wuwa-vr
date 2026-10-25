@@ -2,7 +2,9 @@
 // player guide, built from mod/controls.json and the mod's own catalogs
 // (mod/localization/wuwa), so the website and the in-VR controls cards use the
 // same words in every language. Button names follow Xbox; data-ps carries the
-// PlayStation name for the toggle.
+// PlayStation name for the toggle. The keyboard group (device "keyboard") has keys,
+// not buttons: no PlayStation names, no controller drawing, and each named key is
+// translated on its own.
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const controls = JSON.parse(fs.readFileSync(path.join(root, 'mod/controls.json'), 'utf8'));
@@ -22,13 +24,30 @@ const ICON = {
   View: '<svg class="kbd-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 4.5h7v6h-7zM6.5 10.5v1.5h7v-6h-4"/></svg>',
   Menu: '<svg class="kbd-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 4.5h10M3 8h10M3 11.5h10"/></svg>'
 };
-function chip(text) {
+function chip(text, keyboard = false) {
+  if (keyboard) return `<kbd>${esc(text)}</kbd>`;
   const ps = toPs(text), face = /^[ABXY]$/.test(text) ? ` data-face="${text}"` : '';
   const label = ps !== text ? `<span data-ps="${esc(ps)}">${esc(text)}</span>` : esc(text);
   return `<kbd${face}>${ICON[text] || ''}${label}</kbd>`;
 }
+// Keyboard keys: "VR key + E / Q", "W A S D / Mouse", "Shift / Double Shift". Named keys come
+// from the catalogs one by one; letters and digits are printed as they are.
+const NAMED_KEYS = ['VR key', 'Wheel', 'Mouse', 'Insert', 'Space', 'Ctrl', 'Shift'];
+const keyParts = keys => keys.split(/\s*\+\s*/).flatMap(part => part.split(' / ')).map(part => part.replace(/^Double /, ''))
+  .flatMap(part => NAMED_KEYS.includes(part) ? [part] : part.split(' '));
+function keyboardCombo(keys, t) {
+  const key = name => chip(NAMED_KEYS.includes(name) ? t(name) : name, true);
+  const one = part => {
+    const double = part.match(/^Double (.+)$/);
+    if (double) return key(double[1]) + '<span class="times">×2</span>';
+    return NAMED_KEYS.includes(part) ? key(part) : part.split(' ').map(key).join('');
+  };
+  const html = keys.split(/\s*\+\s*/).map(part => part.split(' / ').map(one).join('<span class="op">/</span>')).join('<span class="op">+</span>');
+  return `<bdi dir="ltr" class="combo">${html}</bdi>`;
+}
 // "L3 + Y / X" -> chips joined by + and /; "Double R3" -> R3 ×2; worded parts stay one chip.
-function combo(keys, t) {
+function combo(keys, t, keyboard = false) {
+  if (keyboard) return keyboardCombo(keys, t);
   const double = keys.match(/^Double (L3|R3)$/);
   if (double) return `<bdi dir="ltr" class="combo" title="${esc(t(keys))}">${chip(double[1])}<span class="times">×2</span></bdi>`;
   const parts = t(keys).split(/\s*(\+|→)\s*/);  // some catalogs write RT+左 without spaces
@@ -87,11 +106,17 @@ const CHIP = {YX: 'Y / X'};
 function language(code) {
   const cat = catalog(code), en = catalog('en');
   const t = key => cat[key] ?? key;
-  for (const row of controls.groups.flatMap(g => g.rows)) {
+  for (const group of controls.groups) for (const row of group.rows) {
     assert(en[row.action] !== undefined, `mod/controls.json action missing from en catalog: ${row.action}`);
+    if (group.device === 'keyboard') {
+      for (const part of keyParts(row.keys)) {
+        if (NAMED_KEYS.includes(part)) assert(cat[part] !== undefined, `${code} catalog lacks key name: ${part}`);
+        else assert(/^[A-Z0-9]$/.test(part), `keyboard key is neither a named key nor one letter or digit: ${part}`);
+      }
+    }
     if (code !== 'en') {
       assert(cat[row.action] !== undefined, `${code} catalog lacks action: ${row.action}`);
-      if (needsWords(row.keys) && !/^Double (L3|R3)$/.test(row.keys)) assert(cat[row.keys] !== undefined, `${code} catalog lacks keys: ${row.keys}`);
+      if (group.device !== 'keyboard' && needsWords(row.keys) && !/^Double (L3|R3)$/.test(row.keys)) assert(cat[row.keys] !== undefined, `${code} catalog lacks keys: ${row.keys}`);
     }
   }
   return t;
@@ -121,16 +146,18 @@ function card({dir, copy, t}) {
 }
 // Table rows for one group, with a heading row whenever the context changes.
 function tableRows(group, t, copy, {hover = false} = {}) {
-  const when = {freecam: [copy.freecam, 'Double R3'], mouse: [copy.mouse, 'L3 + LB'], uevr: [copy.uevr, 'L3 + R3']};
+  const keyboard = group.device === 'keyboard';
+  const when = {freecam: [copy.freecam, 'Double R3'], mouse: [copy.mouse, 'L3 + LB'], uevr: [copy.uevr, 'L3 + R3'],
+    'keyboard-freecam': [copy.freecam, 'VR key + C']};
   let context = null;
   return group.rows.map(r => {
     let head = '';
     if ((r.when || null) !== context) {
       context = r.when || null;
-      if (context) head = `<tr class="when"><th colspan="2" scope="colgroup">${esc(when[context][0])} ${combo(when[context][1], t)}</th></tr>`;
+      if (context) head = `<tr class="when"><th colspan="2" scope="colgroup">${esc(when[context][0])} ${combo(when[context][1], t, keyboard)}</th></tr>`;
     }
-    const btns = hover ? ` data-btns="${buttonsOf(r.keys).join(' ')}"` : '';
-    return head + `<tr${btns}><th scope="row">${combo(r.keys, t)}</th><td>${esc(t(r.action))}</td></tr>`;
+    const btns = hover && !keyboard ? ` data-btns="${buttonsOf(r.keys).join(' ')}"` : '';
+    return head + `<tr${btns}><th scope="row">${combo(r.keys, t, keyboard)}</th><td>${esc(t(r.action))}</td></tr>`;
   }).join('');
 }
 
@@ -155,7 +182,8 @@ const PAGE_NOTES = {
   views: 'Hold LT + RT for half a second for the views card: full VR, stereo screen, mono theatre and blur.',
   cameras: 'The fixed camera, Polar walk and freecam.',
   menus: 'The V / Tab utility and HUD / mouse adjustment.',
-  menu: 'Driving the WuWa VR menu with a gamepad. VR controllers point and pull the trigger.'
+  menu: 'Driving the WuWa VR menu with a gamepad. VR controllers point and pull the trigger.',
+  keyboard: 'Every shortcut on the keyboard: hold the VR key (the key left of 1: ` on US and UK keyboards) for half a second and the keyboard card shows. Change it or turn it off on the WuWa VR menu\'s Controllers page.'
 };
 function renderGuide({copy}) {
   const t = language('en');
@@ -163,8 +191,9 @@ function renderGuide({copy}) {
     assert(PAGE_NOTES[g.id], 'No guide note for sheet page ' + g.id);
     const [, number, title] = t(g.title).match(/^(\d+)\s+(.*)$/);
     const used = [...new Set(g.rows.flatMap(r => buttonsOf(r.keys)))];
+    const drawing = g.device === 'keyboard' ? '' : pad({lit: used, modifier: false, defs: false, leaders: false});
     return `<article class="pad-page" id="sheet-${g.id}" aria-labelledby="sheet-${g.id}-title"><header class="pad-page-head"><span class="step-num pad-page-num" aria-hidden="true">${number}</span><div><h3 id="sheet-${g.id}-title">${esc(title)}</h3><p>${esc(PAGE_NOTES[g.id])}</p></div></header>
-<div class="pad-page-body">${pad({lit: used, modifier: false, defs: false, leaders: false})}<div class="table-scroll"><table class="shortcut-table"><tbody>${tableRows(g, t, copy, {hover: true})}</tbody></table></div></div></article>`;
+<div class="pad-page-body">${drawing}<div class="table-scroll"><table class="shortcut-table"><tbody>${tableRows(g, t, copy, {hover: true})}</tbody></table></div></div></article>`;
   }).join('\n');
   return `<section id="visual-controls"><h2>Controller guide</h2><p>Every shortcut, grouped like the in-VR controls cards: in VR, hold <bdi dir="ltr" class="combo">${chip('L3')}</bdi>, or <bdi dir="ltr" class="combo">${chip('LT')}<span class="op">+</span>${chip('RT')}</bdi>, for half a second to see them. Point at a row to light its buttons; the searchable text reference follows.</p>
 ${toolbar(copy, 'media/controls/en.png', 'en')}

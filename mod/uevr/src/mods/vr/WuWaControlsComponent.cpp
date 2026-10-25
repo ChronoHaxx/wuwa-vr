@@ -1094,8 +1094,12 @@ bool WuWaControlsComponent::status_warning_visible() const {
     if (g_framework->is_drawing_ui() || !VR::get()->is_hmd_active()) return false;
     wuwa_sheet::CardState held;
     if (m_cards->value() && held_card(held)) return false;
-    return wuwa_menu_host::hint_active() || tip_kind() != 0 ||
+    return wuwa_menu_host::hint_active() || tip_kind() != 0 || slow_notice_active() ||
         (!floor_visible() && (menu_warning_active() || mode_warning_active()));
+}
+
+bool WuWaControlsComponent::slow_notice_active() const {
+    return GetTickCount64() < m_slow_notice_until.load(std::memory_order_relaxed);
 }
 
 namespace {
@@ -1360,12 +1364,12 @@ void WuWaControlsComponent::draw_slow_recording_notice(ImDrawList* list, ImVec2 
     if (const auto stop=m_video.slow_stop(); stop.ms>0 && stop.ms!=m_slow_notice_ms) {
         m_slow_notice_ms=stop.ms;
         if (wuwa_video::unix_ms()-stop.ms<60000) {
-            m_slow_notice=stop; m_slow_notice_until=GetTickCount64()+20000;
+            m_slow_notice=stop; m_slow_notice_until.store(GetTickCount64()+20000,std::memory_order_relaxed);
             spdlog::warn("[WuWaRecording] The launcher stopped the recording: the game averaged {:.1f} fps, under {} fps for {} s",
                          stop.fps,stop.min_fps,stop.seconds);
         }
     }
-    if (GetTickCount64()<m_slow_notice_until)
+    if (slow_notice_active())
         wuwa_sheet::draw_recording_stopped_warning(list,size,ImGui::GetFont(),m_slow_notice.min_fps,m_slow_notice.seconds);
 }
 
@@ -1449,10 +1453,10 @@ void WuWaControlsComponent::draw_passive_overlay() {
                     "{LT}+{RT}, hold {R3} to leave mono",vr_controllers,
                     wuwa_l10n::visual(note));
             }
-        } else if (keyboard) {
+        } else if (tip_kind()!=0 && keyboard) {
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",
                 "hold {VR} to see the keyboard shortcuts \xC2\xB7 {Insert} opens the WuWa VR menu",false,{},true);
-        } else {
+        } else if (tip_kind()!=0) {
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",
                 "hold {L3} or {LT}+{RT} to see what each button does \xC2\xB7 {L3}+{R3} opens the WuWa VR menu",vr_controllers);
         }

@@ -366,7 +366,9 @@ private:
     // The notice after the launcher ended a recording for that (20 s, over everything else in the overlay).
     void draw_slow_recording_notice(ImDrawList* list, ImVec2 size);
     int64_t m_slow_notice_ms{};
-    uint64_t m_slow_notice_until{};
+    // Until when (GetTickCount64) the notice shows; it also brings the overlay panel up (status_warning_visible).
+    std::atomic<uint64_t> m_slow_notice_until{0};
+    bool slow_notice_active() const;
     wuwa_video::SlowStop m_slow_notice;
     // 1.2.4: a new key, off by default. The old one was on for everyone, and in live play the smoothing made
     // the window trail head turns ("lead-lag"); OBS users switch it on for recordings.

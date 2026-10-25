@@ -13,7 +13,7 @@ set_property(TARGET wuwa-recorder PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<
 target_compile_features(wuwa-recorder PRIVATE cxx_std_20)
 target_compile_options(wuwa-recorder PRIVATE /EHsc)
 target_include_directories(wuwa-recorder PRIVATE ${WUWA_UPSTREAM}/UEVR/dependencies/openvr/headers ${WUWA_UPSTREAM}/UEVR/out/build/x64-RelWithDebInfo/_deps/json-src/include)
-target_link_libraries(wuwa-recorder PRIVATE d3d11 d3dcompiler dxgi mfplat mfreadwrite mfuuid ole32 winmm)
+target_link_libraries(wuwa-recorder PRIVATE d3d11 d3dcompiler dxgi mfplat mfreadwrite mfuuid ole32 winmm pdh)
 enable_testing()
 add_executable(capture-image-test test-image.cpp)
 target_compile_features(capture-image-test PRIVATE cxx_std_20)

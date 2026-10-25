@@ -403,7 +403,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_card_below, *m_card_place, *m_card_distance, *m_kb_vr_key, *m_kb_flight, *m_free_mouse, *m_kb_tips_shown, m_keyboard_value, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_first_person_camera, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect,
-        *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_scene, *m_video_sound, *m_video_microphone, *m_video_mic_volume, *m_video_sound_files, *m_video_style, *m_showcase_pitch, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
+        *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_scene, *m_video_sound, *m_video_microphone, *m_video_mic_volume, *m_video_sound_files, *m_video_style, *m_showcase_pitch, *m_video_slow_stop, *m_video_slow_fps, *m_video_slow_seconds, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom, *m_id169_left, *m_id169_top, *m_id169_right, *m_id169_bottom};
 }
@@ -805,6 +805,11 @@ void WuWaControlsComponent::on_draw_recording() {
     }
     wuwa_ui::draw(*m_video_style,"Video style");
     wuwa_ui::draw(*m_showcase_pitch,"Showcase view height (degrees)");
+    wuwa_ui::draw(*m_video_slow_stop,"Stop if the game slows down");
+    ImGui::BeginDisabled(!m_video_slow_stop->value());
+    wuwa_ui::draw(*m_video_slow_fps,"Slower than (fps)");
+    wuwa_ui::draw(*m_video_slow_seconds,"For (seconds, on average)");
+    ImGui::EndDisabled();
     ImGui::EndDisabled();
     ImGui::BeginDisabled(!m_video.available() || busy || m_video.pending());
     if (wuwa_ui::Button("Start video recording")) {
@@ -812,7 +817,8 @@ void WuWaControlsComponent::on_draw_recording() {
         if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
                       widths[std::clamp(m_video_width->value(),0,4)],m_video_telemetry->value(),
                       std::clamp(m_video_style->value(),0,3),static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value(),
-                      m_video_microphone->value(),static_cast<int>(std::lround(m_video_mic_volume->value())),m_video_sound_files->value()))
+                      m_video_microphone->value(),static_cast<int>(std::lround(m_video_mic_volume->value())),m_video_sound_files->value(),
+                      slow_rule().first,slow_rule().second))
             m_recording_live.store(true,std::memory_order_relaxed);
     }
     ImGui::EndDisabled();
@@ -1337,8 +1343,30 @@ void WuWaControlsComponent::menu_recording_toggle() {
     if (m_video.submit(profile,true,rates[std::clamp(m_video_fps->value(),0,2)],
                   widths[std::clamp(m_video_width->value(),0,4)],m_video_telemetry->value(),
                   std::clamp(m_video_style->value(),0,3),static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value(),
-                  m_video_microphone->value(),static_cast<int>(std::lround(m_video_mic_volume->value())),m_video_sound_files->value()))
+                  m_video_microphone->value(),static_cast<int>(std::lround(m_video_mic_volume->value())),m_video_sound_files->value(),
+                  slow_rule().first,slow_rule().second))
         m_recording_live.store(true,std::memory_order_relaxed);
+}
+
+std::pair<int,int> WuWaControlsComponent::slow_rule() const {
+    if (!m_video_slow_stop->value()) return {0,20};
+    return {std::clamp(static_cast<int>(std::lround(m_video_slow_fps->value())),1,20),
+            std::clamp(static_cast<int>(std::lround(m_video_slow_seconds->value())),5,60)};
+}
+
+void WuWaControlsComponent::draw_slow_recording_notice(ImDrawList* list, ImVec2 size) {
+    // The launcher's status carries the last stop for the slow-game rule; each one is shown once, for 20 s, and only
+    // when it is fresh (an older one is from before this game started, or already shown).
+    if (const auto stop=m_video.slow_stop(); stop.ms>0 && stop.ms!=m_slow_notice_ms) {
+        m_slow_notice_ms=stop.ms;
+        if (wuwa_video::unix_ms()-stop.ms<60000) {
+            m_slow_notice=stop; m_slow_notice_until=GetTickCount64()+20000;
+            spdlog::warn("[WuWaRecording] The launcher stopped the recording: the game averaged {:.1f} fps, under {} fps for {} s",
+                         stop.fps,stop.min_fps,stop.seconds);
+        }
+    }
+    if (GetTickCount64()<m_slow_notice_until)
+        wuwa_sheet::draw_recording_stopped_warning(list,size,ImGui::GetFont(),m_slow_notice.min_fps,m_slow_notice.seconds);
 }
 
 Matrix4x4f WuWaControlsComponent::floor_transform() const {
@@ -1392,6 +1420,11 @@ void WuWaControlsComponent::draw_passive_overlay() {
     // Keyboard and mouse used last: cards, tips and notices name keys (the VR key as this layout prints it).
     const bool keyboard=keyboard_in_use() && !vr_controllers;
     if (keyboard) update_key_names();
+    // Drawn last, over the card and the other notices, whichever way this function returns.
+    const struct Last {
+        WuWaControlsComponent* self; ImDrawList* list; ImVec2 size;
+        ~Last() { if (wuwa_test::is_wuwa()) self->draw_slow_recording_notice(list,size); }
+    } last{this,list,size};
     if (status_warning_visible()) {
         if (!floor_visible() && (menu_warning_active() || mode_warning_active())) {
             const bool hidden=menu_warning_active();

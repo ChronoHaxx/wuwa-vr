@@ -23,11 +23,14 @@
 #include <chrono>
 #include <cmath>
 #include <Xinput.h>
+#include <pdh.h>
+#include <pdhmsg.h>
 #include <timeapi.h>
 #include <thread>
 #include <atomic>
 #include <mutex>
 #include <functional>
+#include "slow_game.hpp"
 using Microsoft::WRL::ComPtr;
 using Json=nlohmann::json;
 static void check(HRESULT value) { if (FAILED(value)) throw std::runtime_error("HRESULT "+std::to_string(value)); }
@@ -112,6 +115,83 @@ struct Watchdog {
     void pulse() { beat=GetTickCount64(); }
     void finish() { done=true; if (worker.joinable()) worker.join(); }
     ~Watchdog() { finish(); }
+};
+// GPU memory while recording (1.2.7), once a second on its own thread, into gpu.jsonl: the graphics card's dedicated
+// memory in use (every process) and the game's share, from the Windows "GPU Adapter Memory" and "GPU Process Memory"
+// counters, with the game's frame rate over that second. Owner, 25 Oct 2026: in full VR the game could sink to a few
+// fps until it was closed, and a driver reset (Win + Ctrl + Shift + B) sometimes helped, which points at a full card.
+static bool contains_nocase(std::wstring text,std::wstring part) {
+    for (auto* s : {&text,&part}) for (auto& c : *s) c=static_cast<wchar_t>(towlower(c));
+    return text.find(part)!=std::wstring::npos;
+}
+struct GpuMemory {
+    PDH_HQUERY query{}; PDH_HCOUNTER adapter{},process{}; std::wstring luid; bool ok{};
+    void open(LUID id,DWORD pid) {
+        wchar_t text[64]; swprintf_s(text,L"luid_0x%08X_0x%08X",static_cast<unsigned>(id.HighPart),static_cast<unsigned>(id.LowPart));
+        luid=text;
+        if (PdhOpenQueryW(nullptr,0,&query)!=ERROR_SUCCESS) { query=nullptr; return; }
+        const std::wstring game=L"\\GPU Process Memory(pid_"+std::to_wstring(pid)+L"_*)\\Dedicated Usage";
+        ok=PdhAddEnglishCounterW(query,L"\\GPU Adapter Memory(*)\\Dedicated Usage",0,&adapter)==ERROR_SUCCESS &&
+           PdhAddEnglishCounterW(query,game.c_str(),0,&process)==ERROR_SUCCESS && PdhCollectQueryData(query)==ERROR_SUCCESS;
+    }
+    ~GpuMemory() { if (query) PdhCloseQuery(query); }
+    // The counter's instances on this graphics card, summed, in MB (-1 when there is no reading).
+    double sum(PDH_HCOUNTER counter) const {
+        DWORD bytes=0,count=0;
+        if (PdhGetFormattedCounterArrayW(counter,PDH_FMT_LARGE,&bytes,&count,nullptr)!=PDH_MORE_DATA || !bytes) return -1;
+        std::vector<BYTE> buffer(bytes); auto* items=reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W*>(buffer.data());
+        if (PdhGetFormattedCounterArrayW(counter,PDH_FMT_LARGE,&bytes,&count,items)!=ERROR_SUCCESS) return -1;
+        double total=0; bool any=false;
+        for (DWORD i=0;i<count;++i) {
+            const auto status=items[i].FmtValue.CStatus;
+            if ((status!=PDH_CSTATUS_VALID_DATA && status!=PDH_CSTATUS_NEW_DATA) || !contains_nocase(items[i].szName,luid)) continue;
+            total+=double(items[i].FmtValue.largeValue); any=true;
+        }
+        return any?total/1048576.0:-1;
+    }
+    bool read(double& adapter_mb,double& game_mb) {
+        if (!ok || PdhCollectQueryData(query)!=ERROR_SUCCESS) return false;
+        adapter_mb=sum(adapter); game_mb=sum(process); return adapter_mb>=0;
+    }
+};
+struct GpuLog {
+    std::atomic<uint32_t> frame{0}; std::atomic<bool> framed{false},done{false};
+    std::thread worker; double total_mb{},peak_mb{-1},game_peak_mb{-1}; uint64_t rows{}; bool readable{};
+    // Called by the capture loop with the game's frame index.
+    void note(uint32_t index) { frame=index; framed=true; }
+    void start(const std::filesystem::path& file,LUID id,DWORD pid,double card_mb,std::chrono::steady_clock::time_point begin) {
+        total_mb=card_mb;
+        worker=std::thread([this,file,id,pid,begin] {
+            GpuMemory memory; memory.open(id,pid);
+            std::ofstream out(file,std::ios::binary);
+            uint32_t last_frame=0; bool have=false; auto last=std::chrono::steady_clock::now();
+            while (!done) {
+                for (int i=0;i<10 && !done;++i) Sleep(100);
+                const auto now=std::chrono::steady_clock::now();
+                double card=-1,game=-1; const bool got=memory.read(card,game);
+                Json row{{"video_seconds",std::chrono::duration<double>(now-begin).count()}};
+                if (got) {
+                    readable=true; peak_mb=std::max(peak_mb,card); game_peak_mb=std::max(game_peak_mb,game);
+                    row["gpu_memory_mb"]=std::lround(card); row["game_gpu_memory_mb"]=game>=0?Json(std::lround(game)):Json(nullptr);
+                }
+                if (framed) {
+                    const uint32_t index=frame;
+                    if (have) row["game_fps"]=std::round(10.0*static_cast<uint32_t>(index-last_frame)/std::chrono::duration<double>(now-last).count())/10.0;
+                    last_frame=index; have=true;
+                }
+                last=now;
+                if (out) { out<<row.dump()<<'\n'; out.flush(); ++rows; }
+            }
+        });
+    }
+    void finish() { done=true; if (worker.joinable()) worker.join(); }
+    ~GpuLog() { finish(); }
+    Json report() const {
+        Json r{{"file","gpu.jsonl"},{"card_mb",std::lround(total_mb)}};
+        if (!readable) { r["error"]="Windows GPU memory counters unavailable"; return r; }
+        r["peak_mb"]=std::lround(peak_mb); r["game_peak_mb"]=game_peak_mb>=0?Json(std::lround(game_peak_mb)):Json(nullptr);
+        return r;
+    }
 };
 // After a stall: the report first (the launcher reads it), then Finalize for at most 5 s (the fragments already
 // play without it), then exit. A blocked OpenVR or D3D call keeps the process from ending any other way.
@@ -707,6 +787,24 @@ int wmain(int argc,wchar_t** argv) {
             std::cout<<Json{{"microphones",list_microphones()}}.dump(-1,' ',true)<<std::endl;
             CoUninitialize(); com=false; return 0;
         }
+        if (argc==2 && std::wstring_view(argv[1])==L"--self-test-gpu-memory") {
+            // The GPU memory counters on this PC: the first graphics card in use, and this process holding 256 MB on it.
+            ComPtr<IDXGIFactory> factory; ComPtr<IDXGIAdapter> adapter; check(CreateDXGIFactory(IID_PPV_ARGS(&factory)));
+            check(factory->EnumAdapters(0,&adapter)); DXGI_ADAPTER_DESC card{}; check(adapter->GetDesc(&card));
+            ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
+            check(D3D11CreateDevice(adapter.Get(),D3D_DRIVER_TYPE_UNKNOWN,nullptr,0,nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context));
+            D3D11_TEXTURE2D_DESC d{}; d.Width=d.Height=8192; d.MipLevels=d.ArraySize=1; d.Format=DXGI_FORMAT_B8G8R8A8_UNORM;
+            d.SampleDesc.Count=1; d.BindFlags=D3D11_BIND_RENDER_TARGET; ComPtr<ID3D11Texture2D> held; check(device->CreateTexture2D(&d,nullptr,&held));
+            ComPtr<ID3D11RenderTargetView> view; check(device->CreateRenderTargetView(held.Get(),nullptr,&view));
+            const float clear[4]{}; context->ClearRenderTargetView(view.Get(),clear); context->Flush();
+            GpuMemory memory; memory.open(card.AdapterLuid,GetCurrentProcessId());
+            double all=-1,mine=-1; bool got=false;
+            for (int i=0;i<20 && !(got && mine>=200);++i) { Sleep(250); got=memory.read(all,mine); }
+            if (!got || all<mine || mine<200) throw std::runtime_error("GPU memory counters read "+std::to_string(all)+" MB in use, "+std::to_string(mine)+" MB for this process");
+            std::wcout<<L"GPU memory: "<<card.Description<<L", "<<std::lround(card.DedicatedVideoMemory/1048576.0)<<L" MB; "
+                      <<std::lround(all)<<L" MB in use, "<<std::lround(mine)<<L" MB of it this process (256 MB texture).\n";
+            return 0;
+        }
         if (argc==2 && std::wstring_view(argv[1])==L"--self-test-mixer") {
             // Synthetic lanes, no devices: placement by time, a packet before the start, a late one, a gap, the
             // microphone's gain, the soft limit, and each source's own file (raw, no gain).
@@ -1038,8 +1136,10 @@ int wmain(int argc,wchar_t** argv) {
         // --microphone=default|<endpoint ID> (a microphone mixed into that track), --mic-volume=<0..300> (its level in
         // percent, 100 as it comes) and --sound-files (each source also alone beside the video, raw, at its timing:
         // game.wav for what the PC plays, microphone.wav for the microphone).
+        // --min-game-fps=<1..60> with --slow-seconds=<5..300> (1.2.7): end the recording when the game's own frame rate,
+        // averaged over that many seconds of the time it holds the scene, is under that (slow_game.hpp). Off when absent.
         bool showcase=false, with_sound=false, pitched=false, sound_files=false; double pitch=showcase_default_pitch; int one_eye=-1;
-        std::wstring microphone; int mic_volume=100;
+        std::wstring microphone; int mic_volume=100, min_game_fps=0, slow_seconds=20;
         while (argc>1 && std::wstring_view(argv[1]).starts_with(L"--")) {
             const std::wstring_view option=argv[1];
             if (option==L"--showcase") showcase=true;
@@ -1052,6 +1152,13 @@ int wmain(int argc,wchar_t** argv) {
                 mic_volume=std::stoi(std::wstring(option.substr(13)));
                 if (mic_volume<0 || mic_volume>300) throw std::runtime_error("Microphone volume must be 0..300 percent");
             }
+            else if (option.starts_with(L"--min-game-fps=")) {
+                min_game_fps=std::stoi(std::wstring(option.substr(15)));
+                if (min_game_fps<1 || min_game_fps>60) throw std::runtime_error("Slow-game frame rate must be 1..60");
+            } else if (option.starts_with(L"--slow-seconds=")) {
+                slow_seconds=std::stoi(std::wstring(option.substr(15)));
+                if (slow_seconds<5 || slow_seconds>300) throw std::runtime_error("Slow-game seconds must be 5..300");
+            }
             else if (option==L"--eye=left") one_eye=0;
             else if (option==L"--eye=right") one_eye=1;
             else if (option.starts_with(L"--pitch=")) {
@@ -1063,7 +1170,7 @@ int wmain(int argc,wchar_t** argv) {
         }
         if (pitched && !showcase) throw std::runtime_error("--pitch needs --showcase");
         if (showcase && one_eye>=0) throw std::runtime_error("Choose --showcase or --eye, not both");
-        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES] | --eye=left|right] [--sound] [--microphone=default|ID [--mic-volume=PERCENT]] [--sound-files] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..2048), optional stop file");
+        if (argc!=7 && argc!=8) throw std::runtime_error("Expected [--showcase [--pitch=DEGREES] | --eye=left|right] [--sound] [--microphone=default|ID [--mic-volume=PERCENT]] [--sound-files] [--min-game-fps=FPS [--slow-seconds=SECONDS]] openvr_api.dll, game PID, new output folder, seconds (1..300), FPS (10..60), eye width (640..2048), optional stop file");
         const UINT pid=std::stoul(argv[2]), seconds=std::stoul(argv[4]), fps=std::stoul(argv[5]), ew=std::stoul(argv[6]); out=argv[3];
         if (!pid||seconds<1||seconds>300||fps<10||fps>60||ew<640||ew>2048||ew%2) throw std::runtime_error("Invalid recording bounds");
         // Ends the recording cleanly when the game exits (a crash included) instead of waiting out the time.
@@ -1085,6 +1192,16 @@ int wmain(int argc,wchar_t** argv) {
         int adapter_index{}; system->GetDXGIOutputInfo(&adapter_index);
         ComPtr<IDXGIFactory> factory; ComPtr<IDXGIAdapter> adapter;
         check(CreateDXGIFactory(IID_PPV_ARGS(&factory))); check(factory->EnumAdapters(adapter_index,&adapter));
+        DXGI_ADAPTER_DESC card{}; check(adapter->GetDesc(&card));
+        const double card_mb=double(card.DedicatedVideoMemory)/1048576.0;
+        // The slow-game stop and its report (both styles).
+        const auto slow_report=[&](const SlowGame& slow,const std::string& end_reason,double t) {
+            Json r=Json::object();
+            if (!slow.enabled()) return r;
+            r["slow_game_rule"]={{"min_fps",min_game_fps},{"seconds",slow_seconds}};
+            if (end_reason=="slow_game") r["slow_game"]={{"fps",std::round(10*slow.fps())/10},{"at_s",t}};
+            return r;
+        };
         ComPtr<ID3D11Device> device; ComPtr<ID3D11DeviceContext> context;
         check(D3D11CreateDevice(adapter.Get(),D3D_DRIVER_TYPE_UNKNOWN,nullptr,0,nullptr,0,D3D11_SDK_VERSION,&device,nullptr,&context));
         check(CoInitializeEx(nullptr,COINIT_MULTITHREADED)); com=true; check(MFStartup(MF_VERSION)); media=true;
@@ -1120,6 +1237,8 @@ int wmain(int argc,wchar_t** argv) {
             Steady steady; std::vector<BYTE> pixels,pending,print,last_print;
             Sleep(250); const auto start=std::chrono::steady_clock::now();
             if (sounding) sound.begin(encoder,qpc_100ns(),sound_file(L"game.wav"),sound_file(L"microphone.wav"));
+            GpuLog gpu; gpu.start(out/L"gpu.jsonl",card.AdapterLuid,pid,card_mb,start);
+            SlowGame slow(min_game_fps,slow_seconds);
             uint64_t count=0,unsteadied=0,too_soon=0; uint32_t last_index=0; bool have_index=false; const auto start_ms=utc();
             double pending_t=-1, waiting_since=-1;
             std::string end_reason="time_limit"; Json pauses=Json::array(); double paused_at=-1, t=0;
@@ -1133,9 +1252,13 @@ int wmain(int argc,wchar_t** argv) {
                 if (steamvr_quitting(system)) { end_reason="steamvr_quit"; break; }
                 if (std::filesystem::exists(out/L"STOP") || (argc==8&&std::filesystem::exists(argv[7]))) { end_reason="stopped"; break; }
                 if (game && WaitForSingleObject(game,0)==WAIT_OBJECT_0) { end_reason="game_exited"; break; }
-                if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; Sleep(100); continue; }
+                if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; slow.pause(t); Sleep(100); continue; }
                 // A new game frame shows as a new frame index; its timing carries the pose it was rendered with.
                 vr::Compositor_FrameTiming timing{sizeof(timing)}; const bool timed=compositor->GetFrameTiming(&timing);
+                if (timed) {
+                    gpu.note(timing.m_nFrameIndex); slow.sample(t,timing.m_nFrameIndex);
+                    if (slow.slow()) { end_reason="slow_game"; break; }
+                }
                 if (timed && have_index && timing.m_nFrameIndex==last_index) { Sleep(2); continue; }
                 // The mirror can trail the timing by a moment: wait (briefly) for the picture itself to change.
                 crop.fingerprint(context.Get(),eye.view,eye.srgb,print);
@@ -1158,7 +1281,7 @@ int wmain(int argc,wchar_t** argv) {
                     qrows(view,c.rows);
                     crop.read(context.Get(),eye.view,eye.srgb,c,pixels);
                 }
-                if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; continue; }  // frame discarded
+                if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; slow.pause(t); continue; }  // frame discarded
                 if (paused_at>=0) { pauses.push_back({{"from_s",paused_at},{"to_s",t}}); paused_at=-1; }
                 bool nonblack=false; for (size_t i=0;i<pixels.size();i+=128) if (pixels[i]||pixels[i+1]||pixels[i+2]) { nonblack=true; break; }
                 if (!count&&!nonblack) throw std::runtime_error("Blank initial mirror; no useful video");
@@ -1176,7 +1299,7 @@ int wmain(int argc,wchar_t** argv) {
                 frames<<row.dump()<<'\n';
                 ++count; if (count%fps==0) frames.flush();
             }
-            watchdog.finish();
+            watchdog.finish(); gpu.finish();
             if (pending_t>=0) encoder.add(pending,static_cast<LONGLONG>(pending_t*10000000),10000000/fps);
             sound.finish(); encoder.close(); timeEndPeriod(1);
             if (paused_at>=0) pauses.push_back({{"from_s",paused_at},{"to_s",t}});
@@ -1194,7 +1317,7 @@ int wmain(int argc,wchar_t** argv) {
             else result.update({{"frames_unsteadied",unsteadied},
                 {"crop_half_tangents",{frame.half_width,frame.half_height}},{"crop_centre_tangents",{frame.centre_x,frame.centre_y}},{"pitch_degrees",pitch*180/std::acos(-1.0)},{"steady",{{"seconds",tau},{"margin_rad",max_angle}}},
                 {"method","OpenVR left-eye mirror; 16:9 view across the eye's width, lens shifted to the pitch, steadied with the pose each frame was rendered with"}});
-            result.update(sound_report());
+            result.update(sound_report()); result["gpu_memory"]=gpu.report(); result.update(slow_report(slow,end_reason,t));
             std::ofstream(out/L"recording.json")<<result.dump(2)<<'\n';
         } else {
             Eye eyes[2]; for (int i=0;i<2;++i) eyes[i].open(compositor,device.Get(),i);
@@ -1210,6 +1333,8 @@ int wmain(int argc,wchar_t** argv) {
             StereoResize resize; resize.open(device.Get(),ew,eh);
             Sleep(250); const auto start=std::chrono::steady_clock::now();
             if (sounding) sound.begin(encoder,qpc_100ns(),sound_file(L"game.wav"),sound_file(L"microphone.wav"));
+            GpuLog gpu; gpu.start(out/L"gpu.jsonl",card.AdapterLuid,pid,card_mb,start);
+            SlowGame slow(min_game_fps,slow_seconds);
             uint64_t count=0; const auto start_ms=utc();
             // A hitch, loading stall or hang can hand SteamVR's scene to another process. Nothing is read
             // then (another application is never captured); the video holds its last frame and resumes
@@ -1229,12 +1354,16 @@ int wmain(int argc,wchar_t** argv) {
                 if (game && WaitForSingleObject(game,0)==WAIT_OBJECT_0) { end_reason="game_exited"; break; }
                 if (compositor->GetCurrentSceneFocusProcess()!=pid) {
                     if (paused_at<0) paused_at=t;
-                    Sleep(100); continue;
+                    slow.pause(t); Sleep(100); continue;
                 }
                 const auto capture_begin=utc();
                 vr::Compositor_FrameTiming timing{sizeof(timing)}; const bool timed=compositor->GetFrameTiming(&timing);
+                if (timed) {
+                    gpu.note(timing.m_nFrameIndex); slow.sample(t,timing.m_nFrameIndex);
+                    if (slow.slow()) { end_reason="slow_game"; break; }
+                }
                 resize.read(context.Get(),eyes[0].view,eyes[1].view,eyes[0].srgb,eyes[1].srgb,pixels);
-                if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; continue; }  // frame discarded
+                if (compositor->GetCurrentSceneFocusProcess()!=pid) { if (paused_at<0) paused_at=t; slow.pause(t); continue; }  // frame discarded
                 if (paused_at>=0) { pauses.push_back({{"from_s",paused_at},{"to_s",t}}); paused_at=-1; }
                 bool nonblack=false; for (size_t i=0;i<pixels.size();i+=128) if (pixels[i]||pixels[i+1]||pixels[i+2]) { nonblack=true; break; }
                 if (!count&&!nonblack) throw std::runtime_error("Blank initial mirror; no useful video");
@@ -1247,7 +1376,7 @@ int wmain(int argc,wchar_t** argv) {
                 const auto remaining=std::chrono::duration_cast<std::chrono::milliseconds>(target-std::chrono::steady_clock::now()).count();
                 if (remaining>0) Sleep(static_cast<DWORD>(remaining));
             }
-            watchdog.finish();
+            watchdog.finish(); gpu.finish();
             sound.finish(); encoder.close();
             if (paused_at>=0) pauses.push_back({{"from_s",paused_at},{"to_s",t}});
             const double elapsed=std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count();
@@ -1257,7 +1386,7 @@ int wmain(int argc,wchar_t** argv) {
                 {"timing","wall-clock presentation timestamps; encoder may repeat frames to meet target FPS"},
                 {"source_eye_size",{eyes[0].width,eyes[0].height}},{"method","OpenVR per-eye mirror; GPU SBS resize and one readback"},
                 {"stereo_gpu_synchronized",false},{"desktop_captured",false},{"input_sent",false}};
-            result.update(sound_report());
+            result.update(sound_report()); result["gpu_memory"]=gpu.report(); result.update(slow_report(slow,end_reason,t));
             std::ofstream(out/L"recording.json")<<result.dump(2)<<'\n';
         }
         shutdown(); initialized=false; FreeLibrary(library); library=nullptr; MFShutdown(); media=false; CoUninitialize(); com=false;

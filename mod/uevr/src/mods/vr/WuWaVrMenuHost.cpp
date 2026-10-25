@@ -1216,6 +1216,22 @@ Page record_page() {
     page.items.push_back(setting_choice("Picture size", "Width per eye. Larger is sharper and makes bigger files. "
         "1536 and 2048 px need SteamVR; at 2048 px, 30 or 45 fps keeps up best.",
         "WuWaRecording_Width", {"720 px", "1024 px", "1280 px", "1536 px", "2048 px"}));
+    page.items.push_back(setting_toggle("Stop if the game slows down",
+        "Ends the recording when the game itself runs slower than the rate below for the time below, and warns you: a "
+        "sound, a notice here and a window on the desktop. A PC near its limits can otherwise sink to a few frames a "
+        "second while recording and stay there. What was recorded is kept.", "WuWaRecording_SlowStop"));
+    {
+        auto rate = setting_slider("Slower than",
+            "The game's own frame rate that counts as too slow, on average. In VR it usually runs at 25 to 40 fps while "
+            "recording.", "WuWaRecording_SlowFps", 1.0f, 20.0f, 1.0f, "%.0f fps");
+        rate.enabled = [] { auto* on = typed<bool>("WuWaRecording_SlowStop"); return on && on->value(); };
+        page.items.push_back(std::move(rate));
+        auto time = setting_slider("For",
+            "How long the game must stay that slow, on average. Loading screens can freeze it for up to about 10 seconds; "
+            "time when SteamVR shows something else does not count.", "WuWaRecording_SlowSeconds", 5.0f, 60.0f, 5.0f, "%.0f s");
+        time.enabled = [] { auto* on = typed<bool>("WuWaRecording_SlowStop"); return on && on->value(); };
+        page.items.push_back(std::move(time));
+    }
     page.items.push_back(setting_toggle("Record sound",
         "Everything your PC plays goes into the video: the game, and also voice chat and notifications. "
         "SteamVR recordings only.", "WuWaRecording_Sound"));

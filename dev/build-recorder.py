@@ -44,6 +44,8 @@ def main(argv=None) -> int:
         run(exe, '--self-test-showcase', Path(scratch) / 'showcase.mp4')
         # 2048 px per eye (4096x2048) with a sound track, and 1.2 s of real loopback when there is an output.
         run(exe, '--self-test-large', Path(scratch) / 'large.mp4')
+        # The GPU memory counters gpu.jsonl reads (1.2.7): the card in use, and this process's share of it.
+        run(exe, '--self-test-gpu-memory')
         # The sound mixer (1.2.6): what the PC plays and a microphone, placed by time; synthetic, no devices.
         run(exe, '--self-test-mixer')
         # The microphone list the launcher shows (it may be empty).

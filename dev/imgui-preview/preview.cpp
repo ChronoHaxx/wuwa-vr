@@ -363,6 +363,9 @@ int wmain(int argc, wchar_t** argv) {
     scenes.push_back({"warning-keyboard-hidden-ui", [](ImVec2 size) {
         wuwa_sheet::draw_hidden_ui_warning(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), true, true, true);
     }});
+    scenes.push_back({"warning-recording-stopped", [](ImVec2 size) {
+        wuwa_sheet::draw_recording_stopped_warning(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), 5, 20);
+    }});
     scenes.push_back({"warning-keyboard-mouse-mode", [](ImVec2 size) {
         wuwa_sheet::draw_mouse_mode_warning(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), true, false, true);
     }});

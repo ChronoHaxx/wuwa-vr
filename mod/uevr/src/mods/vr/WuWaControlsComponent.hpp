@@ -355,6 +355,19 @@ private:
     // Where the showcase video looks, degrees from where the head points (negative lower). Test 18c: level with
     // the head read as too high, 23 degrees down as too low; people look a little below the head's direction.
     const ModSlider::Ptr m_showcase_pitch{ModSlider::create("WuWaRecording_ShowcasePitch", -40.0f, 20.0f, -12.0f)};
+    // 1.2.7: the launcher ends a recording when the game averages under this many fps for this many seconds of the
+    // time it holds SteamVR's scene (owner, 25 Oct: full VR could sink to a few fps while recording until the game
+    // was closed). 5 fps for 20 s: loading freezes in the owner's recordings lasted up to ~10 s.
+    const ModToggle::Ptr m_video_slow_stop{ModToggle::create("WuWaRecording_SlowStop", true)};
+    const ModSlider::Ptr m_video_slow_fps{ModSlider::create("WuWaRecording_SlowFps", 1.0f, 20.0f, 5.0f)};
+    const ModSlider::Ptr m_video_slow_seconds{ModSlider::create("WuWaRecording_SlowSeconds", 5.0f, 60.0f, 20.0f)};
+    // The rule as the launcher takes it: {fps, seconds}, 0 fps when off.
+    std::pair<int,int> slow_rule() const;
+    // The notice after the launcher ended a recording for that (20 s, over everything else in the overlay).
+    void draw_slow_recording_notice(ImDrawList* list, ImVec2 size);
+    int64_t m_slow_notice_ms{};
+    uint64_t m_slow_notice_until{};
+    wuwa_video::SlowStop m_slow_notice;
     // 1.2.4: a new key, off by default. The old one was on for everyone, and in live play the smoothing made
     // the window trail head turns ("lead-lag"); OBS users switch it on for recordings.
     const ModToggle::Ptr m_steady_desktop{ModToggle::create("WuWaRecording_SteadyWindow", false)};

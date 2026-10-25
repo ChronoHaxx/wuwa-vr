@@ -211,7 +211,20 @@ REC badge with the elapsed time shows while recording.
    16:9; or, since 1.2.6, the left or right eye's whole view as one video,
    `left-eye.mp4` / `right-eye.mp4`, as wide as side by side, not steadied,
    with each frame's eye pose in `frames.jsonl`; showcase and one-eye need
-   SteamVR), frame rate, picture size, sound, **Microphone** (1.2.6,
+   SteamVR), frame rate, picture size, **Stop if the game slows down** (1.2.7,
+   `WuWaRecording_SlowStop`, on) with **Slower than** (`WuWaRecording_SlowFps`,
+   1-20 fps, 5) and **For** (`WuWaRecording_SlowSeconds`, 5-60 s, 20): the
+   SteamVR recorder ends the recording when the game's own frame rate (new
+   frames it gave SteamVR), averaged over that many seconds of the time it holds
+   the scene, is under that (`launcher/dev/steamvr-capture/slow_game.hpp`;
+   `end_reason` `slow_game`, `slow_game_rule` and `slow_game` in
+   recording.json); the launcher then beeps, shows a window on top of the
+   desktop and reports it, and this overlay shows **RECORDING STOPPED** for 20 s.
+   The default comes from the owner's recordings: loading freezes lasted up to
+   about 10 s, every lag spiral (18, 20 and 25 Oct 2026) stayed under 5 fps for
+   longer than 20 s. Since 1.2.7 every SteamVR recording also writes
+   `gpu.jsonl`, once a second: the graphics card's memory in use, the game's
+   share and its frame rate (`gpu_memory` in recording.json has the peaks), sound, **Microphone** (1.2.6,
    `WuWaRecording_Microphone`, Off by default: Windows' default microphone or
    one by name from the launcher's list (`wuwa-recorder.exe --list-microphones`),
    saved as its Windows endpoint ID; one not plugged in shows as not connected

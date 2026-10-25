@@ -752,6 +752,21 @@ void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool sh
     draw->PopClipRect();
 }
 
+void draw_recording_stopped_warning(ImDrawList* draw, ImVec2 size, ImFont* font, int min_fps, int seconds) {
+    const auto c = canvas(draw, size, font);
+    if (!c.font) return;
+    draw->PushClipRect(c.at(0, 0), c.at(1600, 900), true);
+    draw->AddRectFilled(c.at(110, 200), c.at(1490, 520), IM_COL32(68, 8, 12, 250), 26 * c.s);
+    draw->AddRect(c.at(110, 200), c.at(1490, 520), IM_COL32(255, 65, 72, 255), 26 * c.s, 0, 5 * c.s);
+    centered(c, size, 228, 70, IM_COL32(255, 90, 96, 255), "RECORDING STOPPED");
+    char line[256]{};
+    std::snprintf(line, sizeof(line), wuwa_l10n::translate("The game ran below %d fps for %d seconds.").c_str(), min_fps, seconds);
+    centered_text(c, size, 322, 38, IM_COL32(255, 255, 255, 255), wuwa_l10n::visual(line));
+    centered(c, size, 385, 28, IM_COL32(255, 220, 222, 255), "What was recorded is saved.");
+    centered(c, size, 432, 26, IM_COL32(255, 206, 210, 255), "Lower the SteamVR resolution for WuWa, or use the stereo screen for a while.");
+    draw->PopClipRect();
+}
+
 void draw_mouse_mode_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool adjustment, bool hidden_menu, bool keyboard) {
     const auto c = canvas(draw, size, font);
     if (!c.font) return;

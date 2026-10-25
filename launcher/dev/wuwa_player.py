@@ -89,6 +89,8 @@ JOB = {"running": False, "kind": "", "message": "Ready", "output": "", "error": 
 HELPER_WORKERS = {}
 HELPER_WORKERS_LOCK = threading.Lock()
 RECORDING = {"running": False, "stopFile": "", "folder": "", "id": "", "pid": None, "stopping": False}
+# The last recording the slow-game stop ended (1.2.7): reason, unix ms, the rule and the rate seen; shown in VR.
+RECORDING_STOP = {}
 LAST_REQUEST = time.monotonic()
 VERIFY_RESULT: dict = {}
 SERVER = None
@@ -1166,8 +1168,50 @@ def recording_space_left(folder):
     return shutil.disk_usage(path).free
 
 
+# The slow-game stop's default (1.2.7): the game under 5 fps on average for 20 s of the time it holds SteamVR's
+# scene. Loading freezes in the owner's recordings lasted up to ~10 s; every lag spiral stayed under 5 fps longer.
+SLOW_GAME_FPS, SLOW_GAME_SECONDS = 5, 20
+
+
+def check_slow_game(slow_fps, slow_seconds):
+    if type(slow_fps) is not int or not 0 <= slow_fps <= 30:
+        raise ValueError('Choose 0..30 fps for stopping when the game is slow (0: never).')
+    if type(slow_seconds) is not int or not 5 <= slow_seconds <= 120:
+        raise ValueError('Choose 5..120 seconds for stopping when the game is slow.')
+
+
+def warn_slow_game(min_fps, seconds, fps, where):
+    """The slow-game stop ended a recording: a warning sound and a window on top of everything, off the caller's
+    thread (the player may be in the headset; the game shows its own notice)."""
+    seen = f' (it averaged {fps:g} fps)' if isinstance(fps, (int, float)) else ''
+    message = (f'Recording stopped: the game ran below {min_fps} fps for {seconds} seconds{seen}.\n\n'
+               f'What was recorded is saved: {where}\n\n'
+               'To get the speed back: lower the SteamVR resolution for WuWa (or its refresh rate), record a smaller '
+               'picture size, or switch to the stereo screen for a while. If the game stays slow, close it and start '
+               'again. You can change this rule on the WuWa VR menu\'s Recording page.')
+    log('Recording stopped by the slow-game rule: ' + redact(message.splitlines()[0]))
+    if os.environ.get('WUWA_VR_NO_DIALOG'):
+        return message
+
+    def alert():
+        try:
+            import winsound
+            for _ in range(3):
+                winsound.MessageBeep(winsound.MB_ICONHAND)
+                time.sleep(.6)
+        except Exception:
+            pass
+        try:
+            # MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND
+            ctypes.windll.user32.MessageBoxW(None, message, 'WuWa VR: recording stopped', 0x30 | 0x40000 | 0x10000)
+        except Exception:
+            pass
+    threading.Thread(target=alert, name='slow-game-alert', daemon=True).start()
+    return message
+
+
 def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None, source='auto', style='sbs', pitch=None, sound=True,
-                    microphone='', mic_volume=100, sound_files=True):
+                    microphone='', mic_volume=100, sound_files=True, slow_fps=SLOW_GAME_FPS, slow_seconds=SLOW_GAME_SECONDS):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
     if style not in RECORD_STYLES: raise ValueError('Choose the side-by-side, showcase or one-eye video.')
     if pitch is not None and (type(pitch) is not int or not -40<=pitch<=20): raise ValueError('Choose a showcase view height of -40..20 degrees.')
@@ -1176,6 +1220,7 @@ def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None,
     if type(sound) is not bool: raise ValueError('Choose whether to record sound.')
     check_microphone(microphone, mic_volume)
     if type(sound_files) is not bool: raise ValueError('Choose whether to save the sound as separate files.')
+    check_slow_game(slow_fps, slow_seconds)
     games=[p for p in processes() if p['name'].lower() in ('client-win64-shipping','client-win64-shipping.exe')]
     if len(games)!=1: raise ValueError('Launch one WuWa instance through SteamVR or the updated simulator before recording.')
     pid=games[0]['pid']
@@ -1185,7 +1230,8 @@ def start_recording(video_only=False, fps=30, eye_width=1024, expected_pid=None,
     what={'showcase':'showcase video (one eye, steadied, 16:9)','left_eye':'left-eye video (its whole view)',
           'right_eye':'right-eye video (its whole view)'}.get(style,'stereo video')
     begin_job('recording',f'Recording {what} at a target of {fps} fps (5-minute parts until you stop it)',
-              lambda: record_playtest(video_only,fps,eye_width,source,style,pitch,sound,microphone,mic_volume,sound_files),
+              lambda: record_playtest(video_only,fps,eye_width,source,style,pitch,sound,microphone,mic_volume,sound_files,
+                                      slow_fps,slow_seconds),
               prepare=lambda: RECORDING.update(recording_target(pid)))
 
 
@@ -1198,16 +1244,18 @@ def stop_recording(expected_id=None):
 
 
 def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', style='sbs', pitch=None, sound=True,
-                    microphone='', mic_volume=100, sound_files=True):
+                    microphone='', mic_volume=100, sound_files=True, slow_fps=SLOW_GAME_FPS, slow_seconds=SLOW_GAME_SECONDS):
     if source not in ('auto','steamvr','simulator'): raise ValueError('Choose auto, steamvr or simulator recording.')
     if style not in RECORD_STYLES: raise ValueError('Choose the side-by-side, showcase or one-eye video.')
     if type(fps) is not int or fps not in (30,45,60): raise ValueError('Choose 30, 45 or 60 fps.')
     if type(eye_width) is not int or eye_width not in RECORD_EYE_WIDTHS: raise ValueError('Choose 720, 1024, 1280, 1536 or 2048 pixels per eye.')
     if not RECORDING['running']:
         RECORDING.update(recording_target())
+    check_slow_game(slow_fps, slow_seconds)
+    RECORDING_STOP.clear()
     first=Path(RECORDING['folder'])
     stop_file=Path(RECORDING['stopFile'])
-    parts=[]; low_space=False
+    parts=[]; low_space=False; slow=None
     try:
         spec=importlib.util.spec_from_file_location('wuwa_recording',config().app/'dev/record-wuwa.py')
         module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
@@ -1226,7 +1274,8 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', sty
                 recorder=config().app/'dev-tools/wuwa-recorder.exe',openvr=config().app/'dev-tools/openvr_api.dll',
                 simulator_recorder=config().app/'dev-tools/wuwa-simulator-recorder.exe',source=source,
                 pid=RECORDING.get('pid'),fps=fps,eye_width=eye_width,profile=config().profile,style=style,pitch=pitch,sound=sound,
-                microphone=microphone,mic_volume=mic_volume,sound_files=sound_files)
+                microphone=microphone,mic_volume=mic_volume,sound_files=sound_files,
+                min_game_fps=slow_fps,slow_seconds=slow_seconds)
             try:
                 module.record(args)
             except Exception:
@@ -1234,13 +1283,20 @@ def record_playtest(video_only=False, fps=30, eye_width=1024, source='auto', sty
                 break  # The game closed between parts; the parts already saved stand.
             parts.append(folder)
             try:
-                ended=json.loads((folder/'recording.json').read_text(encoding='utf-8')).get('end_reason')
-            except (OSError,ValueError):
-                ended=None
+                report=json.loads((folder/'recording.json').read_text(encoding='utf-8'))
+                ended=report.get('end_reason')
+            except (OSError,ValueError,AttributeError):
+                report,ended={},None
+            if ended=='slow_game':
+                slow=(report.get('slow_game') or {}).get('fps')
             if ended!='time_limit' or stop_file.exists() or RECORDING.get('stopping'):
                 break
         where=str(first) if len(parts)==1 else f'{first} (+{len(parts)-1} more parts beside it)'
         if low_space: where+='. Stopped early: less than 10 GB free on the drive for recordings'
+        if ended=='slow_game':
+            RECORDING_STOP.update(reason='slow_game', ms=int(time.time()*1000), min_fps=slow_fps, seconds=slow_seconds,
+                                  fps=slow if isinstance(slow,(int,float)) else None)
+            return warn_slow_game(slow_fps, slow_seconds, slow, where).replace('\n\n', ' ')
         if style=='showcase':
             return 'Showcase video saved: showcase.mp4 in '+where
         if style in ('left_eye','right_eye'):
@@ -1267,7 +1323,8 @@ def recording_snapshot():
     return {'available':any((config().app/'dev-tools'/name).is_file() for name in
                            ('wuwa-recorder.exe','wuwa-simulator-recorder.exe')),
             'state':state,'recording_id':rec.get('id',''), 'folder':rec.get('folder',''),
-            'message':str(job['output'] if job['error'] else '')[:500], 'microphones':microphones()}
+            'message':str(job['output'] if job['error'] else '')[:500], 'microphones':microphones(),
+            'stop':dict(RECORDING_STOP)}
 
 
 def video_menu_bridge():

@@ -53,6 +53,9 @@ inline bool identity_matches(const nlohmann::json& value,uint32_t pid,int64_t cr
              state=="saved" || state=="busy" || state=="error");
     } catch (...) { return false; }
 }
+// The last recording the launcher ended because the game was too slow (1.2.7; ms 0 when none): when (unix ms),
+// the rule (under min_fps on average for seconds) and the rate it saw (-1 unknown).
+struct SlowStop { int64_t ms{}; int min_fps{}, seconds{}; double fps{-1}; };
 // A microphone the launcher lists (wuwa-recorder.exe --list-microphones): the Windows endpoint ID, its name,
 // and whether Windows records from it by default.
 struct Microphone { std::string id,name; bool preferred{}; };
@@ -95,6 +98,20 @@ public:
         return m_connected ? m_status.value("message",std::string{}) : "";
     }
     std::string folder() const { return m_connected ? m_status.value("folder",std::string{}) : ""; }
+    SlowStop slow_stop() const {
+        SlowStop out;
+        if (!m_connected) return out;
+        try {
+            const auto it=m_status.find("stop");
+            if (it==m_status.end() || !it->is_object() || it->value("reason",std::string{})!="slow_game") return out;
+            const auto& s=*it;
+            if (!s.contains("ms") || !s.at("ms").is_number_integer() || !s.contains("min_fps") || !s.at("min_fps").is_number_integer() ||
+                !s.contains("seconds") || !s.at("seconds").is_number_integer()) return out;
+            out.ms=s.at("ms").get<int64_t>(); out.min_fps=s.at("min_fps").get<int>(); out.seconds=s.at("seconds").get<int>();
+            if (s.contains("fps") && s.at("fps").is_number()) out.fps=s.at("fps").get<double>();
+        } catch (...) { out={}; }
+        return out;
+    }
     // The microphones the launcher lists (1.2.6; none from older launchers), at most 32.
     std::vector<Microphone> microphones() const {
         std::vector<Microphone> out;
@@ -117,10 +134,11 @@ public:
     // from where the head points (negative lower). 2 / 3: the left / right eye's whole view, not steadied (the
     // side-by-side field of view in one picture). sound: what the PC plays, as a track. microphone (1.2.6): none
     // when empty, else "default" or an endpoint ID, mixed into that track at mic_volume percent. sound_files: each
-    // source also alone beside the video (game.wav, microphone.wav).
+    // source also alone beside the video (game.wav, microphone.wav). slow_fps / slow_seconds (1.2.7): the launcher
+    // ends the recording when the game averages under slow_fps for slow_seconds (0 fps: never).
     bool submit(const std::filesystem::path& profile,bool start,int fps=30,int width=1024,bool telemetry=true,
                 int style=0,int pitch=-12,bool sound=true,const std::string& microphone={},int mic_volume=100,
-                bool sound_files=true) noexcept {
+                bool sound_files=true,int slow_fps=5,int slow_seconds=20) noexcept {
         poll(profile,true);
         try {
             if (!available() || pending()) throw std::runtime_error("Wait for the recording launcher.");
@@ -141,7 +159,10 @@ public:
                          else if (style==2 || style==3) request["style"]=style==2?"left_eye":"right_eye";
                          // Only when chosen: a launcher from before 1.2.6 refuses fields it does not know.
                          if (!microphone.empty()) { request["microphone"]=microphone; request["mic_volume"]=std::clamp(mic_volume,0,300); }
-                         if (!sound_files) request["sound_files"]=false; }
+                         if (!sound_files) request["sound_files"]=false;
+                         // The launcher's own default is 5 fps for 20 s; only a change is sent, for the same reason.
+                         if (slow_fps!=5 || slow_seconds!=20) {
+                             request["slow_fps"]=std::clamp(slow_fps,0,30); request["slow_seconds"]=std::clamp(slow_seconds,5,120); } }
             else request["recording_id"]=m_status.at("recording_id");
             const auto target=m_directory/("request-"+std::to_string(GetCurrentProcessId())+".json");
             const auto temporary=m_directory/(id+".tmp");

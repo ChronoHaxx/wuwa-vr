@@ -44,4 +44,6 @@ void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& le
 // keyboard: name the keyboard shortcut (the VR key + H / + M) instead of the controller's.
 void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool shortcut_available, bool menu_detected=true, bool keyboard=false);
 void draw_mouse_mode_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool adjustment, bool hidden_menu, bool keyboard=false);
+// The launcher ended a recording because the game ran under min_fps on average for seconds (1.2.7).
+void draw_recording_stopped_warning(ImDrawList* draw, ImVec2 size, ImFont* font, int min_fps, int seconds);
 }

@@ -248,6 +248,14 @@ def recorder_command(args, client):
             flags+=['--microphone='+microphone,f'--mic-volume={volume}']
         # --sound-files: each source also alone beside the video (game.wav, microphone.wav), raw, for edits.
         if getattr(args,'sound_files',False) and (getattr(args,'sound',False) or microphone): flags.append('--sound-files')
+        # --min-game-fps / --slow-seconds (1.2.7): end the part when the game's own frame rate, averaged over that many
+        # seconds of the time it holds the scene, stays under that (end_reason slow_game). 0: off.
+        slow=getattr(args,'min_game_fps',0) or 0
+        if slow:
+            seconds=getattr(args,'slow_seconds',20)
+            if type(slow) is not int or not 1<=slow<=60: raise ValueError('Choose 1..60 fps for the slow-game stop')
+            if type(seconds) is not int or not 5<=seconds<=300: raise ValueError('Choose 5..300 seconds for the slow-game stop')
+            flags+=[f'--min-game-fps={slow}',f'--slow-seconds={seconds}']
         prefix=[str(exe)]+flags+[str(openvr)]; source='steamvr'
     return source, prefix+[str(client.pid),str(args.output.resolve()),str(args.seconds),
         str(args.fps),str(args.eye_width),str(args.stop_file.resolve())]
@@ -342,6 +350,8 @@ def main(argv=None):
     p.add_argument("--sound",action="store_true",help="SteamVR: record what the PC plays (game, voice chat, notifications) as an AAC track")
     p.add_argument("--microphone",default='',help="SteamVR: also record a microphone ('default' or an ID from wuwa-recorder.exe --list-microphones), mixed in and alone as microphone.wav")
     p.add_argument("--mic-volume",type=int,choices=range(0,301),metavar="0..300",default=100,help="the microphone's level in percent")
+    p.add_argument("--min-game-fps",type=int,default=0,help="SteamVR: end the recording when the game averages under this many fps (0: never)")
+    p.add_argument("--slow-seconds",type=int,default=20,help="SteamVR: over this many seconds of the time it holds the scene (with --min-game-fps)")
     p.add_argument("--sound-files",action="store_true",help="SteamVR: also save each sound source alone, raw (game.wav, microphone.wav)")
     p.add_argument("--source",choices=('auto','steamvr','simulator'),default='auto')
     p.add_argument("--style",choices=STYLES,default='sbs',

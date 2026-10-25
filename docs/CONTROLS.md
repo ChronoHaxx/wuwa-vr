@@ -87,6 +87,56 @@ nothing.
   in the game's flat spectator window. While a test plan is loaded, its current
   step takes the card's place.
 
+## Keyboard and mouse
+
+From 1.2.7, keyboard players have the same shortcuts as a controller. **Hold
+the VR key** (the key left of 1: ` on US and UK keyboards, ^ on German, ² on
+French) and press a key, as L3 + a button. Hold it for half a second and the
+**keyboard card** rises under your view, lighting each key as you press it. The
+VR key, and every key you press while holding it, never reach the game (the
+game's own keys still work; a key you were already holding stays the game's).
+Change or turn off the VR key on the WuWa VR menu's **Controllers** page (Off,
+Key left of 1, Right Ctrl).
+
+| VR key + | Action |
+| --- | --- |
+| 1 | Full VR / stereo screen (from mono theatre: full VR) |
+| 2 | Mono theatre on / off (back to the view you had) |
+| 3 | Portal window (F7 still works on its own) |
+| 4 | Diorama (not in game menus) |
+| B | Blur (depth of field) on / off |
+| N | Hide characters at your eyes on / off |
+| H | Show / hide game UI, menus included |
+| R | Recenter, as L3 + A |
+| P | Windows screenshot (Win + Print Screen) |
+| F | First person on / off |
+| T | Game / fixed camera |
+| C | Freecam on / off |
+| G | First person: full animation follow / previous motion |
+| E / Q | Camera up / down in first person and the fixed camera; nearer / back in story shots (also Page Up / Page Down); HUD up / down in HUD / mouse mode. E + Q together: back to the default (Home in story shots) |
+| Mouse wheel | Fixed camera closer / farther; HUD nearer / farther in HUD / mouse mode |
+| M | HUD / mouse mode on / off |
+| K | Keep the controls card open |
+| Insert (alone) | WuWa VR menu |
+
+**Freecam flight:** while freecam is on and no game menu shows, W A S D (by
+position, so Z Q S D on AZERTY) move, the mouse looks, Space or E rises, Ctrl or
+Q sinks and Shift speeds up (twice quickly: turbo). The game gets none of those
+keys or the mouse movement meanwhile, so your character stays put; mouse clicks
+still reach it. Holding the VR key pauses flight, as L3 does. Plane: W / S speed
+up and slow down, A / D steer, the mouse pitches and banks, Shift boosts, Ctrl
+brakes. Acro drone: W / S raise and lower a throttle that stays where you leave
+it, A / D turn, the mouse rolls and pitches; with the throttle down, Shift arms,
+Ctrl stops, Ctrl + Shift levels and stops. **Mouse look speed** is on the Camera
+page; **Keys fly the freecam** (Controllers page) turns flight by keyboard off.
+A controller in use keeps the freecam.
+
+Cards, tips and notices name keys instead of buttons while the keyboard and
+mouse were used last: the pinned card is the keyboard card then, and the hidden
+UI and HUD / mouse mode notices say **VR key + H** and **VR key + M**.
+**Show game UI** and **HUD / mouse mode** are also rows on the WuWa VR menu
+(Quick and HUD pages).
+
 ## PlayStation controllers (experimental)
 
 A working **Steam Input / Xbox-XInput mapping** uses the bindings below. In
@@ -254,9 +304,13 @@ off, menus keep their normal gamepad controls by default. The legacy automatic
 mouse-in-menus option is separate and starts off.
 
 The **HUD / MOUSE MODE** notice shows the current mode, and the controls card
-marks it **On**. Use **L3 + LB** or
-**WuWa Controls → Exit mouse mode now** to exit. The button also disables legacy
-automatic mouse-in-menus. Release all controls before resuming play.
+marks it **On**. Use **L3 + LB**, the VR key + M, **HUD / mouse mode** on the
+WuWa VR menu's HUD page, or **WuWa Controls → Exit mouse mode now** in UEVR's
+classic window to exit; that last button also disables legacy automatic
+mouse-in-menus. Release all controls before resuming play.
+
+On the keyboard, HUD / mouse mode places the HUD with the VR key held: mouse
+wheel for nearer / farther, E / Q for up / down.
 
 The heading stays **HUD / MOUSE MODE**. When the optional legacy setting
 activates the cursor for a detected menu, a smaller note says **Activated
@@ -265,7 +319,8 @@ available after entering manual adjustment with L3 + LB.
 
 With game UI hidden, a red recovery hint reminds you that game menus are hidden
 too. Detected menus get a larger warning; some WuWa menus do not expose the
-cursor flag, so the smaller hint remains available. **L3 + B** restores the UI.
+cursor flag, so the smaller hint remains available. **L3 + B** (or the VR key +
+H) restores the UI, as does **Show game UI** on the WuWa VR menu's Quick page.
 
 ## First person and fixed camera
 

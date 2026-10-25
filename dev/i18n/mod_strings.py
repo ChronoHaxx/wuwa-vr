@@ -43,7 +43,7 @@ CALLS = {
     'TreeNode': [0], 'CollapsingHeader': [0], 'TableSetupColumn': [0], 'Combo': [0], 'draw': [1],
     'setting_toggle': [0, 1], 'setting_slider': [0, 1, 6], 'setting_int_slider': [0, 1, 6], 'setting_choice': [0, 1, 3],
     'action': [0, 1], 'paragraph': [0], 'menu_angle_slider': [0, 1], 'make': [1, 2],
-    'header': [1, 2], 'rich': [5], 'pieces': [0], 'fit': [1], 'pill': [4], 'pill_width': [1], 'centered': [5],
+    'header': [1, 2], 'rich': [5], 'pieces': [0], 'fit': [1], 'pill': [4], 'pill_width': [1], 'centered': [5], 'centered_key': [5],
     'draw_tip': [3, 4], 'draw_note': [3, 4, 5], 'N_': [0], 'format': [0],
 }
 # These names are only translating calls when qualified (wuwa_ui::draw, wuwa_l10n::text...).

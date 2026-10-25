@@ -642,6 +642,38 @@ Item controllers_toggle(VR* vr) {
     return controllers;
 }
 
+// The game's HUD and menus, as L3 + B or the VR key + H (1.2.7: before, only a shortcut or the classic menu).
+Item game_ui_toggle() {
+    return setting_toggle("Show game UI",
+        "The game's HUD and menus. Off hides them all, menus too, for clean pictures and videos. Shortcut: L3 + B, or "
+        "hold the VR key (` by default) and press H.", "VR_EnableGUI");
+}
+
+Item portal_toggle() {
+    return setting_toggle("Portal window",
+        "Shows the game through a window in front of you instead of all around you. Shortcut: L3 + LT, F7, or the VR key "
+        "+ 3.", "WindowMode_Enabled");
+}
+
+// HUD / mouse mode (L3 + LB): the controller drives the mouse and places the HUD. Starts off each launch.
+Item mouse_mode_toggle() {
+    auto item = make(Kind::Toggle, "HUD / mouse mode",
+        "The controller moves the mouse (A clicks, B goes back) and places the HUD (LT / RT distance, LB / RB height); the "
+        "game gets no controller input meanwhile. Shortcut: L3 + LB, or the VR key + M. Off at each launch.");
+    item.enabled = [] { auto* v = typed<bool>("WuWaControls_MouseAssist"); return v && v->value(); };
+    item.get_bool = [] { return VR::get()->get_wuwa_controls().adjustment_on(); };
+    item.set_bool = [](bool on) { VR::get()->get_wuwa_controls().set_adjustment(on); };
+    item.session_only = true;
+    return item;
+}
+
+// Recenter as L3 + A does: view, horizon and portal, and the seated position when that option is on (Comfort).
+Item recenter_action() {
+    return action("Recenter view", "Faces the view forward from where you are now, as L3 + A does: the portal too, and "
+        "your seated position when L3 + A resets position too is on (Comfort page).",
+        [] { VR::get()->get_wuwa_controls().recenter_like_shortcut(); });
+}
+
 // A treadmill run: on / off, with the run clock in place of On.
 Item run_toggle() {
     auto run = make(Kind::Toggle, "Treadmill run",
@@ -682,6 +714,18 @@ Page controllers_page() {
         "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. Your route "
         "is saved in the UEVR profile, wuwa-runs folder.", "WuWaRun_Auto"));
     page.items.push_back(live_text([vr] { return vr->menu_pointer_status(); }));
+    page.items.push_back(paragraph("Keyboard and mouse", true));
+    page.items.push_back(paragraph(
+        "Hold the VR key and press a key, as L3 + a button on a controller: 1 full VR / stereo screen, 2 mono theatre, 3 "
+        "portal, 4 diorama, H game UI, R recenter, F first person, T fixed camera, C freecam. Hold it for half a second "
+        "to see them all on a card. Insert opens this menu."));
+    page.items.push_back(setting_choice("VR key",
+        "The key you hold for the shortcuts. The key left of 1 is ` on US and UK keyboards (^ on German, \xC2\xB2 on "
+        "French); it never reaches the game. Off turns the keyboard shortcuts off.", "WuWaControls_KeyboardVrKey",
+        {"Off", "Key left of 1", "Right Ctrl"}));
+    page.items.push_back(setting_toggle("Keys fly the freecam",
+        "In freecam, W A S D move, the mouse looks, Space / Ctrl rise and sink and Shift speeds up; the game does not "
+        "get those keys or the mouse movement meanwhile. Mouse clicks still reach the game.", "WuWaControls_KeyboardFlight"));
     return page;
 }
 
@@ -690,6 +734,8 @@ Page quick_page() {
     Page page{"Quick"};
     page.items.push_back(view_choice());
     page.items.push_back(camera_choice());
+    page.items.push_back(game_ui_toggle());
+    page.items.push_back(portal_toggle());
     page.items.push_back(controllers_toggle(vr));
     auto diorama = make(Kind::Toggle, "Diorama (miniature world)",
         "Shows the world as a miniature around you, with the portal on or off. Needs Native Stereo. This launch only.");
@@ -707,7 +753,7 @@ Page quick_page() {
         "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
     page.items.push_back(record_toggle());
     page.items.push_back(run_toggle());
-    page.items.push_back(action("Recenter view", "Faces the view forward from where you are now.", [vr] { vr->recenter_view(); }));
+    page.items.push_back(recenter_action());
     return page;
 }
 
@@ -781,6 +827,15 @@ Page camera_page() {
                 "WuWaControls_AcroInvertPitch"));
             break;
         }
+        page.items.push_back(paragraph(free_style() == 2 ?
+            "Keyboard: W / S speed up and slow down, A / D steer, the mouse pitches and banks, Shift boosts, Ctrl brakes." :
+            free_style() == 3 ?
+            "Keyboard: W / S raise and lower the throttle (it stays where you leave it), A / D turn, the mouse rolls and "
+            "pitches. Lower the throttle, then press Shift to arm; Ctrl stops, Ctrl + Shift levels and stops." :
+            "Keyboard: W A S D move, the mouse looks, Space or E rises, Ctrl or Q sinks, Shift speeds up (press it twice "
+            "for turbo)."));
+        page.items.push_back(setting_slider("Mouse look speed", "How far the view turns as the mouse moves. 1 turns about "
+            "40 degrees an inch at 800 dpi.", "WuWaControls_FreeMouse", 0.1f, 5.0f, 0.1f, "%.1f"));
         page.items.push_back(setting_toggle("Collide with the world",
             "Stops the freecam at walls and the ground. Experimental.", "WuWaControls_FreeCollision"));
         page.items.push_back(action("Leave freecam", "Back to the game camera.", [] {
@@ -857,7 +912,7 @@ Page camera_page() {
             if (auto* v = typed<float>(key)) v->value() = v->default_value();
         }
     }));
-    page.items.push_back(action("Recenter view", "Faces the view forward from where you are now.", [] { VR::get()->recenter_view(); }));
+    page.items.push_back(recenter_action());
     return page;
 }
 
@@ -937,6 +992,8 @@ Page cinema_page() {
 
 Page hud_page() {
     Page page{"HUD"};
+    page.items.push_back(game_ui_toggle());
+    page.items.push_back(mouse_mode_toggle());
     page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear.", "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
     page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
         "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
@@ -998,7 +1055,7 @@ Page hud_page() {
     }));
     page.items.push_back(setting_toggle("Controls cards",
         "Hold L3, or LT + RT, for half a second: a card rises under your view and shows what each button does, lighting "
-        "each one as you press it. Let go and it sinks away.", "WuWaControls_Cards"));
+        "each one as you press it. Let go and it sinks away. On the keyboard, hold the VR key (` by default).", "WuWaControls_Cards"));
     page.items.push_back(setting_toggle("Keep the controls card open",
         "Shows the L3 card without holding anything. Shortcut: L3 + Menu. A loaded test plan shows its step there instead.",
         "WuWaControls_PinCard"));

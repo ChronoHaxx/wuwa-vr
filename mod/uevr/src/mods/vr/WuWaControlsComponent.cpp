@@ -138,12 +138,15 @@ constexpr const char* sheet[][2] = {
     {N_("X + stick  Scroll    D-pad Move map"), N_("LB/RB      HUD down / up")},
     {N_("L3 + LB    Return to normal game controls"), N_("LB + R3 utility shortcut remains available outside adjustment")},
 };
+// Keys and mouse moves sent here (controller mouse mode, the screenshot) carry this tag, so the keyboard
+// shortcuts never take them for the player's own (GetMessageExtraInfo, RAWMOUSE::ulExtraInformation).
+constexpr ULONG_PTR sent_by_mod = 0x57755761;
 void key(WORD code, bool down) {
-    INPUT input{}; input.type = INPUT_KEYBOARD; input.ki.wVk = code;
+    INPUT input{}; input.type = INPUT_KEYBOARD; input.ki.wVk = code; input.ki.dwExtraInfo = sent_by_mod;
     input.ki.dwFlags = down ? 0 : KEYEVENTF_KEYUP; SendInput(1, &input, sizeof(input));
 }
 void mouse(DWORD flags, LONG x = 0, LONG y = 0, DWORD data = 0) {
-    INPUT input{}; input.type = INPUT_MOUSE; input.mi.dwFlags = flags;
+    INPUT input{}; input.type = INPUT_MOUSE; input.mi.dwFlags = flags; input.mi.dwExtraInfo = sent_by_mod;
     input.mi.dx = x; input.mi.dy = y; input.mi.mouseData = data; SendInput(1, &input, sizeof(input));
 }
 nlohmann::json pose_frames_json(const wuwa_pose_pair::Frames& frames) {
@@ -368,6 +371,14 @@ std::string WuWaControlsComponent::StoryValue::get() const {
         const auto reset = owner.m_story_reset_ms.load();
         if (reset && GetTickCount64() - reset < 400) return "2";
         // Read only while the game has focus and UEVR is closed; the keys still reach the game.
+        // The VR key + E / Q (keyboard shortcuts) in the game camera: nearer / back, both together reset.
+        if (owner.m_camera->value() == 0) {
+            std::scoped_lock lock{owner.m_kb_mutex};
+            const auto held = owner.m_kb.vr_held() ? owner.m_kb.chords() : 0u;
+            const bool up = (held & wuwa_keyboard::State::up_bit) != 0, down = (held & wuwa_keyboard::State::down_bit) != 0;
+            if (up && down) return "2";
+            if (up || down) return up ? "1" : "-1";
+        }
         if (!game_focused()) return "0";
         if (GetAsyncKeyState(VK_HOME) & 0x8000) return "2";
         const bool nearer = (GetAsyncKeyState(VK_PRIOR) & 0x8000) != 0, back = (GetAsyncKeyState(VK_NEXT) & 0x8000) != 0;
@@ -389,7 +400,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_card_below, *m_card_place, *m_card_distance, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_first_person_camera, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
+        *m_card_below, *m_card_place, *m_card_distance, *m_kb_vr_key, *m_kb_flight, *m_free_mouse, *m_kb_tips_shown, m_keyboard_value, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_first_person_camera, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_scene, *m_video_sound, *m_video_microphone, *m_video_mic_volume, *m_video_sound_files, *m_video_style, *m_showcase_pitch, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
@@ -589,6 +600,35 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         wuwa_ui::TextWrapped("Fully hold both triggers first. R3: click to switch between full VR and the stereo screen, hold 0.8 seconds for mono theatre (hold again to go back); with the triggers still held you can click or hold R3 again. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen; release all controls before repeating an L3 shortcut. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
         wuwa_ui::TextWrapped("Mono preserves your saved stereo-screen choice; screen off exits both screen modes. Neither changes portal or normal world scale. Manual toggles take priority over automatic cinema for the current scene.");
         wuwa_ui::TextWrapped("Diorama uses a temporary miniature scale (Diorama scale on the WuWa VR menu's Quick page, 10x by default) with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
+        ImGui::TreePop();
+    }
+    if (wuwa_ui::TreeNode("Keyboard and mouse")) {
+        wuwa_ui::TextWrapped("Hold the VR key and press a key, as L3 + a button on a controller. Hold it for half a second to see "
+            "the keyboard card. The VR key and the keys it uses never reach the game.");
+        wuwa_ui::draw(*m_kb_vr_key,"VR key");
+        wuwa_ui::draw(*m_kb_flight,"Keys fly the freecam");
+        wuwa_ui::draw(*m_free_mouse,"Freecam mouse look speed");
+        if (ImGui::BeginTable("Keyboard shortcuts", 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+            wuwa_ui::TableSetupColumn("VR key +", ImGuiTableColumnFlags_WidthFixed, 140.0f);
+            wuwa_ui::TableSetupColumn("Action");
+            for (const auto& row : std::array<std::array<const char*,2>,18>{{
+                {{"1", N_("Full VR / stereo screen")}}, {{"2", N_("Mono theatre")}}, {{"3", N_("Portal window")}},
+                {{"4", N_("Diorama (10\xC3\x97)")}}, {{"B", N_("Blur (depth of field)")}},
+                {{"N", N_("Hide characters at your eyes")}}, {{"H", N_("Show / hide game UI")}}, {{"R", N_("Recenter view")}},
+                {{"P", N_("Screenshot")}}, {{"F", N_("First person")}}, {{"T", N_("Game / fixed camera")}}, {{"C", N_("Freecam")}},
+                {{"G", N_("First person: full animation")}}, {{"E / Q", N_("Camera up / down")}},
+                {{N_("Wheel"), N_("Fixed camera closer / farther")}}, {{"M", N_("HUD / mouse mode")}},
+                {{"K", N_("Keep this card open")}}, {{N_("Insert"), N_("WuWa VR menu")}},
+            }}) {
+                // Letters and digits as printed; the named keys translated.
+                const std::string_view keys{row[0]};
+                ImGui::TableNextRow(); ImGui::TableNextColumn();
+                if (keys == "Wheel" || keys == "Insert") wuwa_ui::TextUnformatted(row[0]); else ImGui::TextUnformatted(row[0]);
+                ImGui::TableNextColumn(); wuwa_ui::TextWrapped("%s", row[1]);
+            }
+            ImGui::EndTable();
+        }
+        wuwa_ui::TextWrapped("Freecam: W A S D move, the mouse looks, Space / Ctrl rise and sink, Shift speeds up (twice: turbo).");
         ImGui::TreePop();
     }
     wuwa_ui::draw(*m_cards,"Controls cards (hold L3, or LT + RT)");
@@ -1124,6 +1164,15 @@ constexpr uint64_t card_rise_ms = 180, card_sink_ms = 160;
 float WuWaControlsComponent::floor_width() const { return card_visible() ? m_card_width->value() : 1.5f; }
 
 bool WuWaControlsComponent::held_card(wuwa_sheet::CardState& state) const {
+    {
+        // The VR key held for half a second: the keyboard card (the chord keys light up on it).
+        std::scoped_lock lock{m_kb_mutex};
+        if (m_kb.vr_held() && GetTickCount64() - m_kb_vr_since >= 500) {
+            state.card = wuwa_sheet::Card::keyboard;
+            state.keys = m_kb.chords();
+            return true;
+        }
+    }
     const auto text = m_card.get();
     char kind[8]{};
     unsigned buttons{};
@@ -1235,7 +1284,9 @@ void WuWaControlsComponent::update_tip() {
     // On the first three launches, one line under your view once play has
     // started (script reporting, headset on, no menus), for 12 seconds.
     if (m_tip_done || !wuwa_test::is_wuwa()) return;
-    if (!m_cards->value() || m_tips_shown->value() >= 3) {
+    // Keyboard players get their own three tips (1.2.7), whatever the controller tips already shown.
+    auto& shown = keyboard_in_use() ? m_kb_tips_shown->value() : m_tips_shown->value();
+    if (!m_cards->value() || shown >= 3) {
         m_tip_done = true;
         return;
     }
@@ -1254,7 +1305,7 @@ void WuWaControlsComponent::update_tip() {
     if (now - m_tip_eligible_since < 4000) return;
     m_tip_until.store(now + 12000);
     m_tip_done = true;
-    m_tips_shown->value() = m_tips_shown->value() + 1;
+    shown = shown + 1;
     g_framework->deferred_save_config();
 }
 
@@ -1338,12 +1389,15 @@ void WuWaControlsComponent::draw_passive_overlay() {
     auto& vr=VR::get();
     const bool vr_controllers=vr->is_using_controllers();
     const int view=vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
+    // Keyboard and mouse used last: cards, tips and notices name keys (the VR key as this layout prints it).
+    const bool keyboard=keyboard_in_use() && !vr_controllers;
+    if (keyboard) update_key_names();
     if (status_warning_visible()) {
         if (!floor_visible() && (menu_warning_active() || mode_warning_active())) {
             const bool hidden=menu_warning_active();
-            const bool shortcut=m_enabled->value() && !vr->physical_gamepad_passthrough();
-            if (hidden) wuwa_sheet::draw_hidden_ui_warning(list,size,ImGui::GetFont(),shortcut,true);
-            if (mode_warning_active()) wuwa_sheet::draw_mouse_mode_warning(list,size,ImGui::GetFont(),m_adjust.value(),hidden);
+            const bool shortcut=m_enabled->value() && (keyboard || !vr->physical_gamepad_passthrough());
+            if (hidden) wuwa_sheet::draw_hidden_ui_warning(list,size,ImGui::GetFont(),shortcut,true,keyboard);
+            if (mode_warning_active()) wuwa_sheet::draw_mouse_mode_warning(list,size,ImGui::GetFont(),m_adjust.value(),hidden,keyboard);
         } else if (wuwa_menu_host::hint_active()) {
             wuwa_menu_host::draw_hint(list,size);
         } else if (tip_kind()==2) {
@@ -1352,10 +1406,19 @@ void WuWaControlsComponent::draw_passive_overlay() {
             std::snprintf(note,sizeof(note),wuwa_l10n::translate(
                 "Hint %d of %d. It then switches off; View hints on the WuWa VR menu's HUD page turns it back on.").c_str(),
                 m_view_hint,view_hint_count);
-            wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),names[view],
-                view==0 ? "{LT}+{RT}, click {R3} for the stereo screen" : view==1 ? "{LT}+{RT}, click {R3} for full VR" :
-                "{LT}+{RT}, hold {R3} to leave mono",vr_controllers,
-                wuwa_l10n::visual(note));
+            if (keyboard) {
+                wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),names[view],
+                    view==0 ? "{VR}+{1} for the stereo screen" : view==1 ? "{VR}+{1} for full VR" : "{VR}+{2} to leave mono",
+                    false,wuwa_l10n::visual(note),true);
+            } else {
+                wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),names[view],
+                    view==0 ? "{LT}+{RT}, click {R3} for the stereo screen" : view==1 ? "{LT}+{RT}, click {R3} for full VR" :
+                    "{LT}+{RT}, hold {R3} to leave mono",vr_controllers,
+                    wuwa_l10n::visual(note));
+            }
+        } else if (keyboard) {
+            wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",
+                "hold {VR} to see the keyboard shortcuts \xC2\xB7 {Insert} opens the WuWa VR menu",false,{},true);
         } else {
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",
                 "hold {L3} or {LT}+{RT} to see what each button does \xC2\xB7 {L3}+{R3} opens the WuWa VR menu",vr_controllers);
@@ -1380,6 +1443,15 @@ void WuWaControlsComponent::draw_passive_overlay() {
         return;
     }
     if (!held) state=m_pin_card->value() ? wuwa_sheet::CardState{} : m_card_last;
+    // The pinned card is the keyboard one while the keyboard and mouse are in use; its keys light as pressed.
+    if (!held && m_pin_card->value() && keyboard) state.card=wuwa_sheet::Card::keyboard;
+    if (state.card==wuwa_sheet::Card::keyboard) {
+        update_key_names();
+        std::scoped_lock lock{m_kb_mutex};
+        state.keys=m_kb.vr_held() ? m_kb.chords() : 0u;
+    }
+    state.freecam=m_camera->value()==2;
+    state.wheel_lit=GetTickCount64()-m_kb_wheel_lit.load()<300;
     state.vr_controllers=vr_controllers;
     state.view=view;
     state.blur=m_stereo_dof->value();
@@ -1646,6 +1718,7 @@ void WuWaControlsComponent::on_frame() {
     const auto now = std::chrono::steady_clock::now();
     const float delta = std::clamp(std::chrono::duration<float>(now - m_last_frame).count(), 0.0f, 0.05f);
     m_last_frame = now;
+    advance_keyboard(delta);
     MouseState state{};
     bool fresh{}, recenter{}, screenshot{};
     {
@@ -1702,6 +1775,292 @@ void WuWaControlsComponent::on_frame() {
     if ((state.buttons & XINPUT_GAMEPAD_B) && !(m_previous_buttons & XINPUT_GAMEPAD_B)) { key(VK_ESCAPE,true); key(VK_ESCAPE,false); }
     m_previous_buttons=state.buttons;
 }
+// ---- Keyboard and mouse shortcuts (1.2.7, utility/WuWaKeyboard.hpp) ----
+namespace {
+IModValue* any_value(std::string_view key) {
+    for (auto& mod : g_framework->get_mods()->get_mods()) if (auto* value = mod->get_value(key)) return value;
+    return nullptr;
+}
+float value_float(std::string_view key, float fallback) {
+    auto* value = any_value(key);
+    if (!value) return fallback;
+    const auto text = value->get();
+    char* end{};
+    const float f = std::strtof(text.c_str(), &end);
+    return end != text.c_str() && std::isfinite(f) ? f : fallback;
+}
+void set_value(std::string_view key, const std::string& text) { if (auto* value = any_value(key)) value->set(text); }
+// The keyboard layout of the game window's thread (the card can be drawn on another thread).
+HKL game_layout() {
+    const auto window = g_framework->get_window();
+    return GetKeyboardLayout(window ? GetWindowThreadProcessId(window, nullptr) : 0);
+}
+const char* action_name(wuwa_keyboard::Action a) {
+    static constexpr const char* names[]{"none", "full_or_stereo", "mono", "portal", "diorama", "blur", "hide_near", "ui",
+        "recenter", "first_person", "fixed_camera", "freecam", "animation", "adjust", "pin_card", "screenshot"};
+    const auto i = static_cast<size_t>(a);
+    return i < std::size(names) ? names[i] : "?";
+}
+// The camera script carries out these, like its controller shortcuts (it keeps the camera to go back to).
+bool script_action(wuwa_keyboard::Action a) {
+    using A = wuwa_keyboard::Action;
+    return a == A::first_person || a == A::fixed_camera || a == A::freecam || a == A::animation;
+}
+}
+
+wuwa_keyboard::Context WuWaControlsComponent::keyboard_context() const {
+    wuwa_keyboard::Context c;
+    c.vr_choice = static_cast<uint8_t>(std::clamp<int>(m_kb_vr_key->value(), 0, 2));
+    // A key message reaching the game window means it has the keyboard; posted test keys count too.
+    c.shortcuts = wuwa_test::is_wuwa() && m_enabled->value() && !g_framework->is_drawing_ui();
+    bool menu{}, fresh{};
+    {
+        std::scoped_lock lock{m_bridge_mutex};
+        menu = m_game_menu;
+        fresh = std::chrono::steady_clock::now() - m_received <= std::chrono::milliseconds(250);
+    }
+    const int mode = m_camera->value();
+    const bool adjust = m_adjust.get() == "true" && m_mouse->value();
+    c.flight = c.shortcuts && m_kb_flight->value() && mode == 2 && fresh && !menu && !adjust;
+    c.wheel = adjust || (mode == 1 && !menu);
+    return c;
+}
+
+bool WuWaControlsComponent::on_keyboard_message(UINT message, WPARAM w_param, LPARAM l_param) {
+    if (!wuwa_test::is_wuwa()) return false;
+    const auto now = GetTickCount64();
+    switch (message) {
+    case WM_KILLFOCUS:
+    case WM_SETFOCUS: {
+        std::scoped_lock lock{m_kb_mutex};
+        m_kb.reset();
+        m_kb_swallow_char = false;
+        return false;
+    }
+    case WM_ACTIVATE:
+        if (LOWORD(w_param) == WA_INACTIVE) {
+            std::scoped_lock lock{m_kb_mutex};
+            m_kb.reset();
+            m_kb_swallow_char = false;
+        }
+        return false;
+    // The character a swallowed key types (Windows makes it before the window sees the key).
+    case WM_CHAR:
+    case WM_DEADCHAR:
+    case WM_SYSCHAR:
+    case WM_SYSDEADCHAR: {
+        const bool swallow = m_kb_swallow_char;
+        m_kb_swallow_char = false;
+        return swallow;
+    }
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+    case WM_KEYUP:
+    case WM_SYSKEYUP: {
+        if (static_cast<ULONG_PTR>(GetMessageExtraInfo()) == sent_by_mod) return false;
+        const bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
+        const auto vk = static_cast<uint8_t>(w_param & 0xff);
+        auto id = wuwa_keyboard::key_id(static_cast<uint32_t>(l_param));
+        // A key sent by a program without a scan code: the position of its virtual key on this layout.
+        if ((id & 0xff) == 0) id = static_cast<uint16_t>(MapVirtualKeyExW(vk, MAPVK_VK_TO_VSC, game_layout()) & 0xff);
+        const bool repeat = down && (l_param & (1 << 30)) != 0;
+        const auto c = keyboard_context();
+        wuwa_keyboard::Result r;
+        {
+            std::scoped_lock lock{m_kb_mutex};
+            const bool before = m_kb.vr_held();
+            r = m_kb.key(id, vk, down, repeat, c);
+            if (!before && m_kb.vr_held()) m_kb_vr_since = now;
+        }
+        if (down) wuwa_input_activity::note_keyboard(now);
+        m_kb_swallow_char = down && r.swallow;
+        if (r.action != wuwa_keyboard::Action::none)
+            spdlog::info("[WuWaKeys] VR key + {} -> {}", static_cast<char>(vk), action_name(r.action));
+        return r.swallow;
+    }
+    case WM_MOUSEWHEEL: {
+        const auto c = keyboard_context();
+        std::scoped_lock lock{m_kb_mutex};
+        return m_kb.wheel(GET_WHEEL_DELTA_WPARAM(w_param), c);
+    }
+    case WM_INPUT: {
+        if (GET_RAWINPUT_CODE_WPARAM(w_param) != RIM_INPUT) return false;
+        RAWINPUT raw{};
+        UINT size = sizeof(raw);
+        if (GetRawInputData(reinterpret_cast<HRAWINPUT>(l_param), RID_INPUT, &raw, &size, sizeof(RAWINPUTHEADER)) == static_cast<UINT>(-1) ||
+            raw.header.dwType != RIM_TYPEMOUSE) return false;
+        const auto& m = raw.data.mouse;
+        // Moves sent by the controller mouse mode, and absolute pointers (pen, remote desktop), are not looks.
+        if (m.ulExtraInformation == sent_by_mod || (m.usFlags & MOUSE_MOVE_ABSOLUTE)) return false;
+        if (m.lLastX || m.lLastY) wuwa_input_activity::note_keyboard(now);
+        const auto c = keyboard_context();
+        std::scoped_lock lock{m_kb_mutex};
+        return m_kb.mouse(m.lLastX, m.lLastY, m.usButtonFlags != 0, c);
+    }
+    default:
+        return false;
+    }
+}
+
+std::string WuWaControlsComponent::KeyboardValue::get() const {
+    const bool flying = owner.keyboard_context().flight;
+    using A = wuwa_keyboard::Action;
+    std::scoped_lock lock{owner.m_kb_mutex};
+    const auto& k = owner.m_kb;
+    const unsigned flags = (k.vr_held() ? 1u : 0u) | (flying ? 2u : 0u);
+    char text[160]{};
+    std::snprintf(text, sizeof(text), "kb1,%u,%u,%u,%lld,%lld,%u,%u,%u,%u", k.generation(), flags,
+        static_cast<unsigned>(k.flight()), k.mouse_x(), k.mouse_y(), k.presses(A::freecam), k.presses(A::first_person),
+        k.presses(A::fixed_camera), k.presses(A::animation));
+    return text;
+}
+
+bool WuWaControlsComponent::keyboard_in_use() const {
+    return m_kb_vr_key->value() != 0 && wuwa_input_activity::keyboard_last();
+}
+
+std::string WuWaControlsComponent::vr_key_name() const {
+    const int choice = m_kb_vr_key->value();
+    if (choice == 2) return wuwa_l10n::text(N_("Right Ctrl"));
+    if (choice != 1) return {};
+    // What the key types on this layout: ` (US, UK), ^ (German), the squared sign (French)...
+    const auto layout = game_layout();
+    const UINT vk = MapVirtualKeyExW(0x29, MAPVK_VSC_TO_VK, layout);
+    const wchar_t ch = static_cast<wchar_t>(MapVirtualKeyExW(vk, MAPVK_VK_TO_CHAR, layout) & 0xffff);
+    if (ch > 32) {
+        char utf8[8]{};
+        const int n = WideCharToMultiByte(CP_UTF8, 0, &ch, 1, utf8, sizeof(utf8) - 1, nullptr, nullptr);
+        if (n > 0) return std::string(utf8, n);
+    }
+    return "`";
+}
+
+void WuWaControlsComponent::update_key_names() const {
+    static HKL named{};
+    static int choice = -1;
+    const auto layout = game_layout();
+    if (layout == named && choice == m_kb_vr_key->value()) return;
+    named = layout;
+    choice = m_kb_vr_key->value();
+    // The freecam keys by position: W A S D, or Z Q S D on AZERTY.
+    std::array<std::string, 4> move{"W", "A", "S", "D"};
+    constexpr UINT positions[]{0x11, 0x1e, 0x1f, 0x20};
+    for (size_t i = 0; i < move.size(); ++i) {
+        const UINT vk = MapVirtualKeyExW(positions[i], MAPVK_VSC_TO_VK, layout);
+        if (vk >= 'A' && vk <= 'Z') move[i] = std::string(1, static_cast<char>(vk));
+    }
+    wuwa_sheet::set_key_names(vr_key_name(), move);
+}
+
+void WuWaControlsComponent::set_adjustment(bool on) {
+    const bool next = on && m_mouse->value();
+    if (m_adjust.value() == next) return;
+    m_adjust.value() = next;
+    if (!next) { release_input(); m_input_armed = false; }
+    spdlog::info("[WuWaControls] HUD / mouse mode {}", next ? "on" : "off");
+}
+
+void WuWaControlsComponent::run_keyboard_action(wuwa_keyboard::Action action) {
+    using A = wuwa_keyboard::Action;
+    auto& vr = VR::get();
+    bool menu{};
+    {
+        std::scoped_lock lock{m_bridge_mutex};
+        menu = m_game_menu;
+    }
+    switch (action) {
+    case A::full_or_stereo: {
+        // As LT + RT, then click R3: either screen goes to full VR, full VR to the stereo screen.
+        const bool screen = vr->is_using_mono_theatre() || vr->is_using_2d_screen();
+        vr->set_mono_theatre_manually(false);
+        vr->set_stereo_screen_manually(!screen);
+        m_kb_mono_return = -1;
+        spdlog::info("[WuWaView] keyboard -> {}", screen ? "full VR" : "stereo screen");
+        break;
+    }
+    case A::mono: {
+        // As LT + RT, then hold R3: mono theatre, and back to the view it was entered from.
+        if (vr->is_using_mono_theatre()) {
+            const bool stereo = m_kb_mono_return == 1;
+            vr->set_mono_theatre_manually(false);
+            vr->set_stereo_screen_manually(stereo);
+            spdlog::info("[WuWaView] keyboard -> {}", stereo ? "stereo screen" : "full VR");
+        } else {
+            m_kb_mono_return = vr->is_using_2d_screen() ? 1 : 0;
+            vr->set_mono_theatre_manually(true);
+            spdlog::info("[WuWaView] keyboard -> mono theatre");
+        }
+        break;
+    }
+    case A::portal: set_value("WindowMode_Enabled", setting_on("WindowMode_Enabled") ? "false" : "true"); break;
+    // As L3 + RT: not in a game menu.
+    case A::diorama: if (!menu) vr->set_diorama_enabled(!vr->is_diorama_enabled()); break;
+    case A::blur: m_stereo_dof->value() = !m_stereo_dof->value(); break;
+    case A::hide_near: m_hide_near->value() = !m_hide_near->value(); break;
+    case A::ui: set_value("VR_EnableGUI", vr->is_gui_enabled() ? "false" : "true"); break;
+    case A::recenter: recenter(m_recenter_position->value()); break;
+    case A::adjust: set_adjustment(!m_adjust.value()); break;
+    case A::pin_card: m_pin_card->value() = !m_pin_card->value(); break;
+    case A::screenshot: key(VK_LWIN, true); key(VK_SNAPSHOT, true); key(VK_SNAPSHOT, false); key(VK_LWIN, false); break;
+    default: break;
+    }
+}
+
+void WuWaControlsComponent::advance_keyboard(float delta) {
+    std::array<uint32_t, wuwa_keyboard::action_count> presses{};
+    uint32_t chords{};
+    long long wheel{};
+    {
+        std::scoped_lock lock{m_kb_mutex};
+        for (int i = 0; i < wuwa_keyboard::action_count; ++i) presses[i] = m_kb.presses(static_cast<wuwa_keyboard::Action>(i));
+        chords = m_kb.vr_held() ? m_kb.chords() : 0u;
+        wheel = m_kb.wheel_total();
+    }
+    for (int i = 1; i < wuwa_keyboard::action_count; ++i) {
+        const auto action = static_cast<wuwa_keyboard::Action>(i);
+        const uint32_t count = presses[i] - m_kb_done[i];
+        m_kb_done[i] = presses[i];
+        if (script_action(action)) continue;
+        // Toggles pressed twice between two frames end where they began.
+        for (uint32_t n = 0; n < (std::min)(count, 4u); ++n) run_keyboard_action(action);
+    }
+    bool menu{};
+    {
+        std::scoped_lock lock{m_bridge_mutex};
+        menu = m_game_menu;
+    }
+    const int mode = m_camera->value();
+    const bool adjust = m_adjust.value() && m_mouse->value();
+    // The VR key + wheel: HUD nearer / farther in HUD / mouse mode, else the fixed camera closer / farther.
+    // Wheel up (away from you) brings it nearer, as LT does.
+    const float steps = static_cast<float>(wheel - m_kb_wheel_done) / WHEEL_DELTA;
+    m_kb_wheel_done = wheel;
+    if (steps != 0.0f) {
+        m_kb_wheel_lit.store(GetTickCount64());
+        if (adjust) {
+            set_value("UI_Distance", std::to_string(std::clamp(value_float("UI_Distance", 2.0f) - steps * 0.1f, 0.5f, 10.0f)));
+        } else if (mode == 1 && !menu) {
+            m_fixed_distance->value() = std::clamp(m_fixed_distance->value() - steps * 20.0f, -100.0f, 1500.0f);
+        }
+    }
+    // The VR key + E / Q: HUD up / down in HUD / mouse mode, else the camera up / down in first person and the
+    // fixed camera (E + Q: its default height again). In the game camera they nudge story shots (StoryValue).
+    const bool up = (chords & wuwa_keyboard::State::up_bit) != 0, down = (chords & wuwa_keyboard::State::down_bit) != 0;
+    if (adjust) {
+        if (up != down)
+            set_value("UI_Y_Offset", std::to_string(std::clamp(value_float("UI_Y_Offset", 0.0f) + (up ? 0.5f : -0.5f) * delta, -10.0f, 10.0f)));
+    } else if (!menu && (mode == 1 || mode == 3)) {
+        auto& height = mode == 3 ? m_fp_up->value() : m_fixed_height->value();
+        const float fallback = mode == 3 ? 0.0f : 30.0f, highest = mode == 3 ? 100.0f : 400.0f, speed = mode == 3 ? 15.0f : 60.0f;
+        if (up && down) {
+            if (!m_kb_reset_held) height = fallback;
+        } else if (up != down) {
+            height = std::clamp(height + (up ? speed : -speed) * delta, -100.0f, highest);
+        }
+    }
+    m_kb_reset_held = up && down;
+}
+
 void WuWaControlsComponent::recenter(bool reset_position) {
     const auto& vr=VR::get();
     if (!vr->is_hmd_active()) return;

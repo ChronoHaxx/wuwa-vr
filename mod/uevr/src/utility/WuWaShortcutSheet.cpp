@@ -1,6 +1,7 @@
 #define NOMINMAX
 #include "WuWaShortcutSheet.hpp"
 #include "WuWaLocalization.hpp"
+#include "WuWaKeyboard.hpp"
 #include "uevr-imgui/font_robotomedium.hpp"
 #include <algorithm>
 #include <cfloat>
@@ -15,6 +16,9 @@ namespace wuwa_sheet {
 namespace {
 ImFontAtlas* owner{};
 ImFont* fallback{};
+// set_key_names: the VR key and the freecam keys as this keyboard layout names them.
+std::string vr_key_label{"`"};
+std::array<std::string, 4> move_labels{"W", "A", "S", "D"};
 
 // The site's palette (site/style.css), so the cards match the website's card.
 constexpr ImU32 card_bg = IM_COL32(13, 12, 10, 248);
@@ -59,6 +63,7 @@ struct Canvas {
     float s{1.0f};
     ImVec2 origin{};
     bool rtl{}, vr{};
+    bool keyboard{}; // {tokens} are keyboard keys: no controller colours or VR controller names
     ImVec2 at(float x, float y) const { return {origin.x + x * s, origin.y + y * s}; }
     float width(float px, const std::string& text) const { return font->CalcTextSizeA(px * s, FLT_MAX, 0.0f, text.c_str()).x / s; }
     void text(float x, float y, float px, ImU32 color, const std::string& visual) const {
@@ -66,7 +71,7 @@ struct Canvas {
     }
 };
 
-Canvas canvas(ImDrawList* list, ImVec2 size, ImFont* font, bool vr = false) {
+Canvas canvas(ImDrawList* list, ImVec2 size, ImFont* font, bool vr = false, bool keyboard = false) {
     Canvas c;
     c.list = list;
     c.font = font;
@@ -75,14 +80,27 @@ Canvas canvas(ImDrawList* list, ImVec2 size, ImFont* font, bool vr = false) {
     c.s = (std::min)(size.x / 1600.0f, size.y / 900.0f);
     c.origin = {(size.x - 1600.0f * c.s) * 0.5f, (size.y - 900.0f * c.s) * 0.5f};
     c.rtl = wuwa_l10n::right_to_left();
-    c.vr = vr;
+    c.vr = vr && !keyboard;
+    c.keyboard = keyboard;
     return c;
 }
 
 // What a {token} names, as printed on its key cap. VR controllers: UEVR maps the
 // triggers to LT / RT, the grips to LB / RB, the stick clicks to L3 / R3, the
 // left controller's lower button to B and the right's upper button to X.
-std::string key_name(const std::string& token, bool vr) {
+std::string key_name(const Canvas& c, const std::string& token) {
+    if (c.keyboard) {
+        // {VR}: the VR key; {W} {A} {S} {D}: the freecam keys by position; named keys are translated.
+        if (token == "VR") return vr_key_label;
+        if (token == "W") return move_labels[0];
+        if (token == "A") return move_labels[1];
+        if (token == "S") return move_labels[2];
+        if (token == "D") return move_labels[3];
+        static constexpr const char* named[]{N_("Wheel"), N_("Space"), N_("Ctrl"), N_("Shift"), N_("Insert")};
+        for (const char* name : named) if (token == name) return tr(token);
+        return token;
+    }
+    const bool vr = c.vr;
     if (vr) {
         if (token == "LT") return tr("L trigger");
         if (token == "RT") return tr("R trigger");
@@ -97,24 +115,24 @@ std::string key_name(const std::string& token, bool vr) {
     if (token == "View" || token == "Menu") return tr(token);
     return token;
 }
-ImU32 key_color(const std::string& token, bool vr) {
-    if (vr) return gold_hi;
+ImU32 key_color(const Canvas& c, const std::string& token) {
+    if (c.vr || c.keyboard) return gold_hi;
     return token == "A" ? green : token == "B" ? red : token == "X" ? blue : token == "Y" ? yellow : gold_hi;
 }
 
 // A key cap: the name on a dark cap with a heavier lower edge, gold when lit.
 float chip_width(const Canvas& c, float px, const std::string& token) {
-    float w = c.width(px, key_name(token, c.vr)) + px * 0.64f;
+    float w = c.width(px, key_name(c, token)) + px * 0.64f;
     if (token == "Down") w += px * 0.7f;
     return (std::max)(w, px * 1.6f);
 }
 float chip(const Canvas& c, float x, float middle, float px, const std::string& token, bool lit = false) {
-    const auto name = key_name(token, c.vr);
+    const auto name = key_name(c, token);
     const float w = chip_width(c, px, token), h = px * 1.45f, top = middle - h * 0.5f;
     c.list->AddRectFilled(c.at(x, top), c.at(x + w, top + h), lit ? gold : key_bg, 7.0f * c.s);
     c.list->AddRect(c.at(x, top), c.at(x + w, top + h), lit ? lit_line : key_line, 7.0f * c.s, 0, 1.2f * c.s);
     c.list->AddLine(c.at(x + 5.0f, top + h - 1.0f), c.at(x + w - 5.0f, top + h - 1.0f), lit ? lit_line : key_line, 2.5f * c.s);
-    const ImU32 color = lit ? lit_text : key_color(token, c.vr);
+    const ImU32 color = lit ? lit_text : key_color(c, token);
     const float tx = token == "Down" ? x + px * 0.32f : x + (w - c.width(px, name)) * 0.5f;
     c.text(tx, middle - px * 0.56f, px, color, name);
     if (token == "Down") {
@@ -449,6 +467,103 @@ void l3_card(const Canvas& c, const CardState& st) {
     rich(c, 1542, 830, 25, muted, "Everything else: {L3}+{R3} opens the WuWa VR menu", 1542 - x, 1.0f);
 }
 
+// One row of the keyboard card: its key caps ("E/Q" draws two), what they do and an optional state pill.
+struct KeyRow {
+    const char* keys;
+    const char* english;
+    bool lit;
+    const char* state = nullptr;
+    ImU32 state_color = 0;
+    bool dim = false;               // does nothing in the current camera
+    const char* note = nullptr;     // a smaller second line under the label
+    const char* value = nullptr;    // a pill with text already translated (a value), in place of state
+};
+void key_row(const Canvas& c, float x, float top, float w, const KeyRow& row) {
+    constexpr float h = 60.0f, key_px = 26.0f;
+    const float middle = top + h * 0.5f;
+    c.list->AddRectFilled(c.at(x, top), c.at(x + w, top + h), row.lit ? row_lit_bg : row_bg, 8.0f * c.s);
+    c.list->AddRect(c.at(x, top), c.at(x + w, top + h), row.lit ? lit_line : row_line, 8.0f * c.s, 0, (row.lit ? 2.5f : 1.0f) * c.s);
+    std::vector<std::string> caps;
+    for (std::string_view rest{row.keys};;) {
+        const auto slash = rest.find('/');
+        caps.emplace_back(rest.substr(0, slash));
+        if (slash == std::string_view::npos) break;
+        rest.remove_prefix(slash + 1);
+    }
+    const float slash_w = c.width(key_px, "/") + 8.0f;
+    float keys_w = 0.0f;
+    for (size_t i = 0; i < caps.size(); ++i) keys_w += chip_width(c, key_px, caps[i]) + (i ? slash_w : 0.0f);
+    // Left to right: caps, text, pill; right to left mirrored.
+    float key_x = c.rtl ? x + w - 16.0f - keys_w : x + 16.0f;
+    for (size_t i = 0; i < caps.size(); ++i) {
+        if (i) { c.text(key_x + 4.0f, middle - key_px * 0.56f, key_px, muted, "/"); key_x += slash_w; }
+        key_x += chip(c, key_x, middle, key_px, caps[i], row.lit);
+    }
+    const std::string state = row.value ? std::string{row.value} : row.state ? tr(row.state) : std::string{};
+    const float state_w = state.empty() ? 0.0f : pill_text_width(c, state, 18.0f) + 12.0f;
+    const float text_w = w - 32.0f - keys_w - 16.0f - state_w;
+    const float text_x = c.rtl ? x + 16.0f + state_w : x + 16.0f + keys_w + 16.0f;
+    const float align = c.rtl ? 1.0f : 0.0f;
+    if (row.note) {
+        draw_fit(c, fit(c, row.english, 25.0f, text_w, false), text_x, middle - 12.0f, row.dim ? muted : ink, align, text_w);
+        draw_fit(c, fit(c, row.note, 19.0f, text_w, false), text_x, middle + 14.0f, row.dim ? muted : accent, align, text_w);
+    } else {
+        draw_fit(c, fit(c, row.english, 27.0f, text_w), text_x, middle, row.dim ? muted : ink, align, text_w);
+    }
+    if (!state.empty()) pill_text(c, c.rtl ? x + 16.0f : x + w - 16.0f - state_w + 12.0f, middle, 18.0f, state, row.state_color);
+}
+
+// Hold the VR key (1.2.7): the keyboard version of the L3 and views cards together.
+void keyboard_card(const Canvas& c, const CardState& st) {
+    header(c, "Hold {VR}, then press", "{Insert} opens the WuWa VR menu");
+    using wuwa_keyboard::Action;
+    const auto held = [&](Action a) { return (st.keys & (1u << static_cast<int>(a))) != 0; };
+    const bool up = (st.keys & wuwa_keyboard::State::up_bit) != 0, down = (st.keys & wuwa_keyboard::State::down_bit) != 0;
+    const bool camera_moves = st.first_person || st.fixed_camera;
+    std::string nudge;
+    if (!st.mouse_mode && st.story_nudge && std::fabs(st.story_nudge_cm) >= 1.0f) {
+        char text[48]{};
+        std::snprintf(text, sizeof(text), wuwa_l10n::translate("%+.0f cm").c_str(), st.story_nudge_cm);
+        nudge = wuwa_l10n::visual(text);
+    }
+    // E / Q follow the camera in use, as Y / X do on the L3 card; in HUD / mouse mode they move the HUD.
+    const char* eq_label = st.mouse_mode ? N_("HUD up / down") : st.story_nudge && !camera_moves ? N_("Story camera: nearer / back") : N_("Camera up / down");
+    const char* eq_note = st.mouse_mode ? nullptr : st.story_nudge && !camera_moves ? N_("E + Q together: back to the game's spot")
+        : camera_moves ? N_("E + Q together: back to default") : N_("Only in first person, the fixed camera and story scenes");
+    const bool wheel_works = st.mouse_mode || st.fixed_camera;
+    const KeyRow left[] = {
+        {"1", N_("Full VR / stereo screen"), held(Action::full_or_stereo), st.view == 1 ? N_("Stereo screen") : nullptr, green},
+        {"2", N_("Mono theatre"), held(Action::mono), st.view == 2 ? N_("On") : nullptr, green},
+        {"3", N_("Portal window"), held(Action::portal), st.portal ? N_("On") : nullptr, green},
+        {"4", N_("Diorama (10\xC3\x97)"), held(Action::diorama), st.diorama ? N_("On") : nullptr, green},
+        {"B", N_("Blur (depth of field)"), held(Action::blur), st.blur ? N_("Blur on") : N_("Blur off"), st.blur ? green : muted},
+        {"N", N_("Hide characters at your eyes"), held(Action::hide_near), st.hide_near ? N_("Hiding on") : N_("Hiding off"), st.hide_near ? green : muted},
+        {"H", N_("Show / hide game UI"), held(Action::ui), st.ui_hidden ? N_("Hidden") : nullptr, red},
+        {"R", N_("Recenter view"), held(Action::recenter)},
+        {"P", N_("Screenshot"), held(Action::screenshot)},
+    };
+    const KeyRow right[] = {
+        {"F", N_("First person"), held(Action::first_person), st.first_person ? N_("On") : nullptr, green},
+        {"T", N_("Game / fixed camera"), held(Action::fixed_camera), st.fixed_camera ? N_("Fixed") : nullptr, green},
+        {"C", N_("Freecam"), held(Action::freecam), st.freecam ? N_("On") : nullptr, green},
+        {"G", N_("First person: full animation"), held(Action::animation), nullptr, 0, !st.first_person},
+        {"E/Q", eq_label, up || down, nullptr, green, !camera_moves && !st.story_nudge && !st.mouse_mode, eq_note,
+            nudge.empty() ? nullptr : nudge.c_str()},
+        {"Wheel", st.mouse_mode ? N_("HUD nearer / farther") : N_("Fixed camera closer / farther"), st.wheel_lit, nullptr, 0,
+            !wheel_works, wheel_works ? nullptr : N_("In the fixed camera and HUD / mouse mode")},
+        {"M", N_("HUD / mouse mode"), held(Action::adjust), st.mouse_mode ? N_("On") : nullptr, green},
+        {"K", N_("Keep this card open"), held(Action::pin_card), st.pinned ? N_("Pinned") : nullptr, green},
+    };
+    constexpr float column_w = 722.0f, top = 128.0f, step = 72.0f;
+    // Views and the screen on one side, cameras and the card on the other (mirrored right to left).
+    const float first_x = c.rtl ? 820.0f : 58.0f, second_x = c.rtl ? 58.0f : 820.0f;
+    for (size_t i = 0; i < std::size(left); ++i) key_row(c, first_x, top + i * step, column_w, left[i]);
+    for (size_t i = 0; i < std::size(right); ++i) key_row(c, second_x, top + i * step, column_w, right[i]);
+    c.list->AddLine(c.at(58, 790), c.at(1542, 790), row_line, 1.2f * c.s);
+    rich(c, c.rtl ? 1542.0f : 58.0f, 818, 25, st.freecam ? ink : muted,
+        "Freecam: {W}{A}{S}{D} move, the mouse looks, {Space} / {Ctrl} up / down, {Shift} faster (twice: turbo)", 1484, c.rtl ? 1.0f : 0.0f);
+}
+
 // Both ways: R3 switches between two views and back (test 17k).
 void arrow2(const Canvas& c, float x, float y) {
     c.list->AddLine(c.at(x - 14, y), c.at(x + 14, y), accent, 3.0f * c.s);
@@ -536,12 +651,24 @@ void views_card(const Canvas& c, const CardState& st) {
     c.text(1542.0f - c.width(f.px, f.lines[0]), 832, f.px, muted, f.lines[0]);
 }
 
-void centered(const Canvas& c, ImVec2 size, float y, float px, ImU32 color, const char* english) {
-    const auto value = wuwa_l10n::text(english);
+void centered_text(const Canvas& c, ImVec2 size, float y, float px, ImU32 color, const std::string& value) {
     const float initial = c.font->CalcTextSizeA(px * c.s, FLT_MAX, 0.0f, value.c_str()).x;
     const float fitted = px * c.s * (std::min)(1.0f, 1350.0f * c.s / (std::max)(initial, 1.0f));
     const float w = c.font->CalcTextSizeA(fitted, FLT_MAX, 0.0f, value.c_str()).x;
     c.list->AddText(c.font, fitted, {size.x * 0.5f - w * 0.5f, c.origin.y + y * c.s}, color, value.c_str());
+}
+void centered(const Canvas& c, ImVec2 size, float y, float px, ImU32 color, const char* english) {
+    centered_text(c, size, y, px, color, wuwa_l10n::text(english));
+}
+// English with one %s for the VR key's name: formatted after translating, then put in visual order.
+// A one-character name (` on US / UK layouts, ^ on German) is easy to miss in a line of text, so it shows as [`].
+void centered_key(const Canvas& c, ImVec2 size, float y, float px, ImU32 color, const char* english) {
+    const auto lead = static_cast<unsigned char>(vr_key_label.empty() ? 0 : vr_key_label[0]);
+    const size_t one_character = lead < 0x80 ? 1 : lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : 4;
+    const std::string name = vr_key_label.size() == one_character ? "[" + vr_key_label + "]" : vr_key_label;
+    char text[256]{};
+    std::snprintf(text, sizeof(text), wuwa_l10n::translate(english).c_str(), name.c_str());
+    centered_text(c, size, y, px, color, wuwa_l10n::visual(text));
 }
 }
 
@@ -550,19 +677,26 @@ void reserve_font(ImFontAtlas* atlas) {
     fallback = atlas->AddFontFromMemoryCompressedTTF(RobotoMedium_compressed_data, RobotoMedium_compressed_size, 32.0f);
 }
 
+void set_key_names(const std::string& vr_key, const std::array<std::string, 4>& move) {
+    if (!vr_key.empty()) vr_key_label = vr_key;
+    move_labels = move;
+}
+
 void draw_card(ImDrawList* draw, ImVec2 size, ImFont* font, const CardState& state) {
-    const auto c = canvas(draw, size, font, state.vr_controllers);
+    const bool keyboard = state.card == Card::keyboard;
+    const auto c = canvas(draw, size, font, state.vr_controllers, keyboard);
     if (!c.font) return;
     draw->PushClipRect(c.at(0, 0), c.at(1600, 900), true);
     frame(c);
-    if (state.card == Card::views) views_card(c, state);
+    if (keyboard) keyboard_card(c, state);
+    else if (state.card == Card::views) views_card(c, state);
     else l3_card(c, state);
     draw->PopClipRect();
 }
 
 void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& lead, const std::string& line, bool vr_controllers,
-    const std::string& note) {
-    const auto c = canvas(draw, size, font, vr_controllers);
+    const std::string& note, bool keyboard) {
+    const auto c = canvas(draw, size, font, vr_controllers, keyboard);
     if (!c.font) return;
     constexpr float px = 26.0f, top = 618.0f, h = 58.0f;
     const auto lead_text = lead.empty() ? std::string{} : tr(lead);
@@ -588,7 +722,7 @@ void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& le
     }
 }
 
-void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool shortcut_available, bool menu_detected) {
+void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool shortcut_available, bool menu_detected, bool keyboard) {
     const auto c = canvas(draw, size, font);
     if (!c.font) return;
     draw->PushClipRect(c.at(0, 0), c.at(1600, 900), true);
@@ -598,7 +732,8 @@ void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool sh
         // of that cursor signal cannot strand the player in a blurred menu.
         draw->AddRectFilled(c.at(175, 535), c.at(1425, 680), IM_COL32(55, 8, 12, 232), 18 * c.s);
         centered(c, size, 552, 42, IM_COL32(255, 100, 104, 255), "GAME UI HIDDEN - MENUS ARE HIDDEN TOO");
-        centered(c, size, 609, 34, IM_COL32(255, 255, 255, 255), shortcut_available ? "L3 + B  =  SHOW UI" : "INSERT > WuWa Controls > Show game UI now");
+        if (shortcut_available && keyboard) centered_key(c, size, 609, 34, IM_COL32(255, 255, 255, 255), "%s + H  =  SHOW UI");
+        else centered(c, size, 609, 34, IM_COL32(255, 255, 255, 255), shortcut_available ? "L3 + B  =  SHOW UI" : "INSERT > Quick > Show game UI");
         draw->PopClipRect();
         return;
     }
@@ -606,13 +741,18 @@ void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool sh
     draw->AddRect(c.at(100, 230), c.at(1500, 670), IM_COL32(255, 65, 72, 255), 28 * c.s, 0, 5 * c.s);
     centered(c, size, 269, 84, IM_COL32(255, 90, 96, 255), "GAME UI IS HIDDEN");
     centered(c, size, 373, 39, IM_COL32(255, 235, 236, 255), "Show UI to see this menu");
-    centered(c, size, 454, 52, IM_COL32(255, 255, 255, 255), shortcut_available ? "L3 + B  =  SHOW UI" : "INSERT  =  OPEN UEVR");
-    centered(c, size, 523, 28, IM_COL32(255, 206, 210, 255), shortcut_available ? "L3 means click and hold the left stick, then press B." : "WuWa Controls > Show game UI now");
-    centered(c, size, 601, 26, IM_COL32(255, 206, 210, 255), shortcut_available ? "Or: UEVR > WuWa Controls > Show game UI now" : "Polar shortcuts are disabled or bypassed.");
+    if (shortcut_available && keyboard) {
+        centered_key(c, size, 454, 52, IM_COL32(255, 255, 255, 255), "%s + H  =  SHOW UI");
+        centered_key(c, size, 523, 28, IM_COL32(255, 206, 210, 255), "Hold %s, then press H.");
+    } else {
+        centered(c, size, 454, 52, IM_COL32(255, 255, 255, 255), shortcut_available ? "L3 + B  =  SHOW UI" : "INSERT  =  WUWA VR MENU");
+        centered(c, size, 523, 28, IM_COL32(255, 206, 210, 255), shortcut_available ? "L3 means click and hold the left stick, then press B." : "Then Quick > Show game UI");
+    }
+    centered(c, size, 601, 26, IM_COL32(255, 206, 210, 255), shortcut_available ? "Or: WuWa VR menu (L3 + R3 or Insert) > Quick > Show game UI" : "Polar shortcuts are disabled or bypassed.");
     draw->PopClipRect();
 }
 
-void draw_mouse_mode_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool adjustment, bool hidden_menu) {
+void draw_mouse_mode_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool adjustment, bool hidden_menu, bool keyboard) {
     const auto c = canvas(draw, size, font);
     if (!c.font) return;
     const float top = hidden_menu ? 700.0f : 590.0f;
@@ -620,8 +760,13 @@ void draw_mouse_mode_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool a
     draw->AddRectFilled(c.at(90, top), c.at(1510, top + 180), IM_COL32(43, 31, 7, 246), 18 * c.s);
     draw->AddRect(c.at(90, top), c.at(1510, top + 180), IM_COL32(255, 192, 60, 255), 18 * c.s, 0, 3 * c.s);
     centered(c, size, top + 15, 43, IM_COL32(255, 208, 99, 255), "HUD / MOUSE MODE ON");
-    centered(c, size, top + 70, 36, IM_COL32(255, 255, 255, 255), adjustment ? "L3 + LB  =  RETURN TO GAME CONTROLS" : "UEVR > WuWa Controls > Exit mouse mode now");
-    centered(c, size, top + 124, 27, IM_COL32(245, 224, 181, 255), adjustment ? "Click left stick + left bumper, then release all controls." : "Activated automatically in this menu: cursor only. L3 + R3 opens the WuWa VR menu.");
+    if (adjustment && keyboard) {
+        centered_key(c, size, top + 70, 36, IM_COL32(255, 255, 255, 255), "%s + M  =  RETURN TO GAME CONTROLS");
+        centered(c, size, top + 124, 27, IM_COL32(245, 224, 181, 255), "Or: WuWa VR menu > HUD > HUD / mouse mode: Off");
+    } else {
+        centered(c, size, top + 70, 36, IM_COL32(255, 255, 255, 255), adjustment ? "L3 + LB  =  RETURN TO GAME CONTROLS" : "WuWa VR menu > HUD > HUD / mouse mode: Off");
+        centered(c, size, top + 124, 27, IM_COL32(245, 224, 181, 255), adjustment ? "Click left stick + left bumper, then release all controls." : "Activated automatically in this menu: cursor only. L3 + R3 opens the WuWa VR menu.");
+    }
     draw->PopClipRect();
 }
 }

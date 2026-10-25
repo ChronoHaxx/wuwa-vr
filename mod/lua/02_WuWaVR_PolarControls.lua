@@ -28,6 +28,7 @@ local stick_view_until=-100
 local tick_sequence=0
 local mesh_checked = -100
 local acro_arm_requested=false
+local kb_flying=false -- the keyboard and mouse flew the freecam this tick
 local collision_cache,collision_report,collision_error=nil,"",nil
 local late_anchor_report="not sampled"
 local fields = {"wButtons", "bLeftTrigger", "bRightTrigger", "sThumbLX", "sThumbLY", "sThumbRX", "sThumbRY"}
@@ -691,6 +692,72 @@ local function process_pad(index,state,result)
     s.previous=b
 end
 
+-- Keyboard and mouse (1.2.7, utility/WuWaKeyboard.hpp): the plugin owns the keys. With the VR key held
+-- (` by default) it carries out most shortcuts itself and counts the camera ones for this script, which keeps
+-- the camera to go back to; in freecam it reports the flight keys and the mouse movement it kept from the game.
+local kb={gen=nil,counts=nil,mx=0,my=0,dx=0,dy=0,flags=0,keys=0,shift=false,shift_at=-100,turbo=false,throttle=0}
+local KB={forward=1,left=2,back=4,right=8,up=16,down=32,fast=64}
+local function read_keyboard()
+    local raw=get("WuWaControls_Keyboard") or ""
+    local f={raw:match("^kb1,(%d+),(%d+),(%d+),(-?%d+),(-?%d+),(%d+),(%d+),(%d+),(%d+)$")}
+    kb.dx,kb.dy=0,0
+    if #f~=9 then kb.flags=0; kb.keys=0; kb.gen=nil; return end
+    for i=1,9 do f[i]=math.tointeger(tonumber(f[i])) or 0 end
+    local counts={f[6],f[7],f[8],f[9]}
+    -- A new generation (focus came back): resync without acting on what was counted before.
+    if kb.gen~=f[1] or not kb.counts then
+        kb.gen=f[1]; kb.counts=counts; kb.mx=f[4]; kb.my=f[5]
+    else
+        for i,name in ipairs({"freecam","firstperson","fixed","motion"}) do
+            if counts[i]~=kb.counts[i] then actions[name]=true end
+        end
+        kb.counts=counts
+        kb.dx,kb.dy=f[4]-kb.mx,f[5]-kb.my; kb.mx,kb.my=f[4],f[5]
+    end
+    kb.flags=f[2]; kb.keys=f[3]
+end
+-- The flight keys as a pad for this freecam style, and the mouse look in degrees; nil unless the plugin says
+-- they fly the freecam now (the VR key held pauses flight, as L3 does).
+local function keyboard_pad(style,t,delta)
+    if kb.flags&2==0 or kb.flags&1~=0 then kb.shift=false; kb.turbo=false; return nil end
+    local function on(bit) return kb.keys&bit~=0 end
+    -- Shift twice within 0.3 s: turbo while held, as double RT; in acro a Shift press arms, as RB does.
+    local shift=on(KB.fast)
+    if shift and not kb.shift then
+        kb.turbo=t-kb.shift_at<=0.3; kb.shift_at=t
+        if style==3 then acro_arm_requested=true end
+    end
+    kb.shift=shift
+    if not shift then kb.turbo=false end
+    local pad={wButtons=0,bLeftTrigger=0,bRightTrigger=0,sThumbLX=0,sThumbLY=0,sThumbRX=0,sThumbRY=0,turbo=kb.turbo}
+    local x=(on(KB.right) and 32767 or 0)-(on(KB.left) and 32767 or 0)
+    local y=(on(KB.forward) and 32767 or 0)-(on(KB.back) and 32767 or 0)
+    if style==2 then
+        -- Plane: W / S speed up / down, A / D yaw, Ctrl brakes, Shift boosts; the mouse pitches and banks.
+        pad.sThumbLX=x
+        pad.bRightTrigger=on(KB.forward) and 255 or 0; pad.bLeftTrigger=on(KB.back) and 255 or 0
+        if on(KB.down) then pad.wButtons=pad.wButtons|B.LB end
+        if shift then pad.wButtons=pad.wButtons|B.RB end
+    elseif style==3 then
+        -- Acro: W / S raise / lower the throttle (it stays where it is left), A / D yaw, Ctrl stops (with
+        -- Shift: level and stop); the mouse rolls and pitches.
+        kb.throttle=math.max(0,math.min(1,kb.throttle+((on(KB.forward) and 1 or 0)-(on(KB.back) and 1 or 0))*delta*0.8))
+        pad.sThumbLX=x
+        pad.bRightTrigger=math.floor(kb.throttle*255+0.5)
+        if number("WuWaControls_AcroThrottle",0,0,1)==1 then pad.sThumbLY=math.floor(kb.throttle*65535-32768+0.5) end
+        if on(KB.down) then pad.wButtons=pad.wButtons|B.LB|(shift and B.RB or 0) end
+    else
+        -- Polar fly and hover drone: W A S D move, Space / E rise, Ctrl / Q descend, Shift boosts.
+        pad.sThumbLX=x; pad.sThumbLY=y
+        pad.bLeftTrigger=on(KB.up) and 255 or 0
+        pad.bRightTrigger=shift and 255 or 0
+        if on(KB.down) then pad.wButtons=pad.wButtons|B.LB end
+    end
+    -- Mouse up looks up; 1 = 0.05 degrees per mouse count.
+    local k=0.05*number("WuWaControls_FreeMouse",1,0.1,5)
+    return pad,{x=kb.dx*k,y=kb.dy*k}
+end
+
 cb.on_xinput_get_state(function(_,index,state,result)
     -- A real raw XInput poll makes the native HID snapshot unavailable before
     -- this callback. Ignore only VR-generated duplicate input while HID owns
@@ -960,7 +1027,7 @@ local function update_acro_view()
     -- It is attached to the drone body and does not tilt its thrust.
     free.rot=qangles(qmul(free.q,qaxis(0,1,0,-math.rad(number("WuWaControls_AcroTilt",15,0,60)))))
 end
-local function move_acro(p,delta,pawn)
+local function move_acro(p,delta,pawn,look)
     local throttle_mode=number("WuWaControls_AcroThrottle",0,0,1)
     if free.throttle_mode~=throttle_mode then free.throttle_mode=throttle_mode; free.armed=false end
     local stop=has(p.wButtons,B.LB)
@@ -975,6 +1042,10 @@ local function move_acro(p,delta,pawn)
         else free.arm_denied=true end
     end
     if not free.armed then free.velocity={x=0,y=0,z=0}; return end
+    if look and (look.x~=0 or look.y~=0) then
+        -- Mouse right rolls right, mouse up raises the nose (the body's own axes, as the sticks' rates are).
+        free.q=qmul(qmul(free.q,qaxis(1,0,0,-math.rad(look.x))),qaxis(0,1,0,math.rad(look.y)))
+    end
     local expo=number("WuWaControls_AcroExpo",0.35,0,0.9)
     local function rate(v,max_rate) local a=flight_axis(v); return math.rad(max_rate*((1-expo)*a+expo*a^3)) end
     local max_rate=number("WuWaControls_AcroRate",360,30,1000)
@@ -1002,7 +1073,7 @@ local function move_acro(p,delta,pawn)
         if not free.armed then break end
     end
 end
-local function move_freecam(p,delta,pawn)
+local function move_freecam(p,delta,pawn,look)
     local style=number("WuWaControls_FreeStyle",0,0,3)
     if not enabled("WuWaControls_FreeCollision") then collision_report="" end
     if free.style~=style then
@@ -1017,13 +1088,14 @@ local function move_freecam(p,delta,pawn)
         if style==3 then update_acro_view() end
         return
     end
-    if style==3 then move_acro(p,delta,pawn); update_acro_view(); return end
+    if style==3 then move_acro(p,delta,pawn,look); update_acro_view(); return end
     local from=point(free.pos)
     local turn=number("WuWaControls_FreeTurn",90,10,300)
     local lx,ly,rx,ry=axis(p.sThumbLX),axis(p.sThumbLY),axis(p.sThumbRX),axis(p.sThumbRY)
-    free.rot.x=math.max(-85,math.min(85,free.rot.x+ry*turn*delta))
+    local mx,my=look and look.x or 0,look and look.y or 0
+    free.rot.x=math.max(-85,math.min(85,free.rot.x+ry*turn*delta-my))
     if style==2 then
-        free.bank=((free.bank+rx*turn*delta+180)%360)-180
+        free.bank=((free.bank+rx*turn*delta+mx+180)%360)-180
         free.rot.y=(free.rot.y+(lx+math.sin(math.rad(free.bank))*0.8)*turn*delta)%360
         free.rot.z=enabled("WuWaControls_FlightRoll") and free.bank or 0
         local speed=number("WuWaControls_PlaneSpeed",300,0,3000)
@@ -1036,9 +1108,11 @@ local function move_freecam(p,delta,pawn)
         free.pos.y=free.pos.y+math.sin(yaw)*math.cos(pitch)*speed*delta
         free.pos.z=free.pos.z+math.sin(pitch)*speed*delta
     else
-        free.rot.y=(free.rot.y+rx*turn*delta)%360
+        free.rot.y=(free.rot.y+rx*turn*delta+mx)%360
         local speed=number("WuWaControls_FreeSpeed",600,10,3000)
-        if p.bRightTrigger>=30 then speed=speed*(input.turbo and 9 or 3) end
+        local turbo=p.turbo
+        if turbo==nil then turbo=input~=nil and input.turbo end
+        if p.bRightTrigger>=30 then speed=speed*(turbo and 9 or 3) end
         local yaw,pitch=math.rad(free.rot.y),math.rad(free.rot.x)
         local vertical=p.bLeftTrigger/255-(has(p.wButtons,B.LB) and 1 or 0)
         if style==0 then
@@ -1082,6 +1156,7 @@ local function tick(_,delta)
         -- Discard stale axes/chords and require a neutral sample on return.
         slots={}; actions={}; input=nil; selected=nil; p=nil
     end
+    read_keyboard()
     local held=selected and slots[selected]
     local card_now=(held and held.card and held.card_at and t-held.card_at<=0.25) and held.card or ""
     if card_now~=card_sent then set("WuWaControls_Card",card_now); card_sent=card_now end
@@ -1212,7 +1287,12 @@ local function tick(_,delta)
         local pos=point(pawn:K2_GetActorLocation()); local rot={x=base.rot.x,y=base.rot.y,z=base.rot.z}
         if mode==2 then
             if not free then free={pos=point(base.pos),rot=rot} end
-            move_freecam(not adjust and p or nil,delta,pawn)
+            -- The keys fly when the pad is idle (or absent); a pad in use keeps the freecam.
+            local keys,look=keyboard_pad(number("WuWaControls_FreeStyle",0,0,3),t,delta)
+            local fly=not adjust and p or nil
+            kb_flying=keys~=nil and not adjust
+            if kb_flying and (not fly or neutral(fly)) then fly=keys else look=nil end
+            move_freecam(fly,delta,pawn,look)
             frame={pos=point(free.pos),rot=point(free.rot)}
         elseif valid(pos) then
             local yaw=math.rad(rot.y)
@@ -1244,7 +1324,8 @@ local function tick(_,delta)
                 status=status..(free.armed and " ARMED." or free.arm_denied and " Lower throttle before arming with RB." or " Paused/disarmed; low throttle + RB arms.")
             end
             if collision_report~="" then status=status.." "..collision_report end
-            if not p then status=status.." Movement paused (no focused, fresh controller sample)." end
+            if not p and not kb_flying then status=status.." Movement paused (no focused, fresh controller sample)." end
+            if kb_flying then status=status.." Keyboard and mouse fly it." end
         end
     else
         if free then free.armed=false; free.velocity={x=0,y=0,z=0} end

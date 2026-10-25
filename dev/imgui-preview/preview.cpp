@@ -16,6 +16,7 @@
 #include "font_robotomedium.hpp"
 #include "utility/WuWaLocalization.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
+#include "utility/WuWaKeyboard.hpp"
 #include "utility/WuWaStepPlan.hpp"
 #include "utility/WuWaVrMenu.hpp"
 
@@ -341,6 +342,30 @@ int wmain(int argc, wchar_t** argv) {
         state.card = Card::views; state.view = 0; state.blur = false; state.lt = state.rt = true; state.buttons = 0x0080;
         card("card-5-hold-lt-rt-pressing-r3", state);
     }
+    // The keyboard card (1.2.7): hold the VR key; H held here, then the fixed camera with the wheel in use.
+    wuwa_sheet::set_key_names("`", {"W", "A", "S", "D"});
+    {
+        CardState state;
+        state.card = Card::keyboard; state.keys = wuwa_keyboard::State::chord_bit('H');
+        state.ui_hidden = true; state.portal = true; state.pinned = true; state.blur = true; state.first_person = true;
+        card("card-6-keyboard-pressing-h", state);
+    }
+    {
+        CardState state;
+        state.card = Card::keyboard; state.keys = wuwa_keyboard::State::up_bit; state.fixed_camera = true; state.wheel_lit = true;
+        state.view = 2; state.hide_near = true;
+        card("card-7-keyboard-fixed-camera", state);
+    }
+    scenes.push_back({"tip-3-keyboard", [](ImVec2 size) {
+        wuwa_sheet::draw_tip(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), "New:",
+            "hold {VR} to see the keyboard shortcuts \xC2\xB7 {Insert} opens the WuWa VR menu", false, {}, true);
+    }});
+    scenes.push_back({"warning-keyboard-hidden-ui", [](ImVec2 size) {
+        wuwa_sheet::draw_hidden_ui_warning(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), true, true, true);
+    }});
+    scenes.push_back({"warning-keyboard-mouse-mode", [](ImVec2 size) {
+        wuwa_sheet::draw_mouse_mode_warning(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), true, false, true);
+    }});
     scenes.push_back({"tip-1-first-launches", [](ImVec2 size) {
         wuwa_sheet::draw_tip(ImGui::GetBackgroundDrawList(), size, ImGui::GetFont(), "New:",
             "hold {L3} or {LT}+{RT} to see what each button does \xC2\xB7 {L3}+{R3} opens the WuWa VR menu", false);

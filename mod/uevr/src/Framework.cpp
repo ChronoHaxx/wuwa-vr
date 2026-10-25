@@ -974,6 +974,15 @@ bool Framework::on_message(HWND wnd, UINT message, WPARAM w_param, LPARAM l_para
         break;
     }
 
+    // WuWa keyboard and mouse shortcuts (1.2.7): ahead of UEVR's window, so a key held when the window
+    // opens is still released into nothing, and the keys the shortcuts use reach neither ImGui nor the game.
+    if (m_game_data_initialized && wuwa_test::is_wuwa()) {
+        const auto& vr = VR::get();
+        if (vr != nullptr && vr->get_wuwa_controls().on_keyboard_message(message, w_param, l_param)) {
+            return false;
+        }
+    }
+
     ImGui_ImplWin32_WndProcHandler(wnd, message, w_param, l_param);
 
     {

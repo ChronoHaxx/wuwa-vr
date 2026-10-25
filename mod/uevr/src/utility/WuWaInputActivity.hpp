@@ -28,4 +28,11 @@ inline void note(const XINPUT_GAMEPAD& pad, uint64_t now_ms) noexcept {
 
 // GetTickCount64 of the last controller input; 0 if none yet.
 inline uint64_t last_gamepad() noexcept { return gamepad_tick().load(std::memory_order_relaxed); }
+
+// And of the last key press or mouse movement the game window received (1.2.7): whichever was used last
+// decides whether the cards and notices name controller buttons or keys.
+inline std::atomic<uint64_t>& keyboard_tick() { static std::atomic<uint64_t> value{0}; return value; }
+inline void note_keyboard(uint64_t now_ms) noexcept { keyboard_tick().store(now_ms, std::memory_order_relaxed); }
+inline uint64_t last_keyboard() noexcept { return keyboard_tick().load(std::memory_order_relaxed); }
+inline bool keyboard_last() noexcept { return last_keyboard() > last_gamepad(); }
 } // namespace wuwa_input_activity

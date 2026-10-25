@@ -18,6 +18,7 @@
 #include "utility/WuWaPlayStationHid.hpp"
 #include "utility/WuWaShortcutSheet.hpp"
 #include "utility/WuWaCursorClip.hpp"
+#include "utility/WuWaKeyboard.hpp"
 
 namespace vrmod {
 
@@ -107,6 +108,18 @@ public:
     std::string auto_cinema_status() const;
     void reset_auto_cinema();
     void override_auto_cinema();
+    // Keyboard and mouse shortcuts (utility/WuWaKeyboard.hpp): Framework::on_message passes every
+    // game-window message here first; true keeps it from the game (and from UEVR's own handling).
+    bool on_keyboard_message(UINT message, WPARAM w_param, LPARAM l_param);
+    // Recenter as L3 + A does: view, horizon and portal, and the seated position when that option is on.
+    void recenter_like_shortcut() { recenter(m_recenter_position->value()); }
+    // HUD / mouse mode (L3 + LB), for the VR menu.
+    bool adjustment_on() const { return m_adjust.get() == "true"; }
+    void set_adjustment(bool on);
+    // The keyboard and mouse were used more recently than a controller: cards and hints name keys.
+    bool keyboard_in_use() const;
+    // The VR key's name on this keyboard layout ("`" on US / UK), for cards and notices; empty when off.
+    std::string vr_key_name() const;
 
 private:
     std::unique_ptr<wuwa_ps_hid::Reader> m_playstation{std::make_unique<wuwa_ps_hid::Reader>()};
@@ -451,6 +464,39 @@ private:
     const ModToggle::Ptr m_run_auto{ModToggle::create("WuWaRun_Auto", true)};
     // A one-line tip shows on the first three launches.
     const ModInt32::Ptr m_tips_shown{ModInt32::create("WuWaControls_TipsShown", 0)};
+    // Keyboard and mouse (1.2.7): the VR key, held like L3 (0 off, 1 the key left of 1, 2 Right Ctrl); WASD
+    // and the mouse flying the freecam; and its mouse look speed (1 = 0.05 degrees per mouse count, about
+    // 40 degrees per inch at 800 dpi; a first guess, to be felt in the headset).
+    const ModCombo::Ptr m_kb_vr_key{ModCombo::create("WuWaControls_KeyboardVrKey", {"Off", "Key left of 1", "Right Ctrl"}, 1)};
+    const ModToggle::Ptr m_kb_flight{ModToggle::create("WuWaControls_KeyboardFlight", true)};
+    const ModSlider::Ptr m_free_mouse{ModSlider::create("WuWaControls_FreeMouse", 0.1f, 5.0f, 1.0f)};
+    // Keyboard players' own first-launch tips (hold the VR key...), counted apart from the controller tips.
+    const ModInt32::Ptr m_kb_tips_shown{ModInt32::create("WuWaControls_KeyboardTipsShown", 0)};
+    // For the camera script: "kb1,<generation>,<flags>,<flight keys>,<mouse x>,<mouse y>,<freecam>,<first
+    // person>,<fixed camera>,<animation>". Flags: 1 the VR key is held, 2 the keys fly the freecam now.
+    // The last four count presses; the script acts when one grows and resyncs when the generation changes.
+    struct KeyboardValue : ModString {
+        WuWaControlsComponent& owner;
+        explicit KeyboardValue(WuWaControlsComponent& o) : ModString{"WuWaControls_Keyboard", ""}, owner{o} {}
+        std::string get() const override;
+        void set(const std::string&) override {}
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    } m_keyboard_value{*this};
+    mutable std::mutex m_kb_mutex;
+    wuwa_keyboard::State m_kb;              // window thread writes, others read (m_kb_mutex)
+    uint64_t m_kb_vr_since{};               // when the VR key went down (m_kb_mutex)
+    bool m_kb_swallow_char{};               // the next WM_CHAR belongs to a swallowed key (window thread)
+    std::array<uint32_t, wuwa_keyboard::action_count> m_kb_done{}; // presses acted on (frame thread)
+    long long m_kb_wheel_done{};
+    bool m_kb_reset_held{};                 // E + Q held: this press already reset the height
+    int m_kb_mono_return{-1};               // the view ` + 2 left for mono theatre (0 full VR, 1 stereo screen)
+    std::atomic<uint64_t> m_kb_wheel_lit{}; // when the VR key + wheel last did something (lights its row)
+    void advance_keyboard(float delta);
+    void run_keyboard_action(wuwa_keyboard::Action action);
+    wuwa_keyboard::Context keyboard_context() const;
+    // Hands the card the VR key's and the freecam keys' names on the current layout (cached per layout).
+    void update_key_names() const;
     // What the camera script reports held: "l3:<buttons>:<lt>:<rt>", "views:..." or nothing.
     struct CardValue : ModString {
         CardValue() : ModString{"WuWaControls_Card", ""} {}
@@ -521,6 +567,7 @@ private:
     const ModSlider::Ptr m_id169_bottom{ModSlider::create("WuWaPrivacy_Profile169Bottom",0.0f,1.0f,0.41f)};
 
     struct MouseState { bool active{}, utility{}; int buttons{}, x{}, y{}; };
+    std::atomic<uint64_t> m_pad_used_ms{}; // the camera script last reported a pressed button or moved stick
     mutable std::mutex m_bridge_mutex;
     MouseState m_mouse_state{};
     bool m_game_menu{};

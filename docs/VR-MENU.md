@@ -131,12 +131,18 @@ agree.
 Tabs shrink to fit the header; the title hides when they need the room. A red
 REC badge with the elapsed time shows while recording.
 
-1. **Quick:** view (full VR, stereo screen, mono theatre), camera, VR
+1. **Quick:** view (full VR, stereo screen, mono theatre), camera, **Show
+   game UI** (`VR_EnableGUI`) and **Portal window** (`WindowMode_Enabled`;
+   both 1.2.7, owner 25 Oct: hiding the game UI had been a shortcut only), VR
    controllers, diorama, HUD size and distance, record video, treadmill run
-   (its clock in place of On), recenter.
+   (its clock in place of On), recenter. **Recenter view** recenters as L3 + A
+   does (view, horizon, portal, and the seated position when *L3 + A resets
+   position too* is on), here and on the Camera page.
 2. **Test:** only while a plan is loaded (see below).
 3. **Camera:** the camera mode, then only the options for that mode: fixed
-   distance and height; freecam style, speed, turn speed and collision; first
+   distance and height; freecam style, speed, turn speed, the keyboard keys
+   for that style, **Mouse look speed** (`WuWaControls_FreeMouse`, 1.2.7) and
+   collision; first
    person motion, body visibility and level horizon. Then, for every mode:
    world scale, the camera offset (forward / back, right / left, up / down in
    cm, and reset), the **diorama camera** (its own forward / back, right /
@@ -155,7 +161,9 @@ REC badge with the elapsed time shows while recording.
    distance, **depth of field (experiment)**, the cinematic scene note,
    automatic cinematic screen and what story scenes and story pictures use
    (see below), matched framing.
-5. **HUD:** size, distance, **16:9 UI layout** (`VR_WuWaUiWindowSize`,
+5. **HUD:** **Show game UI**, **HUD / mouse mode** (the L3 + LB mode, off at
+   each launch; greyed out while controller mouse shortcuts are off), size,
+   distance, **16:9 UI layout** (`VR_WuWaUiWindowSize`,
    default on; see below), **Character screen in the taller layout**
    (`VR_WuWaUiCharacterTall`, with 16:9), **Story scenes in 16:9** (`VR_WuWaUiStoryWindowSize`,
    default on; only with the taller layout), **HUD shape (full VR)** (`UI_WuWaHudShape`,
@@ -166,8 +174,11 @@ REC badge with the elapsed time shows while recording.
    slot Automatic chose), **Sharing with Xbox / treadmill**, **Controller
    slot** (Automatic first), the button map, then **Treadmill**: the run
    switch, the run line (time, walking time, distance in the game) and **Start
-   and end runs automatically** (`WuWaRun_Auto`), and the laser status. Motion
-   controls will go here.
+   and end runs automatically** (`WuWaRun_Auto`), and the laser status, then
+   **Keyboard and mouse** (1.2.7): the shortcut summary, **VR key**
+   (`WuWaControls_KeyboardVrKey`: Off, Key left of 1, Right Ctrl; default the
+   key left of 1) and **Keys fly the freecam** (`WuWaControls_KeyboardFlight`,
+   on). Motion controls will go here.
 7. **Comfort:** decoupled pitch (and its HUD adjustment), smooth camera turns
    and tilt, walk by default, L3 + A also resets position.
 8. **Fixes:** matched far detail, **Full ground detail**

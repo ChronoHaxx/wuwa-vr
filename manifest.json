@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-23T12:36:03.100480+00:00",
+  "updatedAt": "2026-10-25T14:14:25.641158+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -430,7 +430,7 @@
     "mod/notices/wuwa-fonts/sc-OFL.txt": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
     "mod/source-changes/openxr-simulator-working-tree.patch": "cc791e6233bda474ad971d4f8e05cbafd614551679862128bac371942a5cdfbe",
     "mod/source-changes/uesdk-working-tree.patch": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
-    "mod/source-changes/uevr-working-tree-full.patch": "80c69edbfe795040a59890d0ecd7e481c2384278f0e775f3ca4b65090ba96c79",
+    "mod/source-changes/uevr-working-tree-full.patch": "ddcf74ff3aa945218a0fd3e18798247c2476b1167e1256a9a607f4277a026e84",
     "mod/tests/test_playstation_input.cpp": "1acd98023e380c9840771075f692f5161399fc1f68ba1321ac15c8d0e1bfb940",
     "mod/tests/test_playstation_input.ps1": "fad47cf89bd5f912ffeb5f7758eb602991c2151280fc1b617747ba573bb582c9",
     "mod/tests/test_playstation_shortcuts.lua": "13b82548d42e40998e8aa4be8e80b77e3c9eba3ec6c4d1cc059a5fe4a9cfbd44",

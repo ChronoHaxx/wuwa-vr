@@ -264,5 +264,9 @@ private:
     bool m_world_was_ready{false};
     uint64_t m_pair_pending_since{}; // WuWa: VR start, before the second eye's scene capture exists
     uint32_t m_pair_pending_frames{};
+    // WuWa privacy: the whole HUD is masked until this tick after a view switch or HUD resize (see on_frame).
+    bool m_privacy_was_2d_screen{false};
+    uint64_t m_privacy_ui_size{};
+    uint64_t m_privacy_hold_until{};
 };
 } // namespace vrmod

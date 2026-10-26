@@ -333,6 +333,19 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
         m_game_ui_tex.reset(); // Probably fixes non-resident errors.
     }
 
+    // A view switch lays the HUD out again over a few frames, and on those frames the UID can sit outside its
+    // box: the 25 Oct recordings show it on the first black frame after stereo screen -> full VR. While the
+    // boxes are wanted, the whole HUD is masked for a moment after a switch or a HUD resize.
+    {
+        const auto ui_desc = m_game_ui_tex.texture ? m_game_ui_tex.texture->GetDesc() : D3D12_RESOURCE_DESC{};
+        const auto ui_size = (uint64_t{ui_desc.Width} << 32) | ui_desc.Height;
+        if (is_2d_screen != m_privacy_was_2d_screen || ui_size != m_privacy_ui_size) {
+            m_privacy_hold_until = GetTickCount64() + 400;
+        }
+        m_privacy_was_2d_screen = is_2d_screen;
+        m_privacy_ui_size = ui_size;
+    }
+
     const float clear_color[] = { 0.0f, 0.0f, 0.0f, 0.0f };
     // In both screen modes the panel is the game picture: hiding the HUD (L3 + B)
     // leaves the HUD out of it. Before 1.2.2 the stereo screen dropped its panels
@@ -366,7 +379,8 @@ vr::EVRCompositorError D3D12Component::on_frame(VR* vr) {
             for (const auto& r : masks) if (r.valid()) rects[count++]={r.left,r.top,r.right,r.bottom};
             if (count) {
                 const float black[]{0.0f,0.0f,0.0f,1.0f};
-                commands.clear_rtv(m_game_ui_tex,black,ENGINE_SRC_COLOR,count,rects);
+                if (GetTickCount64() < m_privacy_hold_until) commands.clear_rtv(m_game_ui_tex,black,ENGINE_SRC_COLOR);
+                else commands.clear_rtv(m_game_ui_tex,black,ENGINE_SRC_COLOR,count,rects);
             }
         }
 

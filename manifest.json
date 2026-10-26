@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-26T15:22:07.491483+00:00",
+  "updatedAt": "2026-10-26T16:05:42.310439+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -477,8 +477,8 @@
     "mod/uevr/src/mods/vr/CVarManager.cpp": "290c280ab9edd642fba036afef6fb2639835bdc4d91c8db5762b3741719bb4a7",
     "mod/uevr/src/mods/vr/D3D11Component.cpp": "52668fa67b9da43336a039ff82d3d812034d9ca683804ad70bc7b38d0acd40ff",
     "mod/uevr/src/mods/vr/D3D11Component.hpp": "8e434ec8e23c98466b6d0c1729262ebc83ffa2281afcb973ba099937ef086e0a",
-    "mod/uevr/src/mods/vr/D3D12Component.cpp": "f0f85e2bd6486382584c78911b481e8a3cc7de190d7aea85413f7284cd92cef7",
-    "mod/uevr/src/mods/vr/D3D12Component.hpp": "830c6336db86660583c8c77cfd1d3ad73cba5df43a781a7e88999579b87baefd",
+    "mod/uevr/src/mods/vr/D3D12Component.cpp": "01713bbc0646d529ec7923585523d2b8adf3dcf8a0e238356517f9f2e7801cf1",
+    "mod/uevr/src/mods/vr/D3D12Component.hpp": "bbe16ad787df45947e0704053229b393e2525f0430546b1024568018f6ce85ab",
     "mod/uevr/src/mods/vr/FFakeStereoRenderingHook.cpp": "5c0969ee839ab6e0b409fb0cd42aefc6c0a3f58bf30c518de85f7413b6d9c5dc",
     "mod/uevr/src/mods/vr/OverlayComponent.cpp": "5dfb8602c774449a65a92cc5d430ef9430a3019c98e98d21a4517245bb4d7234",
     "mod/uevr/src/mods/vr/OverlayComponent.hpp": "15dfda0d237e8b358ac2592f81859178989fef96978c51554c13db2729f9de12",

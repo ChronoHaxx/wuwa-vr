@@ -561,6 +561,9 @@ private:
     const ModCombo::Ptr m_privacy{ModCombo::create("WuWaPrivacy_Mode",{"Off","While recording","Always"},1)};
     // Set on the UI thread from the launcher's status, read by the render thread.
     std::atomic<bool> m_recording_live{false};
+    // When the launcher last confirmed a recording (GetTickCount64). An unreadable or stale status keeps the
+    // boxes for a while after it: the recorder runs on while the launcher lags (refresh_recording_live).
+    std::atomic<uint64_t> m_recording_live_seen{0};
     std::atomic<uint64_t> m_recording_stop_asked{0};
     void refresh_recording_live();
     const ModToggle::Ptr m_privacy_profile{ModToggle::create("WuWaPrivacy_ProfileID",true)};

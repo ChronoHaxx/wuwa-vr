@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "kind": "public-experimental-source-and-site",
-  "updatedAt": "2026-10-25T20:59:02.474087+00:00",
+  "updatedAt": "2026-10-26T15:22:07.491483+00:00",
   "releaseTag": "beta-2026-10-01",
   "scope": "Selected source, guide and privacy-reviewed showcase. No game assets, raw private logs or live profiles.",
   "files": {
@@ -482,8 +482,8 @@
     "mod/uevr/src/mods/vr/FFakeStereoRenderingHook.cpp": "5c0969ee839ab6e0b409fb0cd42aefc6c0a3f58bf30c518de85f7413b6d9c5dc",
     "mod/uevr/src/mods/vr/OverlayComponent.cpp": "5dfb8602c774449a65a92cc5d430ef9430a3019c98e98d21a4517245bb4d7234",
     "mod/uevr/src/mods/vr/OverlayComponent.hpp": "15dfda0d237e8b358ac2592f81859178989fef96978c51554c13db2729f9de12",
-    "mod/uevr/src/mods/vr/WuWaControlsComponent.cpp": "6c651e40c7c0ef4658399470efc79a2a5b4e899de825d02e597f1bc640ea528b",
-    "mod/uevr/src/mods/vr/WuWaControlsComponent.hpp": "8bc847e3676e61e4210f90fdb936200256828c4341dbcd2f8445683dd9154e0e",
+    "mod/uevr/src/mods/vr/WuWaControlsComponent.cpp": "898b924ded93a7e85f85563724b5c0c86e540ca31257d1562a2c3d885cea3217",
+    "mod/uevr/src/mods/vr/WuWaControlsComponent.hpp": "cf6764d9907728cac8058156e091dc0436b64f141cc5d226d5d8d75a32aeba5e",
     "mod/uevr/src/mods/vr/WuWaVrMenuHost.cpp": "db5db613544e7c29c6d02261251f13c5859517840f5dccc69010d0f0448575e6",
     "mod/uevr/src/mods/vr/WuWaVrMenuHost.hpp": "99ce9efb1890607f1f86ff78e00fb1840c2e26b0a95ea9749c1dc6832b64a616",
     "mod/uevr/src/mods/vr/d3d12/CommandContext.cpp": "b65ffefb4d230d6d00cb05812c697e57b385817a0949f15cfb2afb0884aa67c6",

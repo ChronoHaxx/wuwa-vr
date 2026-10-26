@@ -818,8 +818,10 @@ void WuWaControlsComponent::on_draw_recording() {
                       widths[std::clamp(m_video_width->value(),0,4)],m_video_telemetry->value(),
                       std::clamp(m_video_style->value(),0,3),static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value(),
                       m_video_microphone->value(),static_cast<int>(std::lround(m_video_mic_volume->value())),m_video_sound_files->value(),
-                      slow_rule().first,slow_rule().second))
+                      slow_rule().first,slow_rule().second)) {
+            m_recording_live_seen.store(GetTickCount64(),std::memory_order_relaxed);
             m_recording_live.store(true,std::memory_order_relaxed);
+        }
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
@@ -1321,10 +1323,21 @@ void WuWaControlsComponent::update_tip() {
 
 void WuWaControlsComponent::refresh_recording_live() {
     m_video.poll(Framework::get_persistent_dir());
+    const auto now=GetTickCount64();
+    const bool was_live=m_recording_live.load(std::memory_order_relaxed);
+    // No readable, fresh status is not "stopped": the launcher writes it every half second, and in a lag spiral
+    // it falls more than 5 s behind while the recorder keeps capturing. The boxes then went away and a recording
+    // of 25 Oct showed the UID. Keep covering for up to two minutes after the last confirmed recording.
+    if (!m_video.connected()) {
+        if (was_live && now-m_recording_live_seen.load(std::memory_order_relaxed)<120000) return;
+        m_recording_live.store(m_video.pending() && was_live,std::memory_order_relaxed);
+        return;
+    }
     const auto state=m_video.state();
     // Starting and finishing count too: frames are captured around both.
-    m_recording_live.store(state=="starting" || state=="recording" || state=="finishing" ||
-        (m_video.pending() && m_recording_live.load(std::memory_order_relaxed)),std::memory_order_relaxed);
+    const bool live=state=="starting" || state=="recording" || state=="finishing";
+    if (live) m_recording_live_seen.store(now,std::memory_order_relaxed);
+    m_recording_live.store(live || (m_video.pending() && was_live),std::memory_order_relaxed);
 }
 
 std::string WuWaControlsComponent::menu_recording_state() {
@@ -1348,8 +1361,10 @@ void WuWaControlsComponent::menu_recording_toggle() {
                   widths[std::clamp(m_video_width->value(),0,4)],m_video_telemetry->value(),
                   std::clamp(m_video_style->value(),0,3),static_cast<int>(std::lround(m_showcase_pitch->value())),m_video_sound->value(),
                   m_video_microphone->value(),static_cast<int>(std::lround(m_video_mic_volume->value())),m_video_sound_files->value(),
-                  slow_rule().first,slow_rule().second))
+                  slow_rule().first,slow_rule().second)) {
+        m_recording_live_seen.store(GetTickCount64(),std::memory_order_relaxed);
         m_recording_live.store(true,std::memory_order_relaxed);
+    }
 }
 
 std::pair<int,int> WuWaControlsComponent::slow_rule() const {

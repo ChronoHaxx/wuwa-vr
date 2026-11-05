@@ -205,11 +205,16 @@ def main() -> None:
         if branch_copy.name != 'zz_WuWaHudProbe.lua' and not script.exists():
             shutil.copy2(branch_copy, script)
             print('new script from branch:', script.name, flush=True)
-    for script in sorted((out / 'app/dev').glob('*.py')):
-        branch_copy = REPO / 'launcher/dev' / script.name
-        if branch_copy.exists() and sha(branch_copy) != sha(script):
+    # Every launcher helper file the base ships comes from the branch (the build list aside), not just the Python
+    # ones: Test 23 first went out with 1.2.6's start-wuwa-build.ps1, WuWaBuildProfiles.ps1, WuWaLaunchLifecycle.ps1
+    # and wuwa-player.html. The release's stage.py copies the same set and asserts the tested candidate had it.
+    for script in sorted((out / 'app/dev').rglob('*')):
+        if not script.is_file() or script.name == 'wuwa-builds.json' or '__pycache__' in script.parts:
+            continue
+        branch_copy = REPO / 'launcher/dev' / script.relative_to(out / 'app/dev')
+        if branch_copy.is_file() and sha(branch_copy) != sha(script):
             shutil.copy2(branch_copy, script)
-            print('launcher script from branch:', script.name, flush=True)
+            print('launcher file from branch:', script.relative_to(out / 'app/dev').as_posix(), flush=True)
     # A launcher module the branch added (1.2.6: wuwa_scene.py, loaded by record-wuwa.py) is not in the base
     # yet: ship it when a shipped script names it, so dev-only tools stay out.
     shipped = '\n'.join(p.read_text(encoding='utf-8', errors='replace') for p in (out / 'app/dev').glob('*.py'))

@@ -1,51 +1,18 @@
-<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b0b0c"><link rel="icon" href="media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script><title>Code and contributions — WuWa VR</title><meta name="description" content="Source map, known rendering problems and ways to contribute to WuWa VR."><link rel="canonical" href="https://chronohaxx.github.io/wuwa-vr/developers.html"><meta property="og:type" content="website"><meta property="og:site_name" content="WuWa VR"><meta property="og:title" content="Code and contributions — WuWa VR"><meta property="og:description" content="Source map, known rendering problems and ways to contribute to WuWa VR."><meta property="og:url" content="https://chronohaxx.github.io/wuwa-vr/developers.html"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Code and contributions — WuWa VR"><meta name="twitter:description" content="Source map, known rendering problems and ways to contribute to WuWa VR."></head><body><a class="skip" href="#main">Skip to content</a><header class="site-header"><div class="wrap header-row"><a class="brand" href="index.html" lang="en" dir="ltr"><img src="media/mark.svg" width="32" height="32" alt=""><span>WuWa VR</span></a><nav class="site-nav" aria-label="Site"><a href="index.html">Home</a><a href="guide.html">Guide</a><a href="record.html">Capture</a><a href="feedback.html">Feedback</a></nav><div class="header-actions"><details class="lang-menu"><summary aria-label="Language: English"><svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg><span>English</span></summary><nav aria-label="Language"><ul><li><a href="l/en.html" lang="en" hreflang="en" dir="ltr" data-language="en" aria-current="page">English</a></li><li><a href="l/zh-Hans.html" lang="zh-Hans" hreflang="zh-Hans" dir="ltr" data-language="zh-Hans">简体中文</a></li><li><a href="l/ja.html" lang="ja" hreflang="ja" dir="ltr" data-language="ja">日本語</a></li><li><a href="l/ko.html" lang="ko" hreflang="ko" dir="ltr" data-language="ko">한국어</a></li><li><a href="l/es.html" lang="es" hreflang="es" dir="ltr" data-language="es">Español</a></li><li><a href="l/pt-BR.html" lang="pt-BR" hreflang="pt-BR" dir="ltr" data-language="pt-BR">Português (Brasil)</a></li><li><a href="l/fr.html" lang="fr" hreflang="fr" dir="ltr" data-language="fr">Français</a></li><li><a href="l/de.html" lang="de" hreflang="de" dir="ltr" data-language="de">Deutsch</a></li><li><a href="l/ru.html" lang="ru" hreflang="ru" dir="ltr" data-language="ru">Русский</a></li><li><a href="l/ar.html" lang="ar" hreflang="ar" dir="rtl" data-language="ar">العربية</a></li></ul></nav></details><a class="button primary header-download" href="https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-6/WuWa-VR-Setup.exe">Download</a></div></div></header><main class="wrap page" id="main"><aside class="notice" data-launcher-release><strong>Community beta:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-6">WuWa VR 1.2.6 · game 3.7</a>. Your microphone in recordings, with game and voice also saved apart for editing, one-eye recordings, scene info, far lighting kept even in both eyes, and no cutscene bars in full VR.</aside><h1>Code and contributions</h1><nav class="page-links" aria-label="GitHub collaboration"><a data-project-link="code" hidden rel="noopener noreferrer">Browse GitHub</a><a data-project-link="fork" hidden rel="noopener noreferrer">Fork the repository</a><a data-project-link="issues" hidden rel="noopener noreferrer">Search issues</a><a href="feedback.html">Prepare a report</a></nav><p class="notice" data-repository-pending>The public repository has not been connected yet. The source map below explains the current review bundle; feedback drafts can still be copied.</p><div class="guide-content"><p>WuWa VR is an experimental integration built on UEVR and community WuWa work.
-Help with rendering, camera behavior, controller comfort, documentation and
-translations is welcome. A donation is never required to contribute.</p>
-<h3>Find the right starting point</h3>
-<p>The <a href="https://github.com/ChronoHaxx/wuwa-vr">public repository</a> contains the
-website, matching native source changes, Lua, language catalogs and launcher.</p>
-<div class="table-scroll"><table>
-<thead>
-<tr>
-<th>Folder</th>
-<th>Contents</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/uevr">mod/uevr</a></td>
-<td>Modified native files: stereo/UI hooks, camera settings and portal</td>
-</tr>
-<tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/lua">mod/lua</a></td>
-<td>Camera, controller, head hiding and shadow scripts</td>
-</tr>
-<tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/source-changes">mod/source-changes</a></td>
-<td>Full patches against the pinned upstreams</td>
-</tr>
-<tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/mod/localization">mod/localization</a></td>
-<td>Editable controls and shortcut translations</td>
-</tr>
-<tr>
-<td><a href="https://github.com/ChronoHaxx/wuwa-vr/tree/main/launcher/dev">launcher/dev</a></td>
-<td>Portable launcher, capture and SteamVR recording source</td>
-</tr>
-</tbody></table></div>
-<h3>Reconstruct the release</h3><p>The public source overlay now matches the <strong>28 Sep 16:28 experimental candidate</strong>. <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md">Build instructions and pinned upstreams</a>. The older beta's matching source remains at its release tag.</p><p>95 changed native paths and two SDK paths were reconstructed from pinned upstream files plus the frozen patches. This is not a new full rebuild or live acceptance. The new candidate adds trigger input and dormant inventory tooling; its carried-forward camera change still needs an ultimate test.</p><h3>Remaining work</h3><p>Foliage/prop animation and visibility, some lighting, and ultimate transitions remain open. Main Resonators reflection improved; lower/weapon submenu offsets and freezing are deferred. NSF repaired reported character materials in user testing, with timing corrections in newer profiles.</p><p><a href="understanding.html">Read the evidence, unsuccessful experiments, code map and next steps</a>. Follow the settings supplied with your chosen package; older beta instructions are not the new candidate's defaults.</p><h3>A useful report or pull request</h3>
-<p>State what happened, what you expected, and the shortest reproduction. Include
-the build name/time, headset/runtime, controller connection, camera mode,
-character/menu, and whether a setting or Alt-Tab changes it. A single-eye or
-SBS crop can be useful; label which eye is affected. Review clips for account
-IDs before sharing. Do not upload whole logs or memory captures by default.</p>
-<p>Search existing issues first. Add new evidence to a matching report instead
-of creating another report for the same symptom. The website&#39;s feedback form
-prepares a draft for you to review and submit on GitHub; it sends nothing by
-itself. A GitHub account is required to submit there. Copying the draft also
-works for a community discussion.</p>
-<p>Small fixes and forks are welcome where each component&#39;s terms allow them.
-Credit upstream authors and describe what was actually tested. See the
-<a href="credits.html">credits</a> and <a href="developers.html#contributing">contribution guide</a>.</p>
+<!doctype html><html lang="en" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#080b17"><link rel="icon" href="media/icon-32.png" sizes="32x32" type="image/png"><link rel="icon" href="media/icon-64.png" sizes="64x64" type="image/png"><link rel="apple-touch-icon" href="media/icon-180.png"><link rel="stylesheet" href="style.css"><script src="config.js" defer></script><script src="app.js" defer></script><title>Code and contributions — WuWa VR</title><meta name="description" content="Source map, known rendering problems and ways to contribute to WuWa VR."><link rel="canonical" href="https://chronohaxx.github.io/wuwa-vr/developers.html"><meta property="og:type" content="website"><meta property="og:site_name" content="WuWa VR"><meta property="og:title" content="Code and contributions — WuWa VR"><meta property="og:description" content="Source map, known rendering problems and ways to contribute to WuWa VR."><meta property="og:url" content="https://chronohaxx.github.io/wuwa-vr/developers.html"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Code and contributions — WuWa VR"><meta name="twitter:description" content="Source map, known rendering problems and ways to contribute to WuWa VR."></head><body><a class="skip" href="#main">Skip to content</a><header class="site-header"><div class="wrap header-row"><a class="brand" href="index.html" lang="en" dir="ltr"><img src="media/icon-64.png" width="32" height="32" alt=""><span>WuWa VR</span></a><nav class="site-nav" aria-label="Site"><a href="index.html">Home</a><a href="guide.html">Guide</a><a href="record.html">Capture</a><a href="feedback.html">Feedback</a></nav><div class="header-actions"><details class="lang-menu"><summary aria-label="Language: English"><svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg><span>English</span></summary><nav aria-label="Language"><ul><li><a href="l/en.html" lang="en" hreflang="en" dir="ltr" data-language="en" aria-current="page">English</a></li><li><a href="l/zh-Hans.html" lang="zh-Hans" hreflang="zh-Hans" dir="ltr" data-language="zh-Hans">简体中文</a></li><li><a href="l/ja.html" lang="ja" hreflang="ja" dir="ltr" data-language="ja">日本語</a></li><li><a href="l/ko.html" lang="ko" hreflang="ko" dir="ltr" data-language="ko">한국어</a></li><li><a href="l/es.html" lang="es" hreflang="es" dir="ltr" data-language="es">Español</a></li><li><a href="l/pt-BR.html" lang="pt-BR" hreflang="pt-BR" dir="ltr" data-language="pt-BR">Português (Brasil)</a></li><li><a href="l/fr.html" lang="fr" hreflang="fr" dir="ltr" data-language="fr">Français</a></li><li><a href="l/de.html" lang="de" hreflang="de" dir="ltr" data-language="de">Deutsch</a></li><li><a href="l/ru.html" lang="ru" hreflang="ru" dir="ltr" data-language="ru">Русский</a></li><li><a href="l/ar.html" lang="ar" hreflang="ar" dir="rtl" data-language="ar">العربية</a></li></ul></nav></details><a class="button primary header-download" href="https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-6/WuWa-VR-Setup.exe">Download</a></div></div></header><main class="wrap page" id="main"><aside class="notice" data-launcher-release><strong>Community beta:</strong> <a href="https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-6">WuWa VR 1.2.6 · game 3.7</a>. Your microphone in recordings, with game and voice also saved apart for editing, one-eye recordings, scene info, far lighting kept even in both eyes, and no cutscene bars in full VR.</aside><h1>Code and contributions</h1><nav class="page-links" aria-label="GitHub collaboration"><a data-project-link="code" hidden rel="noopener noreferrer">Browse GitHub</a><a data-project-link="fork" hidden rel="noopener noreferrer">Fork the repository</a><a data-project-link="issues" hidden rel="noopener noreferrer">Search issues</a><a href="feedback.html">Prepare a report</a></nav><p class="notice" data-repository-pending>The public repository has not been connected yet. The source map below explains the current review bundle; feedback drafts can still be copied.</p><div class="guide-content"><p>The source now matches the 28 Sep 16:28 experimental checkpoint. See the
+<a href="understanding.html">beginner timeline, code map and next experiments</a>.
+The older beta source remains at its GitHub release tag.</p>
+<p>Read <a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/mod/BUILD.md">native build instructions</a>.
+The export is an overlay plus exact pinned patches, not a standalone UEVR fork.
+95 native paths and two SDK paths were reconstructed. The owner confirmed the ultimate camera fix in headset testing on 28 Sep
+for the tested cases. No fresh full rebuild or universal foliage repair is claimed.</p>
+<p>Foliage/prop and lighting disparities remain open. Main Resonators
+reflection improved; lower/weapon submenus are deferred. The new trigger and
+inventory tools are ready for live testing. Preserve distinct per-eye projections
+and temporal histories; do not copy one final eye image into the other.</p>
+<p>Source folders: mod/uevr, mod/uesdk, mod/lua, mod/localization, launcher/dev.
+Keep component licenses and attribution. Forks and evidenced improvements welcome.
+Report the exact build, runtime, scene and both-eye clip through the feedback form.
+Do not publish raw personal logs or game asset dumps.</p>
 <section id="contributing"><h2>Contributing</h2><p>This is a free, unofficial fan project. You do not need to donate, write code
 or speak English to contribute. Clear bug reports, translations, comfort
 feedback and small fixes all help. Volunteers are welcome; response times and
@@ -61,17 +28,18 @@ choose <strong>New issue</strong> and the matching template. Do not include acco
 personal paths, login details or unreviewed logs. A short description and the
 build/runtime are usually enough to start.</p>
 <h3>Translations</h3>
-<p>Getting started, common Xbox shortcuts, feedback and support expectations are
-available in English, Simplified Chinese, Japanese, Korean, Spanish, Brazilian
-Portuguese, French, German, Russian and Arabic. These are initial translations
-and community language review is welcome. The full technical guide and native
-UEVR interface remain English; game language is not changed.</p>
-<p>Edit the appropriate <code>site/languages/*.js</code> source and run
-<code>node dev/build-community.cjs</code>. Each translated phrase has the same key as the
-English reference. Keep exact in-game option names and Xbox button names
+<p>The VR mod (the WuWa VR menu, the controls cards and notices), the player
+guide and home pages on the website, the launcher and the portable web tool
+are in English, Simplified Chinese, Japanese, Korean, Spanish, Brazilian
+Portuguese, French, German, Russian and Arabic. Most translations started as
+machine drafts, so review by speakers of each language is very welcome: a
+correction to a single phrase helps.</p>
+<p><a href="https://github.com/ChronoHaxx/wuwa-vr/blob/main/dev/i18n/README.md">dev/i18n/README.md</a> shows where each piece of text lives
+and how to change it. Keep exact in-game option names and Xbox button names
 unchanged so players can find them. Do not add a remote translation service.
-Right-to-left languages use <code>dir=&quot;rtl&quot;</code>; controller chords remain left-to-right.
-Test keyboard use, small screens, long labels and the copy/report flow.</p>
+Right-to-left languages use <code>dir=&quot;rtl&quot;</code>; controller chords remain left-to-right.</p>
+<p>New player-facing text needs all ten languages before a release:
+<code>python dev/i18n/check_all.py</code> must print <code>All translations complete.</code></p>
 <h3>Code, forks and sharing</h3>
 <p>Keep a fix small, describe the actual problem and include how you checked it.
 Distinguish offline tests from game/headset acceptance. Preserve existing
@@ -83,4 +51,4 @@ our community preference, not a restriction added to MIT: commercial use is
 allowed by MIT. Public combined-mod redistribution still needs the upstream
 scope clarified. Nothing in this project requires payment to report a bug,
 ask for a language or contribute.</p>
-</section></div></main><footer class="site-footer"><div class="wrap footer-grid"><div class="footer-brand"><a class="brand" href="index.html" lang="en" dir="ltr"><img src="media/mark.svg" width="28" height="28" alt=""><span>WuWa VR</span></a><p>Free, unofficial fan project. Not affiliated with Kuro Games.</p></div><nav aria-label="Explore"><p class="footer-title">Explore</p><a href="guide.html">Guide</a><a href="record.html">Capture</a><a href="feedback.html">Feedback</a><a href="languages.html">All languages</a></nav><nav aria-label="Project"><p class="footer-title">Project</p><a href="developers.html">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav></div><div class="wrap footer-note"><p>Original independent website and guide work: MIT. Upstream components keep their own terms.</p></div></footer></body></html>
+</section></div></main><footer class="site-footer"><div class="wrap footer-grid"><div class="footer-brand"><a class="brand" href="index.html" lang="en" dir="ltr"><img src="media/icon-64.png" width="28" height="28" alt=""><span>WuWa VR</span></a><p>Free, unofficial fan project. Not affiliated with Kuro Games.</p></div><nav aria-label="Explore"><p class="footer-title">Explore</p><a href="guide.html">Guide</a><a href="record.html">Capture</a><a href="feedback.html">Feedback</a><a href="languages.html">All languages</a></nav><nav aria-label="Project"><p class="footer-title">Project</p><a href="developers.html">Code &amp; contribute</a><a data-project-link="code" hidden rel="noopener noreferrer">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer">Releases</a><a href="risk.html">Account risk &amp; disclaimer</a><a href="license.html">License scope</a><a href="support.html">Optional support</a><a href="credits.html">Credits</a></nav></div><div class="wrap footer-note"><p>Original independent website and guide work: MIT. Upstream components keep their own terms.</p></div></footer></body></html>

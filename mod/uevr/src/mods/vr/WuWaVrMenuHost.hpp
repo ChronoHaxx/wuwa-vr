@@ -16,6 +16,10 @@ void draw_back_button();
 void request_open(bool classic_window);
 // When UEVR's UI closes; the next open shows the VR menu again.
 void on_closed();
+// VR setup (1.2.7): never answered or skipped (WuWaSetup_Version), with this menu in use. UI thread.
+bool setup_pending();
+// Shows the setup from its welcome screen at the next draw(); the caller opens UEVR's UI. UI thread.
+void start_setup();
 // The VR menu (not the classic window) was drawn in the last few frames.
 // Any thread.
 bool showing();

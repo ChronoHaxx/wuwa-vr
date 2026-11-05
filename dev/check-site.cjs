@@ -11,7 +11,7 @@ const server=http.createServer((req,res)=>{
   if(!route.startsWith('/wuwa-vr/')){res.writeHead(404);res.end();return;}
   const file=path.resolve(site,route.slice('/wuwa-vr/'.length)||'index.html');
   if(!file.startsWith(site+path.sep)||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);res.end();return;}
-  const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.mp4':'video/mp4'};
+  const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.mp4':'video/mp4','.woff2':'font/woff2'};
   res.writeHead(200,{'Content-Type':types[path.extname(file)]||'text/plain'});res.end(fs.readFileSync(file));
 });
 (async()=>{
@@ -23,7 +23,10 @@ const server=http.createServer((req,res)=>{
     const page=await browser.newPage({viewport:{width:1440,height:1000},deviceScaleFactor:1});
     page.on('pageerror',e=>errors.push(String(e)));
     page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
-    for(const file of ['index.html','guide.html','record.html','credits.html','support.html','risk.html','license.html','languages.html','feedback.html','testing.html','developers.html']){
+    const guides=['guide.html',...['zh-Hans','ja','ko','es','pt-BR','fr','de','ru','ar'].map(code=>`l/${code}-guide.html`)];
+    // Nothing may contact YouTube before a visitor chooses a video.
+    const youtube=[];page.on('request',r=>{if(/youtube|ytimg|googlevideo/.test(r.url()))youtube.push(r.url());});
+    for(const file of ['index.html',...guides,'reference.html','record.html','credits.html','support.html','risk.html','license.html','languages.html','feedback.html','testing.html','developers.html']){
       await page.goto(base+file);await page.locator('h1').waitFor();
       assert.equal(await page.locator('h1').count(),1);
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Desktop page overflows: '+file);
@@ -36,10 +39,41 @@ const server=http.createServer((req,res)=>{
         assert(fs.existsSync(local),'Broken local link '+target);
         if(parsed.hash){const html=fs.readFileSync(local,'utf8');assert(html.includes(`id="${decodeURIComponent(parsed.hash.slice(1))}"`),'Missing anchor '+target);}
       }
-      if(['index.html','support.html'].includes(file))await page.screenshot({path:path.join(output,'desktop-'+file.replace('.html','.png')),fullPage:true});
+      if(['index.html','support.html','guide.html','reference.html'].includes(file))await page.screenshot({path:path.join(output,'desktop-'+file.replace('.html','.png')),fullPage:true});
       checks.push('desktop links, assets and overflow: '+file);
     }
-    await page.goto(base+'guide.html#controls');
+    assert.deepEqual(youtube,[],'A page contacted YouTube before any video was chosen');
+    checks.push('no request to YouTube on any page until a video is chosen');
+    // Each language's guide: its own language and direction, every section, the controls card and tables.
+    for(const file of guides){
+      await page.goto(base+file);
+      const code=file==='guide.html'?'en':file.slice(2,-11);
+      assert.equal(await page.evaluate(()=>document.documentElement.lang),code,file);
+      assert.equal(await page.evaluate(()=>document.documentElement.dir),code==='ar'?'rtl':'ltr',file);
+      for(const id of ['start','controls','updates','recovery','recording'])assert.equal(await page.locator('#'+id).count(),1,`${file} lacks #${id}`);
+      assert(await page.locator('#controls .pad-card').count()===1&&await page.locator('#controls table.shortcut-table').count()>=5,file+': controls card or tables missing');
+      assert(!/\b0[123] ·|step 0[123]/i.test(await page.locator('main').innerText()),file+': old numbered launcher steps');
+      assert.equal(await page.locator('a[href*="reference.html"]').count()>0,true,file+': no link to the reference');
+    }
+    checks.push('player guide in 10 languages: lang/dir, five sections, controls card and tables, no old step numbers, reference link');
+    // Watch: posters only; spoilers closed; one chosen card becomes the privacy-enhanced player, the others stay posters.
+    await page.route(/youtube-nocookie\.com/,r=>r.fulfill({contentType:'text/html',body:'<title>player</title>'}));
+    await page.goto(base+'index.html#watch');
+    assert(!(await page.locator('#watch .spoiler-reveal').evaluate(d=>d.open)),'Spoiler videos must start hidden');
+    assert(await page.locator('#watch .video-grid.story').isHidden());
+    await page.locator('#watch .spoiler-reveal summary').click();
+    assert(await page.locator('#watch .video-grid.story .video-card').first().isVisible());
+    const cards=await page.locator('#watch .video-card').count();
+    assert(cards>=6,'Expected the featured and story videos');
+    await page.locator('#watch .video-grid.story .video-card').nth(1).locator('.video-play').click();
+    const frame=page.locator('#watch iframe');
+    await frame.waitFor();
+    assert.equal(await frame.count(),1,'Exactly one player after one choice');
+    assert(/^https:\/\/www\.youtube-nocookie\.com\/embed\/[\w-]{11}\?/.test(await frame.getAttribute('src')),'Player must use youtube-nocookie.com');
+    assert.equal(await page.locator('#watch .video-card img').count(),cards-1,'Other cards keep their posters');
+    await page.unroute(/youtube-nocookie\.com/);
+    checks.push('watch section: spoilers hidden until opened; a chosen card loads only its youtube-nocookie player');
+    await page.goto(base+'reference.html#controls');
     await page.getByLabel('FIND A SHORTCUT').fill('HUD');
     assert(await page.locator('[data-control-row]:visible').count()>0);
     assert(await page.locator('[data-control-row]:visible').count()<await page.locator('[data-control-row]').count());
@@ -71,7 +105,7 @@ const server=http.createServer((req,res)=>{
     assert(await page.locator('#support-pending').isHidden());
     await page.unroute('**/config.js');checks.push('empty support URL stays disconnected; unsafe scheme refused; valid fixture displayed without navigation');
     await page.setViewportSize({width:390,height:844});
-    for(const file of ['index.html','guide.html','record.html','credits.html','support.html','risk.html','license.html','languages.html','feedback.html','testing.html']){
+    for(const file of ['index.html','guide.html','l/ar.html','l/ar-guide.html','l/ja-guide.html','reference.html','record.html','credits.html','support.html','risk.html','license.html','languages.html','feedback.html','testing.html']){
       await page.goto(base+file);
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile page overflows: '+file);
       if(['index.html','support.html'].includes(file))await page.screenshot({path:path.join(output,'mobile-'+file.replace('.html','.png')),fullPage:true});
@@ -80,10 +114,14 @@ const server=http.createServer((req,res)=>{
     await page.goto(base+'guide.html#controls');await page.locator('#controls').scrollIntoViewIfNeeded();
     await page.screenshot({path:path.join(output,'mobile-controls.png')});
     const plain=await browser.newContext({javaScriptEnabled:false,viewport:{width:390,height:844}});
-    const nojs=await plain.newPage();await nojs.goto(base+'guide.html');
+    const nojs=await plain.newPage();await nojs.goto(base+'reference.html');
     assert(await nojs.locator('table').count()>5);assert(await nojs.locator('[data-control-row]:visible').count()>30);
     await nojs.goto(base+'support.html');assert(await nojs.locator('#support-pending').isVisible());assert(await nojs.locator('#support-link').isHidden());
-    await plain.close();checks.push('no-JavaScript guide and disconnected support remain usable');
+    // Without JavaScript a video card is a plain link to YouTube, never an embedded player.
+    await nojs.goto(base+'index.html');
+    assert.equal(await nojs.locator('#watch iframe').count(),0);
+    assert(/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.test(await nojs.locator('#watch .video-play').first().getAttribute('href')));
+    await plain.close();checks.push('no-JavaScript reference, disconnected support and plain video links remain usable');
     await page.goto(base+'guide.html');await page.emulateMedia({media:'print'});
     await page.pdf({path:path.join(output,'player-guide.pdf'),format:'A4',printBackground:true,margin:{top:'14mm',bottom:'14mm',left:'12mm',right:'12mm'}});
     checks.push('print guide rendered to PDF');
@@ -91,14 +129,13 @@ const server=http.createServer((req,res)=>{
     for(const file of ['index.html','guide.html']){
       await page.goto(base+file);
       const home=file==='index.html';
-      const steps=page.locator(home?'#start .launcher-steps > li':'#start > ol:first-of-type > li');
-      assert.equal(await steps.count(),3,'Three installed-launcher steps expected on '+file);
-      // Home step titles match the launcher's own card titles; the guide keeps its numbered prose.
-      for(const [index,label] of (home?['Find Wuthering Waves','Install VR','Headset or simulator']:['01 · Game.','02 · Install VR.','03 · Headset or simulator.']).entries()){
-        const text=home?await steps.nth(index).locator('h3').innerText():await steps.nth(index).innerText();
-        assert(home?text===label:text.startsWith(label),'Launcher steps out of order on '+file+': '+text.slice(0,40));
-      }
+      const steps=page.locator('#start .launcher-steps > li');
       if(home){
+        assert.equal(await steps.count(),3,'Three install steps expected on '+file);
+        for(const [index,label] of ['Install','Set up once','Launch in VR'].entries()){
+          const text=await steps.nth(index).locator('h3').innerText();
+          assert(text===label,'Install steps out of order: '+text.slice(0,40));
+        }
         // Each step shows the matching native launcher render, in order.
         const shots=await page.locator('.tour-shot img').evaluateAll(images=>images.map(i=>i.getAttribute('src')));
         assert.deepEqual(shots,['media/launcher/en-fresh.webp','media/launcher/en-found.webp','media/launcher/en-ready.webp']);
@@ -109,9 +146,12 @@ const server=http.createServer((req,res)=>{
       }
       assert.equal(await page.locator('.visual-steps img').count(),0,'Old browser screenshots must not represent the installed app');
       const asset=`https://github.com/ChronoHaxx/wuwa-vr/releases/download/${release.tag}/`;
-      assert.equal(await page.locator('#release-download a.primary').getAttribute('href'),asset+release.installer,'Installer must be the primary download');
-      assert.equal(await page.locator('#release-download a').filter({hasText:'Advanced: portable ZIP'}).getAttribute('href'),asset+'WuWa-VR-Launcher.zip','Portable fallback must use the current release');
-      assert((await steps.nth(2).innerText()).includes('Launch in VR'),'Final step must explain launching');
+      assert.equal(await page.locator('.header-download').getAttribute('href'),asset+release.installer,'Header download must be the current installer');
+      if(home){
+        assert.equal(await page.locator('#release-download a.primary').getAttribute('href'),asset+release.installer,'Installer must be the primary download');
+        assert.equal(await page.locator('#release-download a').filter({hasText:'Advanced: portable ZIP'}).getAttribute('href'),asset+'WuWa-VR-Launcher.zip','Portable fallback must use the current release');
+        assert((await steps.nth(2).innerText()).includes('Launch in VR'),'Final step must explain launching');
+      } else assert((await page.locator('#start').innerText()).includes('Launch in VR'),'The guide must explain launching');
       // Readable type: no visible body text below 14px.
       const small=await page.evaluate(()=>[...document.querySelectorAll('p,li,td,th,figcaption,summary,a,label,button')]
         .filter(e=>e.offsetParent&&e.textContent.trim()&&parseFloat(getComputedStyle(e).fontSize)<14).map(e=>e.textContent.trim().slice(0,40)));
@@ -127,7 +167,7 @@ const server=http.createServer((req,res)=>{
         assert(stop.visible&&stop.outline,`Keyboard stop without visible focus on ${file}: ${JSON.stringify(stop)}`);
       }
     }
-    checks.push('three ordered launcher steps with native screenshots that switch per step; current installer/portable links; no text under 14px; keyboard order starts at skip link with visible focus');
+    checks.push('three ordered install steps with native screenshots that switch per step; current installer/portable links; no text under 14px; keyboard order starts at skip link with visible focus');
     assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(output,'verification.json'),JSON.stringify({checkedAt:new Date().toISOString(),basePath:'/wuwa-vr/',checks,errors,scope:'Local browser and static presentation only; no game/headset acceptance.'},null,2));
     console.log(JSON.stringify({passed:checks.length,output,errors}));

@@ -260,7 +260,7 @@ def main() -> None:
             shutil.copy2(f, delivery / f.name)
     (delivery / 'packages' / tag).mkdir(parents=True)
     shutil.copy2(archive, delivery / 'packages' / tag / archive.name)
-    for name in ('LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'PlayerGuide.html'):
+    for name in ('LICENSE.txt', 'THIRD-PARTY-NOTICES.txt'):
         shutil.copy2(native / name, delivery / name)
     shutil.copy2(folder / 'TEST THIS.txt', delivery / 'TEST THIS.txt')
     files = {f.relative_to(delivery).as_posix(): sha(f) for f in sorted(delivery.rglob('*')) if f.is_file()}

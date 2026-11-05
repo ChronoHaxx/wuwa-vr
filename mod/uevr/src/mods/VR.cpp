@@ -850,6 +850,8 @@ void VR::update_sightseeing_sample(bool synced) {
     // enabled) already uses the Menu button for Start/Back.
     const bool gesture = on || !m_controllers_allowed->value();
     const auto now = GetTickCount64();
+    // The menu and the cards show shortcuts on the device used last (1.2.7).
+    if (valid && !wuwa_sightseeing::neutral(pad)) wuwa_input_activity::note_vr(now);
     bool toggle{}, polled{};
     {
         // Finish runtime queries before taking the mutex used by XInput.
@@ -2885,7 +2887,7 @@ void VR::on_draw_sidebar_entry(std::string_view name) {
             ImGui::EndDisabled();
             if (is_using_afr())
                 wuwa_ui::TextWrapped("Diorama needs Native Stereo. Choose it under Stereo rendering compatibility.");
-            wuwa_ui::TextWrapped("Shrinks the world by the Diorama scale (%.0fx, set on the WuWa VR menu's Quick page) for an action-figure view, seen from the diorama camera (Camera page). Turn off to return to your normal scale. Works with or without the portal window.", m_diorama_scale->value());
+            wuwa_ui::TextWrapped("Shrinks the world by the Diorama scale (%.0fx, set on the WuWa VR menu's Camera page) for an action-figure view, seen from the diorama camera (Camera page). Turn off to return to your normal scale. Works with or without the portal window.", m_diorama_scale->value());
             wuwa_ui::TextWrapped("Normal scale: %.3fx. Your saved scale and camera presets stay unchanged; intentional scale edits become the new normal value.", m_world_scale->value());
             wuwa_ui::TextWrapped("Head movement also scales up. Use Recenter if the view feels displaced. Starts off each launch and after reloading settings.");
         }

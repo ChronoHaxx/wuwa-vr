@@ -4,11 +4,27 @@
     "description": "Descarga la beta comunitaria, gratuita y no oficial de Wuthering Waves VR para Windows: instalador, atajos del mando, configuración del visor, problemas conocidos y aviso de riesgo para la cuenta."
   },
   "chrome": {
-    "skip": "Saltar al contenido", "nav": "Sitio", "home": "Inicio", "guide": "Guía", "capture": "Grabar", "feedback": "Comentarios",
-    "install": "Instalar", "features": "Funciones", "faq": "Preguntas", "download": "Descargar", "language": "Idioma",
-    "tagline": "Proyecto de fans, gratuito y no oficial. Sin relación con Kuro Games.", "explore": "Explorar", "project": "Proyecto",
-    "languages": "Todos los idiomas", "code": "Código y contribuir", "releases": "Versiones", "risk": "Riesgo para la cuenta y aviso legal",
-    "license": "Alcance de la licencia", "support": "Apoyo opcional", "credits": "Créditos",
+    "skip": "Saltar al contenido",
+    "nav": "Sitio",
+    "home": "Inicio",
+    "guide": "Guía",
+    "capture": "Grabar",
+    "feedback": "Comentarios",
+    "install": "Instalar",
+    "features": "Funciones",
+    "faq": "Preguntas",
+    "download": "Descargar",
+    "language": "Idioma",
+    "tagline": "Proyecto de fans, gratuito y no oficial. Sin relación con Kuro Games.",
+    "explore": "Explorar",
+    "project": "Proyecto",
+    "languages": "Todos los idiomas",
+    "code": "Código y contribuir",
+    "releases": "Versiones",
+    "risk": "Riesgo para la cuenta y aviso legal",
+    "license": "Alcance de la licencia",
+    "support": "Apoyo opcional",
+    "credits": "Créditos",
     "mit": "El sitio web y las guías originales usan la licencia MIT. Los componentes de terceros conservan sus propios términos.",
     "suggest": "Ver esta página en español"
   },
@@ -29,40 +45,73 @@
     "play": "Reproducir vídeo",
     "youtube": "Se reproduce desde YouTube (youtube-nocookie.com) solo cuando lo eliges."
   },
-  "risk": { "link": "Leer el aviso de riesgo para la cuenta" },
+  "risk": {
+    "link": "Leer el aviso de riesgo para la cuenta"
+  },
+  "watch": {
+    "title": "Míralo en VR",
+    "lede": "Imágenes reales del visor, grabadas con el mod. Los vídeos de la historia están en 3D: ábrelos en la app de YouTube de tu visor para ver la profundidad.",
+    "noSpoilers": "Sin spoilers",
+    "spoilers": "Mostrar los vídeos de la historia 3.7 (spoilers)",
+    "spoilerNote": "Toda la historia de la 3.7 en cuatro partes, más el final en 25 minutos. Contiene spoilers de la historia.",
+    "channel": "Todos los vídeos y Shorts en YouTube",
+    "privacy": "Un vídeo se carga desde YouTube (youtube-nocookie.com) solo cuando lo eliges."
+  },
   "start": {
-    "title": "Instala y sigue tres pasos",
-    "lede": "Ejecuta WuWa-VR-Setup.exe y abre WuWa VR; el launcher te guía en el resto. La primera instalación descarga el mod de VR y no necesitas Python ni otras herramientas.",
+    "title": "Instala y luego Iniciar en VR",
+    "lede": "El lanzador es una sola pantalla: un titular que dice qué toca después, Iniciar en VR y Jugar sin VR, y luego tu Juego, el Mod VR y el Visor. Tus elecciones se recuerdan, y no necesitas Python ni otras herramientas.",
     "steps": [
-      "Elige tu copia del juego de Steam o del launcher oficial de Kuro. Tu elección se guarda. Epic todavía no es compatible.",
-      "Lee el aviso de riesgo para la cuenta, confirma la versión del juego e instala. Las actualizaciones conservan tus ajustes y copias de seguridad.",
-      "Abre el software de tu visor o elige el simulador incluido. Después pulsa Iniciar en VR y acepta el permiso de Windows."
+      "Ejecuta WuWa-VR-Setup.exe y abre WuWa VR desde el menú Inicio. La primera instalación del mod VR necesita internet.",
+      "El lanzador encuentra tu copia de Steam o del lanzador oficial de Kuro. Lee el aviso de riesgo para la cuenta y selecciona Instalar VR. Epic todavía no es compatible.",
+      "Inicia el software de tu visor o elige el simulador incluido en Visor. Selecciona Iniciar en VR y acepta el permiso de Windows; cuatro pasos sencillos te llevan a la VR."
     ],
     "shots": [
-      "Launcher al abrirlo por primera vez: el paso 01, Buscar Wuthering Waves, está resaltado.",
-      "Juego encontrado: el paso 01 está marcado, el paso 02, Instalar VR, está resaltado y la casilla de riesgo está marcada.",
-      "Listo: los tres pasos están marcados, se detecta SteamVR y Iniciar en VR está disponible."
+      "El lanzador al abrirlo por primera vez, antes de instalar el mod VR.",
+      "Juego encontrado y aviso de riesgo para la cuenta visible, listo para instalar el mod VR.",
+      "Listo para jugar: Iniciar en VR y Jugar sin VR sobre las filas Juego, Mod VR y Visor."
     ],
     "caption": "Pantallas reales del launcher, generadas por la app en español. Tus rutas y tu runtime serán distintos.",
     "controls": "En el juego, L3 + R3 abre el menú de WuWa VR. Los ajustes completos de UEVR están en su página Menu: All settings (classic UEVR menu).",
     "guide": "Guía completa de instalación, actualización y recuperación",
-    "names": ["Buscar Wuthering Waves", "Instalar VR", "Visor o simulador"]
+    "names": [
+      "Instalar",
+      "Preparar una vez",
+      "Iniciar en VR"
+    ]
   },
   "features": {
     "title": "Hecho para jugar, no solo para mirar",
     "items": [
-      ["VR estereoscópica y seguimiento de cabeza", "Profundidad real en visores OpenXR. Los menús y el HUD siguen siendo usables, y puedes mover, escalar u ocultar la interfaz."],
-      ["Pensado para mando", "Atajos para Xbox y, de forma experimental, PlayStation; en la VR, mantén L3 o LT + RT para ver qué hace cada botón."],
-      ["Cuerpo en primera persona", "Mira las manos y el atuendo de tu personaje con la cabeza oculta. Seguimiento de animación opcional y modo de confort incluido."],
-      ["Cámaras libres", "Vistas de cámara libre, dron, avión y acrobacias para explorar y hacer capturas. Experimental."],
-      ["Ventana 6DOF", "Un modo de ventana opcional que coloca el juego en tu habitación. Adaptado del trabajo de Elliott Tate."],
-      ["Ambos ojos coinciden", "Los árboles lejanos, los objetos y la luz indirecta coinciden en cada ojo, así el mundo se ve como una sola escena."]
+      [
+        "VR estereoscópica y seguimiento de cabeza",
+        "Profundidad real en visores OpenXR. Los menús y el HUD siguen siendo usables, y puedes mover, escalar u ocultar la interfaz."
+      ],
+      [
+        "Pensado para mando",
+        "Atajos para Xbox, PlayStation (experimental), mandos de VR y teclado. Mantén L3 o LT + RT y una tarjeta muestra qué hace cada botón."
+      ],
+      [
+        "Cuerpo en primera persona",
+        "Mira las manos y el atuendo de tu personaje con la cabeza oculta. Seguimiento de animación opcional y modo de confort incluido."
+      ],
+      [
+        "Cámaras libres",
+        "Vistas de cámara libre, dron, avión y acrobacias para explorar y hacer capturas. Experimental."
+      ],
+      [
+        "Ventana 6DOF",
+        "Un modo de ventana opcional que coloca el juego en tu habitación. Adaptado del trabajo de Elliott Tate."
+      ],
+      [
+        "Ambos ojos coinciden",
+        "Los árboles lejanos, los objetos y la luz indirecta coinciden en cada ojo, así el mundo se ve como una sola escena."
+      ]
     ]
   },
   "firstPerson": {
     "title": "Primera persona, hasta la animación de reposo",
     "text": "Mira hacia abajo y ahí está tu personaje: manos, atuendo y animaciones de reposo a escala real. Oculta los huesos de la cabeza y conserva el cuerpo, o sigue la animación completa si prefieres una vista más viva.",
-    "caption": "Un ojo del espejo del visor, grabado el 26 de septiembre de 2026 con un Quest Pro a través de SteamVR. Pronto habrá una captura más nítida.",
+    "caption": "Un ojo del espejo del visor, grabado el 26 de septiembre de 2026 con un Quest Pro a través de SteamVR.",
     "cta": "Graba tus propios clips en alta resolución",
     "ctaText": "Paso a paso: primera persona, una imagen limpia y la grabadora integrada."
   },
@@ -82,23 +131,45 @@
   "faq": {
     "title": "Preguntas",
     "items": [
-      ["¿Qué visores funcionan?", "WuWa VR usa OpenXR. Se ha jugado con un Quest Pro a través de SteamVR; otros visores OpenXR deberían funcionar, pero aún no están verificados. El simulador incluido te permite probarlo en una pantalla normal."],
-      ["¿Steam, launcher de Kuro o Epic?", "Steam y el launcher oficial de Kuro son compatibles. Epic todavía no."],
-      ["¿Pueden restringir mi cuenta?", "Sí, es posible. El mod se inyecta en el juego y el antitrampas podría detectarlo. Kuro Games no lo ha aprobado. Lee el aviso de riesgo antes de instalar."],
-      ["Windows avisa sobre el instalador. ¿Es normal?", "El instalador no está firmado, así que SmartScreen puede mostrar un aviso. Descárgalo solo desde la versión de GitHub del proyecto y compara la suma SHA-256. Nunca desactives el antivirus ni el antitrampas."],
-      ["¿Cómo funcionan las actualizaciones?", "La app busca sus propias actualizaciones y pregunta antes de reiniciarse. Al iniciarse, instala por sí sola un paquete VR más reciente para tu versión del juego mientras el juego está cerrado, y «Volver a …» en el paso 02 regresa al que tenías."],
-      ["¿Modifica los archivos del juego?", "No. El launcher no toca los archivos del juego; el mod de VR se inyecta al iniciar."],
-      ["¿Cómo lo desinstalo?", "Usa Solución de problemas → Preparar desinstalación en la app y luego quita WuWa VR en Configuración de Windows → Aplicaciones. Los ajustes, copias de seguridad y grabaciones se conservan salvo que los borres."],
-      ["¿Es gratis?", "Sí. Es un proyecto de fans gratuito y el launcher es de código abierto con licencia MIT. El apoyo en Ko-fi es opcional y no compra ninguna garantía."]
+      [
+        "¿Qué visores funcionan?",
+        "WuWa VR usa OpenXR. Se ha jugado en unas Bigscreen Beyond con SteamVR y en unas Quest Pro con SteamVR y con Virtual Desktop, con un mando de Xbox. Otros visores OpenXR también deberían funcionar. El simulador incluido te permite probarlo en una pantalla plana."
+      ],
+      [
+        "¿Steam, launcher de Kuro o Epic?",
+        "Steam y el launcher oficial de Kuro son compatibles. Epic todavía no."
+      ],
+      [
+        "¿Pueden restringir mi cuenta?",
+        "Sí, es posible. El mod se inyecta en el juego y el antitrampas podría detectarlo. Kuro Games no lo ha aprobado. Lee el aviso de riesgo antes de instalar."
+      ],
+      [
+        "Windows avisa sobre el instalador. ¿Es normal?",
+        "El instalador no está firmado, así que SmartScreen puede mostrar un aviso. Descárgalo solo desde la versión de GitHub del proyecto y compara la suma SHA-256. Nunca desactives el antivirus ni el antitrampas."
+      ],
+      [
+        "¿Cómo funcionan las actualizaciones?",
+        "La aplicación busca sus propias actualizaciones y pregunta antes de reiniciarse. Si se inicia con el juego cerrado, instala por sí sola un paquete de VR más nuevo para tu versión del juego, y Usar la versión instalada anterior en Solución de problemas → Más opciones vuelve al que tenías."
+      ],
+      [
+        "¿Modifica los archivos del juego?",
+        "No. El launcher no toca los archivos del juego; el mod de VR se inyecta al iniciar."
+      ],
+      [
+        "¿Cómo lo desinstalo?",
+        "Usa Solución de problemas → Más opciones → Preparar desinstalación en la aplicación y luego quita WuWa VR en Configuración de Windows → Aplicaciones. Tus ajustes de UEVR vuelven a como estaban antes del mod; las copias de seguridad y las grabaciones se conservan salvo que las borres."
+      ],
+      [
+        "¿Es gratis?",
+        "Sí. Es un proyecto de fans gratuito y el launcher es de código abierto con licencia MIT. El apoyo en Ko-fi es opcional y no compra ninguna garantía."
+      ]
     ]
   },
   "limits": {
     "title": "Limitaciones conocidas",
     "items": [
-      "El inicio con Steam todavía falla en algunos PC; hay una corrección en pruebas. La ruta del launcher oficial de Kuro es la más probada.",
       "Algunas cargas de escenas y diálogos pueden quedarse bloqueadas, y los menús planos pueden mostrar un fondo en movimiento.",
-      "La actualización de la proporción del HUD no es fiable; parte de la iluminación de NPC, los reflejos y la niebla aún necesitan pruebas.",
-      "El cine automático está activado de forma predeterminada; la detección de vídeos de la historia aún no está confirmada en el juego 3.7."
+      "La actualización de la proporción del HUD no es fiable; parte de la iluminación de NPC, los reflejos y la niebla aún necesitan pruebas."
     ],
     "recovery": "Problemas y pasos de recuperación"
   },
@@ -107,8 +178,7 @@
     "text": "El launcher de escritorio es de código abierto con licencia MIT y nuestros cambios al mod son públicos. Cada versión incluye el código correspondiente y sumas SHA-256.",
     "launcher": "Código del launcher",
     "mod": "Cambios del mod",
-    "release": "Sumas de esta versión",
-    "scan": "Aún no se han verificado informes de VirusTotal para esta versión. No se afirma ningún análisis limpio ni certificación de seguridad."
+    "release": "Sumas de esta versión"
   },
   "credits": {
     "title": "Hecho sobre el trabajo de la comunidad",
@@ -118,7 +188,7 @@
   },
   "languagesPage": {
     "title": "Idiomas",
-    "intro": "La página de inicio, los pasos de instalación, los controles básicos y el formulario de comentarios en diez idiomas. La guía completa y el menú de UEVR están en inglés.",
+    "intro": "La página de inicio, la guía del jugador, los controles básicos y el formulario de comentarios en diez idiomas. La referencia detallada y el menú propio de UEVR están en inglés.",
     "request": "Solicitar un idioma o corregir una traducción"
   }
 }

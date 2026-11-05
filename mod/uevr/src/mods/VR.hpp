@@ -503,6 +503,8 @@ public:
     auto begin_diorama_draw(bool supported) {
         if (!supported) m_diorama.request(false);
         m_diorama.set_miniature(m_diorama_scale->value());
+        // An ultimate shows in the normal view (WuWaControls_DioramaSkillPause); the request stays on.
+        m_diorama.set_paused(m_wuwa_controls.diorama_paused());
         return wuwa_diorama::Scale::Draw{m_diorama, m_world_scale->value()};
     }
 
@@ -580,6 +582,11 @@ public:
 
     bool is_decoupled_pitch_enabled() const {
         return m_decoupled_pitch->value();
+    }
+    // What the view uses this frame: the saved setting, given back to the game camera's tilt
+    // in story scenes and ultimates (WuWaControls_PitchInScenes). Never written to the config.
+    bool is_decoupled_pitch_effective() const {
+        return m_decoupled_pitch->value() && !m_wuwa_controls.decoupled_pitch_paused();
     }
 
     bool is_decoupled_pitch_ui_adjust_enabled() const {

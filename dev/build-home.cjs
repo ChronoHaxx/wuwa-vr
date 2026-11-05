@@ -12,6 +12,9 @@ const baseUrl = 'https://chronohaxx.github.io/wuwa-vr/';
 const fill = (text, values = {}) => text.replace(/\{(\w+)\}/g, (match, key) => key in values ? values[key] : match);
 const vars = {app: status.appVersion, game: status.game, previous: status.previousTag.replace(/^beta-/, '').replace(/-/g, '.')};
 const shotStates = ['fresh', 'found', 'ready'];
+const watch = JSON.parse(fs.readFileSync(path.join(__dirname, 'site-content/watch.json'), 'utf8'));
+// Each language's own player guide (dev/build-guide.cjs).
+const guide = (code, prefix) => code === 'en' ? `${prefix}guide.html` : `${prefix}l/${code}-guide.html`;
 
 // Every locale must have exactly the English shape, as text (never markup).
 function load(code) {
@@ -70,18 +73,23 @@ function home(t, prefix) {
   const s = t.strings, english = t.english, toEnglish = label => esc(label) + (english ? `<span class="en-note">${esc(english)}</span>` : '');
   const languageHref = code => code === 'en' ? `${prefix}index.html` : `${prefix}l/${code}.html`;
   const labels = t.chrome;
-  const links = [['#start', labels.install], ['#features', labels.features], ['#faq', labels.faq], [prefix + 'guide.html', labels.guide], [prefix + 'record.html', labels.capture]];
-  const hero = `<section class="hero"><div class="wrap hero-grid"><div class="hero-copy">
-<p class="eyebrow"><span class="pill">${esc(t.hero.eyebrow)}</span><span>${esc(status.appVersion)} · Wuthering Waves ${esc(status.game)}</span></p>
+  const links = [['#start', labels.install], ['#watch', t.watch.title], ['#faq', labels.faq], [guide(t.code, prefix), labels.guide], [prefix + 'record.html', labels.capture], [feedbackPage(t.code, prefix), labels.feedback]];
+  // The hero is a login screen: Abby in a VR headset under the night sky, the build number in
+  // the corner. The treadmill run plays at the top of Watch.
+  const chevron = '<svg class="icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 9.5 12 15.5 18 9.5"/></svg>';
+  const hero = `<section class="hero"><div class="hero-sky" aria-hidden="true"></div><div class="wrap hero-grid"><div class="hero-copy">
+<p class="eyebrow"><span class="pill">${esc(t.hero.eyebrow)}</span></p>
 <h1>${esc(t.hero.title)}</h1><p class="lede">${esc(t.hero.lede)}</p>
 <div id="release-download"><div class="cta-row"><a class="button primary big" href="${asset(status.installer)}">${icon.download}<span>${esc(t.hero.download)}</span></a></div>
 <p class="cta-meta">${esc(fill(t.hero.meta, vars))}</p>
 <p class="cta-links"><a href="${asset('WuWa-VR-Launcher.zip')}">${esc(t.hero.portable)}</a><a href="${releaseUrl}">${esc(t.hero.notes)}</a><a href="${L.repo}/releases/tag/${status.previousTag}">${esc(fill(t.hero.previous, vars))}</a></p></div></div>
-<figure class="hero-media"><div class="video-frame" id="run-video" data-youtube="${youtube.id}" data-youtube-title="${esc(t.hero.watch)}">
+<div class="hero-crest" aria-hidden="true"><img src="${prefix}media/abby.svg" width="1000" height="720" alt="" decoding="async" fetchpriority="high"></div></div>
+<div class="wrap hero-foot"><a class="hero-next" href="#watch"><span class="visually-hidden">${esc(t.watch.title)}</span>${chevron}</a><p class="hero-build" dir="ltr">${esc(status.appVersion)} · Wuthering Waves ${esc(status.game)}</p></div></section>`;
+  const runVideo = `<figure class="hero-media"><div class="video-frame" id="run-video" data-youtube="${youtube.id}" data-youtube-title="${esc(t.hero.watch)}">
 <video muted loop playsinline preload="none" poster="${prefix}media/run-poster.jpg" width="960" height="540" aria-label="${esc(t.hero.caption)}"><source src="${prefix}media/run-loop.mp4" type="video/mp4"></video>
 <button class="video-toggle" type="button" hidden data-play="${esc(t.hero.play)}" data-pause="${esc(t.hero.pause)}" aria-label="${esc(t.hero.play)}">${icon.play}${icon.pause}</button>
 <a class="video-play" href="${youtube.watch}" data-youtube-open rel="noopener noreferrer">${icon.play}<span>${esc(t.hero.watch)}</span><span class="button-meta">${esc(t.hero.watchMeta)}</span></a></div>
-<figcaption>${esc(t.hero.caption)} <span class="small">${esc(t.hero.youtube)}</span></figcaption></figure></div></section>`;
+<figcaption>${esc(t.hero.caption)} <span class="small">${esc(t.hero.youtube)}</span></figcaption></figure>`;
   const risk = `<div class="wrap"><aside class="notice risk">${icon.alert}<p><strong>${esc(s.riskTitle)}</strong> ${esc(s.riskText)} <a href="${prefix}risk.html" hreflang="en">${toEnglish(t.risk.link)}</a></p></aside></div>`;
   const shots = shotStates.map((state, i) => {
     const file = `media/launcher/${t.code}-${state}.webp`, size = imageSize(file);
@@ -90,25 +98,36 @@ function home(t, prefix) {
   const start = `<section id="start" class="section"><div class="wrap"><div class="section-head"><h2>${esc(t.start.title)}</h2><p class="lede">${esc(t.start.lede)}</p></div>
 <div class="tour"><ol class="launcher-steps">${t.start.steps.map((text, i) => `<li class="tour-step${i === 0 ? ' is-active' : ''}"><span class="step-num" aria-hidden="true">0${i + 1}</span><div><h3 id="step-${i + 1}">${esc(t.start.names[i])}</h3><p>${esc(text)}</p></div><button class="tour-select" type="button" hidden data-shot="${i}" aria-labelledby="step-${i + 1}" aria-pressed="${i === 0}"></button></li>`).join('')}</ol>
 <div class="tour-shots">${shots}<p class="small tour-caption">${esc(t.start.caption)}</p></div></div>
-<p class="section-foot">${esc(t.start.controls)} <a href="${prefix}guide.html#start" hreflang="en">${toEnglish(t.start.guide)}</a></p></div></section>`;
+<p class="section-foot">${esc(t.start.controls)} <a href="${guide(t.code, prefix)}#start">${esc(t.start.guide)}</a></p></div></section>`;
+  const card = (v, tag) => `<li class="video-card"><div class="video-frame" data-youtube="${v.id}" data-youtube-title="${esc(v.title)}"><img src="${prefix}${v.poster}" width="${v.width}" height="${v.height}" loading="lazy" decoding="async" alt="">` +
+    `<a class="video-play" href="https://www.youtube.com/watch?v=${v.id}" data-youtube-open rel="noopener noreferrer">${icon.play}<span class="visually-hidden">${esc(t.hero.play)}: <bdi lang="en">${esc(v.title)}</bdi></span></a></div>` +
+    `<p class="video-title"><bdi lang="en" dir="ltr">${esc(v.title)}</bdi>${tag ? `<span class="tag">${esc(tag)}</span>` : ''}</p></li>`;
+  const watchSection = `<section id="watch" class="section watch"><div class="wrap"><div class="section-head"><h2>${esc(t.watch.title)}</h2><p class="lede">${esc(t.watch.lede)}</p></div>
+<div class="watch-feature">${runVideo}
+<div class="watch-side"><ul class="video-grid featured">${watch.featured.map(v => card(v, t.watch.noSpoilers)).join('')}</ul><p>${esc(t.watch.privacy)}</p><a class="card-link" href="${watch.channel}" rel="noopener noreferrer"><strong>${esc(t.watch.channel)}</strong><span>@chronohax7186</span>${icon.arrow}</a></div></div>
+<details class="spoiler-reveal"><summary>${icon.alert}<span>${esc(t.watch.spoilers)}</span></summary><p class="small">${esc(t.watch.spoilerNote)}</p><ul class="video-grid story">${watch.story.map(v => card(v)).join('')}</ul></details></div></section>`;
   const features = `<section id="features" class="section alt"><div class="wrap"><div class="section-head"><h2>${esc(t.features.title)}</h2></div><ul class="feature-grid">${t.features.items.map(([title, text], i) => `<li class="feature">${svg(featureIcons[i])}<h3>${esc(title)}</h3><p>${esc(text)}</p></li>`).join('')}</ul></div></section>`;
   const firstPerson = `<section id="first-person" class="section"><div class="wrap split"><figure class="clip"><video controls preload="none" playsinline poster="${prefix}media/feature-first-person.jpg" width="960" height="720"><source src="${prefix}media/feature-first-person.mp4" type="video/mp4"><a href="${prefix}media/feature-first-person.mp4">${esc(t.firstPerson.title)}</a></video><figcaption>${esc(t.firstPerson.caption)}</figcaption></figure>
 <div class="split-copy"><h2>${esc(t.firstPerson.title)}</h2><p>${esc(t.firstPerson.text)}</p><a class="card-link" href="${prefix}record.html" hreflang="en"><strong>${toEnglish(t.firstPerson.cta)}</strong><span>${esc(t.firstPerson.ctaText)}</span>${icon.arrow}</a></div></div></section>`;
-  const controls = pad.render({code: t.code, dir: t.dir, copy: t.pad, prefix, guideLink: `<a href="${prefix}guide.html#controls" hreflang="en">${esc(s.detailed)}</a>`});
+  const controls = pad.render({code: t.code, dir: t.dir, copy: t.pad, prefix, guideLink: `<a class="card-link" href="${guide(t.code, prefix)}#controls"><strong>${esc(t.pad.all)}</strong>${icon.arrow}</a>`});
   const faq = `<section id="faq" class="section"><div class="wrap narrow"><div class="section-head"><h2>${esc(t.faq.title)}</h2></div><div class="faq">${t.faq.items.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div></div></section>`;
-  const limits = `<section id="limits" class="section alt"><div class="wrap narrow"><div class="section-head"><h2>${esc(t.limits.title)}</h2></div><ul class="limit-list">${t.limits.items.map(item => `<li>${esc(item)}</li>`).join('')}</ul><p class="section-foot"><a href="${prefix}guide.html#recovery" hreflang="en">${toEnglish(t.limits.recovery)}</a></p></div></section>`;
-  const open = `<section id="open" class="section"><div class="wrap narrow"><div class="section-head"><h2>${esc(t.open.title)}</h2><p>${esc(t.open.text)}</p></div><div class="link-row"><a class="button" href="${L.repo}/tree/main/launcher/native">${esc(t.open.launcher)}</a><a class="button" href="${L.repo}/tree/main/mod">${esc(t.open.mod)}</a><a class="button" href="${releaseUrl}">${esc(t.open.release)}</a></div><p class="small">${esc(scanNote(t))}</p></div></section>`;
-  const feedback = `<section id="feedback" class="section alt"><div class="wrap narrow"><div class="section-head"><h2>${esc(s.feedback)}</h2></div>${report(s)}</div></section>`;
-  const credits = `<section id="credits" class="section"><div class="wrap narrow credits"><h2>${esc(t.credits.title)}</h2><p>${esc(t.credits.text)}</p><p class="link-row"><a href="${prefix}credits.html" hreflang="en">${toEnglish(t.credits.more)}</a><a href="${prefix}support.html" hreflang="en">${esc(t.credits.support)}</a></p></div></section>`;
-  const body = `<a class="skip" href="#main">${esc(labels.skip)}</a>${L.header({lang: t.code, prefix, labels, links, languageHref})}${t.code === 'en' ? `<p class="language-suggest wrap" id="language-suggest" hidden data-options="${esc(JSON.stringify(Object.fromEntries(locales.filter(l => l.code !== 'en').map(l => [l.code, [l.chrome.suggest, `l/${l.code}.html`]]))))}"></p>` : ''}<main id="main" class="home" data-home="${t.code}">${hero}${risk}${start}${features}${firstPerson}${controls}${faq}${limits}${open}${feedback}${credits}</main>${L.footer({prefix, labels})}`;
-  const headExtra = alternates() + `<link rel="preload" as="image" href="${prefix}media/run-poster.jpg">`;
+  const limits = `<section id="limits" class="section alt"><div class="wrap narrow"><div class="section-head"><h2>${esc(t.limits.title)}</h2></div><ul class="limit-list">${t.limits.items.map(item => `<li>${esc(item)}</li>`).join('')}</ul><p class="section-foot"><a href="${guide(t.code, prefix)}#recovery">${esc(t.limits.recovery)}</a></p></div></section>`;
+  // One closing section: open source and checksums beside the community credits. The feedback
+  // form has its own page in each language (feedbackPage), linked from the header.
+  const closing = `<section id="credits" class="section"><div class="wrap closing-grid">
+<div id="open" class="closing-card"><h2>${esc(t.open.title)}</h2><p>${esc(t.open.text)}</p><div class="link-row"><a class="button" href="${L.repo}/tree/main/launcher/native">${esc(t.open.launcher)}</a><a class="button" href="${L.repo}/tree/main/mod">${esc(t.open.mod)}</a><a class="button" href="${releaseUrl}">${esc(t.open.release)}</a></div></div>
+<div class="closing-card credits"><h2>${esc(t.credits.title)}</h2><p>${esc(t.credits.text)}</p><p class="link-row"><a href="${prefix}credits.html" hreflang="en">${toEnglish(t.credits.more)}</a><a href="${prefix}support.html" hreflang="en">${esc(t.credits.support)}</a><a href="${feedbackPage(t.code, prefix)}">${esc(s.feedback)}</a></p></div></div></section>`;
+  const body = `<a class="skip" href="#main">${esc(labels.skip)}</a>${L.header({lang: t.code, prefix, labels, links, languageHref})}${t.code === 'en' ? `<p class="language-suggest wrap" id="language-suggest" hidden data-options="${esc(JSON.stringify(Object.fromEntries(locales.filter(l => l.code !== 'en').map(l => [l.code, [l.chrome.suggest, `l/${l.code}.html`]]))))}"></p>` : ''}<main id="main" class="home" data-home="${t.code}">${hero}${risk}${watchSection}${start}${features}${firstPerson}${controls}${faq}${limits}${closing}</main>${L.footer({prefix, labels})}`;
+  const headExtra = alternates();
   return `<!doctype html><html lang="${t.code}" dir="${t.dir}">${L.head({lang: t.code, title: t.meta.title, description: t.meta.description, prefix, extra: headExtra})}<body>${body}</body></html>\n`;
 }
-function scanNote(t) {
-  const record = JSON.parse(fs.readFileSync(path.join(root, 'release/security-reports.json'), 'utf8'));
-  const reports = (record.releases.find(r => r.tag === status.tag) || {files: []}).files.filter(f => f.status === 'reported');
-  // Reported scans are listed on the release; the page only claims what was verified.
-  return reports.length ? '' : t.open.scan;
+// The feedback form in each language: feedback.html (English, dev/build-community.cjs) and l/<code>-feedback.html.
+const feedbackPage = (code, prefix) => code === 'en' ? `${prefix}feedback.html` : `${prefix}l/${code}-feedback.html`;
+function feedback(t) {
+  const prefix = '../', s = t.strings, labels = t.chrome;
+  const links = [[`${prefix}l/${t.code}.html`, labels.home], [guide(t.code, prefix), labels.guide], [prefix + 'record.html', labels.capture]];
+  const body = `<a class="skip" href="#main">${esc(labels.skip)}</a>${L.header({lang: t.code, prefix, labels, links, languageHref: code => feedbackPage(code, prefix)})}<main class="wrap page" id="main"><h1>${esc(s.feedback)}</h1><section id="feedback">${report(s)}</section></main>${L.footer({prefix, labels})}`;
+  return `<!doctype html><html lang="${t.code}" dir="${t.dir}">${L.head({lang: t.code, title: `${s.feedback} — WuWa VR`, description: t.meta.description, prefix})}<body>${body}</body></html>\n`;
 }
 function languagesPage() {
   const t = en.languagesPage;
@@ -121,11 +140,11 @@ function recordPage() {
   const body = `<p class="eyebrow"><span class="pill">Capture guide</span></p><h1>Record first-person clips</h1>
 <p class="intro">Show what WuWa VR feels like: your character's hands, outfit and idle animation at full scale. This guide uses the tools that ship with WuWa VR; no extra capture software is needed for the basic route.</p>
 <div class="guide-steps">
-${step(0, 'Before you start', `<ul><li>Install and launch through the WuWa VR app as usual. See <a href="index.html#start">the three setup steps</a>.</li><li>The built-in recorder captures the game's two eye views from <strong>SteamVR</strong> or the bundled <strong>OpenXR Simulator</strong>. It does not record the desktop or audio. VDXR is not supported.</li><li>Recording costs performance. Close other heavy apps, and expect a lower frame rate than normal play.</li><li>Recordings stop after five minutes, when the game closes or when the scene changes.</li></ul>`)}
+${step(0, 'Before you start', `<ul><li>Install and launch through the WuWa VR app as usual. See <a href="guide.html#start">the player guide</a>.</li><li>The built-in recorder captures the game's two eye views from <strong>SteamVR</strong> or the bundled <strong>OpenXR Simulator</strong>, not the desktop. With SteamVR it can also record the game's sound and a microphone. VDXR is not supported.</li><li>Recording costs performance. Close other heavy apps, and expect a lower frame rate than normal play.</li><li>Recordings stop after five minutes, when the game closes or when the scene changes.</li></ul>`)}
 ${step(1, 'Get into first person', `<p>Press ${kbd('L3 + View')} to enter first person. In the WuWa VR menu (${kbd('L3 + R3')}), open <strong>Camera</strong> and set <strong>Your body</strong> to <strong>Hide head</strong> so the body stays visible.</p><p>If the view clips into the body, raise or lower it with ${kbd('L3 + Y')} / ${kbd('L3 + X')}. For a livelier idle shot, ${kbd('L3 + D-pad Down')} toggles full animation follow. It moves the view with the character's head, so it is more intense; keep takes short or sit down.</p>`)}
 ${step(2, 'Clean up the frame', `<ul><li>Close the WuWa VR menu with ${kbd('L3 + R3')}.</li><li>If you pinned the controls card, unpin it with ${kbd('L3 + Menu')}.</li><li>Hide the game UI with ${kbd('L3 + B')}. Press it again to bring the UI back.</li><li>Optional: <strong>Record → Hide player IDs</strong> covers your UID. Still review clips for names before sharing.</li></ul><p>Then stand still and let the idle animation play. Move your head slowly: look at your hands, then down at the outfit, then out at the scenery.</p>`)}
-${step(3, 'Make it sharper (optional)', `<p>In the WuWa VR menu, <strong>Fixes → Render resolution</strong> goes up to 120 %. For more, open <strong>Menu → All settings (classic UEVR menu)</strong>, then <strong>OpenXR Options → Resolution Scale</strong>, and raise it above 1.0 (try 1.3–1.5). The game renders more pixels per eye and the recording looks cleaner, at a GPU cost. Lower it again if the frame rate drops. If nothing changes, restart the game.</p><p>Raising in-game graphics quality helps too. Lighting and far detail already match between the eyes.</p>`)}
-${step(4, 'Record', `<ol><li>With the game running, select <strong>Developer tools</strong> in the WuWa VR app's footer. The advanced launcher opens in your browser.</li><li>Under <strong>Record gameplay</strong>, set <strong>Purpose</strong> to <strong>Content creation: clean video only</strong>.</li><li>Pick <strong>Resolution per eye: 1280 px</strong>. Use <strong>30 fps</strong> to start; try 45 or 60 only if your PC has headroom. The recorder cannot add frames the game never rendered.</li><li>Select <strong>Start recording</strong>, return to the game and play. Select <strong>Stop recording</strong> when done, then <strong>Open recordings</strong>.</li></ol><p class="small">Simulator capture: keep the simulator preview open with both eyes side by side and full render off. Its video resolution is limited by the preview window size.</p>`)}
+${step(3, 'Make it sharper (optional)', `<p>In the WuWa VR menu, <strong>Graphics → Render resolution</strong> goes up to 120 %. For more, open <strong>Menu → All settings (classic UEVR menu)</strong>, then <strong>OpenXR Options → Resolution Scale</strong>, and raise it above 1.0 (try 1.3–1.5). The game renders more pixels per eye and the recording looks cleaner, at a GPU cost. Lower it again if the frame rate drops. If nothing changes, restart the game.</p><p>Raising in-game graphics quality helps too. Lighting and far detail already match between the eyes.</p>`)}
+${step(4, 'Record', `<ol><li>With the game running, open <strong>Troubleshooting → More options</strong> in the WuWa VR app and select <strong>Developer tools</strong>. The advanced launcher opens in your browser. (The WuWa VR menu's <strong>Record</strong> page can start a recording too.)</li><li>Under <strong>Record gameplay</strong>, set <strong>Purpose</strong> to <strong>Content creation: clean video only</strong>.</li><li>Pick <strong>Resolution per eye: 1280 px</strong>. Use <strong>30 fps</strong> to start; try 45 or 60 only if your PC has headroom. The recorder cannot add frames the game never rendered.</li><li>Select <strong>Start recording</strong>, return to the game and play. Select <strong>Stop recording</strong> when done, then <strong>Open recordings</strong>.</li></ol><p class="small">Simulator capture: keep the simulator preview open with both eyes side by side and full render off. Its video resolution is limited by the preview window size.</p>`)}
 ${step(5, 'Export one eye', `<p>The recorder saves <code>clean-sbs.mp4</code>, a side-by-side stereo video. For a normal flat video, keep one eye. <code>replay.html</code> in the same folder can save single-eye stills. To crop the video with <a href="https://ffmpeg.org/">FFmpeg</a>, run this in PowerShell from the recording folder:</p><pre><code>ffmpeg -i clean-sbs.mp4 -vf "crop=iw/2:ih:0:0" -c:v libx264 -crf 18 -preset slow left-eye.mp4</code></pre><p>Need more than 1280 px? Open SteamVR's <strong>Display VR View</strong>, show one eye, maximize the window and record it with OBS. That captures the mirror at your monitor's resolution, including any resolution scale you set.</p>`)}
 </div>
 <aside class="notice"><p>Share what you make. A clip of first-person idle animation in your favourite outfit is a great way to show people the mod. Please credit WuWa VR and keep the account-risk notice in mind when posting gameplay.</p></aside>`;
@@ -136,11 +155,17 @@ fs.mkdirSync(path.join(site, 'l'), {recursive: true});
 for (const t of locales) {
   if (t.code === 'en') fs.writeFileSync(path.join(site, 'index.html'), home(t, ''));
   fs.writeFileSync(path.join(site, 'l', t.code + '.html'), home(t, '../'));
+  if (t.code !== 'en') fs.writeFileSync(path.join(site, 'l', t.code + '-feedback.html'), feedback(t));
 }
 fs.writeFileSync(path.join(site, 'languages.html'), languagesPage());
 fs.writeFileSync(path.join(site, 'record.html'), recordPage());
-const kept = ['credits.html', 'developers.html', 'feedback.html', 'guide.html', 'license.html', 'risk.html', 'support.html', 'testing.html', 'understanding.html'];
-const changed = L.refreshChrome(site, kept);
-require('./site-metadata.cjs').apply(site);
-console.log(`Built ${locales.length} home pages, languages and capture guide; refreshed chrome on ${changed} pages.`);
-module.exports = {locales};
+// Then the player guide and reference, the shared chrome on hand-kept pages, metadata,
+// and last the lean README and docs pointers, which name these pages.
+module.exports = {locales, ready: (async () => {
+  const pages = await require('./build-guide.cjs').build();
+  const kept = ['credits.html', 'developers.html', 'feedback.html', 'license.html', 'risk.html', 'support.html', 'testing.html', 'understanding.html'];
+  const changed = L.refreshChrome(site, kept);
+  require('./site-metadata.cjs').apply(site);
+  const readme = require('./build-readme.cjs').build();
+  console.log(`Built ${locales.length} home pages, ${pages} guide and reference pages, languages and capture guide; refreshed chrome on ${changed} pages; wrote ${readme}.`);
+})().catch(error => { console.error(error); process.exitCode = 1; throw error; })};

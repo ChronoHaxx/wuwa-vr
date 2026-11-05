@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "WuWaShortcutBeats.hpp"
+
 struct ImDrawList;
 struct ImFont;
 struct ImVec2;
@@ -47,6 +49,16 @@ struct Item {
     std::function<bool()> is_default;
     std::function<void()> reset;
     bool session_only{}; // this launch only: never saved
+    // 1.2.7 lean menu (owner, 5 Nov 2026). Hidden rows take no space and no focus (rows under More settings).
+    std::function<bool()> visible;
+    // A second help paragraph (English, translated on its own): notes that used to be rows keep their translations.
+    std::string help_more;
+    // A live line in the help strip while the row has focus (status that used to take a row of its own), as shown.
+    std::function<std::string()> status;
+    // The row's shortcuts, played one after another on a live 3D controller in the help strip, on the device
+    // used last; label names each when there are several (English; translated when drawn).
+    struct Keys { std::string label; wuwa_pad3d::Shortcut shortcut; };
+    std::vector<Keys> shortcuts;
 };
 
 inline Item make(Kind kind, std::string label, std::string help = {}) {
@@ -60,7 +72,9 @@ inline Item make(Kind kind, std::string label, std::string help = {}) {
 struct Page {
     std::string title; // English
     std::vector<Item> items;
+    bool tiles{};      // Home: large tiles in a grid of tile_columns; left / right / up / down move between them
 };
+constexpr int tile_columns = 4;
 
 // Discrete moves from a gamepad or keyboard, gathered by the host each frame as
 // new presses (or key repeats), never as held state.
@@ -196,8 +210,12 @@ struct State {
     int dragging{-1}; // slider row held by the pointer
 };
 
+inline bool shown(const Item& item) {
+    return !item.visible || item.visible();
+}
+
 inline bool focusable(const Item& item) {
-    return item.kind != Kind::Text && (!item.enabled || item.enabled());
+    return item.kind != Kind::Text && shown(item) && (!item.enabled || item.enabled());
 }
 
 inline int first_focusable(const Page& page) {
@@ -276,6 +294,37 @@ inline void set_page(const std::vector<Page>& pages, State& state, int page) {
     state.dragging = -1;
 }
 
+// After a row hid itself (More settings opens the rows below it): focus moves on to the next row, or back.
+inline void settle_focus(const Page& page, State& state) {
+    const int count = static_cast<int>(page.items.size());
+    if (state.focus < 0 || state.focus >= count || focusable(page.items[state.focus])) return;
+    for (int i = state.focus + 1; i < count; ++i) {
+        if (focusable(page.items[i])) { state.focus = i; return; }
+    }
+    for (int i = state.focus - 1; i >= 0; --i) {
+        if (focusable(page.items[i])) { state.focus = i; return; }
+    }
+    state.focus = -1;
+}
+
+// A tile page: left / right step through the tiles in order, up / down move a row of the grid.
+inline void tile_move(const Page& page, State& state, const Moves& moves) {
+    const int count = static_cast<int>(page.items.size());
+    if (moves.left) state.focus = step_focus(page, state.focus, -1);
+    if (moves.right) state.focus = step_focus(page, state.focus, +1);
+    const int row = moves.up ? -tile_columns : moves.down ? tile_columns : 0;
+    if (row != 0) {
+        const int target = state.focus + row;
+        if (target >= 0 && target < count && focusable(page.items[target])) state.focus = target;
+        else if (row > 0 && target >= count) {
+            // Down from a top-row tile above an empty slot: the last tile.
+            for (int i = count - 1; i > state.focus; --i) {
+                if (focusable(page.items[i])) { state.focus = i; break; }
+            }
+        }
+    }
+}
+
 // Applies one frame of gamepad / keyboard moves. Pages wrap; rows do not.
 inline void apply_moves(std::vector<Page>& pages, State& state, const Moves& moves) {
     if (pages.empty()) return;
@@ -292,13 +341,107 @@ inline void apply_moves(std::vector<Page>& pages, State& state, const Moves& mov
         if (state.focus < 0) return;
         if (moves.up || moves.down) return; // the first press only shows where focus is
     }
-    if (moves.up) state.focus = step_focus(page, state.focus, -1);
-    if (moves.down) state.focus = step_focus(page, state.focus, +1);
+    if (page.tiles) {
+        tile_move(page, state, moves);
+    } else {
+        if (moves.up) state.focus = step_focus(page, state.focus, -1);
+        if (moves.down) state.focus = step_focus(page, state.focus, +1);
+    }
     auto& item = page.items[state.focus];
-    if (moves.left) nudge(item, -1, moves.scale);
-    if (moves.right) nudge(item, +1, moves.scale);
+    if (!page.tiles && moves.left) nudge(item, -1, moves.scale);
+    if (!page.tiles && moves.right) nudge(item, +1, moves.scale);
     if (moves.accept) activate(item);
     if (moves.reset && item.reset && (!item.enabled || item.enabled())) item.reset();
+    settle_focus(page, state);
+}
+
+// VR setup (1.2.7; owner, 5 Nov 2026: a first-launch VR setup rather than new defaults). A few questions,
+// one screen each, answered with big cards. Picking a card applies it at once and moves on; the last
+// screen sums up. Focus starts on the choice the settings already match, so pressing A through every
+// screen changes nothing.
+struct SetupChoice {
+    std::string label;  // English
+    std::string detail; // English, a line or two
+    bool recommended{};
+};
+
+struct SetupQuestion {
+    std::string title; // English; also its name on the summary
+    std::string text;  // English
+    std::vector<SetupChoice> choices;
+    std::function<int()> get;     // the choice the settings match now, or -1
+    std::function<void(int)> set; // applies a choice
+};
+
+enum class SetupResult { Open, Done, Skipped };
+
+struct Setup {
+    std::vector<SetupQuestion> questions;
+    int screen{0}; // 0 the welcome, 1..n the questions, n + 1 the summary
+    int first{0};  // where this run started: Back there leaves the setup
+    int focus{0};  // the card in focus on this screen
+    Source source{Source::Buttons};
+    SetupResult result{SetupResult::Open};
+    std::string done_detail; // English, under Done: where it goes back to
+
+    int count() const { return static_cast<int>(questions.size()); }
+    bool welcome() const { return screen == 0; }
+    bool summary() const { return screen == count() + 1; }
+    // Cards on this screen: Set up now and Skip on the welcome, the choices, Done on the summary.
+    int cards() const { return welcome() ? 2 : summary() ? 1 : static_cast<int>(questions[screen - 1].choices.size()); }
+};
+
+inline void setup_go(Setup& setup, int screen) {
+    setup.screen = std::clamp(screen, 0, setup.count() + 1);
+    setup.focus = 0;
+    if (!setup.welcome() && !setup.summary()) {
+        const auto& question = setup.questions[setup.screen - 1];
+        const int now = question.get ? question.get() : -1;
+        if (now >= 0 && now < static_cast<int>(question.choices.size())) setup.focus = now;
+    }
+}
+
+// From the welcome (first launch) or straight to the first question (the Menu page).
+inline void setup_start(Setup& setup, bool welcome) {
+    setup.result = SetupResult::Open;
+    setup.source = Source::Buttons;
+    setup.first = welcome ? 0 : 1;
+    setup_go(setup, setup.first);
+}
+
+// A card picked (accept or a click): applies it and moves on.
+inline void setup_pick(Setup& setup, int card) {
+    if (setup.result != SetupResult::Open || card < 0 || card >= setup.cards()) return;
+    if (setup.welcome()) {
+        if (card == 0) setup_go(setup, 1);
+        else setup.result = SetupResult::Skipped;
+        return;
+    }
+    if (setup.summary()) {
+        setup.result = SetupResult::Done;
+        return;
+    }
+    auto& question = setup.questions[setup.screen - 1];
+    if (question.set) question.set(card);
+    setup_go(setup, setup.screen + 1);
+}
+
+// Back: the screen before; where this run started, it leaves the setup (as Skip does).
+inline void setup_back(Setup& setup) {
+    if (setup.result != SetupResult::Open) return;
+    if (setup.screen <= setup.first) setup.result = SetupResult::Skipped;
+    else setup_go(setup, setup.screen - 1);
+}
+
+// One frame of gamepad / keyboard moves: up / down focus a card, accept picks it, back goes back. Left /
+// right and page changes do nothing here, so a stray push never changes a setting.
+inline void setup_apply_moves(Setup& setup, const Moves& moves) {
+    if (!moves.any() || setup.result != SetupResult::Open) return;
+    setup.source = Source::Buttons;
+    if (moves.up) setup.focus = (std::max)(setup.focus - 1, 0);
+    if (moves.down) setup.focus = (std::min)(setup.focus + 1, setup.cards() - 1);
+    if (moves.accept) setup_pick(setup, setup.focus);
+    else if (moves.back) setup_back(setup);
 }
 
 struct Look {
@@ -306,11 +449,16 @@ struct Look {
     ImFont* font{}; // a large baked font (the sheet font); null uses the current font
     bool right_to_left{};
     std::string badge; // e.g. "REC 1:23", shown in red in the header; empty for none
+    wuwa_pad3d::Device device{wuwa_pad3d::Device::xbox}; // used last: shortcuts and hints are shown for it
+    double time{};     // seconds, for the shortcut playback
 };
 
 // Draws the menu into the current ImGui window, filling pos..pos+size. Pointer
 // input comes from ImGui's mouse (the host feeds the laser into it).
 void draw(std::vector<Page>& pages, State& state, const Moves& moves, const ImVec2& pos, const ImVec2& size, const Look& look);
+
+// The VR setup in the menu's place and size, applying this frame's moves and the pointer.
+void draw_setup(Setup& setup, const Moves& moves, const ImVec2& pos, const ImVec2& size, const Look& look);
 
 // The current step of a guided test plan, drawn where the controls card goes
 // while the menu is closed. index == steps.size() means the plan is finished.

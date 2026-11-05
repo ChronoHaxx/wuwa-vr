@@ -28,6 +28,10 @@ inline Bits showroom_bits(Bits b) {
     const auto at = [](uint8_t v) { return uint8_t((v & showroom) ? dialogue : 0); };
     return {at(b.active), at(b.hold), at(b.known)};
 }
+// lease-v5 (5 Nov 2026): the game's camera mode is 1, its skill camera
+// (CameraBlueprintFunctionLibrary.GetCameraMode; an ultimate's shot). Decoupled pitch
+// and the diorama pause on it; no view or layout reads it.
+constexpr uint8_t skill = 32, all_bits = 63;
 enum class Presentation : uint8_t { none, stereo_screen, mono_theatre };
 // What automatic cinema asks for: a story video wins, then a story picture (also for a
 // moment after one, so the crossfade between pictures does not flip the view), then

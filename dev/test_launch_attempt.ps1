@@ -27,6 +27,7 @@ $c=New-FixtureCase
 $r=Invoke-LaunchFrontEnd @c -Preflight {throw 'fixture preflight error'} -Elevate {throw 'Must not launch'}
 $s=Read-LaunchState $c.StatePath
 Check ($r.Outcome -eq 'PreflightFailed' -and $s.phase -eq 'failed' -and $s.message -like '*fixture preflight error*') 'preflight failure is retained'
+Check ($s.reachedPhase -eq 'preflight') 'a preflight failure stops at the first step'
 Check ($s.attemptId -eq $c.AttemptId -and $s.ownerPid -eq $PID -and $s.ownerStartedUtc -and ([IO.File]::ReadAllText($c.StatePath) -match '"requestedAt"\s*:\s*"[^"]+Z"')) 'attempt identity and UTC owner are recorded'
 $c=New-FixtureCase
 $r=Invoke-LaunchFrontEnd @c -Preflight {} -Elevate {
@@ -36,6 +37,10 @@ $r=Invoke-LaunchFrontEnd @c -Preflight {} -Elevate {
 }
 $s=Read-LaunchState $c.StatePath
 Check ($r.Outcome -eq 'ElevationCancelled' -and $s.phase -eq 'cancelled') 'denied UAC records cancellation before any game startup'
+Check ($s.reachedPhase -eq 'permission-pending') 'a declined permission keeps the step it stopped at'
+Update-LaunchState $c.StatePath @{phase='injected'}; Update-LaunchState $c.StatePath @{phase='stopping'}; Update-LaunchState $c.StatePath @{phase='failed';outcome='GameExited'}
+$s=Read-LaunchState $c.StatePath
+Check ($s.phase -eq 'failed' -and $s.reachedPhase -eq 'injected') 'stopping and failed keep the last progress phase'
 $c=New-FixtureCase
 $r=Invoke-LaunchFrontEnd @c -Preflight {} -Elevate {throw 'fixture Windows dispatch failed'}
 $s=Read-LaunchState $c.StatePath

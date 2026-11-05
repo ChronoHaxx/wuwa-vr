@@ -48,26 +48,35 @@
   "risk": {
     "link": "Read the account-risk notice"
   },
+  "watch": {
+    "title": "Watch it in VR",
+    "lede": "Real headset footage, recorded with the mod. The story videos are in 3D: open them in the YouTube app on your headset to see the depth.",
+    "noSpoilers": "No spoilers",
+    "spoilers": "Show the 3.7 story videos (spoilers)",
+    "spoilerNote": "The whole 3.7 story in four parts, plus the finale in 25 minutes. Contains story spoilers.",
+    "channel": "All videos and Shorts on YouTube",
+    "privacy": "A video loads from YouTube (youtube-nocookie.com) only when you choose it."
+  },
   "start": {
-    "title": "Install, then three steps",
-    "lede": "Run WuWa-VR-Setup.exe and open WuWa VR. The launcher walks you through the rest; the first install downloads the VR mod, and no Python or other tools are needed.",
+    "title": "Install, then Launch in VR",
+    "lede": "The launcher is one screen: a headline that says what comes next, Launch in VR and Play without VR, then your Game, VR mod and Headset. Your choices are remembered, and no Python or other tools are needed.",
     "steps": [
-      "Pick your Steam or official Kuro launcher copy of the game. Your choice is saved. Epic is not supported yet.",
-      "Read the account-risk notice, confirm your game version and install. Updates keep your settings and backups.",
-      "Start your headset software, or choose the bundled simulator. Then select Launch in VR and accept the Windows permission prompt."
+      "Run WuWa-VR-Setup.exe, then open WuWa VR from the Start menu. The first install of the VR mod needs internet.",
+      "The launcher finds your Steam or official Kuro launcher copy of the game. Read the account-risk notice and select Install VR. Epic is not supported yet.",
+      "Start your headset software, or choose the bundled simulator under Headset. Select Launch in VR and accept the Windows permission prompt; four plain steps show the way into VR."
     ],
     "shots": [
-      "Launcher on first start: step 01 Find Wuthering Waves is highlighted.",
-      "Game found: step 01 is ticked and step 02 Install VR is highlighted, with the account-risk box ticked.",
-      "Ready: all three steps are ticked, SteamVR is detected and Launch in VR is enabled."
+      "The launcher on first start, before the VR mod is installed.",
+      "The game found and the account-risk notice shown, ready to install the VR mod.",
+      "Ready to play: Launch in VR and Play without VR above the Game, VR mod and Headset rows."
     ],
     "caption": "Actual launcher screens, rendered from the app in English. Your paths and runtime will differ.",
     "controls": "In game, L3 + R3 opens the WuWa VR menu. UEVR's full settings are on its Menu page: All settings (classic UEVR menu).",
     "guide": "Full setup, update and recovery guide",
     "names": [
-      "Find Wuthering Waves",
-      "Install VR",
-      "Headset or simulator"
+      "Install",
+      "Set up once",
+      "Launch in VR"
     ]
   },
   "features": {
@@ -79,7 +88,7 @@
       ],
       [
         "Controller first",
-        "Xbox and experimental PlayStation shortcuts; in VR, hold L3, or LT + RT, to see what each button does."
+        "Shortcuts for Xbox, PlayStation (experimental), VR controllers and the keyboard. Hold L3, or LT + RT, and a card shows what each button does."
       ],
       [
         "First-person body",
@@ -102,7 +111,7 @@
   "firstPerson": {
     "title": "First person, down to the idle animation",
     "text": "Look down and your character is there: hands, outfit and idle animations, at full scale. Hide the head bones and keep the body, or follow the full animation if you like a livelier view.",
-    "caption": "One eye from the headset mirror, recorded 26 September 2026 on a Quest Pro through SteamVR. A sharper capture is coming.",
+    "caption": "One eye from the headset mirror, recorded 26 September 2026 on a Quest Pro through SteamVR.",
     "cta": "Record your own high-resolution clips",
     "ctaText": "Step-by-step: first person, a clean frame and the built-in recorder."
   },
@@ -124,7 +133,7 @@
     "items": [
       [
         "Which headsets work?",
-        "WuWa VR uses OpenXR. It has been played on a Quest Pro through SteamVR; other OpenXR headsets should work but are not verified yet. The bundled simulator lets you try it on a flat screen."
+        "WuWa VR uses OpenXR. It has been played on a Bigscreen Beyond through SteamVR, and on a Quest Pro through SteamVR and through Virtual Desktop, with an Xbox controller. Other OpenXR headsets should work too. The bundled simulator lets you try it on a flat screen."
       ],
       [
         "Steam, Kuro launcher or Epic?",
@@ -140,7 +149,7 @@
       ],
       [
         "How do updates work?",
-        "The app checks for its own updates and asks before restarting. When it starts, a newer VR package for your game version installs by itself while the game is closed, and Back to … in step 02 returns to the one you had."
+        "The app checks for its own updates and asks before restarting. When it starts with the game closed, a newer VR package for your game version installs by itself, and Use previous installed version under Troubleshooting → More options returns to the one you had."
       ],
       [
         "Does it change my game files?",
@@ -148,7 +157,7 @@
       ],
       [
         "How do I uninstall?",
-        "Use Troubleshooting → Prepare uninstall in the app, then remove WuWa VR in Windows Settings → Apps. Settings, backups and recordings are kept unless you delete them."
+        "Use Troubleshooting → More options → Prepare uninstall in the app, then remove WuWa VR in Windows Settings → Apps. Your UEVR settings go back to how they were before the mod; backups and recordings are kept unless you delete them."
       ],
       [
         "Is it free?",
@@ -159,10 +168,8 @@
   "limits": {
     "title": "Known limitations",
     "items": [
-      "Steam startup still fails on some PCs; a fix is in testing. The official Kuro launcher route is the most tested.",
       "Some scene and dialogue loads can stall, and flat menus may show a moving background.",
-      "HUD-aspect refresh is unreliable; some NPC lighting, reflections and fog still need testing.",
-      "Automatic cinema is on by default; its story-video detection is not yet confirmed on game 3.7."
+      "HUD-aspect refresh is unreliable; some NPC lighting, reflections and fog still need testing."
     ],
     "recovery": "Problems and recovery steps"
   },
@@ -171,8 +178,7 @@
     "text": "The desktop launcher is MIT open source and our mod changes are public. Every release ships matching source and SHA-256 checksums.",
     "launcher": "Launcher source",
     "mod": "Mod changes",
-    "release": "Checksums for this release",
-    "scan": "VirusTotal reports have not yet been verified for this release. No clean-scan or safety certification is claimed."
+    "release": "Checksums for this release"
   },
   "credits": {
     "title": "Built on community work",
@@ -182,7 +188,7 @@
   },
   "languagesPage": {
     "title": "Languages",
-    "intro": "The home page, setup steps, everyday controls and feedback form in ten languages. The full guide and UEVR's own menu are in English.",
+    "intro": "The home page, the player guide, everyday controls and the feedback form in ten languages. The detailed reference and UEVR's own menu are in English.",
     "request": "Request a language or correct a translation"
   }
 }

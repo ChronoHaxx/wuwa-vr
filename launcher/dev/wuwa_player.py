@@ -558,7 +558,7 @@ def launch_state(state=None):
         state = read_json(config().data / "launch-state.json")
     if not isinstance(state, dict):
         return {}
-    shown = {k: state.get(k) for k in ("phase", "message", "outcome", "buildId", "pid", "started", "heartbeat", "attemptId", "requestedAt", "ownerPid", "ownerStartedUtc",
+    shown = {k: state.get(k) for k in ("phase", "reachedPhase", "message", "outcome", "buildId", "pid", "started", "heartbeat", "attemptId", "requestedAt", "ownerPid", "ownerStartedUtc",
         "elevated", "injectorPid", "injectorStarted", "injectorRunning", "backendLogStarted", "firstFrameSeen",
         "gameStartRequested", "gameStartEffective", "gameStartLauncher", "gameTarget", "backendError", "backendLogCaptured",
         "steamTargetCount", "steamTargetUnverifiedCount", "steamTargetCandidateCount", "steamTargetProcesses",

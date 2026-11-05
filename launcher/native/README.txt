@@ -17,7 +17,7 @@ Close game and injector before switching. Updating never switches automatically.
 
 The launcher app and VR package have separate update status. Update the app;
 when it starts with the game closed, it installs a newer VR package for the
-same game version by itself, and Back to ... in step 02 returns to the one you
+same game version by itself, and Back to ... in the VR mod row returns to the one you
 had. Test builds are never replaced. Settings, backups, recordings and logs are
 kept. Every published version is in Troubleshooting > Versions & updates.
 
@@ -25,7 +25,7 @@ L3 + R3 opens the WuWa VR menu (laser, gamepad or mouse); UEVR's full
 settings: Menu > All settings (classic UEVR menu). Hold both triggers first,
 then click R3 for the next view (full VR, stereo screen, mono theatre), or
 hold R3 for 0.8 seconds for full VR. Release all controls before repeating.
-PlayStation setup, input limitations and the complete controls are in PlayerGuide.html.
+PlayStation setup, input limitations and the complete controls are on the website: https://chronohaxx.github.io/wuwa-vr/
 Automatic cinema is experimental, off by default, and untested with real
 prerendered movies. Scene stalls, HUD reset and some rendering issues remain.
 
@@ -61,7 +61,7 @@ Steam 通过 Steam 启动；库洛用户还需在库洛启动器点击开始游�
 
 L3 + R3 打开鸣潮 VR 菜单（激光、手柄或鼠标）；UEVR 完整设置：Menu > All settings (classic UEVR menu)。
 先按住两个扳机，再点击 R3 切换下一视图（完整 VR、立体屏幕、单目影院），或按住 R3 0.8 秒回到完整 VR。
-每次操作后松开全部按键。PlayStation 配置和完整限制见 PlayerGuide.html。
+每次操作后松开全部按键。PlayStation 配置和完整限制见网站：https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html
 自动影院为实验功能，默认关闭，真正的预渲染影片仍未验证。加载停顿、HUD
 刷新和部分渲染问题仍未解决。
 

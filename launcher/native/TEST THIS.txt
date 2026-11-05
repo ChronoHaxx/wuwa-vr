@@ -19,4 +19,4 @@ Close game and injector before updating package or changing runtime.
     in the 16:9 layout.
 
 PS4/PS5 hardware and physical-headset comfort remain separate pending checks.
-See PlayerGuide.html for controls, recovery and remaining rendering limitations.
+Controls, recovery and remaining rendering limitations are on the website: https://chronohaxx.github.io/wuwa-vr/

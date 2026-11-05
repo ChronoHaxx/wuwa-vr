@@ -53,10 +53,10 @@ class SceneInfo(unittest.TestCase):
         self.assertIn("0:00  Character  BP_Xinyuehu_C", text)
 
     def test_digits_masked_and_nothing_without_scene(self):
-        d = self.folder([row(1_000_000, {"full": True, "texts": {"A/B/Txt": "User ID: 701123532"}})])
+        d = self.folder([row(1_000_000, {"full": True, "texts": {"A/B/Txt": "User ID: 123456789"}})])
         wuwa_scene.write(d)
-        self.assertNotIn("701123532", (d / "scene.txt").read_text(encoding="utf-8"))
-        self.assertNotIn("701123532", (d / "scene.jsonl").read_text(encoding="utf-8"))
+        self.assertNotIn("123456789", (d / "scene.txt").read_text(encoding="utf-8"))
+        self.assertNotIn("123456789", (d / "scene.jsonl").read_text(encoding="utf-8"))
         empty = self.folder([row(1_000_000), row(1_000_033)])
         self.assertEqual(wuwa_scene.write(empty), 0)
         self.assertFalse((empty / "scene.txt").exists())

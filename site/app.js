@@ -51,7 +51,8 @@
     } catch { /* Keep the informational fallback if configuration is invalid. */ }
   }
 
-  // Hero: a muted preview loop. Reduced-motion and data-saver visitors start paused.
+  // The treadmill run at the top of Watch: a muted preview loop that plays while it is on screen.
+  // Reduced-motion and data-saver visitors start paused.
   const frame = document.getElementById("run-video");
   if (frame) {
     const video = frame.querySelector("video"), toggle = frame.querySelector(".video-toggle");
@@ -67,27 +68,36 @@
       toggle.addEventListener("click", () => { chosen = true; video.paused ? play() : video.pause(); });
       video.addEventListener("play", () => show(true));
       video.addEventListener("pause", () => show(false));
-      // Browsers may refuse playback in a hidden tab; start once the page is visible.
-      document.addEventListener("visibilitychange", () => {
-        if (!calm && !chosen && !document.hidden && video.paused) play();
-      });
-      if (!calm) play();
+      // Nothing downloads until the loop scrolls into view; it pauses again when it leaves.
+      let inView = false;
+      const follow = () => {
+        if (calm || chosen) return;
+        if (inView && !document.hidden) { if (video.paused) play(); } else if (!video.paused) video.pause();
+      };
+      document.addEventListener("visibilitychange", follow);
+      if ("IntersectionObserver" in window)
+        new IntersectionObserver(entries => { inView = entries[0].isIntersecting; follow(); }, {threshold: .35}).observe(frame);
+      else if (!calm) play();
     }
-    // Contact YouTube only after the visitor asks for the full run.
-    const id = /^[\w-]{11}$/.test(frame.dataset.youtube || "") ? frame.dataset.youtube : "";
-    if (id) document.querySelectorAll("[data-youtube-open]").forEach(link => link.addEventListener("click", event => {
-      event.preventDefault();
-      const player = document.createElement("iframe");
-      player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
-      player.title = frame.dataset.youtubeTitle || "YouTube";
-      player.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
-      player.allowFullscreen = true;
-      player.referrerPolicy = "strict-origin-when-cross-origin";
-      frame.replaceChildren(player);
-      frame.scrollIntoView({block: "center", behavior: calm ? "auto" : "smooth"});
-      player.focus();
-    }));
   }
+  // Every video (hero and Watch cards): contact YouTube only after the visitor chooses one.
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.querySelectorAll("[data-youtube-open]").forEach(link => link.addEventListener("click", event => {
+    const box = link.closest("[data-youtube]");
+    const id = /^[\w-]{11}$/.test(box?.dataset.youtube || "") ? box.dataset.youtube : "";
+    if (!id) return;
+    event.preventDefault();
+    const player = document.createElement("iframe");
+    player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
+    player.title = box.dataset.youtubeTitle || "YouTube";
+    player.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+    player.allowFullscreen = true;
+    player.referrerPolicy = "strict-origin-when-cross-origin";
+    box.replaceChildren(player);
+    box.classList.add("is-playing");
+    box.scrollIntoView({block: "center", behavior: still ? "auto" : "smooth"});
+    player.focus();
+  }));
 
   // Launcher tour: each step card shows its screenshot.
   document.querySelectorAll(".tour").forEach(tour => {
@@ -267,18 +277,30 @@
     };
     if (window.ResizeObserver) new ResizeObserver(drawLeaders).observe(drawing.parentElement);
     document.fonts?.ready.then(drawLeaders);
+    // The live 3D controller (pad3d.js, the in-VR model from media/pad3d.json) replaces the drawing where it can.
+    let live = null;
+    const base = document.currentScript?.src || document.querySelector('script[src$="app.js"]')?.src || location.href;
+    if (window.fetch && document.createElement("canvas").getContext) {
+      const script = document.createElement("script");
+      script.src = new URL("pad3d.js", base).href;
+      script.onload = () => fetch(new URL("media/pad3d.json", base)).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(models => {
+        live = window.WuWaPad3D?.attach(padCard, models, () => pad.dataset.pad || "xbox");
+      }).catch(() => { /* the drawing stays */ });
+      document.head.append(script);
+    }
     const choose = (choice, remember) => {
-      named.forEach(el => {el.textContent = choice === "ps" ? el.dataset.ps : el.dataset.xbox;});
+      named.forEach(el => {el.textContent = choice === "ps" ? el.dataset.ps : choice === "vr" && el.dataset.vr ? el.dataset.vr : el.dataset.xbox;});
       pad.dataset.pad = choice;
       padSwitch.querySelectorAll("[data-pad-choice]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.padChoice === choice)));
       if (remember) try { localStorage.setItem("wuwa-pad", choice); } catch { /* optional */ }
       drawLeaders();
+      live?.redraw();
     };
     padSwitch.addEventListener("click", event => {
       const button = event.target.closest("[data-pad-choice]");
       if (button) choose(button.dataset.padChoice, true);
     });
-    try { if (localStorage.getItem("wuwa-pad") === "ps") choose("ps", false); } catch { /* optional */ }
+    try { const saved = localStorage.getItem("wuwa-pad"); if (saved === "ps" || saved === "vr") choose(saved, false); } catch { /* optional */ }
     padSwitch.hidden = false;
     const light = (id, on) => padCard.querySelectorAll(`.pad-svg [data-btn~="${id}"], .pad-list [data-btn="${id}"], .pad-leaders [data-btn="${id}"]`).forEach(el => el.classList.toggle("is-hot", on));
     padCard.querySelectorAll(".pad-list li[data-btn]").forEach(li => {

@@ -51,6 +51,17 @@ do
     if ready and type(instance)=="table" then scene.log=instance
     else functions.log_warn("[WuWaScene] module unavailable: "..tostring(found and instance or module)) end
 end
+-- The user ID hidden at the source (wuwa_uid_hide.lua, 1.2.7): the game never draws it, so no view switch can show it.
+local uid={error=nil,said=nil,hide={tick=function() end,restore=function() end,status="UID: module unavailable"}}
+do
+    local found,module=pcall(require,"wuwa_uid_hide")
+    local ready,instance=false,nil
+    if found and type(module)=="table" and type(module.new)=="function" then
+        ready,instance=pcall(module.new,{api=uevr.api,types=uevr.types})
+    end
+    if ready and type(instance)=="table" then uid.hide=instance
+    else functions.log_warn("[WuWaUID] module unavailable: "..tostring(found and instance or module)) end
+end
 local function set(k,v) vr.set_mod_value(k,tostring(v)) end
 local function has(b,mask) return b & mask ~= 0 end
 local function motion() return number("WuWaControls_FirstMotion",0,0,3) end
@@ -2189,6 +2200,15 @@ cb.on_pre_viewport_client_draw(function()
         pcall(hider.restore,"error")
         if hider.error~=tostring(hide_err) then hider.error=tostring(hide_err); functions.log_warn("[WuWaHide] "..hider.error:sub(1,200)) end
     end
+    -- Whenever the privacy setting isn't Off, not only while recording: a hidden ID costs the player nothing.
+    local uid_ok,uid_err=pcall(uid.hide.tick,uid.hide,now(),number("WuWaPrivacy_Mode",1,0,2)>0)
+    if not uid_ok then
+        pcall(uid.hide.restore,uid.hide,"error")
+        if uid.error~=tostring(uid_err) then uid.error=tostring(uid_err); functions.log_warn("[WuWaUID] "..uid.error:sub(1,200)) end
+    end
+    if uid.said~=uid.hide.status and uid.hide.status~="UID: looking" then
+        uid.said=uid.hide.status; functions.log_info("[WuWaUID] "..tostring(uid.said))
+    end
     if not enabled("WuWaControls_Recording") then
         if scene.recording then scene.recording=false; pcall(scene.log.reset,scene.log) end
         return
@@ -2223,7 +2243,11 @@ cb.on_pre_viewport_client_draw(function()
             camera=frame,game=base,slot=selected,input=input and input.pad or nil,input_age=input and now()-input.at or nil,
             pawn=pawn and point(pawn:K2_GetActorLocation()) or nil,
             actor_yaw=pawn and math.deg(pawn_yaw(pawn)) or nil,
-            anchor=mesh_cache and mesh_cache.anchor_report or nil,status=status,scene=scene_info}
+            anchor=mesh_cache and mesh_cache.anchor_report or nil,status=status,scene=scene_info,
+            -- what the headset shows, so videos can label modes without guessing from the picture
+            view=enabled("WuWaControls_EffectiveMonoTheatre") and "mono theatre"
+                or enabled("WuWaControls_EffectiveScreen") and "stereo screen" or "full VR",
+            diorama=enabled("WuWaDiorama_Enabled")}
         functions.dispatch_custom_event("WuWaControls.Input.v1",json.dump_string({motion_only=true,motion=sample}))
     end)
     if not ok then functions.log_warn("WuWaControls recording sample unavailable: "..tostring(err)) end

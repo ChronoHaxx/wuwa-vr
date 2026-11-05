@@ -137,6 +137,9 @@ function Update-LaunchState {
     if ([string]::IsNullOrWhiteSpace($Path)) { return }
     $table = ConvertTo-LaunchStateTable (Read-LaunchState -Path $Path)
     foreach ($key in $Values.Keys) { $table[$key] = $Values[$key] }
+    # The last progress phase survives failed/cancelled/stopping, so the launcher can show
+    # which of its four steps a launch stopped at (LauncherPresentation.StoppedStep).
+    if ($Values.Contains('phase') -and [string]$Values['phase'] -in @('preflight','permission-pending','handoff-unconfirmed','waiting-for-play','waiting-game','game-starting','injected','settling')) { $table['reachedPhase'] = [string]$Values['phase'] }
     Write-LaunchState -Path $Path -State $table
 }
 
@@ -255,7 +258,7 @@ function New-LaunchAttemptState {
         attemptId=$AttemptId; requestedAt=[DateTime]::UtcNow.ToString('o'); pid=$PID;
         ownerPid=$PID; ownerStartedUtc=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o');
         started=(Get-Process -Id $PID).StartTime.ToString('o'); buildId=$BuildId;
-        runDir=$run; cancelPath=(Join-Path $run 'cancel.request'); phase=$Phase; message=$Message;
+        runDir=$run; cancelPath=(Join-Path $run 'cancel.request'); phase=$Phase; reachedPhase=$Phase; message=$Message;
         elevated=$false; injectorStarted=$false
     })
     return Read-LaunchState -Path $Path

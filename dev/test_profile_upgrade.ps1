@@ -90,4 +90,22 @@ Save-WuWaBuildState $c $state
 $again=Select-WuWaBuild $c 'new'
 Check (-not $again.changed -and -not (Get-WuWaBuildState $c).restoredOriginalAt) 'No-op selection retained obsolete restoration receipt'
 
-Write-Output 'PASS: compatible upgrade/settings/scripts/backup; wrong hash/reset/saved-target precedence; restore-reapply and stale no-op restoration receipts.'
+# Deleting or blanking config.txt (Lelouche, 2 Nov) must bring the supplied one back on the next
+# apply: the launch used to stop at the missing file, and a blank one ran on UEVR's own defaults.
+foreach ($blank in @($null, '', "`r`n# comment`r`n")) {
+    $c=Fixture
+    $null=Select-WuWaBuild $c 'new'
+    $config=Join-Path $c.Profile 'config.txt'
+    if ($null -eq $blank) { Remove-Item -LiteralPath $config } else { Write-Text $config $blank }
+    $fixed=Select-WuWaBuild $c 'new'
+    Check $fixed.changed 'Missing or blank config.txt left in place'
+    Check ((Text $config) -eq 'WindowMode_PlaneWidth=2.4') 'Supplied config.txt not restored'
+    Check ((Text (Join-Path $c.Profile 'cameras.txt')) -eq 'personal camera') 'Config restore reset the camera file'
+    Check ((Text (Join-Path $c.Profile 'cvars_data.txt')) -eq 'Engine_r.OneFrameThreadLag=1') 'Config restore reset a CVar'
+    Check ((Text (Join-Path $c.Profile 'scripts/personal.lua')) -eq 'personal script') 'Config restore lost a personal script'
+    Check ((Get-WuWaSelectedRuntime $c) -eq (Join-Path $c.Root 'runtime/new')) 'Config restore changed the injector selection'
+    Assert-WuWaSnapshot $fixed.backup
+    Check (-not (Select-WuWaBuild $c 'new').changed) 'Restored config.txt is not a no-op next time'
+}
+
+Write-Output 'PASS: compatible upgrade/settings/scripts/backup; wrong hash/reset/saved-target precedence; restore-reapply and stale no-op restoration receipts; missing/blank config.txt restored.'

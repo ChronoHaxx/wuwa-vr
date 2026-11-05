@@ -8,10 +8,12 @@ text a player can see. dev/i18n/README.md describes the workflow.
 
   * the VR mod: every string shown in the headset or the settings window, and
     the website's controls card, in all ten catalogs (dev/i18n/mod_strings.py);
-  * the offline player guide the launcher opens (dev/i18n/build_guide.py);
+  * the player guide on the website (dev/build-guide.cjs --check);
+  * the website, README and docs pointers match their sources: one rebuild in a
+    temporary copy, compared file by file (dev/check-site-sync.cjs; needs Node);
   * the launcher app's own text (launcher/native/check-locales.py);
   * the portable web tool's text (launcher/localization/launcher), checked here.
-The website's home pages are checked when the site is built (dev/build-home.cjs).
+The website's home pages are also checked when the site is built (dev/build-home.cjs).
 
 The guide, launcher, web tool and home pages are keyed by id, so an edited
 English sentence would leave nine stale translations that still look complete.
@@ -21,15 +23,18 @@ changed (or a new key) fails here until all ten languages are updated and
 """
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+NODE = shutil.which('node') or 'node'
 CHECKS = [
-    ('VR mod and controls card', ['dev/i18n/mod_strings.py', 'check']),
-    ('Player guide', ['dev/i18n/build_guide.py', '--check']),
-    ('Launcher app', ['launcher/native/check-locales.py']),
+    ('VR mod and controls card', [sys.executable, 'dev/i18n/mod_strings.py', 'check']),
+    ('Player guide', [NODE, 'dev/build-guide.cjs', '--check']),
+    ('Website, README and docs in sync', [NODE, 'dev/check-site-sync.cjs']),
+    ('Launcher app', [sys.executable, 'launcher/native/check-locales.py']),
 ]
 WEB_TOOL = ROOT / 'launcher/localization/launcher'
 SNAPSHOT = ROOT / 'dev/i18n/english-snapshot.json'
@@ -112,7 +117,7 @@ def main():
         print(f'Recorded the current English in {SNAPSHOT.relative_to(ROOT).as_posix()}.')
     failed = 0
     for name, command in CHECKS:
-        run = subprocess.run([sys.executable, *command], cwd=ROOT, capture_output=True, text=True, encoding='utf-8')
+        run = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, encoding='utf-8')
         output = (run.stdout + run.stderr).strip()
         print(f'== {name}: {"OK" if run.returncode == 0 else "FAILED"}')
         if run.returncode:

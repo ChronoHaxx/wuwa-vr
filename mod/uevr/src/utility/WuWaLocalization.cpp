@@ -26,6 +26,11 @@ bool pending=true, initialized=false, rtl=false;
 // Stepping through the language picker asks for several languages in a row;
 // only the one it stops on rebuilds the fonts.
 ULONGLONG requested_at=0;
+// Limits on a catalog, against a broken or hostile community file. 1.2.7: the cap was 1200 strings and the
+// catalogs reached 1212 (VR setup, 5 Nov 2026), so every language fell back to English. dev/i18n/mod_strings.py
+// check reads both numbers and fails a release while the catalogs are within 75% of either.
+constexpr size_t max_catalog_strings=5000;
+constexpr uintmax_t max_override_bytes=1536*1024;
 ImFontAtlas* font_owner{};
 ImFont *menu{}, *sheet{};
 ImVector<ImWchar> glyph_ranges;
@@ -82,7 +87,7 @@ std::optional<std::vector<std::string>> formats(std::string_view value) {
 bool metadata(const Json& data,std::string_view id) {
     if(!data.is_object() || !data.contains("schema") || !data["schema"].is_number_integer() || data["schema"]!=1 ||
         !data.contains("language") || !data["language"].is_string() || data["language"].get_ref<const std::string&>()!=id ||
-        !data.contains("strings") || !data["strings"].is_object() || data["strings"].size()>1200) return false;
+        !data.contains("strings") || !data["strings"].is_object() || data["strings"].size()>max_catalog_strings) return false;
     for(const char* key : {"name","direction","font"}) {
         if(!data.contains(key)) continue;
         if(!data[key].is_string()) return false;
@@ -102,7 +107,7 @@ void merge_strings(const Json& data) {
 }
 Json read_override(const std::filesystem::path& path) {
     std::error_code error;
-    if(!std::filesystem::is_regular_file(path,error) || std::filesystem::file_size(path,error)>512*1024 || error) return {};
+    if(!std::filesystem::is_regular_file(path,error) || std::filesystem::file_size(path,error)>max_override_bytes || error) return {};
     std::ifstream stream{path,std::ios::binary};
     return Json::parse(stream,nullptr,false);
 }
@@ -311,7 +316,13 @@ void reserve_fonts(ImFontAtlas* atlas,HMODULE module,float menu_size) {
     for(const auto& n : natives) if(std::string_view{n.font}=="latin") ranges.AddText(n.name);
     glyph_ranges.clear();
     ranges.BuildRanges(&glyph_ranges);
-    std::vector<std::pair<std::string_view,const ImWchar*>> name_fonts;
+    // Arabic letters stand shorter than Latin ones at one size (in our fonts the teeth of seen reach 0.40 em, the
+    // Latin x-height 0.54 em), so Arabic read small next to English (owner, 5 Nov 2026): merged 1.2x larger.
+    // Merged glyphs keep the main font's baseline, so lines still sit level.
+    constexpr float arabic_scale=1.2f;
+    const auto scale_of=[](std::string_view kind) { return kind=="arabic" ? arabic_scale : 1.0f; };
+    struct NameFont { std::string_view data; const ImWchar* glyphs; float scale; };
+    std::vector<NameFont> name_fonts;
     for(size_t i=0;i<std::size(script_fonts);++i) {
         const auto& [kind,id]=script_fonts[i];
         if(font_kind==kind) continue;
@@ -323,7 +334,7 @@ void reserve_fonts(ImFontAtlas* atlas,HMODULE module,float menu_size) {
         name_ranges[i].clear();
         names.BuildRanges(&name_ranges[i]);
         const auto data=resource(module,id);
-        if(!data.empty()) name_fonts.emplace_back(data,name_ranges[i].Data);
+        if(!data.empty()) name_fonts.push_back({data,name_ranges[i].Data,scale_of(kind)});
     }
     const auto latin=resource(module,4820);
     int extra_id=font_kind=="sc" ? 4821 : font_kind=="jp" ? 4822 : font_kind=="kr" ? 4823 : font_kind=="arabic" ? 4824 : 0;
@@ -334,11 +345,12 @@ void reserve_fonts(ImFontAtlas* atlas,HMODULE module,float menu_size) {
             atlas->AddFontFromMemoryTTF(const_cast<char*>(latin.data()),static_cast<int>(latin.size()),size,&cfg,glyph_ranges.Data);
         if(!extra.empty()) {
             cfg.MergeMode=true;
-            atlas->AddFontFromMemoryTTF(const_cast<char*>(extra.data()),static_cast<int>(extra.size()),size,&cfg,glyph_ranges.Data);
+            atlas->AddFontFromMemoryTTF(const_cast<char*>(extra.data()),static_cast<int>(extra.size()),size*scale_of(font_kind),&cfg,
+                glyph_ranges.Data);
         }
-        for(const auto& [data,glyphs] : name_fonts) {
+        for(const auto& [data,glyphs,scale] : name_fonts) {
             ImFontConfig names; names.FontDataOwnedByAtlas=false; names.MergeMode=true;
-            atlas->AddFontFromMemoryTTF(const_cast<char*>(data.data()),static_cast<int>(data.size()),size,&names,glyphs);
+            atlas->AddFontFromMemoryTTF(const_cast<char*>(data.data()),static_cast<int>(data.size()),size*scale,&names,glyphs);
         }
         return font;
     };

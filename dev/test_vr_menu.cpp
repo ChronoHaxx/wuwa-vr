@@ -222,6 +222,177 @@ int main() {
     check(clock_text(0.0) == "0:00" && clock_text(75.9) == "1:15" && clock_text(3725.0) == "1:02:05" && clock_text(-4.0) == "0:00",
         "elapsed time was formatted wrongly");
 
+    // VR setup: two questions over plain values.
+    {
+        int camera = 2, blur = 1, sets = 0;
+        Setup setup;
+        SetupQuestion first{"Camera", "How you see."};
+        first.choices = {{"Game", "", true}, {"First", ""}, {"Fixed", ""}};
+        first.get = [&camera] { return camera; };
+        first.set = [&](int choice) { camera = choice; ++sets; };
+        SetupQuestion second{"Blur", "Depth of field."};
+        second.choices = {{"Off", "", true}, {"On", ""}};
+        second.get = [&blur] { return blur; };
+        second.set = [&](int choice) { blur = choice; ++sets; };
+        setup.questions = {first, second};
+        Moves accept; accept.accept = true;
+        Moves down; down.down = true;
+        Moves up; up.up = true;
+        Moves back; back.back = true;
+
+        setup_start(setup, true);
+        check(setup.welcome() && setup.focus == 0 && setup.cards() == 2, "the setup did not open on its welcome");
+        setup_apply_moves(setup, accept);
+        check(setup.screen == 1 && setup.focus == 2, "a question did not focus the choice the settings already match");
+        setup_apply_moves(setup, accept);
+        check(camera == 2 && setup.screen == 2 && setup.focus == 1, "accepting the current choice changed it or did not move on");
+        setup_apply_moves(setup, accept);
+        check(setup.summary() && setup.cards() == 1 && blur == 1, "the summary did not follow the last question");
+        setup_apply_moves(setup, accept);
+        check(setup.result == SetupResult::Done && camera == 2 && blur == 1 && sets == 2,
+            "pressing A through the setup changed a setting");
+
+        setup_start(setup, true);
+        setup_apply_moves(setup, accept);
+        setup_apply_moves(setup, up);
+        setup_apply_moves(setup, up);
+        setup_apply_moves(setup, up);
+        check(setup.focus == 0, "up went past the first card");
+        setup_apply_moves(setup, accept);
+        check(camera == 0 && setup.screen == 2, "picking a card did not apply it and move on");
+        setup_apply_moves(setup, down);
+        setup_apply_moves(setup, down);
+        check(setup.focus == 1, "down went past the last card");
+        setup_apply_moves(setup, back);
+        check(setup.screen == 1 && setup.focus == 0 && setup.result == SetupResult::Open, "back did not return to the question before");
+        setup_apply_moves(setup, back);
+        setup_apply_moves(setup, back);
+        check(setup.result == SetupResult::Skipped, "back on the welcome did not leave the setup");
+
+        setup_start(setup, true);
+        setup_apply_moves(setup, down);
+        setup_apply_moves(setup, accept);
+        check(setup.result == SetupResult::Skipped && camera == 0 && blur == 1, "Skip on the welcome changed a setting");
+
+        setup_start(setup, false);
+        check(setup.screen == 1 && setup.first == 1, "the Menu page's setup did not start at the first question");
+        Moves sideways; sideways.left = sideways.right = sideways.next_page = sideways.reset = true;
+        setup_apply_moves(setup, sideways);
+        check(setup.screen == 1 && camera == 0 && setup.result == SetupResult::Open, "left / right or a page change acted in the setup");
+        setup_apply_moves(setup, back);
+        check(setup.result == SetupResult::Skipped, "back on the first question of a Menu page setup did not leave it");
+        setup_apply_moves(setup, accept);
+        check(setup.result == SetupResult::Skipped && camera == 0, "a finished setup still took moves");
+
+        camera = 7; // a value no choice matches (the freecam)
+        setup_start(setup, false);
+        check(setup.focus == 0, "an unmatched setting did not focus the first choice");
+        setup_pick(setup, 9);
+        check(setup.screen == 1 && camera == 7, "a card that does not exist was picked");
+    }
+
+    // 1.2.7 lean menu: rows under More settings stay hidden until its row is pressed, then focus moves into them.
+    {
+        bool open = false;
+        int runs = 0;
+        Page page;
+        page.title = "View";
+        page.items.push_back(make(Kind::Action, "First"));
+        page.items.back().run = [&runs] { ++runs; };
+        Item more = make(Kind::Action, "More settings");
+        more.visible = [&open] { return !open; };
+        more.run = [&open] { open = true; };
+        page.items.push_back(more);
+        Item hidden = make(Kind::Toggle, "Rare");
+        bool rare = false;
+        hidden.get_bool = [&rare] { return rare; };
+        hidden.set_bool = [&rare](bool on) { rare = on; };
+        hidden.visible = [&open] { return open; };
+        page.items.push_back(hidden);
+        std::vector<Page> view{page};
+        State s;
+        set_page(view, s, 0);
+        Moves down; down.down = true;
+        Moves accept; accept.accept = true;
+        apply_moves(view, s, down);
+        check(s.focus == 1, "down did not reach the More settings row");
+        apply_moves(view, s, down);
+        check(s.focus == 1, "focus went to a hidden row");
+        apply_moves(view, s, accept);
+        check(open && s.focus == 2, "opening More settings did not move focus to the first row it showed");
+        apply_moves(view, s, accept);
+        check(rare, "a row shown by More settings did not take A");
+        Moves up; up.up = true;
+        apply_moves(view, s, up);
+        check(s.focus == 0, "up stopped on the hidden More settings row");
+    }
+
+    // Home tiles: left / right step through them, up / down move a row of four.
+    {
+        std::vector<int> picks(6, 0);
+        Page home;
+        home.title = "Home";
+        home.tiles = true;
+        for (int i = 0; i < 6; ++i) {
+            Item tile = make(Kind::Action, "Tile");
+            tile.run = [&picks, i] { ++picks[i]; };
+            home.items.push_back(tile);
+        }
+        std::vector<Page> pages{home};
+        State s;
+        set_page(pages, s, 0);
+        Moves right; right.right = true;
+        Moves left; left.left = true;
+        Moves down; down.down = true;
+        Moves up; up.up = true;
+        Moves accept; accept.accept = true;
+        apply_moves(pages, s, right);
+        apply_moves(pages, s, right);
+        check(s.focus == 2, "right did not step to the next tile");
+        apply_moves(pages, s, down);
+        check(s.focus == 5, "down from a top tile with nothing below it did not reach the last tile");
+        apply_moves(pages, s, up);
+        check(s.focus == 1, "up did not move a row of four");
+        apply_moves(pages, s, left);
+        apply_moves(pages, s, left);
+        check(s.focus == 0, "left went past the first tile");
+        apply_moves(pages, s, accept);
+        check(picks[0] == 1 && picks[1] == 0, "A on a tile did not run that tile alone");
+    }
+
+    // Shortcut playback: held controls stay lit through the beats after them; a long press fills, then fires.
+    {
+        using namespace wuwa_pad3d;
+        const Beats view = triggers_then(press(button::R3));
+        const auto at_press = moment(view, beat_seconds(view[0]) + lead_seconds + 0.1);
+        check(at_press.beat == 1 && (at_press.held & button::LT) && (at_press.held & button::RT) && (at_press.down & button::R3),
+            "the triggers were not held while R3 was pressed");
+        const auto resting = moment(view, loop_seconds(view) - 0.05);
+        check(resting.beat == -1 && resting.held == 0 && resting.down == 0, "controls stayed lit in the rest between loops");
+        const auto again = moment(view, loop_seconds(view) + 0.1);
+        check(again.beat == 0 && (again.held & button::LT), "the playback did not loop");
+        const Beats hold_menu{long_press(button::Menu, 1.0f)};
+        const auto filling = moment(hold_menu, lead_seconds + 0.5);
+        check(filling.progress > 0.45f && filling.progress < 0.55f && (filling.down & button::Menu), "a long press did not fill as it was held");
+        const auto fired = moment(hold_menu, lead_seconds + 1.1);
+        check(fired.down == 0 && fired.ripple >= 0.0f && (fired.ripple_mask & button::Menu), "a long press did not fire when it completed");
+        const auto twice = moment(Beats{press(button::R3, 2)}, lead_seconds + tap_seconds + 0.1);
+        check(twice.down & button::R3, "the second click of a double click was missing");
+
+        Shortcut views;
+        views.pad = view;
+        check(views.beats(Device::vr).size() == 2 && views.beats(Device::keyboard).empty(), "a pad shortcut was not shown on VR controllers");
+        Shortcut dpad;
+        dpad.pad = l3_then(button::Down);
+        check(dpad.beats(Device::vr).empty() && shown_on(dpad, Device::keyboard) == Device::xbox,
+            "a D-pad shortcut showed on VR controllers or a key-less one not on the pad");
+        Shortcut vr_menu;
+        vr_menu.vr = hold_menu;
+        vr_menu.vr_only = true;
+        check(vr_menu.beats(Device::xbox).empty() && shown_on(vr_menu, Device::xbox) == Device::vr,
+            "a VR-only shortcut was not shown on the VR controllers");
+    }
+
     std::cout << "PASS: " << checks << " VR menu navigation checks (pure C++ values)\n";
     return 0;
 }

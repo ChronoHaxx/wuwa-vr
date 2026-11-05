@@ -13,6 +13,7 @@
 #include "utility/WuWaPlaytestControl.hpp"
 #include "utility/WuWaLguiProbe.hpp"
 #include "utility/WuWaInputActivity.hpp"
+#include "utility/WuWaPad3D.hpp"
 #include "utility/WuWaStatusText.hpp"
 #include "WuWaVrMenuHost.hpp"
 #include "Mods.hpp"
@@ -250,6 +251,19 @@ void WuWaControlsComponent::advance_auto_cinema(bool runtime_ready, bool story_r
     m_story_scene.store(m_story_lease.presentation(now) != wuwa_auto_cinema::Presentation::none);
     if (!character_ready) m_showroom_lease.invalidate();
     m_character_screen.store(m_showroom_lease.presentation(now) != wuwa_auto_cinema::Presentation::none);
+    // The two pauses, fixed for this frame. The detector samples every 0.1 s: a skill sample
+    // older than 0.6 s (detector stopped or faulted) no longer pauses anything.
+    const auto plot_seen = m_plot_seen_ms.load(), skill_seen = m_skill_seen_ms.load();
+    const bool plot = plot_seen && now - plot_seen < 1500, skill = skill_seen && now - skill_seen < 600;
+    const bool pitch_paused = m_pitch_scenes->value() && (plot || skill), diorama_paused = m_diorama_skills->value() && skill;
+    // One line per change, only for players using the feature: the session summary and a
+    // report's log show the pauses working (or not) without a debugger.
+    if (m_frame_pitch_paused.exchange(pitch_paused) != pitch_paused && VR::get()->is_decoupled_pitch_enabled()) {
+        spdlog::info("[WuWa] Decoupled pitch: {}", pitch_paused ? (skill ? "game camera tilt (ultimate)" : "game camera tilt (story)") : "back on");
+    }
+    if (m_frame_diorama_paused.exchange(diorama_paused) != diorama_paused && VR::get()->is_diorama_enabled()) {
+        spdlog::info("[WuWa] Diorama: {}", diorama_paused ? "normal view (ultimate)" : "back on");
+    }
     // Whatever changed the full VR layout (the HUD page, a story scene, a step's
     // setting), the game's UI scaler keeps the old size until a layout refresh.
     // The stereo screen and mono theatre refresh on their own way back.
@@ -266,6 +280,17 @@ std::string WuWaControlsComponent::auto_cinema_status() const {
     return wuwa_l10n::translate(state) + ". " + m_cinema_signal +
         " [detection " + std::to_string(static_cast<int>(std::round(m_cinema_detection_ms))) + " ms]";
 }
+// The comfort script answers "done" or "unavailable" (no game camera library or camera yet).
+std::string WuWaControlsComponent::level_status() const {
+    const auto status = m_level_status.get();
+    if (status == "done") return wuwa_l10n::translate(N_("The game camera is level now."));
+    if (status == "unavailable") return wuwa_l10n::translate(N_("The game camera could not be levelled here. Try again in the world."));
+    return {};
+}
+bool WuWaControlsComponent::wants_camera_detect() const {
+    const auto vr = VR::get();
+    return (m_pitch_scenes->value() && vr->is_decoupled_pitch_enabled()) || (m_diorama_skills->value() && vr->is_diorama_enabled());
+}
 void WuWaControlsComponent::reset_auto_cinema() {
     std::scoped_lock lock{m_cinema_mutex};
     // Keeps the producer generation: the story-scene detector may be running.
@@ -281,7 +306,7 @@ void WuWaControlsComponent::override_auto_cinema() {
     m_cinema_presentation.store(wuwa_auto_cinema::Presentation::none);
 }
 std::string WuWaControlsComponent::CinemaValue::get() const {
-    if (kind == 1) return "lease-v4";
+    if (kind == 1) return "lease-v5";
     if (kind == 2) return owner.auto_cinema_status();
     if (kind == 3) return VR::get()->is_using_mono_theatre() ? "true" : "false";
     // v2 (test 3i): explicit "on" / "off" as well as "toggle", for the view cycle.
@@ -289,6 +314,7 @@ std::string WuWaControlsComponent::CinemaValue::get() const {
     if (kind == 6) return VR::get()->is_using_2d_screen() ? "true" : "false";
     if (kind == 7) return VR::get()->wants_story_scene_layout() ? "true" : "false";
     if (kind == 8) return VR::get()->wants_character_screen_layout() ? "true" : "false";
+    if (kind == 9) return owner.wants_camera_detect() ? "true" : "false";
     std::scoped_lock lock{owner.m_cinema_mutex};
     return std::to_string(owner.m_cinema_lease.generation());
 }
@@ -324,16 +350,20 @@ void WuWaControlsComponent::CinemaValue::set(const std::string& text) {
         const auto detail = sample.value("detail", std::string{});
         const auto elapsed = sample.value("elapsed_ms", 0.0);
         if (world.empty() || world.size() > 32 || world.find_first_not_of("0123456789") != std::string::npos ||
-            active < 0 || active > 31 || hold < 0 || hold > 31 || known < 0 || known > 31 ||
+            active < 0 || active > wuwa_auto_cinema::all_bits || hold < 0 || hold > wuwa_auto_cinema::all_bits ||
+            known < 0 || known > wuwa_auto_cinema::all_bits ||
             detail.size() > 240 || !std::isfinite(elapsed) || elapsed < 0 || elapsed > 50) return;
         std::scoped_lock lock{owner.m_cinema_mutex};
         const bool cinema = VR::get()->is_auto_cinema_enabled(), story = VR::get()->wants_story_scene_layout();
-        const bool character = VR::get()->wants_character_screen_layout();
+        const bool character = VR::get()->wants_character_screen_layout(), camera = owner.wants_camera_detect();
         // The cinema lease's generation fences old producers for all three leases.
-        if ((!cinema && !story && !character) || generation != owner.m_cinema_lease.generation()) return;
+        if ((!cinema && !story && !character && !camera) || generation != owner.m_cinema_lease.generation()) return;
         const auto now = GetTickCount64();
-        // The plot flag alone, for the story camera nudge.
+        // The plot flag alone, for the story camera nudge and the decoupled pitch pause.
         if (known & wuwa_auto_cinema::plot) owner.m_plot_seen_ms.store((active & wuwa_auto_cinema::plot) ? now : 0);
+        // The game's skill camera, for the decoupled pitch and diorama pauses.
+        if (known & wuwa_auto_cinema::skill) owner.m_skill_seen_ms.store((active & wuwa_auto_cinema::skill) ? now : 0);
+        else owner.m_skill_seen_ms.store(0);
         bool accepted = false;
         const wuwa_auto_cinema::Bits bits{static_cast<uint8_t>(active), static_cast<uint8_t>(hold), static_cast<uint8_t>(known)};
         if (cinema) {
@@ -400,9 +430,10 @@ WuWaControlsComponent::WuWaControlsComponent() {
         *m_acro_thrust, *m_acro_drag, *m_acro_tilt, *m_acro_invert_pitch,
         *m_free_collision, *m_collision_complex, *m_collision_radius, *m_fp_forward, *m_fp_right, *m_fp_up,
         *m_fp_animation, *m_fp_motion, *m_fp_look, *m_fp_smooth, *m_fp_blend_time, *m_fp_late, *m_fp_horizon, *m_cards, *m_pin_card, *m_card_width,
-        *m_card_below, *m_card_place, *m_card_distance, *m_kb_vr_key, *m_kb_flight, *m_free_mouse, *m_kb_tips_shown, m_keyboard_value, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, m_card, m_first_person_camera, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
+        *m_card_below, *m_card_place, *m_card_distance, *m_kb_vr_key, *m_kb_flight, *m_free_mouse, *m_kb_tips_shown, m_keyboard_value, *m_view_hints, *m_view_hints_shown, *m_near_hint_shown, *m_run_auto, *m_tips_shown, *m_setup_version, m_card, m_first_person_camera, m_focus, m_clock, m_recording, m_native_menu, m_hud_aspect_request, m_hud_aspect_status, *m_lens_match, *m_lens_nearest, *m_stereo_dof, *m_stereo_dof_source, *m_stereo_dof_strength, *m_stereo_dof_strength_vr, *m_lens_follow, *m_show_step_card, *m_stereo_effects, *m_lens_subject, m_lens_status, *m_story_nudge, *m_story_nudge_keep, *m_story_hint, *m_story_hint_shown, m_story_keys, m_story_scene_value, m_story_nudge_now, *m_closeup_near_clip, m_near_clip_now, *m_hide_near, *m_near_hint, m_near_seen,
         m_playstation_state, m_playstation_status,
-        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect,
+        m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect, m_camera_detect,
+        *m_pitch_scenes, *m_diorama_skills, m_level_request, m_level_status,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_scene, *m_video_sound, *m_video_microphone, *m_video_mic_volume, *m_video_sound_files, *m_video_style, *m_showcase_pitch, *m_video_slow_stop, *m_video_slow_fps, *m_video_slow_seconds, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
         *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom, *m_id169_left, *m_id169_top, *m_id169_right, *m_id169_bottom};
@@ -599,7 +630,7 @@ void WuWaControlsComponent::on_draw_shortcuts() {
         wuwa_ui::TextWrapped("Hold L3, then fully squeeze LT for the portal or RT for diorama. Keep the other trigger released; release all controls before repeating. Close UEVR and game menus and leave HUD/mouse adjustment first. Physical gamepad passthrough bypasses these shortcuts.");
         wuwa_ui::TextWrapped("Fully hold both triggers first. R3: click to switch between full VR and the stereo screen, hold 0.8 seconds for mono theatre (hold again to go back); with the triggers still held you can click or hold R3 again. L3: click to turn blur on or off, hold 0.8 seconds for the stereo screen; release all controls before repeating an L3 shortcut. Available during dialogue; close UEVR and leave HUD/mouse adjustment first.");
         wuwa_ui::TextWrapped("Mono preserves your saved stereo-screen choice; screen off exits both screen modes. Neither changes portal or normal world scale. Manual toggles take priority over automatic cinema for the current scene.");
-        wuwa_ui::TextWrapped("Diorama uses a temporary miniature scale (Diorama scale on the WuWa VR menu's Quick page, 10x by default) with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
+        wuwa_ui::TextWrapped("Diorama uses a temporary miniature scale (Diorama scale on the WuWa VR menu's Camera page, 10x by default) with Native Stereo, with the portal on or off. Turning it off returns to your normal saved scale, including deliberate scale edits. It starts off each launch, settings reload and runtime reinitialization. Head movement is magnified; L3 + A recenters.");
         ImGui::TreePop();
     }
     if (wuwa_ui::TreeNode("Keyboard and mouse")) {
@@ -848,7 +879,7 @@ void WuWaControlsComponent::on_draw_recording() {
     }
     wuwa_ui::TextWrapped("%s", run_status().c_str());
     wuwa_ui::draw(*m_run_auto, "Start and end treadmill runs automatically");
-    wuwa_ui::TextWrapped("With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. The WuWa VR menu has the same switch on its Controllers page.");
+    wuwa_ui::TextWrapped("With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. The WuWa VR menu has the same switch on its Controls page.");
     wuwa_ui::TextWrapped("Your route in the game is saved once a second (UEVR profile > wuwa-runs), so no map screenshots are needed. Each start and end flashes a magenta square in the desktop view, so an OBS video lines up with the route.");
     ImGui::Separator();
     wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
@@ -1292,6 +1323,34 @@ int WuWaControlsComponent::tip_kind() const {
     return now < m_tip_until.load() ? 1 : 0;
 }
 
+bool WuWaControlsComponent::playing_in_headset() const {
+    if (!game_focused() || !VR::get()->is_hmd_active() || menu_warning_active()) return false;
+    std::scoped_lock lock{m_bridge_mutex};
+    return !m_game_menu && m_received != std::chrono::steady_clock::time_point{} &&
+        std::chrono::steady_clock::now() - m_received <= std::chrono::milliseconds(1000);
+}
+
+void WuWaControlsComponent::update_setup() {
+    // 1.2.7 (owner, 5 Nov 2026): the VR setup opens by itself once, after 4 s of play in the headset, until
+    // it is answered or skipped. Closing it half way brings it back next launch, not this one.
+    if (m_setup_tried || !wuwa_test::is_wuwa()) return;
+    if (!wuwa_menu_host::setup_pending()) {
+        m_setup_tried = true;
+        return;
+    }
+    const auto now = GetTickCount64();
+    if (g_framework->is_drawing_ui() || !playing_in_headset()) {
+        m_setup_eligible_since = 0;
+        return;
+    }
+    if (m_setup_eligible_since == 0) m_setup_eligible_since = now;
+    if (now - m_setup_eligible_since < 4000) return;
+    m_setup_tried = true;
+    spdlog::info("[WuWa] VR setup: opening (first launch)");
+    wuwa_menu_host::start_setup();
+    g_framework->set_draw_ui(true);
+}
+
 void WuWaControlsComponent::update_tip() {
     // On the first three launches, one line under your view once play has
     // started (script reporting, headset on, no menus), for 12 seconds.
@@ -1302,12 +1361,8 @@ void WuWaControlsComponent::update_tip() {
         m_tip_done = true;
         return;
     }
-    bool playing = game_focused() && VR::get()->is_hmd_active() && !menu_warning_active();
-    {
-        std::scoped_lock lock{m_bridge_mutex};
-        playing = playing && !m_game_menu && m_received != std::chrono::steady_clock::time_point{} &&
-            std::chrono::steady_clock::now() - m_received <= std::chrono::milliseconds(1000);
-    }
+    // Not under the menu (1.2.7: the VR setup opens at the same moment and would use up the tip).
+    const bool playing = !g_framework->is_drawing_ui() && playing_in_headset();
     const auto now = GetTickCount64();
     if (!playing) {
         m_tip_eligible_since = 0;
@@ -1430,6 +1485,7 @@ bool setting_on(std::string_view key) {
 void WuWaControlsComponent::draw_passive_overlay() {
     // Recordings started from the launcher window are seen here (twice a second).
     if (wuwa_test::is_wuwa()) refresh_recording_live();
+    update_setup(); // first: it opens the menu, and the tip then waits for it to close
     update_tip();
     auto* list=ImGui::GetBackgroundDrawList();
     const auto size=ImGui::GetIO().DisplaySize;
@@ -1438,6 +1494,8 @@ void WuWaControlsComponent::draw_passive_overlay() {
     const int view=vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
     // Keyboard and mouse used last: cards, tips and notices name keys (the VR key as this layout prints it).
     const bool keyboard=keyboard_in_use() && !vr_controllers;
+    // A PlayStation pad used last: cards and tips name its buttons (L1, R2, the face shapes) (1.2.7).
+    const bool playstation=!keyboard && !vr_controllers && wuwa_input_activity::last_device()==1;
     if (keyboard) update_key_names();
     // Drawn last, over the card and the other notices, whichever way this function returns.
     const struct Last {
@@ -1456,7 +1514,7 @@ void WuWaControlsComponent::draw_passive_overlay() {
             static constexpr const char* names[]{N_("Full VR"),N_("Stereo screen"),N_("Mono theatre")};
             char note[512]{};
             std::snprintf(note,sizeof(note),wuwa_l10n::translate(
-                "Hint %d of %d. It then switches off; View hints on the WuWa VR menu's HUD page turns it back on.").c_str(),
+                "Hint %d of %d. It then switches off; View hints on the WuWa VR menu's Interface page turns it back on.").c_str(),
                 m_view_hint,view_hint_count);
             if (keyboard) {
                 wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),names[view],
@@ -1466,14 +1524,15 @@ void WuWaControlsComponent::draw_passive_overlay() {
                 wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),names[view],
                     view==0 ? "{LT}+{RT}, click {R3} for the stereo screen" : view==1 ? "{LT}+{RT}, click {R3} for full VR" :
                     "{LT}+{RT}, hold {R3} to leave mono",vr_controllers,
-                    wuwa_l10n::visual(note));
+                    wuwa_l10n::visual(note),false,playstation);
             }
         } else if (tip_kind()!=0 && keyboard) {
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",
                 "hold {VR} to see the keyboard shortcuts \xC2\xB7 {Insert} opens the WuWa VR menu",false,{},true);
         } else if (tip_kind()!=0) {
             wuwa_sheet::draw_tip(list,size,ImGui::GetFont(),"New:",
-                "hold {L3} or {LT}+{RT} to see what each button does \xC2\xB7 {L3}+{R3} opens the WuWa VR menu",vr_controllers);
+                "hold {L3} or {LT}+{RT} to see what each button does \xC2\xB7 {L3}+{R3} opens the WuWa VR menu",vr_controllers,
+                {},false,playstation);
         }
         return;
     }
@@ -1505,6 +1564,7 @@ void WuWaControlsComponent::draw_passive_overlay() {
     state.freecam=m_camera->value()==2;
     state.wheel_lit=GetTickCount64()-m_kb_wheel_lit.load()<300;
     state.vr_controllers=vr_controllers;
+    state.playstation=playstation;
     state.view=view;
     state.blur=m_stereo_dof->value();
     state.hide_near=m_hide_near->value();
@@ -1734,6 +1794,8 @@ void WuWaControlsComponent::advance_playstation() {
         return;
     }
     wuwa_ps_hid::hid_menu_held.store((s.pad.buttons & 0xc0) == 0xc0);
+    // The menu and the cards show shortcuts on the device used last (1.2.7).
+    if (wuwa_ps::recent(s.stamp, now, 250) && !wuwa_ps::neutral(s.pad)) wuwa_input_activity::note_playstation(now);
     if (m_playstation_menu.update(s.pad, now, FrameworkConfig::get()->is_enable_l3_r3_toggle(),
         FrameworkConfig::get()->is_l3_r3_long_press() && !g_framework->is_drawing_ui())) {
         g_framework->set_draw_ui(!g_framework->is_drawing_ui());
@@ -2002,6 +2064,25 @@ void WuWaControlsComponent::update_key_names() const {
         if (vk >= 'A' && vk <= 'Z') move[i] = std::string(1, static_cast<char>(vk));
     }
     wuwa_sheet::set_key_names(vr_key_name(), move);
+    // The 3D keyboard (menu help strip, cards): what each key prints on this layout, and where the letters and
+    // digits of the VR key chords are (they go by letter, so on AZERTY the A key is where Q is on QWERTY).
+    wuwa_pad3d::vr_key_label = vr_key_name();
+    wuwa_pad3d::vr_key_scan = m_kb_vr_key->value() == 2 ? 0x11d : 0x29;
+    for (UINT scan = 1; scan < wuwa_pad3d::printed.size(); ++scan) {
+        const UINT vk = MapVirtualKeyExW(scan, MAPVK_VSC_TO_VK, layout);
+        const wchar_t ch = vk ? static_cast<wchar_t>(MapVirtualKeyExW(vk, MAPVK_VK_TO_CHAR, layout) & 0xffff) : 0;
+        std::string name;
+        if (ch > 32) {
+            char utf8[8]{};
+            const int n = WideCharToMultiByte(CP_UTF8, 0, &ch, 1, utf8, sizeof(utf8) - 1, nullptr, nullptr);
+            if (n > 0) name.assign(utf8, n);
+        }
+        wuwa_pad3d::printed[scan] = name;
+    }
+    for (char c = '0'; c <= 'Z'; ++c) {
+        if (c > '9' && c < 'A') continue;
+        wuwa_pad3d::scan_for[static_cast<unsigned char>(c)] = static_cast<std::uint16_t>(MapVirtualKeyExW(c, MAPVK_VK_TO_VSC, layout) & 0xff);
+    }
 }
 
 void WuWaControlsComponent::set_adjustment(bool on) {

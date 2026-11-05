@@ -19,6 +19,7 @@
 #include "utility/String.hpp"
 #include "utility/Input.hpp"
 #include "utility/WuWaModuleCapture.hpp"
+#include "utility/WuWaBrand.hpp"
 #include "utility/WuWaLguiProbe.hpp"
 #include "utility/WuWaPlanarProbe.hpp"
 #include "utility/WuWaConfigSave.hpp"
@@ -1222,7 +1223,9 @@ void Framework::update_fonts() {
 
     wuwa_l10n::reserve_fonts(fonts, m_framework_module, (float)m_font_size);
     wuwa_sheet::reserve_font(fonts);
+    wuwa_brand::reserve(fonts, m_framework_module); // the crest, for the VR menu and the cards
     fonts->Build();
+    wuwa_brand::fill(fonts);
     m_wants_device_object_cleanup = true;
 }
 

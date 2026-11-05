@@ -76,7 +76,7 @@ def verify_pack_receipt(checkout, packed, assets):
     # Compiled binaries are normally ignored by Git. Verify their exact staged
     # inputs, and bind every copied guide/licence plus the icon/packer to the
     # release checkout. This does not claim a reproducible source-to-binary build.
-    docs = {'README.txt', 'TEST THIS.txt', 'PlayerGuide.html', 'LICENSE.txt', 'THIRD-PARTY-NOTICES.txt'}
+    docs = {'README.txt', 'TEST THIS.txt', 'LICENSE.txt', 'THIRD-PARTY-NOTICES.txt'}
     binaries = {'WuWa VR.exe', 'Velopack.dll', 'Newtonsoft.Json.dll'}
     inputs = receipt['inputs']
     require(all(safe_name(x['name']) for x in inputs), 'Unsafe receipt input name')

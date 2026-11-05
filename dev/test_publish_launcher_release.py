@@ -33,7 +33,7 @@ class ReceiptTests(unittest.TestCase):
         self.packed = self.base / 'packed'
         native = self.checkout / 'launcher/native'
         inputs = []
-        docs = ['README.txt', 'TEST THIS.txt', 'PlayerGuide.html', 'LICENSE.txt', 'THIRD-PARTY-NOTICES.txt']
+        docs = ['README.txt', 'TEST THIS.txt', 'LICENSE.txt', 'THIRD-PARTY-NOTICES.txt']
         binaries = ['WuWa VR.exe', 'Velopack.dll', 'Newtonsoft.Json.dll']
         for name in docs + binaries:
             data = ('fixture:' + name).encode()
@@ -121,7 +121,7 @@ class ReceiptTests(unittest.TestCase):
 
     def test_staged_dll_and_checkout_docs_icon_packer_bound(self):
         paths = [self.packed / 'app-stage/Velopack.dll',
-                 self.checkout / 'launcher/native/PlayerGuide.html',
+                 self.checkout / 'launcher/native/README.txt',
                  self.checkout / 'launcher/native/assets/wuwa-vr.ico',
                  self.checkout / 'launcher/native/pack-installer.ps1']
         for path in paths:

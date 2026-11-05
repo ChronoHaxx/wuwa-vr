@@ -96,21 +96,41 @@ namespace WuWaVR.Manager
         string catalogKey = "catalogBundled";
         Dictionary<string, object> status = new Dictionary<string, object>();
         readonly List<Button> actions = new List<Button>();
-        readonly Brush background = Color("#0F0F10"), card = Color("#19191B"), foreground = Color("#F5F3EE"), muted = Color("#B9B4AA"), accent = Color("#D8B565");
-        readonly Brush line = Color("#2E2D2A"), activeLine = Color("#8A7238"), badge = Color("#2A2414");
-        // Step cards show where the player is: done (check), current (outlined) or still to come.
-        enum StepState { Pending, Current, Done }
+        readonly Brush background = Color("#090D1C"), card = Color("#111830"), foreground = Color("#F5F3EE"), muted = Color("#B5BDCC"), accent = Color("#D8B565");
+        readonly Brush line = Color("#26304F"), activeLine = Color("#8A7238"), badge = Color("#2A2414");
+        // Failures are red with a "!" (never colour alone): a row that is broken, the launch step
+        // that failed, the hero's outline and the footer line of an action that failed.
+        readonly Brush danger = Color("#E2735F"), dangerLine = Color("#7A3A2E");
+        // Status rows show where the player is: done (check), current (outlined), still to come,
+        // or a problem (red "!" and the reason under the row).
+        enum StepState { Pending, Current, Done, Problem }
         readonly Border[] stepCards = new Border[3], stepBadges = new Border[3];
-        readonly TextBlock[] stepNumbers = new TextBlock[3];
+        readonly TextBlock[] stepNumbers = new TextBlock[3], rowProblems = new TextBlock[3];
+        // The last action that failed, by the row it belongs to (-1: the launch, in the hero),
+        // until the next action starts.
+        string pendingActionKey, previewHint; int failedRow = -2; string failedMessage = "";
+        Border heroCard; Button heroHelp;
         Border launcherUpdateBar;
         TextBlock launcherUpdateBarText;
+        // The one-screen layout (3 Nov 2026): a hero with the launch, three status rows, and the
+        // fixes on the troubleshooting page with everything else under More options.
+        TextBlock heroTitle;
+        readonly TextBlock[] phaseChips = new TextBlock[4];
+        StackPanel phaseRow, runtimeOptions;
+        Border consentNotice;
+        Button playFlatButton;
+        Expander morePanel;
+        // When the current launch phase was first seen, for "taking longer than usual".
+        string shownPhase = "";
+        DateTime phaseSince = DateTime.UtcNow;
+        static readonly TimeSpan SlowVrStart = TimeSpan.FromSeconds(90);
         public MainWindow(PackageStore store, string backendData, bool preview = false, string language = null,
             LauncherUpdateService launcherUpdates = null)
         {
             this.store = store; this.preview = preview; bridge = new LauncherBridge(backendData);
             this.launcherUpdates = preview ? new LauncherUpdateService() : launcherUpdates ?? new LauncherUpdateService();
             text.Language = Strings.Supported(language ?? store.State.language);
-            Title = "WuWa VR"; Width = 860; Height = 800; MinWidth = 720; MinHeight = 640;
+            Title = "WuWa VR"; Width = 780; Height = 720; MinWidth = 640; MinHeight = 580;
             Background = background; Foreground = foreground; FontFamily = new FontFamily("Segoe UI"); FontSize = 14;
             Resources.Add(typeof(Button), ButtonStyle());
             Resources.Add(typeof(ComboBox), ChoiceStyle());
@@ -134,6 +154,8 @@ namespace WuWaVR.Manager
                         await Connect(c);
                     }
                 });
+                // Opening is not an operation the player asked for: no "Operation complete." line.
+                if (operationText.Text == text["actionComplete"]) operationText.Text = "";
                 poll.Start();
                 await Task.WhenAll(CheckLauncherUpdates(updateLifetime.Token, true), UpdateCatalog(updateLifetime.Token, true));
                 await AutoUpdatePackage();
@@ -171,6 +193,19 @@ namespace WuWaVR.Manager
             // Closing never starts a replacement helper and never kills by process
             // name. A helper already identified as another package is not ours to stop.
             if (bridge.Conflict != null || store.Selected == null) return true;
+            // Closing once VR is up is the normal end of a launch, but the worker still finishes
+            // its check for up to 30 s. Hide the window now and stop the helper after it.
+            bool hidden = false;
+            if (bridge.Address != null && LauncherPresentation.InVr(status))
+            {
+                Hide(); hidden = true;
+                try
+                {
+                    using (var limit = new CancellationTokenSource(TimeSpan.FromSeconds(90)))
+                        while (LauncherPresentation.InVr(status = await bridge.Status(limit.Token))) await Task.Delay(2000, limit.Token);
+                }
+                catch (Exception) { return true; } // As "close only": anything still running keeps running.
+            }
             bool stopped = false, cancelled = false; string remaining = "";
             await RunAction(async c => {
                 using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(c))
@@ -204,7 +239,8 @@ namespace WuWaVR.Manager
                     }
                 }
             }, false);
-            if (stopped || cancelled) return stopped;
+            if (stopped || cancelled) return stopped || hidden;
+            if (hidden) return true; // Out of sight already: never ask from a hidden window.
             details.Text = remaining; feedbackPanel.Visibility = Visibility.Visible; feedbackPanel.IsExpanded = true;
             OpenProcessRecovery();
             string prompt = text["closeOnlyPrompt"] + Environment.NewLine + Environment.NewLine + remaining;
@@ -213,7 +249,7 @@ namespace WuWaVR.Manager
         }
         void OpenProcessRecovery()
         {
-            ShowPage(true); processRecoveryPanel.IsExpanded = true;
+            ShowPage(true); morePanel.IsExpanded = true; processRecoveryPanel.IsExpanded = true;
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => { if (!closing) processRecoveryPanel.BringIntoView(); }));
         }
         async Task CancelOrRecover()
@@ -267,7 +303,7 @@ namespace WuWaVR.Manager
         Style ButtonStyle()
         {
             var style = new Style(typeof(Button));
-            style.Setters.Add(new Setter(Control.BackgroundProperty, Color("#26262A")));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, Color("#1B2444")));
             style.Setters.Add(new Setter(Control.ForegroundProperty, foreground));
             style.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
             style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
@@ -304,69 +340,55 @@ namespace WuWaVR.Manager
         Button Action(string key, Func<CancellationToken, Task> fn, bool primary = false)
         {
             var button = new Button { Content = text[key], Padding = new Thickness(14, 9, 14, 9), Margin = new Thickness(0, 4, 8, 4),
-                Background = primary ? accent : Color("#26262A"), Foreground = primary ? background : foreground, Cursor = System.Windows.Input.Cursors.Hand, Tag = key };
+                Background = primary ? accent : Color("#1B2444"), Foreground = primary ? background : foreground, Cursor = System.Windows.Input.Cursors.Hand, Tag = key };
             ToolTipService.SetShowOnDisabled(button, true);
-            button.Click += async (s, e) => await Run(async c =>
+            button.Click += async (s, e) => { pendingActionKey = key; await Run(async c =>
             {
                 await fn(c);
                 if (!submittedJob && operationText.Text == text["busy"])
                     operationText.Text = text[key] + " · " + text["actionComplete"];
-            }); actions.Add(button); return button;
+            }); }; actions.Add(button); return button;
+        }
+        // Which status row an action's failure belongs to; -1 is the launch itself (the hero).
+        static int RowForAction(string key)
+        {
+            switch (key)
+            {
+                case "browse": case "useGameLocation": case "browseGameFile": case "scanGame": return 0;
+                case "install": case "installVersion": case "updatePackage": case "rollbackPackage": case "rollback":
+                case "repair": case "useVersion": case "reset": case "restore": case "retryConnection": case "switchLauncher": return 1;
+                case "useHeadset": case "useSimulator": case "check": return 2;
+                case "playFlat": return 0;
+                case "launch": return -1;
+                default: return -2;
+            }
+        }
+        // A failed helper job, by its kind (wuwa_player.py begin_job).
+        static int RowForJob(string kind)
+        {
+            switch (kind)
+            {
+                case "apply": case "verify": case "restore": return 1;
+                case "runtime": case "check": return 2;
+                case "launch": return -1;
+                default: return -2;
+            }
         }
         Button Link(string key, string url)
         { return Action(key, c => { Open(url); operationText.Text = text["browserOpened"]; return Task.CompletedTask; }); }
-        string guideDirectoryOverride = null;
-        string GuideUrl(string page)
+        // The website is the one place player docs live (site/, built in ten languages); the
+        // launcher ships no guide of its own, so nothing here can fall out of date with it.
+        const string Website = "https://chronohaxx.github.io/wuwa-vr/";
+        string WebsiteUrl() { return Website + (text.Language == "en" ? "" : "l/" + text.Language + ".html"); }
+        // A page that is English only (the problem-report form), saying so in other languages.
+        Button GuideLink(string key, string page)
         {
-            // Resolve on click: install/rollback and language can change while
-            // the window stays open. A broken helper must not hide offline help.
-            var section = page.Split(new[] { '#' }, 2);
-            if (section[0] == "guide.html")
+            return Action(key, c =>
             {
-                // The launcher's own guide is built with this app (dev/i18n/build_guide.py), so it
-                // is current even when the installed package's copy is older.
-                var launcherGuide = Path.Combine(guideDirectoryOverride ?? AppDomain.CurrentDomain.BaseDirectory, "PlayerGuide.html");
-                if (File.Exists(launcherGuide))
-                {
-                    // Sections are id'd en, zh, then by language code; a guide
-                    // without this language's section opens at English. A part
-                    // of it (#controls) is id'd per language: controls, controls-zh.
-                    string anchor = text.Language == "zh-Hans" ? "zh" : text.Language, guide = File.ReadAllText(launcherGuide);
-                    Func<string, bool> has = id => guide.Contains("id=\"" + id + "\"") || guide.Contains("id='" + id + "'");
-                    if (!has(anchor)) anchor = "en";
-                    if (section.Length == 2)
-                    {
-                        var part = section[1] + (anchor == "en" ? "" : "-" + anchor);
-                        if (has(part)) anchor = part;
-                    }
-                    return new Uri(launcherGuide).AbsoluteUri + "#" + anchor;
-                }
-            }
-            if (store.Selected != null)
-            {
-                var parts = page.Split(new[] { '#' }, 2);
-                string languageRoot = text.Language == "en" ? "" : "l/" + text.Language + "/";
-                // Candidate instructions describe this desktop app; the full
-                // published guide remains a linked portable reference.
-                if (parts[0] == "guide.html" && File.Exists(Paths.Inside(store.Folder(store.Selected), "app/site/" + languageRoot + "quickstart.html")))
-                    parts[0] = "quickstart.html";
-                string relative = languageRoot + parts[0];
-                var file = Paths.Inside(store.Folder(store.Selected), "app/site/" + relative);
-                if (File.Exists(file)) return new Uri(file).AbsoluteUri + (parts.Length == 2 ? "#" + parts[1] : "");
-            }
-            return "https://chronohaxx.github.io/wuwa-vr/" + page;
-        }
-        Button GuideLink(string key, string page, bool footer = false)
-        {
-            var link = Action(key, c =>
-            {
-                var url = GuideUrl(page); Open(url);
-                operationText.Text = text[text.Language != "en" && !new Uri(url).IsFile ? "englishGuideFallback" : "browserOpened"];
+                Open(Website + page);
+                operationText.Text = text[text.Language != "en" ? "englishGuideFallback" : "browserOpened"];
                 return Task.CompletedTask;
             });
-            if (footer) { link.Background = Brushes.Transparent; link.Foreground = muted; link.FontSize = 11;
-                link.Padding = new Thickness(4, 3, 4, 3); link.Margin = new Thickness(0, 0, 12, 0); }
-            return link;
         }
         Action<string> openOverride = null;
         void Open(string target)
@@ -387,10 +409,10 @@ namespace WuWaVR.Manager
             // Keep the ComboBox's native keyboard/selection behavior while styling its popup too.
             return (Style)System.Windows.Markup.XamlReader.Parse(@"
 <Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='{x:Type ComboBox}'>
- <Setter Property='Foreground' Value='#F5F3EE'/><Setter Property='Background' Value='#222225'/><Setter Property='BorderBrush' Value='#45423B'/>
+ <Setter Property='Foreground' Value='#F5F3EE'/><Setter Property='Background' Value='#18203D'/><Setter Property='BorderBrush' Value='#344070'/>
  <Setter Property='ScrollViewer.HorizontalScrollBarVisibility' Value='Disabled'/>
  <Setter Property='ItemContainerStyle'><Setter.Value><Style TargetType='{x:Type ComboBoxItem}'>
-  <Setter Property='Foreground' Value='#F5F3EE'/><Setter Property='Background' Value='#19191B'/><Setter Property='Padding' Value='10,8'/>
+  <Setter Property='Foreground' Value='#F5F3EE'/><Setter Property='Background' Value='#111830'/><Setter Property='Padding' Value='10,8'/>
   <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type ComboBoxItem}'><Border Background='{TemplateBinding Background}' Padding='{TemplateBinding Padding}'><ContentPresenter/></Border></ControlTemplate></Setter.Value></Setter>
   <Style.Triggers><Trigger Property='IsHighlighted' Value='True'><Setter Property='Background' Value='#3A3220'/></Trigger><Trigger Property='IsSelected' Value='True'><Setter Property='Background' Value='#4A3E22'/></Trigger></Style.Triggers>
  </Style></Setter.Value></Setter>
@@ -401,9 +423,9 @@ namespace WuWaVR.Manager
     <ToggleButton.Template><ControlTemplate TargetType='{x:Type ToggleButton}'><Border Background='{TemplateBinding Background}'/></ControlTemplate></ToggleButton.Template>
    </ToggleButton>
    <ContentPresenter Margin='11,8,30,8' IsHitTestVisible='False' VerticalAlignment='Center' Content='{TemplateBinding SelectionBoxItem}' ContentTemplate='{TemplateBinding SelectionBoxItemTemplate}' ContentTemplateSelector='{TemplateBinding ItemTemplateSelector}'/>
-   <TextBlock Text='&#xE70D;' FontFamily='Segoe MDL2 Assets' FontSize='10' Margin='0,0,12,0' Foreground='#B9B4AA' HorizontalAlignment='Right' VerticalAlignment='Center' IsHitTestVisible='False'/>
+   <TextBlock Text='&#xE70D;' FontFamily='Segoe MDL2 Assets' FontSize='10' Margin='0,0,12,0' Foreground='#B5BDCC' HorizontalAlignment='Right' VerticalAlignment='Center' IsHitTestVisible='False'/>
    <Popup x:Name='PART_Popup' Placement='Bottom' IsOpen='{TemplateBinding IsDropDownOpen}' AllowsTransparency='True' Focusable='False' PopupAnimation='Fade'>
-    <Border Background='#19191B' BorderBrush='#4E4A40' BorderThickness='1' CornerRadius='6' MinWidth='{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}' MaxHeight='280' Padding='3' Margin='0,3,0,0'>
+    <Border Background='#111830' BorderBrush='#344070' BorderThickness='1' CornerRadius='6' MinWidth='{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}' MaxHeight='280' Padding='3' Margin='0,3,0,0'>
      <ScrollViewer CanContentScroll='True' HorizontalScrollBarVisibility='Disabled'><ItemsPresenter KeyboardNavigation.DirectionalNavigation='Contained'/></ScrollViewer>
     </Border>
    </Popup>
@@ -420,8 +442,8 @@ namespace WuWaVR.Manager
  <Setter Property='Foreground' Value='#F5F3EE'/><Setter Property='Cursor' Value='Hand'/><Setter Property='FocusVisualStyle' Value='{x:Null}'/>
  <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='{x:Type CheckBox}'>
   <Grid Background='Transparent'><Grid.ColumnDefinitions><ColumnDefinition Width='Auto'/><ColumnDefinition/></Grid.ColumnDefinitions>
-   <Border x:Name='Box' Width='18' Height='18' CornerRadius='4' Background='#222225' BorderBrush='#6E685B' BorderThickness='1' VerticalAlignment='Top' Margin='0,4,10,0'>
-    <TextBlock x:Name='Tick' Text='&#xE73E;' FontFamily='Segoe MDL2 Assets' FontSize='12' Foreground='#0F0F10' HorizontalAlignment='Center' VerticalAlignment='Center' Visibility='Collapsed'/>
+   <Border x:Name='Box' Width='18' Height='18' CornerRadius='4' Background='#18203D' BorderBrush='#5A6690' BorderThickness='1' VerticalAlignment='Top' Margin='0,4,10,0'>
+    <TextBlock x:Name='Tick' Text='&#xE73E;' FontFamily='Segoe MDL2 Assets' FontSize='12' Foreground='#090D1C' HorizontalAlignment='Center' VerticalAlignment='Center' Visibility='Collapsed'/>
    </Border>
    <ContentPresenter Grid.Column='1' VerticalAlignment='Top' RecognizesAccessKey='True'/>
   </Grid>
@@ -446,8 +468,8 @@ namespace WuWaVR.Manager
     <Track.DecreaseRepeatButton><RepeatButton Command='ScrollBar.PageUpCommand' Opacity='0' Focusable='False'/></Track.DecreaseRepeatButton>
     <Track.IncreaseRepeatButton><RepeatButton Command='ScrollBar.PageDownCommand' Opacity='0' Focusable='False'/></Track.IncreaseRepeatButton>
     <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='{x:Type Thumb}'>
-     <Border x:Name='T' Background='#3A3833' CornerRadius='3' Margin='3,2,3,2'/>
-     <ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='T' Property='Background' Value='#5A5446'/></Trigger>
+     <Border x:Name='T' Background='#2C3760' CornerRadius='3' Margin='3,2,3,2'/>
+     <ControlTemplate.Triggers><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='T' Property='Background' Value='#46548A'/></Trigger>
       <Trigger Property='IsDragging' Value='True'><Setter TargetName='T' Property='Background' Value='#D8B565'/></Trigger></ControlTemplate.Triggers>
     </ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
    </Track>
@@ -488,32 +510,65 @@ namespace WuWaVR.Manager
             var control = new ComboBox { Margin = new Thickness(0, 4, 0, 4), MinWidth = 130, MaxDropDownHeight = 280 };
             foreach (string item in items) control.Items.Add(item); control.SelectedIndex = 0; return control;
         }
-        Border Step(string number, string title, Button action, params UIElement[] elements)
+        // One line per setup part (game, VR mod, headset): a check when done, the title, what was
+        // found and its hint, and the row's one action. Extra content (choices) folds out below.
+        Border StatusRow(int index, string title, Button action, params UIElement[] elements)
         {
             var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(46) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+            // Titles share one width across the rows (the rows' panel is the size scope).
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 96, SharedSizeGroup = "rowTitle" });
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var numberText = Label(number, 13, accent); numberText.FontWeight = FontWeights.SemiBold; numberText.Margin = new Thickness(0);
+            var numberText = Label((index + 1).ToString(), 11, muted); numberText.FontWeight = FontWeights.SemiBold; numberText.Margin = new Thickness(0);
             numberText.HorizontalAlignment = HorizontalAlignment.Center; numberText.VerticalAlignment = VerticalAlignment.Center;
-            var stepBadge = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = badge, Child = numberText, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 14, 0) };
+            var stepBadge = new Border { Width = 22, Height = 22, CornerRadius = new CornerRadius(11), Background = badge, BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent,
+                Child = numberText, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
             grid.Children.Add(stepBadge);
-            var body = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
-            var heading = Label(title, 16); heading.FontWeight = FontWeights.SemiBold; heading.Margin = new Thickness(0, 5, 0, 3); body.Children.Add(heading);
+            var heading = Label(title, 13, muted); heading.Margin = new Thickness(0, 6, 16, 0); heading.VerticalAlignment = VerticalAlignment.Top;
+            heading.TextWrapping = TextWrapping.NoWrap;
+            Grid.SetColumn(heading, 1); grid.Children.Add(heading);
+            var body = new StackPanel { Margin = new Thickness(0, 2, 12, 0) };
             foreach (var element in elements) body.Children.Add(element);
-            Grid.SetColumn(body, 1); grid.Children.Add(body);
-            if (action != null) { action.Margin = new Thickness(0, 2, 0, 0); action.VerticalAlignment = VerticalAlignment.Top; Grid.SetColumn(action, 2); grid.Children.Add(action); }
-            var result = new Border { Background = card, BorderBrush = line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(18, 14, 18, 14), Margin = new Thickness(0, 0, 0, 10), Child = grid };
-            int index = int.Parse(number) - 1; stepCards[index] = result; stepBadges[index] = stepBadge; stepNumbers[index] = numberText;
+            var problem = Label("", 12, danger); problem.Margin = new Thickness(0, 4, 0, 2); problem.Visibility = Visibility.Collapsed;
+            body.Children.Add(problem); rowProblems[index] = problem;
+            Grid.SetColumn(body, 2); grid.Children.Add(body);
+            if (action != null)
+            {
+                action.Margin = new Thickness(0, 2, 0, 0); action.Padding = new Thickness(14, 6, 14, 6); action.VerticalAlignment = VerticalAlignment.Top;
+                Grid.SetColumn(action, 3); grid.Children.Add(action);
+            }
+            var result = new Border { BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0, 9, 0, 9), Child = grid };
+            stepCards[index] = result; stepBadges[index] = stepBadge; stepNumbers[index] = numberText;
             return result;
         }
-        void ShowStep(int index, StepState state)
+        void ShowStep(int index, StepState state, string problem = null)
         {
             if (stepCards[index] == null) return;
-            stepCards[index].BorderBrush = state == StepState.Current ? activeLine : line;
-            stepBadges[index].Background = state == StepState.Done ? accent : badge;
-            stepNumbers[index].Text = state == StepState.Done ? "✓" : "0" + (index + 1);
-            stepNumbers[index].Foreground = state == StepState.Done ? background : state == StepState.Current ? accent : muted;
+            bool bad = state == StepState.Problem;
+            stepBadges[index].Background = state == StepState.Done ? accent : bad ? danger : badge;
+            stepBadges[index].BorderBrush = state == StepState.Current ? accent : Brushes.Transparent;
+            stepNumbers[index].Text = state == StepState.Done ? "✓" : bad ? "!" : (index + 1).ToString();
+            stepNumbers[index].Foreground = state == StepState.Done || bad ? background : state == StepState.Current ? accent : muted;
+            System.Windows.Automation.AutomationProperties.SetHelpText(stepBadges[index], problem ?? "");
+            rowProblems[index].Text = problem ?? "";
+            rowProblems[index].Visibility = String.IsNullOrEmpty(problem) ? Visibility.Collapsed : Visibility.Visible;
+        }
+        Border Divider() { return new Border { Height = 1, Background = line }; }
+        static readonly string[] PhaseChipKeys = { "stepPermission", "stepPlay", "stepStartVr", "stepInVr" };
+        UIElement PhaseChips()
+        {
+            // The four steps of a launch, shown while one runs (the current one is lit) and after
+            // one fails or is cancelled (the step it stopped at is red "!" or marked "–").
+            phaseRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0), Visibility = Visibility.Collapsed };
+            var keys = PhaseChipKeys;
+            for (int i = 0; i < keys.Length; ++i)
+            {
+                phaseChips[i] = new TextBlock { Text = text[keys[i]], FontSize = 12, Foreground = muted, VerticalAlignment = VerticalAlignment.Center };
+                phaseRow.Children.Add(new Border { Background = badge, CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 3, 10, 4),
+                    Margin = new Thickness(0, 0, 6, 0), Child = phaseChips[i] });
+            }
+            return phaseRow;
         }
         Button FooterLink(string key, string url)
         {
@@ -535,25 +590,25 @@ namespace WuWaVR.Manager
             bool recoveryOpen = recoveryPanel?.IsExpanded == true,
                 feedbackOpen = feedbackPanel?.IsExpanded == true, recordingOptionsOpen = recordingOptions?.IsExpanded == true,
                 controllerOpen = controllerPanel?.IsExpanded == true, processRecoveryOpen = processRecoveryPanel?.IsExpanded == true,
-                uninstallOpen = uninstallPanel?.IsExpanded == true;
+                uninstallOpen = uninstallPanel?.IsExpanded == true, moreOpen = morePanel?.IsExpanded == true,
+                runtimeChoicesOpen = runtimeOptions?.Visibility == Visibility.Visible;
             string savedDetails = details?.Text, savedFeedback = operationText?.Text;
             rendering = true; actions.Clear();
             FlowDirection = Strings.RightToLeft(text.Language) ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
-            var outer = new DockPanel { Margin = new Thickness(24, 18, 24, 12), Background = background };
-            var header = new Grid { Margin = new Thickness(0, 0, 0, 16) };
+            var outer = new DockPanel { Margin = new Thickness(20, 14, 20, 10) };
+            var header = new Grid { Margin = new Thickness(0, 0, 0, 12) };
             System.Windows.Input.KeyboardNavigation.SetTabIndex(header, 0);
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); header.ColumnDefinitions.Add(new ColumnDefinition());
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var logo = Mark(46); logo.VerticalAlignment = VerticalAlignment.Center; header.Children.Add(logo);
-            var heading = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 12, 0) };
-            var title = new TextBlock { Text = text["title"], FontSize = 24, FontWeight = FontWeights.SemiBold, Foreground = foreground, VerticalAlignment = VerticalAlignment.Center };
-            var pill = new Border { Background = badge, CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 2, 9, 3), Margin = new Thickness(12, 3, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+            var logo = Mark(38); logo.VerticalAlignment = VerticalAlignment.Center; header.Children.Add(logo);
+            var heading = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 12, 0) };
+            var title = new TextBlock { Text = text["title"], FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = foreground, VerticalAlignment = VerticalAlignment.Center };
+            var pill = new Border { Background = badge, CornerRadius = new CornerRadius(10), Padding = new Thickness(9, 2, 9, 3), Margin = new Thickness(10, 2, 0, 0), VerticalAlignment = VerticalAlignment.Center,
                 Child = new TextBlock { Text = text["beta"], FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = accent } };
             heading.Children.Add(Row(title, pill));
-            var tagline = Label(text["tagline"], 13, muted); tagline.Margin = new Thickness(0, 1, 0, 0); heading.Children.Add(tagline);
             Grid.SetColumn(heading, 1); header.Children.Add(heading);
             languages = Choice(Strings.Names); languages.SelectedIndex = Math.Max(0, Array.IndexOf(Strings.Codes, text.Language));
-            languages.MinWidth = 150; System.Windows.Automation.AutomationProperties.SetName(languages, text["language"]); languages.ToolTip = text["language"];
+            languages.MinWidth = 210; System.Windows.Automation.AutomationProperties.SetName(languages, text["language"]); languages.ToolTip = text["language"];
             languages.SelectionChanged += (s, e) =>
             {
                 if (rendering || operation != null) return;
@@ -576,9 +631,8 @@ namespace WuWaVR.Manager
             launcherUpdateBar = new Border { Background = Color("#241E10"), BorderBrush = activeLine, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10),
                 Padding = new Thickness(14, 7, 8, 7), Margin = new Thickness(0, 0, 0, 12), Child = updateRow, Visibility = Visibility.Collapsed };
             DockPanel.SetDock(launcherUpdateBar, Dock.Top); outer.Children.Add(launcherUpdateBar);
-            var footer = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+            var footer = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
             System.Windows.Input.KeyboardNavigation.SetTabIndex(footer, 2);
-            footer.Children.Add(new Border { Height = 1, Background = line, Margin = new Thickness(0, 0, 0, 12) });
             launchButton = Action("launch", async c =>
             {
                 // First-run installation is the primary action. Never start the game
@@ -597,24 +651,30 @@ namespace WuWaVR.Manager
                 await bridge.Post("/api/settings", new { riskAcknowledged = true }, c);
                 await SubmitJob("/api/launch", new { id = CurrentBuild() }, c);
             }, true);
-            launchState = Label(text["gameNotRunning"], 13, foreground); launchState.VerticalAlignment = VerticalAlignment.Center; launchState.Margin = new Thickness(0, 0, 18, 0);
-            launchButton.MinWidth = 190; launchButton.FontWeight = FontWeights.SemiBold; launchButton.FontSize = 15;
-            launchButton.Padding = new Thickness(24, 12, 24, 12); launchButton.Margin = new Thickness(0, 2, 0, 2);
-            cancelButton = new Button { Content = text["cancel"], Padding = new Thickness(16, 11, 16, 11), Margin = new Thickness(0, 2, 10, 2) };
+            // The launch lives in the hero card (Setup); the footer keeps what both pages share:
+            // progress, the operation line with Cancel, details and the links.
+            launchState = Label(text["gameNotRunning"], 13, muted); launchState.Margin = new Thickness(0, 2, 0, 0);
+            launchButton.MinWidth = 200; launchButton.FontWeight = FontWeights.SemiBold; launchButton.FontSize = 15;
+            launchButton.Padding = new Thickness(26, 12, 26, 12); launchButton.Margin = new Thickness(0);
+            playFlatButton = Action("playFlat", async c => await PlayWithoutVr(c));
+            playFlatButton.Padding = new Thickness(18, 12, 18, 12); playFlatButton.Margin = new Thickness(0, 0, 10, 0);
+            cancelButton = new Button { Content = text["cancel"], Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             cancelButton.Click += async (s, e) => await CancelOrRecover();
-            var launchBar = new DockPanel(); DockPanel.SetDock(launchButton, Dock.Right); launchBar.Children.Add(launchButton);
-            DockPanel.SetDock(cancelButton, Dock.Right); launchBar.Children.Add(cancelButton); launchBar.Children.Add(launchState); footer.Children.Add(launchBar);
-            operationText = Label(preview ? text["preview"] : text["ready"], 12, muted);
-            progress = new ProgressBar { Minimum = 0, Maximum = 1, Height = 4, Foreground = accent, Background = card, Margin = new Thickness(0, 8, 0, 5) };
-            footer.Children.Add(progress); footer.Children.Add(operationText);
+            operationText = Label(preview ? text["preview"] : text["ready"], 12, muted); operationText.VerticalAlignment = VerticalAlignment.Center;
+            progress = new ProgressBar { Minimum = 0, Maximum = 1, Height = 3, Foreground = accent, Background = card, Margin = new Thickness(0, 0, 0, 4) };
+            var statusStrip = new DockPanel(); DockPanel.SetDock(cancelButton, Dock.Right); statusStrip.Children.Add(cancelButton); statusStrip.Children.Add(operationText);
+            footer.Children.Add(progress); footer.Children.Add(statusStrip);
             recoveryShortcut = new Button { Content = text["processRecoveryTitle"], Tag = "processRecoveryOpen", HorizontalAlignment = HorizontalAlignment.Left };
             recoveryShortcut.Click += (s, e) => OpenProcessRecovery(); StyleFooter(recoveryShortcut); actions.Add(recoveryShortcut); footer.Children.Add(recoveryShortcut);
             details = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 65, MaxHeight = 110,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = card, Foreground = foreground, BorderThickness = new Thickness(0), Padding = new Thickness(10) };
             feedbackPanel = new Expander { Header = text["details"], Content = details, Foreground = muted, Visibility = Visibility.Collapsed };
             footer.Children.Add(feedbackPanel);
-            var footnotes = Wrap(GuideLink("guide", "guide.html", true), GuideLink("fullControls", "guide.html#controls", true),
-                PageLink("troubleshooting", true), FooterLink("support", "https://ko-fi.com/chronohax"));
+            footer.Children.Add(new Border { Height = 1, Background = line, Margin = new Thickness(0, 8, 0, 0) });
+            // Guide and controls live on the website (in the player's language), not in the app.
+            var website = Action("website", c => { Open(WebsiteUrl()); operationText.Text = text["browserOpened"]; return Task.CompletedTask; });
+            StyleFooter(website);
+            var footnotes = Wrap(PageLink("troubleshooting", true), website, FooterLink("support", "https://ko-fi.com/chronohax"));
             var footerRow = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
             DockPanel.SetDock(launcherVersion, Dock.Right); footerRow.Children.Add(launcherVersion); footerRow.Children.Add(footnotes);
             footer.Children.Add(footerRow); DockPanel.SetDock(footer, Dock.Bottom); outer.Children.Add(footer);
@@ -638,25 +698,79 @@ namespace WuWaVR.Manager
                 recoveryPanel.IsExpanded = recoveryOpen; recordingOptions.IsExpanded = recordingOptionsOpen;
                 controllerPanel.IsExpanded = controllerOpen;
                 processRecoveryPanel.IsExpanded = processRecoveryOpen;
-                uninstallPanel.IsExpanded = uninstallOpen;
+                uninstallPanel.IsExpanded = uninstallOpen; morePanel.IsExpanded = moreOpen;
+                runtimeOptions.Visibility = runtimeChoicesOpen ? Visibility.Visible : Visibility.Collapsed;
                 details.Text = savedDetails ?? ""; operationText.Text = savedFeedback ?? text["ready"];
                 feedbackPanel.IsExpanded = feedbackOpen;
             }
-            Content = new Border { Background = background, Child = outer }; rendering = false; ShowStatus();
+            Content = Backdrop(outer); rendering = false; ShowStatus();
             if (rebuilding)
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
                 { (pageHost.Content as ScrollViewer)?.ScrollToVerticalOffset(scrollOffset); languages.Focus(); }));
         }
-        // The site/icon mark (dev/build-launcher-icon.ps1), drawn as vectors so it stays sharp at any DPI.
+        // Abby in his VR headset, the app icon's head crop (brand files: LICENSE.md, fan art).
         FrameworkElement Mark(double size)
         {
-            var grid = new Grid { Width = 40, Height = 40 };
-            grid.Children.Add(new Border { Margin = new Thickness(1), CornerRadius = new CornerRadius(9), Background = Color("#0E0E10"),
-                BorderBrush = Color("#8A7238"), BorderThickness = new Thickness(1) });
-            grid.Children.Add(new System.Windows.Shapes.Path { Data = Geometry.Parse("M7,23 L13,13 L20,27 L27,13 L33,23 M7,29 L33,29"),
-                Stroke = Color("#D8B565"), StrokeThickness = 2, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
-                StrokeLineJoin = PenLineJoin.Round });
-            return new Viewbox { Width = size, Height = size, Child = grid, FlowDirection = FlowDirection.LeftToRight };
+            var art = Asset("abby-mark.png");
+            if (art == null) return new Border { Width = size, Height = size };
+            var image = new Image { Source = art, Width = size, Height = size, FlowDirection = FlowDirection.LeftToRight };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            return image;
+        }
+        // The login-screen backdrop: a night sky with stars, and Abby inside the wave rings above a
+        // gold horizon in the free space under the cards. Only the setup page shows Abby; the
+        // troubleshooting page is long and its text must not sit on the artwork.
+        Image backdropArt;
+        UIElement Backdrop(UIElement content)
+        {
+            var sky = new Grid { Background = new RadialGradientBrush(((SolidColorBrush)Color("#17224A")).Color, ((SolidColorBrush)background).Color)
+                { Center = new Point(.5, .8), GradientOrigin = new Point(.5, .8), RadiusX = .8, RadiusY = .62 } };
+            var stars = Asset("stars.png");
+            if (stars != null)
+                sky.Children.Add(new Border { IsHitTestVisible = false, Background = new ImageBrush(stars)
+                    { TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 512, 512), ViewportUnits = BrushMappingMode.Absolute, Stretch = Stretch.None, Opacity = .6 } });
+            var art = Asset("abby-backdrop.png");
+            backdropArt = null;
+            if (art != null)
+            {
+                backdropArt = new Image { Source = art, Height = 420, Stretch = Stretch.Uniform, IsHitTestVisible = false,
+                    HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 52),
+                    FlowDirection = FlowDirection.LeftToRight, Visibility = troubleshootingVisible ? Visibility.Collapsed : Visibility.Visible };
+                RenderOptions.SetBitmapScalingMode(backdropArt, BitmapScalingMode.HighQuality);
+                sky.Children.Add(backdropArt);
+            }
+            sky.Children.Add(content);
+            // After every layout pass (window resize, a notice opening); FitBackdrop only writes on change.
+            sky.LayoutUpdated += (s, e) => FitBackdrop();
+            return sky;
+        }
+        // Abby takes the free space under the cards, up to full size; with too little room he steps aside.
+        void FitBackdrop()
+        {
+            var sky = Content as FrameworkElement; var setup = setupPage?.Content as FrameworkElement;
+            if (backdropArt == null || sky == null || setup == null || troubleshootingVisible || pageHost?.Content != setupPage) return;
+            // DesiredSize: the scroll view stretches the panel to the viewport, the cards end sooner.
+            double cardsBottom = setup.TranslatePoint(new Point(0, setup.DesiredSize.Height), sky).Y;
+            double room = sky.ActualHeight - backdropArt.Margin.Bottom - cardsBottom - 6;
+            double height = Math.Max(1, Math.Min(420, room));
+            var shown = room < 150 ? Visibility.Collapsed : Visibility.Visible;
+            if (Math.Abs(backdropArt.Height - height) > 0.5) backdropArt.Height = height;
+            if (backdropArt.Visibility != shown) backdropArt.Visibility = shown;
+        }
+        static readonly Dictionary<string, BitmapImage> assets = new Dictionary<string, BitmapImage>();
+        // Brand images are embedded in the EXE (WuWaVR.Manager.csproj: assets\*.png).
+        static BitmapImage Asset(string name)
+        {
+            BitmapImage image;
+            if (assets.TryGetValue(name, out image)) return image;
+            using (var stream = typeof(MainWindow).Assembly.GetManifestResourceStream("assets." + name))
+            {
+                if (stream == null) return null;
+                image = new BitmapImage();
+                image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.StreamSource = stream; image.EndInit(); image.Freeze();
+            }
+            assets[name] = image;
+            return image;
         }
         void StyleFooter(Button button)
         { button.Background = Brushes.Transparent; button.Foreground = muted; button.FontSize = 11;
@@ -670,6 +784,8 @@ namespace WuWaVR.Manager
         {
             troubleshootingVisible = troubleshooting;
             if (pageHost != null) pageHost.Content = troubleshooting ? troubleshootingPage : setupPage;
+            if (backdropArt != null) backdropArt.Visibility = troubleshooting ? Visibility.Collapsed : Visibility.Visible;
+            if (!troubleshooting) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(FitBackdrop));
         }
         ScrollViewer Page(UIElement body)
         { return new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -694,7 +810,7 @@ namespace WuWaVR.Manager
         void OfferSteamPackageUpdate()
         {
             if (!SteamChoiceNeedsPackage()) return;
-            // Step 02's Update button installs the newer package; the old helper
+            // The VR mod row's Update button installs the newer package; the old helper
             // and the game choice are left alone until the player uses it.
             operationText.Text = text["gameSteamUpdateRequired"];
         }
@@ -748,13 +864,23 @@ namespace WuWaVR.Manager
                 if (picker.ShowDialog(this) == true) await ChooseLauncher(picker.FileName, c);
                 else operationText.Text = text["notChanged"];
             })));
-            gameHint = Label(text[preview ? "locateHint" : "findingGame"], 11, muted);
-            panel.Children.Add(Step("01", text["locate"], browse, gamePath, gameHint, gameLocationOptions));
-            runtime = Label(text["runtimeHint"], 12, muted);
+            gameHint = Label(text[preview ? "locateHint" : "findingGame"], 11, muted); gameHint.Margin = new Thickness(0, 0, 0, 2);
+            gamePath.Margin = new Thickness(0, 4, 0, 0);
+            var gameRow = StatusRow(0, text["rowGame"], browse, gamePath, gameHint, gameLocationOptions);
+            runtime = Label(text["runtimeHint"], 13, foreground); runtime.Margin = new Thickness(0, 4, 0, 2);
             runtimeCheck = Action("check", async c => { await EnsureConnected(c); await SubmitJob("/api/check", new { id = CurrentBuild() }, c); });
             runtimeHint = Label(text["runtimeInstallHint"], 11, muted);
-            var runtimeStep = Step("03", text["runtime"], null, runtime,
-                Wrap(Action("useHeadset", async c => await Runtime("headset", c)), Action("useSimulator", async c => await Runtime("simulator", c))), runtimeHint);
+            // Headset or simulator is a rare change: its two buttons fold out under Change.
+            runtimeOptions = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 0) };
+            runtimeOptions.Children.Add(Wrap(Action("useHeadset", async c => await Runtime("headset", c)), Action("useSimulator", async c => await Runtime("simulator", c))));
+            runtimeOptions.Children.Add(runtimeHint);
+            var runtimeToggle = Action("runtimeOptions", c =>
+            {
+                runtimeOptions.Visibility = runtimeOptions.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+                operationText.Text = runtimeOptions.Visibility == Visibility.Visible ? runtimeHint.Text : text["notChanged"];
+                return Task.CompletedTask;
+            });
+            var runtimeRow = StatusRow(2, text["rowHeadset"], runtimeToggle, runtime, runtimeOptions);
             releases = Choice(); foreach (var release in catalog.releases) releases.Items.Add(release);
             if (store.Selected != null && !releases.Items.Cast<Release>().Any(r => r.id == store.Selected.release.id)) releases.Items.Add(store.Selected.release);
             releases.SelectedItem = store.Selected == null ? releases.Items.Cast<Release>().FirstOrDefault() : releases.Items.Cast<Release>().First(r => r.id == store.Selected.release.id);
@@ -777,20 +903,21 @@ namespace WuWaVR.Manager
                 var release = SelectedRelease();
                 if (!Confirm("installVersionConfirm", release.DisplayLabel, release.gameVersion)) return;
                 // The dialog names the game version and the account risk: the same
-                // consent as step 02's checkbox, for a version chosen here.
+                // consent as the install checkbox, for a version chosen here.
                 risk.IsChecked = true;
                 await InstallOrSelect(release, c);
             })));
             updates.Children.Add(Label(text["selectedVersionAction"], 11, muted));
             // Every listed version, including diagnostic builds, lives on the
-            // troubleshooting page; step 02 offers only Update and Back.
+            // troubleshooting page; the VR mod row offers only Update and Back.
             advancedPanel = new Expander { Header = text["advanced"], Foreground = foreground, Content = updates, Margin = new Thickness(0, 0, 0, 14) };
             risk = new CheckBox { Content = Label(text["riskAccept"], 12), Foreground = foreground, Margin = new Thickness(0, 3, 0, 0) };
             risk.Checked += (s, e) => ShowStatus(); risk.Unchecked += (s, e) => ShowStatus();
             riskNotice = Label(text["risk"], 12, Color("#F0B4A3"));
             var consent = new StackPanel(); consent.Children.Add(riskNotice); consent.Children.Add(versionConsent); consent.Children.Add(risk);
-            var notice = new Border { Child = consent, Padding = new Thickness(12, 6, 12, 7), CornerRadius = new CornerRadius(9), Background = Color("#22130F"),
-                BorderBrush = Color("#5E3026"), BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 4) };
+            // Shown until the risk is accepted (the helper remembers it) or while installing.
+            consentNotice = new Border { Child = consent, Padding = new Thickness(12, 6, 12, 7), CornerRadius = new CornerRadius(9), Background = Color("#22130F"),
+                BorderBrush = Color("#5E3026"), BorderThickness = new Thickness(1), Margin = new Thickness(0, 12, 0, 0), Visibility = Visibility.Collapsed };
             packageUpdateButton = Action("updatePackage", async c =>
             {
                 var newer = NewerPackage();
@@ -798,10 +925,39 @@ namespace WuWaVR.Manager
                 await InstallOrSelect(newer, c);
             }, true);
             packageRollbackButton = Action("rollbackPackage", async c => await UsePrevious(c));
+            foreach (var small in new[] { packageUpdateButton, packageRollbackButton }) { small.Padding = new Thickness(12, 5, 12, 5); small.Margin = new Thickness(0, 4, 8, 2); }
+            packageState.Margin = new Thickness(0, 4, 0, 0); gameVersion.FontSize = 11; gameVersion.Margin = new Thickness(0, 0, 0, 2);
             // "Update to X" names the newer package itself; no separate "update available" line.
-            panel.Children.Add(Step("02", text["package"], null, packageState, gameVersion, Wrap(packageUpdateButton, packageRollbackButton), notice));
-            panel.Children.Add(runtimeStep);
+            var packageRow = StatusRow(1, text["rowMod"], null, packageState, gameVersion, Wrap(packageUpdateButton, packageRollbackButton));
+            heroTitle = Label("", 20); heroTitle.FontWeight = FontWeights.SemiBold; heroTitle.Margin = new Thickness(0);
+            var launchRow = new DockPanel { Margin = new Thickness(0, 14, 0, 0), LastChildFill = false };
+            DockPanel.SetDock(launchButton, Dock.Right); DockPanel.SetDock(playFlatButton, Dock.Right);
+            // After a failed launch: the way to the fixes, beside Launch (which is also Try again).
+            heroHelp = Action("getHelp", c => { ShowPage(true); return Task.CompletedTask; });
+            heroHelp.Padding = new Thickness(16, 12, 16, 12); heroHelp.Margin = new Thickness(0); heroHelp.Visibility = Visibility.Collapsed;
+            DockPanel.SetDock(heroHelp, Dock.Left);
+            launchRow.Children.Add(launchButton); launchRow.Children.Add(playFlatButton); launchRow.Children.Add(heroHelp);
+            var hero = new StackPanel(); hero.Children.Add(heroTitle); hero.Children.Add(launchState); hero.Children.Add(PhaseChips());
+            hero.Children.Add(consentNotice); hero.Children.Add(launchRow);
+            heroCard = new Border { Background = card, BorderBrush = line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(20, 16, 20, 16), Margin = new Thickness(0, 0, 0, 10), Child = hero };
+            panel.Children.Add(heroCard);
+            var rows = new StackPanel(); Grid.SetIsSharedSizeScope(rows, true); rows.Children.Add(gameRow); rows.Children.Add(Divider()); rows.Children.Add(packageRow); rows.Children.Add(Divider()); rows.Children.Add(runtimeRow);
+            panel.Children.Add(new Border { Background = card, BorderBrush = line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(18, 4, 18, 4), Child = rows });
             return panel;
+        }
+        // Starts the game the normal way, with no injection: the official launcher, or Steam.
+        async Task PlayWithoutVr(CancellationToken c)
+        {
+            await Task.Yield();
+            var game = Json.Child(status, "game");
+            string mode = Json.Text(game, "mode"), path = Json.Text(game, "launcher");
+            if (String.IsNullOrEmpty(path)) path = store.State.launcherPath ?? discovery?.Path;
+            var choice = GameDiscovery.ExistingChoice(path, File.Exists);
+            if (choice == null) throw new InvalidOperationException(text["locateHint"]);
+            Open(choice.Mode == "steam" || mode == "steam" ? "steam://rungameid/3513350" : choice.Path);
+            operationText.Text = text["playFlatStarted"];
         }
         UIElement Recording()
         {
@@ -879,16 +1035,39 @@ namespace WuWaVR.Manager
             var panel = new StackPanel();
             panel.Children.Add(PageLink("backToSetup", false));
             panel.Children.Add(Label(text["troubleshooting"], 22));
-            panel.Children.Add(Label(text["troubleshootingIntro"], 12, muted));
-            panel.Children.Add(ControllerCheck());
-            var web = Action("web", async c => { await EnsureConnected(c); Open(bridge.Address); operationText.Text = text["webOpened"]; });
-            web.Content = text["developerTools"];
-            panel.Children.Add(Wrap(runtimeCheck, Action("copyDiagnostics", async c => await CopyDiagnostics(c)), GuideLink("report", "feedback.html"), web));
-            panel.Children.Add(ProcessRecovery());
-            panel.Children.Add(advancedPanel);
+            panel.Children.Add(Label(text["fixIntro"], 12, muted));
             installed = Choice(); foreach (var item in store.State.installed) installed.Items.Add(item);
             installed.SelectedItem = store.Selected;
             installed.SelectionChanged += (s, e) => ShowStatus();
+            // The three fixes, mildest first. Each confirms or is harmless; the version list
+            // they act on (installed) defaults to the version in use, under More options.
+            var repair = Action("repair", async c =>
+            {
+                var item = installed.SelectedItem as Installed;
+                if (item == null) throw new InvalidOperationException(text["chooseVersion"]);
+                await InstallRelease(item.release, c);
+            });
+            repair.Content = text["repairFiles"];
+            var fixes = new StackPanel(); Grid.SetIsSharedSizeScope(fixes, true);
+            fixes.Children.Add(FixRow(repair, "repairInfo"));
+            fixes.Children.Add(Divider());
+            fixes.Children.Add(FixRow(Action("reset", async c =>
+            {
+                if (!Confirm("resetConfirm")) return;
+                await EnsureConnected(c); await SubmitJob("/api/apply", new { id = CurrentBuild(), reset = true }, c);
+            }), "resetInfo"));
+            fixes.Children.Add(Divider());
+            fixes.Children.Add(FixRow(Action("saveReport", async c => await SaveProblemReport(c)), "saveReportInfo"));
+            panel.Children.Add(new Border { Background = card, BorderBrush = line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(18, 4, 18, 4), Margin = new Thickness(0, 8, 0, 12), Child = fixes });
+            var more = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+            more.Children.Add(ControllerCheck());
+            var web = Action("web", async c => { await EnsureConnected(c); Open(bridge.Address); operationText.Text = text["webOpened"]; });
+            web.Content = text["developerTools"];
+            more.Children.Add(Wrap(runtimeCheck, Action("copyDiagnostics", async c => await CopyDiagnostics(c)), GuideLink("report", "feedback.html"),
+                Action("openSettings", c => { OpenSettingsFolder(); return Task.CompletedTask; }), web));
+            more.Children.Add(ProcessRecovery());
+            more.Children.Add(advancedPanel);
             var recovery = new StackPanel { Margin = new Thickness(8) };
             recovery.Children.Add(Card(text["installed"], installed, Label(text["recoveryInfo"], 13, muted),
                 Wrap(Action("useVersion", async c =>
@@ -896,29 +1075,22 @@ namespace WuWaVR.Manager
                     var item = installed.SelectedItem as Installed; if (item == null) throw new InvalidOperationException(text["chooseVersion"]);
                     await Task.Run(() => PackageStore.Verify(store.Folder(item), item.release, c), c);
                     await PreparePackageChange(c); store.Select(item); PopulateInstalled(); await Connect(c);
-                }), Action("repair", async c =>
-                {
-                    var item = installed.SelectedItem as Installed;
-                    if (item == null) throw new InvalidOperationException(text["chooseVersion"]);
-                    await InstallRelease(item.release, c);
-                }),
-                Action("rollback", async c => await UsePrevious(c))),
-                Wrap(Action("restore", async c =>
+                }), Action("rollback", async c => await UsePrevious(c)),
+                Action("remove", async c => await Remove(c)), Action("removeOld", async c => await RemoveOld(c)),
+                // Not a fix (the next launch applies the mod again): for leaving the mod, going back
+                // to another UEVR profile, or before removing the version in use. Uninstall runs it too.
+                Action("restore", async c =>
                 {
                     if (!Confirm("restoreConfirm")) return;
                     await EnsureConnected(c); await SubmitJob("/api/restore", new { }, c);
-                }), Action("reset", async c =>
-                {
-                    if (!Confirm("resetConfirm")) return;
-                    await EnsureConnected(c); await SubmitJob("/api/apply", new { id = CurrentBuild(), reset = true }, c);
-                }), Action("remove", async c => await Remove(c)), Action("removeOld", async c => await RemoveOld(c)))));
+                }))));
             recovery.Children.Add(Wrap(Action("scanGame", async c => await DiscoverGame(c)), Action("openLogs", c =>
             {
                 if (!Directory.Exists(bridge.Data)) throw new DirectoryNotFoundException(text["logsMissing"]);
                 Open(bridge.Data); operationText.Text = text["folderOpened"]; return Task.CompletedTask;
             }), Action("portable", async c => await OpenPortable(c))));
             recoveryPanel = new Expander { Header = text["recovery"], Foreground = foreground, Content = recovery, Margin = new Thickness(0, 0, 0, 14) };
-            panel.Children.Add(recoveryPanel);
+            more.Children.Add(recoveryPanel);
             uninstallResultText = new TextBox { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
                 MinHeight = 50, MaxHeight = 200, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 Background = card, Foreground = foreground, BorderThickness = new Thickness(0), Padding = new Thickness(8), Text = uninstallDetails,
@@ -928,8 +1100,56 @@ namespace WuWaVR.Manager
                     Wrap(ControllerButton("prepareUninstall", async () => {
                         await Run(PrepareUninstall); if (uninstallNeedsRecovery) OpenProcessRecovery();
                     })), uninstallResultText) };
-            panel.Children.Add(uninstallPanel);
+            more.Children.Add(uninstallPanel);
+            morePanel = new Expander { Header = text["moreOptions"], Foreground = foreground, Content = more, Margin = new Thickness(0, 0, 0, 12) };
+            panel.Children.Add(morePanel);
             panel.Children.Add(Label(text["privacy"], 12, muted)); return panel;
+        }
+        UIElement FixRow(Button action, string infoKey)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 9, 0, 9) };
+            // The buttons share the widest label's width (German runs long); the fixes' panel is the scope.
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 210, SharedSizeGroup = "fixButton" }); grid.ColumnDefinitions.Add(new ColumnDefinition());
+            action.Margin = new Thickness(0, 0, 14, 0); action.HorizontalAlignment = HorizontalAlignment.Stretch; action.VerticalAlignment = VerticalAlignment.Center;
+            grid.Children.Add(action);
+            var info = Label(text[infoKey], 12, muted); info.VerticalAlignment = VerticalAlignment.Center; info.Margin = new Thickness(0);
+            Grid.SetColumn(info, 1); grid.Children.Add(info); return grid;
+        }
+        // UEVR's own per-game folder (config.txt, log.txt): players look for it under the mod's
+        // name and miss UnrealVRMod (Lelouche, 1 Nov).
+        Func<string> settingsFolderOverride = null;
+        string SettingsFolder()
+        {
+            return settingsFolderOverride != null ? settingsFolderOverride() :
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "UnrealVRMod", "Client-Win64-Shipping");
+        }
+        void OpenSettingsFolder()
+        {
+            string folder = SettingsFolder();
+            if (!Directory.Exists(folder)) throw new DirectoryNotFoundException(text["settingsMissing"]);
+            Open(folder); operationText.Text = text["folderOpened"];
+        }
+        // Uninstalling leaves no mod settings in UEVR's WuWa profile: it goes back to how it was
+        // before WuWa VR first changed it (Restore-WuWaOriginalProfile backs the mod's up first).
+        // If that fails nothing is removed, so the player can close the game and try again.
+        async Task RestoreBeforeUninstall(CancellationToken c)
+        {
+            if (store.Selected == null) return;
+            if (!connectionReady) await EnsureConnected(c);
+            status = await bridge.Status(c);
+            if (!Json.Flag(status, "originalBackup") ||
+                (!String.IsNullOrEmpty(Json.Text(status, "restoredOriginalAt")) && String.IsNullOrEmpty(Json.Text(status, "selected")))) return;
+            operationText.Text = text["uninstallRestoring"];
+            await bridge.Post("/api/restore", new { }, c);
+            for (var waited = Stopwatch.StartNew(); waited.Elapsed < TimeSpan.FromMinutes(2); await Task.Delay(400, c))
+            {
+                status = await bridge.Status(c); var job = Json.Child(status, "job");
+                if (Json.Text(job, "kind") != "restore" || Json.Flag(job, "running")) continue;
+                if (!Json.Flag(job, "error")) return;
+                string output = Json.Text(job, "output").Trim();
+                throw new InvalidOperationException(text["uninstallRestoreFailed"] + (output == "" ? "" : Environment.NewLine + output));
+            }
+            throw new TimeoutException(text["uninstallRestoreFailed"]);
         }
         async Task PrepareUninstall(CancellationToken c)
         {
@@ -942,6 +1162,7 @@ namespace WuWaVR.Manager
             UninstallResult result = null;
             try
             {
+                await RestoreBeforeUninstall(c);
                 operationText.Text = text["uninstallPreparing"];
                 // The same service is called by Windows uninstall. It validates
                 // ownership, closes only idle helpers and enforces its own budget.
@@ -1188,19 +1409,94 @@ namespace WuWaVR.Manager
             details.Text = text["portableHint"] + Environment.NewLine + release.id + Environment.NewLine + archive;
         }
         Action<string> diagnosticsCopyOverride = null;
-        string RedactDiagnostics(string report)
+        const string SecretLines = @"(?im)(\b(?:user(?:name)?|computer(?:name)?|password|passwd|secret|token|api[ _-]?key|authorization|serial(?:[ _-]?number)?|device[ _-]?(?:id|instance))\b[""']?\s*[:=]\s*)[^\r\n]*";
+        const string DeviceIds = @"(?i)\b(?:HID|USB|BTHENUM|PCI)[\\#][^\s""'<>]+";
+        static string RedactNames(string report)
         {
-            // Apply this to the complete report, including native exceptions and
-            // helper logs. A helper's own redaction is not a clipboard boundary.
-            report = Regex.Replace(report ?? "", @"(?im)(\b(?:user(?:name)?|computer(?:name)?|password|passwd|secret|token|api[ _-]?key|authorization|serial(?:[ _-]?number)?|device[ _-]?(?:id|instance))\b[""']?\s*[:=]\s*)[^\r\n]*", "$1[redacted]");
-            report = Regex.Replace(report, @"(?i)(?:file:/+|[a-z]:[\\/]|\\\\|%(?:USERPROFILE|LOCALAPPDATA|APPDATA)%[\\/])[^\r\n""'<>|]*", "[path]");
-            report = Regex.Replace(report, @"(?i)\b(?:HID|USB|BTHENUM|PCI)[\\#][^\s""'<>]+", "[device]");
             foreach (var value in new[] { Environment.UserName, Environment.MachineName })
                 if (!String.IsNullOrWhiteSpace(value))
                     report = Regex.Replace(report, @"(?<![\w])" + Regex.Escape(value) + @"(?![\w])", "[private]", RegexOptions.IgnoreCase);
             return report;
         }
-        async Task CopyDiagnostics(CancellationToken c)
+        string RedactDiagnostics(string report)
+        {
+            // Apply this to the complete report, including native exceptions and
+            // helper logs. A helper's own redaction is not a clipboard boundary.
+            report = Regex.Replace(report ?? "", SecretLines, "$1[redacted]");
+            report = Regex.Replace(report, @"(?i)(?:file:/+|[a-z]:[\\/]|\\\\|%(?:USERPROFILE|LOCALAPPDATA|APPDATA)%[\\/])[^\r\n""'<>|]*", "[path]");
+            report = Regex.Replace(report, DeviceIds, "[device]");
+            return RedactNames(report);
+        }
+        // Files in a problem report keep their paths readable (which runtime, which game copy) but
+        // not whose PC they came from; a game account number is hidden too.
+        static string RedactReportFile(string content)
+        {
+            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!String.IsNullOrEmpty(home)) content = Regex.Replace(content, Regex.Escape(home), "%USERPROFILE%", RegexOptions.IgnoreCase);
+            content = Regex.Replace(content, SecretLines, "$1[redacted]");
+            content = Regex.Replace(content, DeviceIds, "[device]");
+            content = Regex.Replace(content, @"(?i)\b(UID\W{0,3})\d{6,12}\b", "$1[hidden]");
+            return RedactNames(content);
+        }
+        // The last part of a file another program may still be writing (the game keeps log.txt open).
+        static string ReadTail(string path, int limit)
+        {
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                long start = Math.Max(0, stream.Length - limit); stream.Seek(start, SeekOrigin.Begin);
+                var bytes = new byte[stream.Length - start]; int read = 0;
+                while (read < bytes.Length) { int n = stream.Read(bytes, read, bytes.Length - read); if (n <= 0) break; read += n; }
+                return (start > 0 ? "[earlier part left out]" + Environment.NewLine : "") + System.Text.Encoding.UTF8.GetString(bytes, 0, read);
+            }
+        }
+        Func<string> reportFolderOverride = null;
+        // One zip on the desktop with what a bug report needs: the copied diagnostics, the last
+        // three launch transcripts, UEVR's config.txt and log.txt and the launcher logs. It is
+        // written beside its final name first, so a failed report never leaves half a zip.
+        async Task SaveProblemReport(CancellationToken c)
+        {
+            string diagnostics = (await DiagnosticsText(c)).Item1;
+            string folder = reportFolderOverride != null ? reportFolderOverride() : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            string target = Path.Combine(folder, "WuWa VR problem report " + DateTime.Now.ToString("yyyy-MM-dd HHmmss", CultureInfo.InvariantCulture) + ".zip");
+            string data = bridge.Data, settings = SettingsFolder();
+            await Task.Run(() =>
+            {
+                var files = new List<KeyValuePair<string, string>>();
+                var runs = new DirectoryInfo(Path.Combine(data, "runs"));
+                if (runs.Exists)
+                    foreach (var run in runs.GetDirectories().OrderByDescending(d => d.Name, StringComparer.Ordinal).Take(3))
+                        foreach (var name in new[] { "startup.log", "startup.json", "build.json", "openxr.json" })
+                            files.Add(new KeyValuePair<string, string>("launches/" + run.Name + "/" + name, Path.Combine(run.FullName, name)));
+                var logs = new DirectoryInfo(Path.Combine(data, "logs"));
+                if (logs.Exists)
+                    foreach (var log in logs.GetFiles("launcher-*.log").OrderByDescending(f => f.Name, StringComparer.Ordinal).Take(3))
+                        files.Add(new KeyValuePair<string, string>("launcher/" + log.Name, log.FullName));
+                foreach (var name in new[] { "config.txt", "log.txt" })
+                    files.Add(new KeyValuePair<string, string>("uevr/" + name, Path.Combine(settings, name)));
+                string partial = target + ".partial";
+                try
+                {
+                    using (var zip = System.IO.Compression.ZipFile.Open(partial, System.IO.Compression.ZipArchiveMode.Create))
+                    {
+                        Action<string, string> add = (name, content) =>
+                        {
+                            using (var writer = new StreamWriter(zip.CreateEntry(name).Open(), new System.Text.UTF8Encoding(false))) writer.Write(content);
+                        };
+                        add("report.txt", diagnostics);
+                        foreach (var file in files)
+                        {
+                            c.ThrowIfCancellationRequested();
+                            if (File.Exists(file.Value)) add(file.Key, RedactReportFile(ReadTail(file.Value, 4 << 20)));
+                        }
+                    }
+                    File.Move(partial, target);
+                }
+                finally { if (File.Exists(partial)) File.Delete(partial); }
+            }, c);
+            if (!preview) { if (openOverride != null) openOverride(target); else Process.Start("explorer.exe", "/select,\"" + target + "\""); }
+            operationText.Text = String.Format(text["reportSaved"], Path.GetFileName(target));
+        }
+        async Task<Tuple<string, bool>> DiagnosticsText(CancellationToken c)
         {
             string report = text["nativeDiagnostics"] + Environment.NewLine +
                 (String.IsNullOrEmpty(lastNativeError) ? text["noNativeError"] : lastNativeError);
@@ -1213,9 +1509,14 @@ namespace WuWaVR.Manager
                 catch (Exception e) { report += Environment.NewLine + Environment.NewLine + text["backendUnavailable"] + ": " + e.Message; }
             }
             else report += Environment.NewLine + Environment.NewLine + text["backendUnavailable"];
-            c.ThrowIfCancellationRequested(); report = RedactDiagnostics(report);
-            if (diagnosticsCopyOverride != null) diagnosticsCopyOverride(report); else Clipboard.SetText(report);
-            operationText.Text = text[backendAvailable ? "diagnosticsCopied" : "diagnosticsLocalOnly"];
+            c.ThrowIfCancellationRequested();
+            return Tuple.Create(RedactDiagnostics(report), backendAvailable);
+        }
+        async Task CopyDiagnostics(CancellationToken c)
+        {
+            var report = await DiagnosticsText(c);
+            if (diagnosticsCopyOverride != null) diagnosticsCopyOverride(report.Item1); else Clipboard.SetText(report.Item1);
+            operationText.Text = text[report.Item2 ? "diagnosticsCopied" : "diagnosticsLocalOnly"];
         }
         static string JobSnapshot(Dictionary<string, object> status)
         {
@@ -1260,7 +1561,7 @@ namespace WuWaVR.Manager
             Func<string, int, bool, Button> option = (label, value, primary) =>
             {
                 var button = new Button { Content = label, Padding = new Thickness(14, 9, 14, 9), Margin = new Thickness(0, 10, 8, 0), IsDefault = primary,
-                    Background = primary ? accent : Color("#26262A"), Foreground = primary ? background : foreground, Cursor = System.Windows.Input.Cursors.Hand };
+                    Background = primary ? accent : Color("#1B2444"), Foreground = primary ? background : foreground, Cursor = System.Windows.Input.Cursors.Hand };
                 button.Click += (s, e) => { result = value; dialog.Close(); };
                 return button;
             };
@@ -1597,6 +1898,10 @@ namespace WuWaVR.Manager
             if (preview || operation != null) return;
             lastJobSnapshot = JobSnapshot(status);
             preserveActionFeedback = false; submittedJob = false;
+            // A new attempt clears the last failure's red marks; Launch while installing is an install.
+            string actionKey = pendingActionKey; pendingActionKey = null;
+            int actionRow = actionKey == "launch" && WantsInstall() ? 1 : RowForAction(actionKey);
+            failedRow = -2; failedMessage = "";
             var finished = operationFinished = new TaskCompletionSource<bool>();
             operation = new CancellationTokenSource(); foreach (var button in actions) button.IsEnabled = false; languages.IsEnabled = false; cancelButton.IsEnabled = true; cancelButton.Visibility = Visibility.Visible; progress.Visibility = Visibility.Visible;
             operationText.Text = text["busy"]; progress.IsIndeterminate = true;
@@ -1611,6 +1916,7 @@ namespace WuWaVR.Manager
             {
                 string message = e is OperationCanceledException ? text["requestInterrupted"] : e.Message;
                 operationText.Text = text["failed"] + ": " + message; details.Text = message; feedbackPanel.IsExpanded = true; lastNativeError = e.ToString(); preserveActionFeedback = true;
+                failedRow = actionRow; failedMessage = message;
                 if (!connectionReady && !String.IsNullOrEmpty(connectionProblem)) ShowPage(false);
             }
             finally
@@ -1662,13 +1968,16 @@ namespace WuWaVR.Manager
             gamePath.Text = pendingChoice ? store.State.pendingLauncherPath : Json.Flag(game, "saved") && Json.Text(game, "mode") == "manual" ? text["manualStart"] : String.IsNullOrEmpty(launcher) ? (discovery == null ? store.State.launcherPath : discovery.Path) : launcher;
             if (String.IsNullOrEmpty(gamePath.Text)) gamePath.Text = text["noGame"];
             gamePath.ToolTip = gamePath.Text;
-            string hint = discovery == null ? (preview ? "locateHint" : "findingGame") : discovery.Message;
+            string hint = previewHint ?? (discovery == null ? (preview ? "locateHint" : "findingGame") : discovery.Message);
             if (SteamChoiceNeedsPackage()) hint = "gameSteamUpdateRequired";
             if (!pendingChoice && Json.Flag(game, "saved")) hint = Json.Text(game, "mode") == "manual" ? "gameManualSaved" :
                 String.IsNullOrEmpty(Json.Text(game, "problem")) ? Json.Text(game, "mode") == "steam" ? "gameSteamSaved" : "gameSavedFound" : "gameSavedMissing";
             gameHint.Text = text[hint];
+            // These hints say what is broken; the row gets a red "!" and the hint turns red.
+            bool gameProblem = new[] { "gameSavedMissing", "gameNotFound", "gameSettingsUnreadable", "gameSteamUpdateRequired" }.Contains(hint);
+            gameHint.Foreground = gameProblem ? danger : muted;
             gameHint.ToolTip = discovery != null && discovery.Candidates.Count > 1 ? String.Join(Environment.NewLine, discovery.Candidates) : gameHint.Text;
-            runtime.Text = store.Selected != null && !connectionReady ? text["connectionRequired"] : LauncherPresentation.RuntimeSummary(bridge.Address != null || previewConnected, status, k => text[k]);
+            runtime.Text = store.Selected != null && !connectionReady ? text["runtimeNotChecked"] : LauncherPresentation.RuntimeSummary(bridge.Address != null || previewConnected, status, k => text[k]);
             runtimeCheck.IsEnabled = operation == null && store.Selected != null;
             var job = Json.Child(status, "job"); var launch = Json.Child(status, "launch");
             bool workerRunning = LauncherBridge.LaunchWorkerRunning(status), running = Json.Flag(job, "running") || workerRunning;
@@ -1676,6 +1985,12 @@ namespace WuWaVR.Manager
             // A connection loss clears status for display but cannot prove that its
             // previously observed startup worker stopped. Resolve only from fresh status.
             if (connectionReady && status.ContainsKey("job")) unresolvedStartup = workerRunning || (Json.Flag(job, "running") && Json.Text(job, "kind") == "launch");
+            string phase = LauncherBridge.CurrentLaunch(status) ? Json.Text(launch, "phase") : "";
+            if (phase != shownPhase) { shownPhase = phase; phaseSince = DateTime.UtcNow; }
+            string phaseKey = workerRunning && !workerStalled ?
+                LauncherPresentation.LaunchPhaseKey(phase, Json.Text(game, "mode") == "steam", DateTime.UtcNow - phaseSince > SlowVrStart) : null;
+            bool inVr = LauncherPresentation.InVr(status);
+            bool launchJob = Json.Flag(job, "running") && Json.Text(job, "kind") == "launch";
             bool workerFailed = LauncherBridge.CurrentLaunch(status) && Json.Text(launch, "phase") == "failed";
             bool workerCancelled = LauncherBridge.CurrentLaunch(status) && Json.Text(launch, "phase") == "cancelled";
             bool hasPackage = store.Selected != null, recording = Json.Flag(Json.Child(status, "recording"), "running");
@@ -1691,7 +2006,12 @@ namespace WuWaVR.Manager
             risk.Visibility = wantsInstall ? Visibility.Collapsed : Visibility.Visible;
             gameVersion.Text = text["targetGame"] + " " + (wantsInstall ? SelectedRelease().gameVersion : store.Selected.release.gameVersion);
             runtimeHint.Text = text[!hasPackage ? "runtimeInstallHint" : !connectionReady ? "connectionRequired" : gameRunning || injectorRunning ? "runtimeCloseFirst" : runtimeBlock ?? (Json.Flag(xr, "canSimulator") && !Json.Flag(xr, "canHeadset") ? "runtimeSimulatorOnlyHint" : "runtimeChoiceHint")];
-            launchState.Text = gameRunning || running || workerFailed || workerCancelled ? LauncherBridge.LaunchSummary(status, k => text[k]) :
+            // A launch that failed before the worker began leaves only its job's error.
+            bool launchJobFailed = Json.Text(job, "kind") == "launch" && Json.Flag(job, "error") && !Json.Flag(job, "running") && !workerFailed && !workerCancelled;
+            bool launchFailed = workerFailed || launchJobFailed || failedRow == -1;
+            string failureKey = workerFailed || workerCancelled ? LauncherPresentation.FailureKey(launch, workerCancelled) : launchFailed ? "failUnknown" : workerStalled ? "failStalled" : null;
+            launchState.Foreground = launchFailed || workerStalled ? danger : muted;
+            launchState.Text = phaseKey != null ? text[phaseKey] : failureKey != null ? text[failureKey] : gameRunning || running ? LauncherBridge.LaunchSummary(status, k => text[k]) :
                 text[wantsInstall ? "installNext" : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : injectorRunning ? "runtimeCloseFirst" : runtimeBlock ?? (risk.IsChecked != true ? "riskNext" : Json.Text(game, "mode") == "steam" ? "launchNextSteam" : "launchNext")];
             feedbackPanel.Visibility = String.IsNullOrWhiteSpace(details.Text) ? Visibility.Collapsed : Visibility.Visible;
             // Done steps get a check; the first unfinished one is outlined.
@@ -1699,9 +2019,44 @@ namespace WuWaVR.Manager
                 "gameSettingsUnreadable", "gameMultiple", "findingGame", "locateHint" }.Contains(hint));
             bool packageReady = hasPackage && !wantsInstall, runtimeReady = packageReady && connectionReady && runtimeBlock == null;
             var done = new[] { gameReady, packageReady, runtimeReady };
+            // A broken row (red "!") outranks done or to-do. Its reason goes under it, unless the
+            // row's own line already says it (the game hint).
+            var problems = new string[3];
+            if (gameProblem) problems[0] = "";
+            if (hasPackage && !connectionReady && operation == null) problems[1] = text["connectionRequired"];
+            if (connectionReady && (runtimeBlock == "runtimeUnavailableHint" || runtimeBlock == "runtimeSelectCurrentSimulator")) problems[2] = text[runtimeBlock];
+            int jobRow = Json.Flag(job, "error") && !Json.Flag(job, "running") ? RowForJob(Json.Text(job, "kind")) : -2;
+            if (jobRow >= 0) problems[jobRow] = text["failed"] + ": " + LastLine(Json.Text(job, "output"));
+            if (failedRow >= 0) problems[failedRow] = failedMessage;
             int currentStep = Array.IndexOf(done, false);
             for (int index = 0; index < done.Length; ++index)
-                ShowStep(index, done[index] ? StepState.Done : index == currentStep ? StepState.Current : StepState.Pending);
+                ShowStep(index, problems[index] != null ? StepState.Problem : done[index] ? StepState.Done : index == currentStep ? StepState.Current : StepState.Pending, problems[index]);
+            bool anyProblem = problems.Any(p => p != null);
+            // Nothing is running: the hero points at the marked row instead of the next launch step.
+            if (anyProblem && failureKey == null && phaseKey == null && !gameRunning && !running && !wantsInstall) launchState.Text = text["problemNext"];
+            bool stereoSeen = LauncherBridge.LaunchSummary(status, k => k) == "stereoSeen";
+            heroTitle.Text = text[launchFailed ? "heroFailed" : workerCancelled ? "heroCancelled" : workerStalled ? "heroStalled" :
+                inVr || stereoSeen ? "heroInVr" : workerRunning || launchJob ? "heroStarting" :
+                gameRunning ? "heroGameRunning" : anyProblem ? "heroProblem" : wantsInstall ? "heroInstall" :
+                gameReady && connectionReady && runtimeBlock == null && !SteamChoiceNeedsPackage() ? "heroReady" : "heroSetup"];
+            heroCard.BorderBrush = launchFailed || workerStalled ? danger : anyProblem ? dangerLine : line;
+            heroHelp.Visibility = launchFailed ? Visibility.Visible : Visibility.Collapsed;
+            // The chips stay after a failed or cancelled launch, showing the step it stopped at.
+            int stoppedStep = workerFailed || workerCancelled ? LauncherPresentation.StoppedStep(launch) : launchFailed ? 0 : -1;
+            int litStep = workerRunning || launchJob ? LauncherPresentation.LaunchStep(phase) : stoppedStep >= 0 ? stoppedStep : -2;
+            bool litBad = workerStalled || (launchFailed && !(workerRunning || launchJob)), litStopped = workerCancelled && !(workerRunning || launchJob);
+            phaseRow.Visibility = litStep == -2 ? Visibility.Collapsed : Visibility.Visible;
+            for (int i = 0; i < phaseChips.Length; ++i)
+            {
+                bool lit = i == litStep;
+                phaseChips[i].Text = (i < litStep ? "✓ " : lit && litBad ? "! " : lit && litStopped ? "– " : "") + text[PhaseChipKeys[i]];
+                phaseChips[i].Foreground = lit && !litStopped ? background : i < litStep || lit ? foreground : muted;
+                ((Border)phaseChips[i].Parent).Background = lit ? litBad ? danger : litStopped ? line : accent : badge;
+            }
+            // The account risk shows until it is accepted once (the helper remembers that), and
+            // always while installing, where it is part of the version consent.
+            consentNotice.Visibility = wantsInstall || (connectionReady && !Json.Flag(status, "riskAcknowledged")) ? Visibility.Visible : Visibility.Collapsed;
+            playFlatButton.Visibility = !hasPackage || wantsInstall || Json.Text(game, "mode") == "manual" ? Visibility.Collapsed : Visibility.Visible;
             var capture = Json.Child(status, "recording");
             ShowMicrophones(capture);
             bool canRecord = CaptureAvailability.HasSource(status, new[] { "auto", "steamvr", "simulator" }[Math.Max(0, source.SelectedIndex)]);
@@ -1733,7 +2088,9 @@ namespace WuWaVR.Manager
                             store.Selected != null && SelectedRelease().id == store.Selected.release.id ? "alreadySelected" : null; break;
                         case "updateLauncher": reason = launcherUpdates.Busy ? "busy" : launcherUpdates.AvailableVersion == null ? "launcherUpdateHint" :
                             launcherUpdates.ReadyToRestart && (running || recording || gameRunning || injectorRunning) ? "launcherRestartIdle" : null; break;
-                        case "launch": reason = running ? "busy" : gameRunning ? "alreadyRunning" : injectorRunning ? "runtimeCloseFirst" : wantsInstall ? (conflict ? "connectionRequired" : compatible.IsChecked != true ? "compatRequired" : null) : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : runtimeBlock ?? (risk.IsChecked != true ? "riskAccept" : null); break;
+                        case "playFlat": reason = running ? "busy" : gameRunning ? "alreadyRunning" : injectorRunning ? "runtimeCloseFirst" : !gameReady ? "locateHint" : null; break;
+                        case "launch": reason = running ? "busy" : gameRunning ? "alreadyRunning" : injectorRunning ? "runtimeCloseFirst" :
+                            gameProblem && hint != "gameSteamUpdateRequired" && !wantsInstall ? hint : wantsInstall ? (conflict ? "connectionRequired" : compatible.IsChecked != true ? "compatRequired" : null) : SteamChoiceNeedsPackage() ? "gameSteamUpdateRequired" : !connectionReady ? "connectionRequired" : runtimeBlock ?? (risk.IsChecked != true ? "riskAccept" : null); break;
                         case "recordStart": reason = !hasPackage ? "chooseVersion" : running || recording ? "busy" : !gameRunning ? "recordNeedsGame" : !canRecord ? "recordUnavailable" : null; break;
                         case "recordStop": reason = !recording ? "noRecording" : null; break;
                         case "repair": case "useVersion": case "remove": reason = running ? "busy" : gameRunning || injectorRunning ? "runtimeCloseFirst" : installed.SelectedItem == null ? "chooseVersion" : null; break;
@@ -1763,14 +2120,16 @@ namespace WuWaVR.Manager
             if (recordMic != null) { recordMic.IsEnabled = operation == null && !running; recordMicVolume.IsEnabled = recordMic.IsEnabled && recordMic.SelectedIndex > 0; }
             if (recordSoundFiles != null) recordSoundFiles.IsEnabled = operation == null && !running;
             bool active = operation != null || running;
-            recoveryShortcut.Visibility = unresolvedStartup || (hasPackage && !connectionReady) || workerFailed ? Visibility.Visible : Visibility.Collapsed;
-            bool canCancel = operation != null || (bridge.Address != null && LauncherBridge.CanCancelLaunch(status));
+            // Only when something looks stuck: not during every healthy launch.
+            recoveryShortcut.Visibility = workerStalled || (unresolvedStartup && !workerRunning && !launchJob) || (hasPackage && !connectionReady) ? Visibility.Visible : Visibility.Collapsed;
+            // In VR there is nothing left to wait for or stop: the worker only finishes its check.
+            bool canCancel = operation != null || (bridge.Address != null && LauncherBridge.CanCancelLaunch(status) && !inVr);
             cancelButton.Content = text[operation == null && canCancel ? "stopWaiting" : "cancel"];
             cancelButton.IsEnabled = canCancel; cancelButton.Visibility = canCancel ? Visibility.Visible : Visibility.Collapsed;
-            progress.Visibility = active && !(operation == null && workerStalled) ? Visibility.Visible : Visibility.Collapsed;
+            progress.Visibility = active && !(operation == null && (workerStalled || inVr)) ? Visibility.Visible : Visibility.Collapsed;
             if (operation == null)
             {
-                progress.IsIndeterminate = running && !workerStalled;
+                progress.IsIndeterminate = running && !workerStalled && !inVr;
                 string snapshot = JobSnapshot(status);
                 if (snapshot != lastJobSnapshot)
                 {
@@ -1780,23 +2139,24 @@ namespace WuWaVR.Manager
                     {
                         if (running)
                         {
-                            operationText.Text = workerRunning && !String.IsNullOrWhiteSpace(Json.Text(launch, "message")) ? Json.Text(launch, "message") : Json.Text(job, "message");
+                            // A known phase is told in the hero; its raw message stays in Details.
+                            operationText.Text = phaseKey != null ? "" : workerRunning && !String.IsNullOrWhiteSpace(Json.Text(launch, "message")) ? Json.Text(launch, "message") : Json.Text(job, "message");
                             if (workerRunning) { details.Text = StartupDetails(launch); feedbackPanel.Visibility = Visibility.Visible; if (workerStalled) feedbackPanel.IsExpanded = true; }
                         }
                         else if (workerFailed || workerCancelled)
                         {
                             string message = Json.Text(launch, "message");
-                            operationText.Text = text[workerFailed ? "launchFailed" : "launchCancelled"] + (String.IsNullOrWhiteSpace(message) ? "" : " " + message);
-                            details.Text = operationText.Text;
+                            details.Text = String.IsNullOrWhiteSpace(message) ? text[workerFailed ? "launchFailed" : "launchCancelled"] : message;
+                            operationText.Text = "";
                             feedbackPanel.Visibility = Visibility.Visible; feedbackPanel.IsExpanded = workerFailed;
                         }
                         else if (Json.Flag(job, "error") || !String.IsNullOrEmpty(Json.Text(job, "code")))
                         {
                             string kind = Json.Text(job, "kind");
                             string output = Json.Text(job, "output").Trim();
-                            string summary = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "";
+                            string summary = LastLine(output);
                             operationText.Text = text[Json.Flag(job, "error") ? "failed" : kind == "check" ? "checkComplete" : kind == "runtime" ? "runtimeComplete" : "actionComplete"] +
-                                (String.IsNullOrEmpty(summary) ? "" : " " + (summary.Length > 180 ? summary.Substring(0, 177) + "…" : summary));
+                                (String.IsNullOrEmpty(summary) ? "" : " " + summary);
                             details.Text = Json.Text(job, "output");
                             feedbackPanel.Visibility = String.IsNullOrWhiteSpace(details.Text) ? Visibility.Collapsed : Visibility.Visible;
                             feedbackPanel.IsExpanded = Json.Flag(job, "error") || kind == "check";
@@ -1804,6 +2164,13 @@ namespace WuWaVR.Manager
                     }
                 }
             }
+            // Red for a failure, whichever path wrote the line (an action, a helper job, the launch).
+            operationText.Foreground = operationText.Text.StartsWith(text["failed"]) || operationText.Text.StartsWith(text["launchFailed"]) ? danger : muted;
+        }
+        static string LastLine(string output)
+        {
+            string last = ((output ?? "").Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "").Trim();
+            return last.Length > 180 ? last.Substring(0, 177) + "…" : last;
         }
         // Documentation renders: preview-state\preview.json may supply observed helper
         // status so screenshots show a ready launcher without a helper, game or headset.
@@ -1815,14 +2182,19 @@ namespace WuWaVR.Manager
             risk.IsChecked = Json.Flag(fixture, "riskAccepted");
             compatible.IsChecked = Json.Flag(fixture, "versionConfirmed");
             operationText.Text = Json.Text(fixture, "operation");
-            if (Json.Flag(fixture, "troubleshooting")) { ShowPage(true); advancedPanel.IsExpanded = true; }
+            // Unhappy-path renders: a game hint, a failed action under its row, the details.
+            previewHint = String.IsNullOrEmpty(Json.Text(fixture, "gameHint")) ? null : Json.Text(fixture, "gameHint");
+            if (fixture.ContainsKey("failedRow")) { failedRow = int.Parse(Json.Text(fixture, "failedRow")); failedMessage = Json.Text(fixture, "failedMessage"); }
+            if (!String.IsNullOrEmpty(Json.Text(fixture, "details"))) { details.Text = Json.Text(fixture, "details"); feedbackPanel.IsExpanded = true; }
+            if (Json.Flag(fixture, "troubleshooting")) ShowPage(true);
+            if (Json.Flag(fixture, "moreOptions")) { morePanel.IsExpanded = true; advancedPanel.IsExpanded = true; }
             ShowStatus();
         }
         public void SavePreview(string path, double scale = 1)
         {
             var visual = (FrameworkElement)Content;
-            visual.Measure(new Size(880, 790)); visual.Arrange(new Rect(0, 0, 880, 790)); visual.UpdateLayout();
-            var image = new RenderTargetBitmap((int)Math.Round(880 * scale), (int)Math.Round(790 * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32); image.Render(visual);
+            visual.Measure(new Size(780, 700)); visual.Arrange(new Rect(0, 0, 780, 700)); visual.UpdateLayout(); FitBackdrop(); visual.UpdateLayout();
+            var image = new RenderTargetBitmap((int)Math.Round(780 * scale), (int)Math.Round(700 * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32); image.Render(visual);
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
             using (var stream = File.Create(path)) encoder.Save(stream);

@@ -118,7 +118,8 @@ public static class WindowTests
         public string DiagnosticsReply = "Fixture backend diagnostics", DiagnosticsFailure;
         public int IdentityPid = int.MaxValue;
         public bool RejectRecordStart, AllowRecordStart, AllowLaunch, RejectLaunch, AllowGameSettings, RejectGameSettings;
-        public bool RejectCancel, KeepCancelRunning, StallStatus;
+        public bool RejectCancel, KeepCancelRunning, StallStatus, RestoreFails;
+        public int Restores;
         public bool StallCancelStatus;
         public int CompleteCancelAfterReads, CancelStatusReads;
         public int GameSettingsWrites;
@@ -230,6 +231,12 @@ public static class WindowTests
                         Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", false }, { "cancellable", false }, { "phase", "cancelled" }, { "message", "Fixture launch cancelled before the game started" }, { "firstFrameSeen", false } };
                         Status["job"] = new Dictionary<string, object> { { "kind", "launch" }, { "running", false }, { "code", 0 }, { "output", "Fixture launch cancelled before the game started" } };
                         return Reply(new { ok = true });
+                    case "/api/restore":
+                        Restores++;
+                        Status["job"] = new Dictionary<string, object> { { "kind", "restore" }, { "running", false }, { "error", RestoreFails }, { "code", RestoreFails ? 1 : 0 },
+                            { "output", RestoreFails ? "Fixture: close the game before restoring" : "Restored the pre-install profile." } };
+                        if (!RestoreFails) { Status["restoredOriginalAt"] = "2026-11-04T00:00:00Z"; Status["selected"] = ""; }
+                        return Reply(new { ok = true });
                     case "/api/check":
                         ReadinessChecks++;
                         Status["job"] = new Dictionary<string, object> { { "kind", "check" }, { "running", false }, { "code", 0 }, { "output", "Ready to apply. This build is not applied yet." } };
@@ -278,7 +285,6 @@ public static class WindowTests
             Json.Save(Path.Combine(data, "launcher.json"), new { url = "http://127.0.0.1:34671/", pid = int.MaxValue });
             Window = new MainWindow(Store, data, false, "en");
             Set(Window, "closeOnlyConfirmOverride", new Func<string, bool>(message => false));
-            Set(Window, "guideDirectoryOverride", Store.Root);
             Field<LauncherBridge>(Window, "bridge").Dispose();
             Field<RepoClient>(Window, "repo").Dispose();
             Http = new HelperHttp(Store) { SettingsFile = Path.Combine(data, "settings.json") };
@@ -357,7 +363,7 @@ public static class WindowTests
                 }));
                 Click(w, Button(w, "prepareUninstall"));
                 Check(prepares == 0 && f.Http.Writes.Count == writes && prompt.Contains(Path.Combine(f.Store.Root, "versions")) && prompt.Contains(f.Store.Cache) &&
-                    prompt.Contains("recordings, settings and backups are kept") && prompt.Contains("OpenXR") && f.Store.Selected != null,
+                    prompt.Contains("recordings and backups are kept") && prompt.Contains("before WuWa VR") && prompt.Contains("OpenXR") && f.Store.Selected != null,
                     "uninstall confirmation omitted scope/preservation or ran cleanup after decline");
                 Console.WriteLine("PASS WINDOW Prepare uninstall confirms exact download paths and preservation; declining performs no cleanup (inert service only)");
             }
@@ -658,7 +664,7 @@ public static class WindowTests
                     Check(Field<TextBox>(w, "details").Text == evidence, "language lost backend error details");
                     string code = language == 1 ? "zh-Hans" : "en";
                     Check(new PackageStore(f.Store.Root).State.language == code, "language event did not save the selected language");
-                    Check(Convert.ToString(Button(w, "repair").Content) == new Strings { Language = code }["repair"], "controls did not actually translate");
+                    Check(Convert.ToString(Button(w, "repair").Content) == new Strings { Language = code }["repairFiles"], "controls did not actually translate");
                     Offscreen(w);
                 }
                 Console.WriteLine("PASS WINDOW language events retain selections, capture options, consent, tab and error evidence (EN -> zh -> EN)");
@@ -947,45 +953,21 @@ public static class WindowTests
             }
             using (var f = new Fixture(root))
             {
-                var w = f.Window;
-                var store = Field<PackageStore>(w, "store");
-                var outerGuide = Path.Combine(store.Root, "PlayerGuide.html");
-                File.WriteAllText(outerGuide, "<h1 id='en'>Player guide</h1><h1 id='zh'>玩家指南</h1>");
-                string opened = null; Set(w, "openOverride", new Action<string>(url => opened = url));
-                string selected = store.State.selected; store.State.selected = null;
-                Click(w, Button(w, "guide"));
-                Check(new Uri(opened).IsFile && Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(outerGuide) &&
-                    new Uri(opened).Fragment == "#en", "fresh launcher guide was unavailable without a package");
-                store.State.selected = selected;
-                var guide = Path.Combine(store.Folder(store.Selected), "app/site/l/zh-Hans/guide.html");
-                Directory.CreateDirectory(Path.GetDirectoryName(guide)); File.WriteAllText(guide, "<h1>操作指南</h1>");
+                // Player docs live on the website only (4 Nov 2026): the footer opens it in the
+                // player's language, and the English-only report form says so. No helper is needed.
+                var w = f.Window; string opened = null; Set(w, "openOverride", new Action<string>(url => opened = url));
+                Check(!Field<List<Button>>(w, "actions").Any(b => new[] { "guide", "fullControls" }.Contains(Convert.ToString(b.Tag))),
+                    "the launcher still links a guide or controls page of its own");
+                Click(w, Button(w, "website"));
+                Check(opened == "https://chronohaxx.github.io/wuwa-vr/", "the English website link opened " + opened);
                 Field<ComboBox>(w, "languages").SelectedIndex = 1; Drain();
-                Click(w, Button(w, "guide"));
-                Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(outerGuide) && new Uri(opened).Fragment == "#zh",
-                    "launcher guide did not retain priority or Chinese section after installation");
-                // Controls opens the launcher guide too: its language's controls part, else the language section.
-                Click(w, Button(w, "fullControls"));
-                Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(outerGuide) && new Uri(opened).Fragment == "#zh",
-                    "controls without a controls part did not open the Chinese launcher guide: " + opened);
-                File.WriteAllText(outerGuide, "<h1 id='en'>Player guide</h1><h2 id='controls'>Controls</h2><h1 id='zh'>玩家指南</h1><h2 id='controls-zh'>操作</h2>");
-                Click(w, Button(w, "fullControls"));
-                Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(outerGuide) && new Uri(opened).Fragment == "#controls-zh",
-                    "controls did not open the Chinese controls part of the launcher guide: " + opened);
-                File.Delete(outerGuide);
-                Click(w, Button(w, "guide"));
-                Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(guide), "missing outer guide broke installed offline fallback");
-                Click(w, Button(w, "fullControls"));
-                Check(new Uri(opened).IsFile && Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(guide) && new Uri(opened).Fragment == "#controls", "Chinese offline guide did not open with section anchor: " + opened + " expected " + guide);
-                var candidateGuide = Path.Combine(Path.GetDirectoryName(guide), "quickstart.html");
-                File.WriteAllText(candidateGuide, "<h1>候选版操作</h1>");
-                Click(w, Button(w, "fullControls"));
-                Check(Path.GetFullPath(new Uri(opened).LocalPath) == Path.GetFullPath(candidateGuide) && new Uri(opened).Fragment == "#controls", "candidate controls did not take priority over the older public guide");
-                File.Delete(candidateGuide);
-                File.Delete(guide); Click(w, Button(w, "fullControls"));
-                Check(opened == "https://chronohaxx.github.io/wuwa-vr/guide.html#controls" && Field<TextBlock>(w, "operationText").Text.Contains("英文"), "missing translation did not explain English online fallback");
-                // No helper connection is needed for retained package documentation.
-                Check(Field<LauncherBridge>(w, "bridge").Address == null, "offline guide started a helper");
-                Console.WriteLine("PASS WINDOW fresh EN/installed zh outer guide, portable controls and visible English fallback without a helper");
+                Click(w, Button(w, "website"));
+                Check(opened == "https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html", "the Chinese website link opened " + opened);
+                Click(w, Button(w, "report"));
+                Check(opened == "https://chronohaxx.github.io/wuwa-vr/feedback.html" && Field<TextBlock>(w, "operationText").Text.Contains("英文"),
+                    "the English-only report form did not say so in Chinese: " + opened);
+                Check(Field<LauncherBridge>(w, "bridge").Address == null, "opening the website started a helper");
+                Console.WriteLine("PASS WINDOW footer opens the website in the player's language; no guide of its own (no helper)");
             }
             using (var f = new Fixture(root))
             {
@@ -1023,7 +1005,8 @@ public static class WindowTests
                 Check(!Field<Button>(w, "launchButton").IsEnabled && Field<Button>(w, "cancelButton").IsEnabled && Field<Button>(w, "cancelButton").Visibility == Visibility.Visible,
                     "waiting launch allowed another launch or hid cancellation");
                 Click(w, Field<Button>(w, "cancelButton"));
-                Check(f.Http.Cancels == 1 && Field<TextBlock>(w, "operationText").Text.Contains("cancelled before the game started") &&
+                Check(f.Http.Cancels == 1 && Field<TextBox>(w, "details").Text.Contains("cancelled before the game started") &&
+                    Field<TextBlock>(w, "launchState").Text == new Strings()["failCancelled"] &&
                     Field<Button>(w, "launchButton").IsEnabled && Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed,
                     "launch cancellation did not reach a visible terminal state ready for retry");
                 Click(w, Field<Button>(w, "launchButton"));
@@ -1042,6 +1025,181 @@ public static class WindowTests
                     "completed launch retained waiting controls or permitted duplicate launch");
                 Offscreen(w);
                 Console.WriteLine("PASS WINDOW launch click acknowledges risk, targets active build, waits, cancels, retries and shows matching stereo evidence (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                // The one-screen launch (3 Nov 2026): known phases in plain words with the raw line in
+                // Details, a slow start called out, nothing to stop once in VR, and closing then hides
+                // at once and stops the helper only after the worker's check.
+                var w = f.Window; Connect(w); Field<CheckBox>(w, "risk").IsChecked = true; var s = new Strings();
+                var worker = new Dictionary<string, object> { { "current", true }, { "running", true }, { "cancellable", true },
+                    { "phase", "injected" }, { "message", "UEVR startup needs attention; still waiting in case it recovers." }, { "ownerPid", 4242 } };
+                f.Http.Status["launch"] = worker; f.Http.Status["gameRunning"] = true; Refresh(w);
+                Check(Field<TextBlock>(w, "launchState").Text == s["phaseStartingVr"] && Field<TextBlock>(w, "heroTitle").Text == s["heroStarting"] &&
+                    Field<TextBlock>(w, "operationText").Text == "" && Field<TextBox>(w, "details").Text.Contains("needs attention") &&
+                    Field<StackPanel>(w, "phaseRow").Visibility == Visibility.Visible && Field<Button>(w, "cancelButton").Visibility == Visibility.Visible &&
+                    Button(w, "processRecoveryOpen").Visibility == Visibility.Collapsed,
+                    "a starting launch showed the raw warning, lost it from Details, hid Stop waiting or offered stuck-process recovery");
+                Set(w, "phaseSince", DateTime.UtcNow - TimeSpan.FromMinutes(2)); Invoke(w, "ShowStatus");
+                Check(Field<TextBlock>(w, "launchState").Text == s["phaseSlow"], "a slow VR start was not called out");
+                worker["phase"] = "settling"; worker["message"] = "Stereo initialization observed; sampling for 30 s."; Refresh(w);
+                Check(Field<TextBlock>(w, "heroTitle").Text == s["heroInVr"] && Field<TextBlock>(w, "launchState").Text == s["phaseInVr"] &&
+                    Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed && Field<ProgressBar>(w, "progress").Visibility == Visibility.Collapsed &&
+                    !Field<Button>(w, "launchButton").IsEnabled, "in VR the launcher still looked busy, offered to stop or allowed a second launch");
+                int stops = f.Http.Stops, prompts = 0;
+                Set(w, "closeOnlyConfirmOverride", new Func<string, bool>(message => { prompts++; return false; }));
+                var close = (Task<bool>)Invoke(w, "PrepareToClose"); Drain();
+                Check(!close.IsCompleted && f.Http.Stops == stops, "closing in VR stopped the helper during the worker's check or skipped the wait");
+                worker["running"] = false; worker["cancellable"] = false; worker["phase"] = "finished";
+                PumpUntil(() => close.IsCompleted, "close after the in-VR check");
+                Check(close.GetAwaiter().GetResult() && f.Http.Stops == stops + 1 && prompts == 0, "closing in VR asked, or did not stop the idle helper after the check");
+                Console.WriteLine("PASS WINDOW launch phases read plainly, slow start is called out, in-VR needs no stop and closes quietly after the check (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                // Unhappy paths (4 Nov 2026): a failure is marked where it happened (a red "!" on its
+                // row, the launch step it stopped at, the hero's outline) with a plain reason, and
+                // trying again stays possible. Fake HTTP only.
+                var w = f.Window; Connect(w); Field<CheckBox>(w, "risk").IsChecked = true; var s = new Strings();
+                var badges = Field<Border[]>(w, "stepBadges"); var numbers = Field<TextBlock[]>(w, "stepNumbers"); var reasons = Field<TextBlock[]>(w, "rowProblems");
+                var danger = Field<System.Windows.Media.Brush>(w, "danger"); var chips = Field<TextBlock[]>(w, "phaseChips");
+                Func<int, bool> bad = i => numbers[i].Text == "!" && badges[i].Background == danger;
+                Func<bool> healthy = () => Enumerable.Range(0, 3).All(i => !bad(i) && reasons[i].Visibility == Visibility.Collapsed) &&
+                    Field<Border>(w, "heroCard").BorderBrush == Field<System.Windows.Media.Brush>(w, "line") && Field<Button>(w, "heroHelp").Visibility == Visibility.Collapsed;
+                Check(healthy(), "a healthy launcher showed a failure mark");
+                // The saved game moved: its row is red, the hero says something needs fixing, Launch waits.
+                var game = Json.Child(f.Http.Status, "game"); game["mode"] = "official"; game["launcher"] = @"D:\Moved\launcher.exe"; game["problem"] = "missing"; Refresh(w);
+                Check(bad(0) && Field<TextBlock>(w, "gameHint").Text == s["gameSavedMissing"] && Field<TextBlock>(w, "gameHint").Foreground == danger &&
+                    Field<TextBlock>(w, "heroTitle").Text == s["heroProblem"] && Field<TextBlock>(w, "launchState").Text == s["problemNext"] &&
+                    Field<Border>(w, "heroCard").BorderBrush == Field<System.Windows.Media.Brush>(w, "dangerLine") &&
+                    !Field<Button>(w, "launchButton").IsEnabled && Convert.ToString(Field<Button>(w, "launchButton").ToolTip) == s["gameSavedMissing"],
+                    "a missing saved game was not marked, or Launch still tried to start it");
+                game["mode"] = "manual"; game["launcher"] = ""; game["problem"] = "";
+                // No headset runtime: the headset row says why under it.
+                Json.Child(f.Http.Status, "openxr")["available"] = false; Refresh(w);
+                Check(bad(2) && !bad(0) && reasons[2].Text == s["runtimeUnavailableHint"] && reasons[2].Visibility == Visibility.Visible &&
+                    Field<TextBlock>(w, "heroTitle").Text == s["heroProblem"], "an unavailable runtime was not marked on the headset row");
+                Json.Child(f.Http.Status, "openxr")["available"] = true;
+                // A helper job that failed (a reset) lands under the VR mod row, and the footer line is red.
+                f.Http.Status["job"] = new Dictionary<string, object> { { "kind", "apply" }, { "running", false }, { "error", true }, { "code", 1 }, { "output", "Applying\nFixture profile is locked" } };
+                Refresh(w);
+                Check(bad(1) && reasons[1].Text == s["failed"] + ": Fixture profile is locked" && Field<TextBlock>(w, "operationText").Foreground == danger,
+                    "a failed reset was not marked on the VR mod row: " + reasons[1].Text);
+                f.Http.Status["job"] = new Dictionary<string, object> { { "running", false } }; Refresh(w);
+                Check(healthy(), "a cleared failure left a red mark");
+                // A failed action of the launcher itself goes under its row until the next action.
+                Set(w, "gameChoicesOverride", new Func<CancellationToken, Task<GameDiscovery.Result>>(c => { throw new IOException("Fixture drive unreadable"); }));
+                Click(w, Button(w, "browse"));
+                Check(bad(0) && reasons[0].Text == "Fixture drive unreadable" && Field<TextBlock>(w, "operationText").Foreground == danger, "a failed game search was not marked on the game row");
+                Set(w, "gameChoicesOverride", new Func<CancellationToken, Task<GameDiscovery.Result>>(c => Task.FromResult(new GameDiscovery.Result())));
+                Click(w, Button(w, "browse")); Click(w, Button(w, "browse"));
+                Check(!bad(0), "a later successful action kept the old failure mark");
+                // Each way a launch can stop: the step it stopped at, a plain reason, Get help, Launch again.
+                foreach (var c in new[] {
+                    new { outcome = "ElevationCancelled", phase = "cancelled", reached = "permission-pending", step = 0, key = "failPermissionDeclined", hero = "heroCancelled" },
+                    new { outcome = "PreflightFailed", phase = "failed", reached = "preflight", step = 0, key = "failPreflight", hero = "heroFailed" },
+                    new { outcome = "ChildExited", phase = "failed", reached = "permission-pending", step = 0, key = "failBlocked", hero = "heroFailed" },
+                    new { outcome = "LauncherClosed", phase = "failed", reached = "waiting-for-play", step = 1, key = "failLauncherClosed", hero = "heroFailed" },
+                    new { outcome = "TimedOut", phase = "failed", reached = "waiting-for-play", step = 1, key = "failTimedOut", hero = "heroFailed" },
+                    new { outcome = "NotInjected", phase = "failed", reached = "game-starting", step = 1, key = "failNoAttach", hero = "heroFailed" },
+                    new { outcome = "InjectorExited", phase = "failed", reached = "injected", step = 2, key = "failNoAttach", hero = "heroFailed" },
+                    new { outcome = "TargetUnverified", phase = "failed", reached = "injected", step = 2, key = "failLostGame", hero = "heroFailed" },
+                    new { outcome = "GameExited", phase = "failed", reached = "settling", step = 3, key = "failGameClosed", hero = "heroFailed" },
+                    new { outcome = "Cancelled", phase = "cancelled", reached = "game-starting", step = 1, key = "failCancelled", hero = "heroCancelled" },
+                    new { outcome = "Error", phase = "failed", reached = "", step = 0, key = "failUnknown", hero = "heroFailed" } })
+                {
+                    f.Http.Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", false }, { "cancellable", false }, { "phase", c.phase },
+                        { "outcome", c.outcome }, { "reachedPhase", c.reached }, { "message", "Fixture worker stopped: " + c.outcome } };
+                    f.Http.Status["job"] = new Dictionary<string, object> { { "kind", "launch" }, { "running", false }, { "code", 1 }, { "output", "Fixture worker stopped: " + c.outcome } };
+                    Refresh(w);
+                    bool failed = c.phase == "failed";
+                    Check(Field<TextBlock>(w, "heroTitle").Text == s[c.hero] && Field<TextBlock>(w, "launchState").Text == s[c.key] &&
+                        Field<StackPanel>(w, "phaseRow").Visibility == Visibility.Visible && chips[c.step].Text == (failed ? "! " : "\u2013 ") + s[new[] { "stepPermission", "stepPlay", "stepStartVr", "stepInVr" }[c.step]] &&
+                        Enumerable.Range(0, c.step).All(i => chips[i].Text.StartsWith("\u2713 ")) && Enumerable.Range(c.step + 1, 3 - c.step).All(i => !chips[i].Text.StartsWith("\u2713 ")) &&
+                        ((Border)chips[c.step].Parent).Background == (failed ? danger : Field<System.Windows.Media.Brush>(w, "line")) &&
+                        (Field<Border>(w, "heroCard").BorderBrush == danger) == failed && (Field<Button>(w, "heroHelp").Visibility == Visibility.Visible) == failed &&
+                        (Field<TextBlock>(w, "launchState").Foreground == danger) == failed &&
+                        Field<Button>(w, "launchButton").IsEnabled && Field<TextBox>(w, "details").Text.Contains("stopped: " + c.outcome) &&
+                        Field<TextBlock>(w, "operationText").Text == "" &&
+                        Button(w, "processRecoveryOpen").Visibility == Visibility.Collapsed,
+                        c.outcome + " did not show where and why the launch stopped, or blocked trying again: " + Field<TextBlock>(w, "launchState").Text + " / " + chips[c.step].Text);
+                }
+                Click(w, Field<Button>(w, "heroHelp"));
+                Check(Field<bool>(w, "troubleshootingVisible"), "Get help did not open Troubleshooting");
+                Invoke(w, "ShowPage", false);
+                // A launch that stops reporting reads as stuck, not as still starting.
+                f.Http.Status["launch"] = new Dictionary<string, object> { { "current", true }, { "running", true }, { "cancellable", true }, { "phase", "injected" },
+                    { "stalled", true }, { "ownerPid", 4242 }, { "message", "Fixture worker stopped reporting" } };
+                f.Http.Status["job"] = new Dictionary<string, object> { { "running", false } }; Refresh(w);
+                Check(Field<TextBlock>(w, "heroTitle").Text == s["heroStalled"] && Field<TextBlock>(w, "launchState").Text == s["failStalled"] &&
+                    chips[2].Text.StartsWith("! ") && Field<Border>(w, "heroCard").BorderBrush == danger &&
+                    Button(w, "processRecoveryOpen").Visibility == Visibility.Visible, "a stalled launch still read as starting, or hid stuck-process recovery");
+                f.Http.Status.Remove("launch");
+                // The helper connection lost: the VR mod row is red and points at the recovery card.
+                Set(w, "connectionReady", false); Invoke(w, "ShowStatus");
+                Check(bad(1) && reasons[1].Text == s["connectionRequired"] && Field<Border>(w, "connectionPanel").Visibility == Visibility.Visible &&
+                    Field<TextBlock>(w, "runtime").Text == s["runtimeNotChecked"],
+                    "a lost helper connection was not marked on the VR mod row");
+                Console.WriteLine("PASS WINDOW unhappy paths: broken rows, every launch outcome, a stall and a lost connection are marked where they happened, with a reason (fake HTTP only)");
+            }
+            foreach (bool restoreFails in new[] { false, true }) using (var f = new Fixture(root))
+            {
+                // Prepare uninstall first puts back the UEVR settings from before WuWa VR; if that
+                // fails, nothing is removed.
+                var w = f.Window; Connect(w); int prepares = 0;
+                f.Http.Status["originalBackup"] = true; f.Http.Status["selected"] = f.B.release.buildId; f.Http.RestoreFails = restoreFails;
+                Set(w, "uninstallConfirmOverride", new Func<string, bool>(message => true));
+                Set(w, "uninstallPrepareOverride", new Func<string, string, CancellationToken, Task<UninstallResult>>((manager, helper, c) => {
+                    prepares++; return Task.FromResult(new UninstallResult { RemovedFiles = 1, Message = "Fixture removed", RetainedReasons = new List<string>() });
+                }));
+                Click(w, Button(w, "prepareUninstall"));
+                string result = Field<TextBox>(w, "uninstallResultText").Text;
+                Check(f.Http.Restores == 1 && prepares == (restoreFails ? 0 : 1) && result.Contains(new Strings()["uninstallRestoreFailed"]) == restoreFails &&
+                    (!restoreFails || result.Contains("close the game before restoring")), "uninstall did not restore the pre-mod settings first, or removed files after it failed");
+                Console.WriteLine("PASS WINDOW uninstall restores the pre-mod UEVR settings first; " + (restoreFails ? "a failed restore removes nothing" : "then removes downloads") + " (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                var w = f.Window; Connect(w); var s = new Strings();
+                Check(Field<Border>(w, "consentNotice").Visibility == Visibility.Visible, "the account risk was hidden before it was ever accepted");
+                f.Http.Status["riskAcknowledged"] = true; Refresh(w);
+                Check(Field<Border>(w, "consentNotice").Visibility == Visibility.Collapsed, "an accepted account risk still fills the main screen");
+                Check(Button(w, "playFlat").Visibility == Visibility.Collapsed, "Play without VR offered for a manual game start");
+                // Play without VR opens the chosen game launcher itself: never the injector.
+                string game = Path.Combine(root, "flat-" + Guid.NewGuid().ToString("N"), "launcher.exe");
+                Directory.CreateDirectory(Path.GetDirectoryName(game)); File.WriteAllText(game, "inert fixture, never executed");
+                f.Http.Status["game"] = new Dictionary<string, object> { { "saved", true }, { "mode", "launcher" }, { "launcher", game }, { "problem", "" } };
+                Set(w, "discovery", new GameDiscovery.Result { Message = "gameSavedFound", Path = game }); Refresh(w);
+                string opened = null; Set(w, "openOverride", new Action<string>(target => opened = target));
+                Check(Field<TextBlock>(w, "heroTitle").Text == s["heroReady"] && Button(w, "playFlat").Visibility == Visibility.Visible, "a ready setup did not say so or hid Play without VR");
+                Click(w, Button(w, "playFlat"));
+                Check(opened == game && f.Http.Launches == 0 && Field<TextBlock>(w, "operationText").Text == s["playFlatStarted"], "Play without VR did not open the launcher alone");
+                f.Http.Status["gameRunning"] = true; Refresh(w);
+                Check(!Button(w, "playFlat").IsEnabled, "Play without VR allowed a second game");
+                Console.WriteLine("PASS WINDOW account risk shows until accepted; Play without VR opens only the saved launcher (fake HTTP only)");
+            }
+            using (var f = new Fixture(root))
+            {
+                // Save a problem report: one zip, private names out, readable paths kept, no partial file.
+                var w = f.Window; Connect(w);
+                string reports = Path.Combine(root, "reports-" + Guid.NewGuid().ToString("N")), uevr = Path.Combine(reports, "uevr-profile");
+                Directory.CreateDirectory(uevr); File.WriteAllText(Path.Combine(uevr, "config.txt"), "VR_RenderingMethod=0\r\n");
+                Set(w, "reportFolderOverride", new Func<string>(() => reports)); Set(w, "settingsFolderOverride", new Func<string>(() => uevr));
+                string run = Path.Combine(Field<LauncherBridge>(w, "bridge").Data, "runs", "20261103-120000-fixture"); Directory.CreateDirectory(run);
+                string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                File.WriteAllText(Path.Combine(run, "startup.log"), "Username: " + Environment.UserName + "\r\nProfile " + Path.Combine(home, "AppData") + "\r\nUID: 712345678\r\n");
+                string shown = null; Set(w, "openOverride", new Action<string>(target => shown = target));
+                Click(w, Button(w, "saveReport"));
+                var zip = Directory.GetFiles(reports, "*.zip").Single();
+                Check(shown == zip && Directory.GetFiles(reports, "*.partial").Length == 0, "the report was not shown or left a partial file");
+                using (var archive = ZipFile.OpenRead(zip))
+                {
+                    string log; using (var reader = new StreamReader(archive.GetEntry("launches/20261103-120000-fixture/startup.log").Open())) log = reader.ReadToEnd();
+                    Check(log.IndexOf(Environment.UserName, StringComparison.OrdinalIgnoreCase) < 0 && log.Contains("%USERPROFILE%") && !log.Contains("712345678"),
+                        "the report kept the Windows user name, lost readable paths or kept an account number");
+                    Check(archive.GetEntry("report.txt") != null && archive.GetEntry("uevr/config.txt") != null, "the report missed diagnostics or UEVR's settings");
+                }
+                Console.WriteLine("PASS WINDOW problem report is one redacted zip with diagnostics, launch transcripts and UEVR settings (fixture files only)");
             }
             using (var f = new Fixture(root))
             {
@@ -1079,12 +1237,12 @@ public static class WindowTests
                 Check(!blockedClose.GetAwaiter().GetResult() && f.Http.Stops == 0 && Field<TextBox>(w, "details").Text.Contains("98765") &&
                     Field<TextBlock>(w, "operationText").Text.Contains(new Strings()["closeStartup"]), "closing abandoned the pending worker or hid its process identity");
                 Click(w, Field<Button>(w, "cancelButton"));
-                Check(f.Http.Cancels == 1 && Field<TextBlock>(w, "operationText").Text.Contains("cancelled before the game started") &&
+                Check(f.Http.Cancels == 1 && Field<TextBox>(w, "details").Text.Contains("cancelled before the game started") &&
                     Field<Button>(w, "cancelButton").Visibility == Visibility.Collapsed && Field<Button>(w, "launchButton").IsEnabled, "external worker Stop waiting failed");
                 // The same completed job can outlive a worker failure: only phase/message change.
                 worker["running"] = false; worker["cancellable"] = false; worker["phase"] = "failed"; worker["message"] = "Fixture Steam handoff failed after dispatch";
                 f.Http.Status["launch"] = worker; Refresh(w);
-                Check(Field<TextBlock>(w, "launchState").Text == new Strings()["launchFailed"] && Field<TextBox>(w, "details").Text.Contains("handoff failed after dispatch") &&
+                Check(Field<TextBlock>(w, "launchState").Text == new Strings()["failUnknown"] && Field<TextBox>(w, "details").Text.Contains("handoff failed after dispatch") &&
                     Field<Expander>(w, "feedbackPanel").IsExpanded && Field<Expander>(w, "feedbackPanel").Visibility == Visibility.Visible,
                     "terminal external worker failure stayed hidden behind successful dispatch");
                 worker["current"] = false; worker["running"] = true; worker["cancellable"] = true; worker["message"] = "Stale worker must not block"; Refresh(w);

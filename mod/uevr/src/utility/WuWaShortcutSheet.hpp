@@ -18,6 +18,7 @@ struct CardState {
     unsigned buttons{};      // XInput buttons held, lit on the card
     bool lt{}, rt{};         // triggers held
     bool vr_controllers{};   // name the VR controllers' triggers, grips and sticks
+    bool playstation{};      // a PlayStation pad was used last: its names (L1, R2, Create, the face shapes) (1.2.7)
     int view{};              // 0 full VR, 1 stereo screen, 2 mono theatre
     bool blur{};
     bool hide_near{};        // Hide characters at your eyes (LT + RT, then Y)
@@ -38,8 +39,9 @@ void draw_card(ImDrawList* draw, ImVec2 size, ImFont* font, const CardState& sta
 // line with {L3}-style button chips. Both are English catalog keys.
 // note: an optional smaller line under the tip, already translated.
 // keyboard: the line's {tokens} are keys ({VR} the VR key, {W} {A} {S} {D} the freecam keys by position).
+// playstation: a PlayStation pad was used last; the caps show its names (1.2.7).
 void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& lead, const std::string& line, bool vr_controllers,
-    const std::string& note = {}, bool keyboard = false);
+    const std::string& note = {}, bool keyboard = false, bool playstation = false);
 
 // keyboard: name the keyboard shortcut (the VR key + H / + M) instead of the controller's.
 void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool shortcut_available, bool menu_detected=true, bool keyboard=false);

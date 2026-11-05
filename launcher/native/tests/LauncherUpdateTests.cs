@@ -330,7 +330,7 @@ public static class LauncherUpdateTests
                 Check(Field<CheckBox>(w, "risk").IsChecked == true && Field<CheckBox>(w, "compatible").IsChecked == true && Field<TextBlock>(w, "operationText").Text == "", "fixture consent or footer text ignored");
                 string png = Path.Combine(dir, "scaled.png"); w.SavePreview(png, 2);
                 var frame = BitmapDecoder.Create(new Uri(png), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
-                Check(frame.PixelWidth == 1760 && frame.PixelHeight == 1580, "preview scale ignored: " + frame.PixelWidth + "x" + frame.PixelHeight);
+                Check(frame.PixelWidth == 1560 && frame.PixelHeight == 1400, "preview scale ignored: " + frame.PixelWidth + "x" + frame.PixelHeight);
             }
             finally { w.Close(); }
         });

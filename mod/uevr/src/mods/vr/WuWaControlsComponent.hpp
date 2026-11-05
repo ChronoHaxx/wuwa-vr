@@ -99,6 +99,15 @@ public:
     bool story_scene_active() const { return m_story_scene.load(std::memory_order_relaxed); }
     // The detector's plot flag (story dialogue or cutscene running), whatever the view or layout.
     bool plot_running() const { const auto seen = m_plot_seen_ms.load(); return seen && GetTickCount64() - seen < 1500; }
+    // This game frame: decoupled pitch gives the game camera's tilt back (story scene or
+    // ultimate), and the diorama shows the normal view (ultimate). Both false with the
+    // options off or the detector silent.
+    bool decoupled_pitch_paused() const { return m_frame_pitch_paused.load(std::memory_order_relaxed); }
+    bool diorama_paused() const { return m_frame_diorama_paused.load(std::memory_order_relaxed); }
+    // Whether the detector has to watch the camera mode and plot for the two pauses above.
+    bool wants_camera_detect() const;
+    void request_level_camera() { m_level_status.set(""); m_level_request.set("true"); }
+    std::string level_status() const;
     // The camera at the character screen's showroom (HUD page "Character screen in the taller layout").
     bool character_screen_active() const { return m_character_screen.load(std::memory_order_relaxed); }
     // The story camera nudge the camera script applies now, in cm ("+4"), or empty outside story shots.
@@ -170,7 +179,8 @@ private:
       m_toggle_screen{*this, 5, "WuWaControls_ToggleStereoScreen"},
       m_effective_screen{*this, 6, "WuWaControls_EffectiveScreen"},
       m_scene_detect{*this, 7, "WuWaControls_StoryLayoutDetect"},
-      m_character_detect{*this, 8, "WuWaControls_CharacterLayoutDetect"};
+      m_character_detect{*this, 8, "WuWaControls_CharacterLayoutDetect"},
+      m_camera_detect{*this, 9, "WuWaControls_CameraDetect"};
     struct FocusValue : ModToggle {
         FocusValue() : ModToggle{"WuWaControls_Focused", false} {}
         std::string get() const override { return game_focused() ? "true" : "false"; }
@@ -295,6 +305,31 @@ private:
     } m_story_keys{*this, 0, "WuWaControls_StoryNudgeKeys"}, m_story_scene_value{*this, 1, "WuWaControls_StoryScene"},
       m_story_nudge_now{*this, 2, "WuWaControls_StoryNudgeNow"};
     std::atomic<uint64_t> m_plot_seen_ms{}; // the last detector sample with the plot running; 0: none
+    std::atomic<uint64_t> m_skill_seen_ms{}; // the last sample with the game's skill camera (an ultimate); 0: none
+    // Lelouche, 4 Nov 2026: decoupled pitch keeps the game camera's tilt in story scenes and
+    // ultimates, and the diorama gives way to the normal view during an ultimate. Taken once
+    // per game frame (advance_auto_cinema), so both eyes and every pass of a frame agree.
+    const ModToggle::Ptr m_pitch_scenes{ModToggle::create("WuWaControls_PitchInScenes", true)};
+    const ModToggle::Ptr m_diorama_skills{ModToggle::create("WuWaControls_DioramaSkillPause", true)};
+    std::atomic<bool> m_frame_pitch_paused{false}, m_frame_diorama_paused{false};
+    // "Level the game camera now" (Comfort page): the comfort script levels the game camera once.
+    struct LevelRequest : ModToggle {
+        LevelRequest() : ModToggle{"WuWaControls_LevelCamera", false} {}
+        std::atomic<bool> pending{false};
+        std::string get() const override { return pending.load() ? "true" : "false"; }
+        void set(const std::string& text) override { pending.store(text == "true" || text == "1"); }
+        void config_load(const utility::Config&, bool) override { pending.store(false); }
+        void config_save(utility::Config&) override {}
+    } m_level_request;
+    struct LevelStatus : ModString {
+        LevelStatus() : ModString{"WuWaControls_LevelStatus", ""} {}
+        mutable std::mutex mutex;
+        std::string status;
+        std::string get() const override { std::scoped_lock lock{mutex}; return status; }
+        void set(const std::string& text) override { std::scoped_lock lock{mutex}; status = text.substr(0, 240); }
+        void config_load(const utility::Config&, bool) override { set(""); }
+        void config_save(utility::Config&) override {}
+    } m_level_status;
     // Close-up near clip (utility/WuWaNearClip.hpp): in story close-ups nothing
     // nearer than this is drawn, in cm; 10 is the game's own value (off). The
     // camera script sends the per-shot value, already kept short of the person
@@ -479,6 +514,9 @@ private:
     const ModToggle::Ptr m_run_auto{ModToggle::create("WuWaRun_Auto", true)};
     // A one-line tip shows on the first three launches.
     const ModInt32::Ptr m_tips_shown{ModInt32::create("WuWaControls_TipsShown", 0)};
+    // 1.2.7: the VR setup (WuWaVrMenuHost) opens once play starts in the headset until it is answered or
+    // skipped; it then saves its version here. 0: never.
+    const ModInt32::Ptr m_setup_version{ModInt32::create("WuWaSetup_Version", 0)};
     // Keyboard and mouse (1.2.7): the VR key, held like L3 (0 off, 1 the key left of 1, 2 Right Ctrl); WASD
     // and the mouse flying the freecam; and its mouse look speed (1 = 0.05 degrees per mouse count, about
     // 40 degrees per inch at 800 dpi; a first guess, to be felt in the headset).
@@ -547,12 +585,17 @@ private:
     std::atomic<uint64_t> m_tip_until{};
     uint64_t m_tip_eligible_since{};
     bool m_tip_done{};
+    uint64_t m_setup_eligible_since{};
+    bool m_setup_tried{}; // opened (or not needed) this launch
     bool held_card(wuwa_sheet::CardState& state) const;
     bool card_visible() const;
     Matrix4x4f card_anchor(glm::vec3& back) const;
     // 0 nothing, 1 the first-launch tip, 2 the view-switch chip.
     int tip_kind() const;
     void update_tip();
+    void update_setup();
+    // Play has started in the headset: the comfort script reporting, the game focused, no game menu or warning.
+    bool playing_in_headset() const;
     // Privacy is deliberately outside the control-reset allowlist. Resetting
     // camera/input settings must not accidentally reveal a creator's ID.
     // The boxes are approximate and can cover useful HUD, so by default they

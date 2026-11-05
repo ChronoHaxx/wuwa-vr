@@ -86,7 +86,8 @@ try {
     [ordered]@{mode=$(if($wuwaUseHeadset){'headset'}else{'simulator'});manifest=$wuwaSelectedOpenXR} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $run 'openxr.json') -Encoding UTF8
     Write-Host ('OpenXR runtime: '+$wuwaSelectedOpenXR)
     if($wuwaUseHeadset) { Write-Host 'Headset launch: connect Steam Link / your headset runtime before pressing Play. Simulator captures are unavailable.' }
-    Copy-Item -LiteralPath (Join-Path $ctx.Profile 'config.txt') -Destination (Join-Path $run 'config-before.txt')
+    # A diagnostic copy: a missing config.txt must never stop the launch.
+    if(Test-Path -LiteralPath (Join-Path $ctx.Profile 'config.txt') -PathType Leaf) { Copy-Item -LiteralPath (Join-Path $ctx.Profile 'config.txt') -Destination (Join-Path $run 'config-before.txt') }
     # Recording starts only after this explicit launch request, never on page
     # load. It reads status/logs and the simulator capture API; no window/input
     # control, setting change, or retry launch is performed by the recorder.

@@ -6,7 +6,9 @@ const baseUrl = 'https://chronohaxx.github.io/wuwa-vr/';
 const pages = [
   'credits.html', 'developers.html', 'feedback.html', 'guide.html', 'index.html',
   ...['ar', 'de', 'en', 'es', 'fr', 'ja', 'ko', 'pt-BR', 'ru', 'zh-Hans'].map(code => `l/${code}.html`),
-  'languages.html', 'license.html', 'record.html', 'risk.html', 'support.html', 'testing.html', 'understanding.html'
+  ...['ar', 'de', 'es', 'fr', 'ja', 'ko', 'pt-BR', 'ru', 'zh-Hans'].map(code => `l/${code}-guide.html`),
+  ...['ar', 'de', 'es', 'fr', 'ja', 'ko', 'pt-BR', 'ru', 'zh-Hans'].map(code => `l/${code}-feedback.html`),
+  'languages.html', 'license.html', 'record.html', 'reference.html', 'risk.html', 'support.html', 'testing.html', 'understanding.html'
 ];
 const entryPages = {
   'index.html': {
@@ -15,7 +17,7 @@ const entryPages = {
   },
   'guide.html': {
     title: 'Wuthering Waves VR player guide | WuWa VR',
-    description: 'Set up the unofficial Wuthering Waves VR community beta on Windows. Read installation steps, controller shortcuts, comfort settings, recovery advice and account risks.'
+    description: 'Set up the unofficial Wuthering Waves VR community beta on Windows: install and launch, controller shortcuts, updates, troubleshooting and recording, in ten languages.'
   },
   'l/en.html': {
     title: 'Wuthering Waves VR setup for Windows | WuWa VR beta',

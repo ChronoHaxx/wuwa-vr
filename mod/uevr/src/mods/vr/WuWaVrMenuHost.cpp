@@ -35,6 +35,7 @@
 #include "utility/WuWaLocalizedUI.hpp"
 #include "utility/WuWaRunMarker.hpp"
 #include "utility/WuWaStepPlan.hpp"
+#include "utility/WuWaInputActivity.hpp"
 #include "utility/WuWaVrMenu.hpp"
 
 namespace wuwa_menu_host {
@@ -51,6 +52,13 @@ std::vector<Page> pages{};
 std::string built_key{};
 bool built_with_test{};
 std::atomic<std::uint64_t> showing_until{};
+
+// VR setup (1.2.7): shown in the menu's place while it runs. Opened once on the first VR launch (from the
+// welcome screen) or from the Menu page (straight to the questions). WuWaSetup_Version counts as answered
+// at this number; raise it when a release adds a question every player should see.
+constexpr int32_t setup_version = 1;
+Setup setup{};
+bool setup_active{}, setup_auto{};
 
 // Recorder state, read once per frame; the clock starts when recording does.
 std::string rec_state{"offline"};
@@ -198,7 +206,8 @@ nlohmann::json context() {
              "WuWaControls_CameraMode", "UI_Size", "UI_Distance", "UI_WuWaHudShape", "WuWaControls_LensMatch",
              "WuWaControls_LensNearest", "WuWaControls_CloseUpNearClip", "WuWaControls_HideNearCharacters", "VR_WuWaDioramaScale",
              "VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset", "VR_WuWaUiWindowSize", "VR_WuWaUiStoryWindowSize",
-             "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode", "WuWaControls_StoryNudge", "WuWaControls_StoryNudgeKeep"}) {
+             "WuWaStereo_DepthOfField", "WuWaPrivacy_Mode", "WuWaControls_StoryNudge", "WuWaControls_StoryNudgeKeep",
+             "WuWaControls_PitchInScenes", "WuWaControls_DioramaSkillPause"}) {
         if (auto* value = cached(key)) settings[key] = value->get();
     }
     if (auto* scale = resolution_scale()) settings["OpenXR_ResolutionScale"] = scale->get();
@@ -225,6 +234,26 @@ std::string recorder_line() {
 }
 
 // ---- Rows bound to settings ----
+
+using wuwa_pad3d::Shortcut;
+namespace keys = wuwa_pad3d;
+namespace btn = wuwa_pad3d::button;
+
+Shortcut pad_and_key(keys::Beats pad, keys::Beats keyboard) {
+    Shortcut shortcut;
+    shortcut.pad = std::move(pad);
+    shortcut.keyboard = std::move(keyboard);
+    return shortcut;
+}
+// Hold L3, then press; hold the VR key, then press (the controls cards' pairs).
+Shortcut l3_and_key(std::uint32_t control, const char* key) { return pad_and_key(keys::l3_then(control), keys::vr_key_then(key)); }
+void add_keys(Item& item, Shortcut shortcut, std::string label = {}) { item.shortcuts.push_back({std::move(label), std::move(shortcut)}); }
+
+// A live status for the help strip: catalog English (N_) or text filled by wuwa_ui::format.
+std::function<std::string()> status_of(std::function<std::string()> text) {
+    return [text = std::move(text)] { return wuwa_l10n::text(text()); };
+}
+
 
 Item setting_toggle(const char* label, const char* help, const char* key) {
     auto item = make(Kind::Toggle, label, help);
@@ -417,16 +446,6 @@ Item story_nudge_keep_choice() {
     return item;
 }
 
-Item story_nudge_status() {
-    return live_text([] {
-        auto* on = typed<bool>("WuWaControls_StoryNudge");
-        if (!on || !on->value()) return std::string{};
-        const auto now = VR::get()->get_wuwa_controls().story_nudge_now();
-        if (now.empty()) return wuwa_ui::format("Story camera nudge: waiting for a story shot");
-        return wuwa_ui::format("Story camera nudge now: %s cm", now.c_str());
-    });
-}
-
 // The nudge the camera script applies now is at least a centimetre either way.
 bool story_nudged() {
     const auto now = VR::get()->get_wuwa_controls().story_nudge_now();
@@ -487,17 +506,6 @@ Item near_clip_slider() {
         "WuWaControls_CloseUpNearClip", 10.0f, 50.0f, 5.0f, "%.0f cm");
 }
 
-Item lens_status() {
-    return live_text([] {
-        auto* status = cached("WuWaControls_LensStatus");
-        const auto text = status ? status->get() : std::string{};
-        if (text.empty()) return std::string{};
-        // The script sends parts (an English format and its values); each is translated here.
-        const auto shown = wuwa_status_text::lens(text, [](std::string_view english) { return wuwa_l10n::translate_quiet(english); });
-        return wuwa_ui::format("Now: %s", shown.c_str());
-    });
-}
-
 // The OpenXR render resolution, in a few steps. Each change rebuilds the eye
 // images (as a view switch does), so it is a choice rather than a held slider.
 Item resolution_choice() {
@@ -545,8 +553,7 @@ Item language_choice() {
 Item view_choice() {
     auto item = make(Kind::Choice, "View",
         "Full VR: the game all around you. Stereo screen: a big 3D screen, for menus and scenes that look wrong in full VR. "
-        "Mono theatre: a flat screen, the same picture in both eyes. Shortcut: hold LT + RT, then hold R3 "
-        "(hold again to go back).");
+        "Mono theatre: a flat screen, the same picture in both eyes.");
     item.get_int = [] {
         auto* vr = VR::get().get();
         return vr->is_using_mono_theatre() ? 2 : vr->is_using_2d_screen() ? 1 : 0;
@@ -561,14 +568,20 @@ Item view_choice() {
         }
     };
     item.choices = {"Full VR", "Stereo screen", "Mono theatre"};
+    add_keys(item, pad_and_key(keys::triggers_then(keys::press(btn::R3)), keys::vr_key_then("1")), N_("Full VR / stereo screen"));
+    add_keys(item, pad_and_key(keys::triggers_then(keys::long_press(btn::R3, 0.8f)), keys::vr_key_then("2")), N_("Mono theatre"));
     return item;
 }
 
 Item camera_choice() {
-    return setting_choice("Camera",
+    auto item = setting_choice("Camera",
         "Game camera: WuWa's own camera. Fixed third person: a steady camera behind you. Freecam: fly the camera anywhere, "
         "for cutscenes and photos. First person: through your character's eyes. Options for each are on the Camera page.",
         "WuWaControls_CameraMode", {"Game camera", "Fixed third person", "Freecam", "First person"});
+    add_keys(item, l3_and_key(btn::View, "F"), N_("First person"));
+    add_keys(item, l3_and_key(btn::RB, "T"), N_("Fixed third person"));
+    add_keys(item, pad_and_key({keys::press(btn::R3, 2)}, keys::vr_key_then("C")), N_("Freecam"));
+    return item;
 }
 
 Item record_toggle() {
@@ -590,6 +603,7 @@ Item record_toggle() {
         if (rec_state == "finishing") return wuwa_l10n::text(N_("Saving"));
         return std::string{};
     };
+    record.status = [] { return wuwa_l10n::text(recorder_line()); };
     return record;
 }
 
@@ -613,7 +627,130 @@ void save_report(const std::string& problem) {
     }
 }
 
+// ---- VR setup ----
+
+// The questions read and write the same settings as the pages. Recommended marks the shipped default, except
+// the blur (Lelouche, 4 Nov 2026: depth of field is better off in VR; owner, 5 Nov: ask in a first-launch setup
+// rather than change the default). Camera tilt recommends neither: it is a matter of taste and stomach.
+std::vector<SetupQuestion> setup_questions() {
+    std::vector<SetupQuestion> questions;
+    {
+        SetupQuestion question{N_("Camera"), N_("How you see the world. You can change it any time on the Home page.")};
+        question.choices = {
+            {N_("Game camera"), N_("WuWa's own camera, all around you in 3D. Best for most play."), true},
+            {N_("First person"), N_("Through your character's eyes.")},
+            {N_("Fixed third person"), N_("A steady camera behind your character that does not swing around.")}};
+        question.get = [] {
+            const int mode = camera_mode();
+            return mode == 0 ? 0 : mode == 3 ? 1 : mode == 1 ? 2 : -1; // freecam: your own setting
+        };
+        question.set = [](int choice) {
+            if (auto* mode = typed<int32_t>("WuWaControls_CameraMode")) mode->value() = choice == 1 ? 3 : choice == 2 ? 1 : 0;
+        };
+        questions.push_back(std::move(question));
+    }
+    {
+        SetupQuestion question{N_("Background blur"), N_("The 2D game blurs what lies behind the subject (depth of field). "
+            "In VR your eyes do the focusing, so most players find it easier without.")};
+        question.choices = {
+            {N_("Off"), N_("Everything stays sharp."), true},
+            {N_("On"), N_("The 2D game's blur, in both eyes.")}};
+        question.get = [] {
+            auto* blur = typed<bool>("WuWaStereo_DepthOfField");
+            return blur ? (blur->value() ? 1 : 0) : -1;
+        };
+        question.set = [](int choice) {
+            if (auto* blur = typed<bool>("WuWaStereo_DepthOfField")) blur->value() = choice == 1;
+        };
+        questions.push_back(std::move(question));
+    }
+    {
+        SetupQuestion question{N_("Camera tilt"), N_("When the game camera looks up or down, your view can tilt with it.")};
+        question.choices = {
+            {N_("Tilt with the game camera"), N_("As in the 2D game. Some players feel it in their stomach.")},
+            {N_("Keep the horizon level"), N_("Only your head looks up and down (decoupled pitch). Steadier. Story scenes "
+                "and ultimates keep the game's tilt.")}};
+        question.get = [] { return VR::get()->is_decoupled_pitch_enabled() ? 1 : 0; };
+        question.set = [](int choice) { VR::get()->set_decoupled_pitch(choice == 1); };
+        questions.push_back(std::move(question));
+    }
+    {
+        SetupQuestion question{N_("Story scenes"), N_("Story scenes and conversations can stay in full VR or switch to a "
+            "screen while they play.")};
+        question.choices = {
+            {N_("Keep your view"), N_("Stay in full VR, or whichever view you are in."), true},
+            {N_("Stereo screen"), N_("A big 3D screen, framed like the 2D game.")},
+            {N_("Mono theatre"), N_("A flat screen, the same picture in both eyes.")}};
+        question.get = [] {
+            auto* automatic = typed<bool>("VR_AutoCinema");
+            auto* story = typed<int32_t>("VR_AutoStoryPresentation");
+            if (!automatic || !story) return -1;
+            return automatic->value() ? std::clamp(story->value(), 0, 2) : 0;
+        };
+        question.set = [](int choice) {
+            if (auto* story = typed<int32_t>("VR_AutoStoryPresentation")) story->value() = choice;
+            // A screen needs automatic switching; keeping your view leaves it as it is (story videos and pictures).
+            if (choice > 0) {
+                if (auto* automatic = typed<bool>("VR_AutoCinema")) automatic->value() = true;
+            }
+        };
+        questions.push_back(std::move(question));
+    }
+    return questions;
+}
+
+void start_setup_run(bool automatic) {
+    if (setup.questions.empty()) setup.questions = setup_questions();
+    setup.done_detail = automatic ? N_("Back to the game.") : N_("Back to the menu.");
+    setup_start(setup, automatic);
+    setup_active = true;
+    setup_auto = automatic;
+    classic = false;
+}
+
+// Answered or skipped: saved as done (the config is written when the menu closes) and logged with the answers.
+void finish_setup() {
+    if (auto* done = typed<int32_t>("WuWaSetup_Version")) done->value() = (std::max)(done->value(), setup_version);
+    std::string answers;
+    for (const auto& question : setup.questions) {
+        const int now = question.get ? question.get() : -1;
+        answers += (answers.empty() ? "" : ", ") + question.title + " = " +
+            (now >= 0 && now < static_cast<int>(question.choices.size()) ? question.choices[now].label : std::string{"own setting"});
+    }
+    spdlog::info("[WuWa] VR setup {}{}: {}", setup.result == SetupResult::Done ? "finished" : "skipped",
+        setup_auto ? " (first launch)" : "", answers);
+    setup_active = false;
+    if (setup_auto) state.close_requested = true; // first launch: straight back to the game
+}
+
 // ---- Pages ----
+// 1.2.7 lean menu (owner, 5 Nov 2026: "make our VR menu more lean and better designed"; the proposal of the
+// same day): Home tiles for what you switch while playing, then one page per subject, every setting in one
+// place. Each page opens with its essentials; the rest sit under More settings, which stays open until the
+// menu closes. Notes that were rows of their own join the help (help_more keeps their translations), status
+// lines show in the help strip, and rows with a shortcut play it on a 3D controller there.
+
+// More settings: page titles opened since the menu opened.
+std::vector<std::string> more_open{};
+bool is_open(const std::string& title) { return std::find(more_open.begin(), more_open.end(), title) != more_open.end(); }
+
+// Appends a page's rarely used rows behind a More settings row.
+void add_more(Page& page, std::vector<Item> rows) {
+    if (rows.empty()) return;
+    const std::string title = page.title;
+    int count = 0;
+    for (auto& row : rows) {
+        if (row.kind != Kind::Text) ++count;
+        auto earlier = std::move(row.visible);
+        row.visible = [title, earlier] { return is_open(title) && (!earlier || earlier()); };
+    }
+    auto more = make(Kind::Action, N_("More settings"), N_("The rest of this page's settings, for edge cases. They stay open until the menu closes."));
+    more.visible = [title] { return !is_open(title); };
+    more.run = [title] { if (!is_open(title)) more_open.push_back(title); };
+    more.value_text = [count] { return wuwa_l10n::visual(wuwa_ui::format(N_("%d more"), count)); };
+    page.items.push_back(std::move(more));
+    for (auto& row : rows) page.items.push_back(std::move(row));
+}
 
 // Automatic first in the list; the saved value keeps fixed slots at 0-3 and Automatic at 4.
 Item slot_choice() {
@@ -639,20 +776,40 @@ Item controllers_toggle(VR* vr) {
     controllers.get_bool = [vr] { return vr->sightseeing_on(); };
     controllers.set_bool = [vr](bool on) { vr->set_sightseeing_on(on, "VR menu"); };
     controllers.session_only = true;
+    controllers.status = status_of([vr] { return vr->sightseeing_status(); });
+    Shortcut hold_menu;
+    hold_menu.vr = {keys::long_press(btn::Menu, 1.0f)};
+    hold_menu.vr_only = true;
+    add_keys(controllers, std::move(hold_menu));
     return controllers;
 }
 
 // The game's HUD and menus, as L3 + B or the VR key + H (1.2.7: before, only a shortcut or the classic menu).
 Item game_ui_toggle() {
-    return setting_toggle("Show game UI",
+    auto item = setting_toggle("Show game UI",
         "The game's HUD and menus. Off hides them all, menus too, for clean pictures and videos. Shortcut: L3 + B, or "
         "hold the VR key (` by default) and press H.", "VR_EnableGUI");
+    add_keys(item, l3_and_key(btn::B, "H"));
+    return item;
 }
 
 Item portal_toggle() {
-    return setting_toggle("Portal window",
+    auto item = setting_toggle("Portal window",
         "Shows the game through a window in front of you instead of all around you. Shortcut: L3 + LT, F7, or the VR key "
         "+ 3.", "WindowMode_Enabled");
+    add_keys(item, l3_and_key(btn::LT, "3"));
+    return item;
+}
+
+Item diorama_toggle(VR* vr) {
+    auto diorama = make(Kind::Toggle, "Diorama (miniature world)",
+        "Shows the world as a miniature around you, with the portal on or off. Needs Native Stereo. This launch only.");
+    diorama.enabled = [vr] { return !vr->physical_gamepad_passthrough(); };
+    diorama.get_bool = [vr] { return vr->is_diorama_enabled(); };
+    diorama.set_bool = [vr](bool on) { vr->set_diorama_enabled(on); };
+    diorama.session_only = true;
+    add_keys(diorama, l3_and_key(btn::RT, "4"));
+    return diorama;
 }
 
 // HUD / mouse mode (L3 + LB): the controller drives the mouse and places the HUD. Starts off each launch.
@@ -664,21 +821,24 @@ Item mouse_mode_toggle() {
     item.get_bool = [] { return VR::get()->get_wuwa_controls().adjustment_on(); };
     item.set_bool = [](bool on) { VR::get()->get_wuwa_controls().set_adjustment(on); };
     item.session_only = true;
+    add_keys(item, l3_and_key(btn::LB, "M"));
     return item;
 }
 
 // Recenter as L3 + A does: view, horizon and portal, and the seated position when that option is on (Comfort).
 Item recenter_action() {
-    return action("Recenter view", "Faces the view forward from where you are now, as L3 + A does: the portal too, and "
+    auto item = action("Recenter view", "Faces the view forward from where you are now, as L3 + A does: the portal too, and "
         "your seated position when L3 + A resets position too is on (Comfort page).",
         [] { VR::get()->get_wuwa_controls().recenter_like_shortcut(); });
+    add_keys(item, l3_and_key(btn::A, "R"));
+    return item;
 }
 
 // A treadmill run: on / off, with the run clock in place of On.
 Item run_toggle() {
     auto run = make(Kind::Toggle, "Treadmill run",
         "Times your run and saves your route in the game once a second, with a sync flash for OBS videos. With Reality "
-        "Runner open, walking starts a run by itself (Controllers page).");
+        "Runner open, walking starts a run by itself (Controls page).");
     run.session_only = true;
     run.get_bool = [] { return wuwa_run::active(); };
     run.set_bool = [](bool on) {
@@ -687,285 +847,51 @@ Item run_toggle() {
         else wuwa_run::end(profile, "manual");
     };
     run.value_text = [] { return wuwa_run::active() ? wuwa_run::clock_text(wuwa_run::totals().duration_ms) : std::string{}; };
+    run.status = status_of([] { return VR::get()->get_wuwa_controls().run_status(); });
+    run.help_more = "Reality Runner and other treadmills: keep Sharing on Both together and Controller slot on Automatic, so walking "
+        "and the VR controllers work at the same time.";
     return run;
 }
 
-// VR controllers, sharing with an Xbox pad or treadmill, and treadmill runs. Motion
-// controls will join this page.
-Page controllers_page() {
-    auto* vr = VR::get().get();
-    Page page{"Controllers"};
-    page.items.push_back(controllers_toggle(vr));
-    page.items.push_back(live_text([vr] { return vr->sightseeing_status(); }));
-    page.items.push_back(setting_choice("Sharing with Xbox / treadmill",
-        "Both together: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps "
-        "working while you look around with VR. Last used wins: the other waits until you use it. VR only: the Xbox pad "
-        "is ignored while VR controllers are on.",
-        "VR_WuWaVRControllerStyle", {"Both together", "Last used wins", "VR only (Xbox ignored)"}));
-    page.items.push_back(slot_choice());
-    page.items.push_back(paragraph("A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped."));
-    page.items.push_back(paragraph("Treadmill", true));
-    page.items.push_back(paragraph(
-        "Reality Runner and other treadmills: keep Sharing on Both together and Controller slot on Automatic, so walking "
-        "and the VR controllers work at the same time."));
-    page.items.push_back(run_toggle());
-    page.items.push_back(live_text([] { return VR::get()->get_wuwa_controls().run_status(); }));
-    page.items.push_back(setting_toggle("Start and end runs automatically",
-        "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. Your route "
-        "is saved in the UEVR profile, wuwa-runs folder.", "WuWaRun_Auto"));
-    page.items.push_back(live_text([vr] { return vr->menu_pointer_status(); }));
-    page.items.push_back(paragraph("Keyboard and mouse", true));
-    page.items.push_back(paragraph(
-        "Hold the VR key and press a key, as L3 + a button on a controller: 1 full VR / stereo screen, 2 mono theatre, 3 "
-        "portal, 4 diorama, H game UI, R recenter, F first person, T fixed camera, C freecam. Hold it for half a second "
-        "to see them all on a card. Insert opens this menu."));
-    page.items.push_back(setting_choice("VR key",
-        "The key you hold for the shortcuts. The key left of 1 is ` on US and UK keyboards (^ on German, \xC2\xB2 on "
-        "French); it never reaches the game. Off turns the keyboard shortcuts off.", "WuWaControls_KeyboardVrKey",
-        {"Off", "Key left of 1", "Right Ctrl"}));
-    page.items.push_back(setting_toggle("Keys fly the freecam",
-        "In freecam, W A S D move, the mouse looks, Space / Ctrl rise and sink and Shift speeds up; the game does not "
-        "get those keys or the mouse movement meanwhile. Mouse clicks still reach the game.", "WuWaControls_KeyboardFlight"));
-    return page;
-}
-
-Page quick_page() {
-    auto* vr = VR::get().get();
-    Page page{"Quick"};
-    page.items.push_back(view_choice());
-    page.items.push_back(camera_choice());
-    page.items.push_back(game_ui_toggle());
-    page.items.push_back(portal_toggle());
-    page.items.push_back(controllers_toggle(vr));
-    auto diorama = make(Kind::Toggle, "Diorama (miniature world)",
-        "Shows the world as a miniature around you, with the portal on or off. Needs Native Stereo. This launch only.");
-    diorama.enabled = [vr] { return !vr->physical_gamepad_passthrough(); };
-    diorama.get_bool = [vr] { return vr->is_diorama_enabled(); };
-    diorama.set_bool = [vr](bool on) { vr->set_diorama_enabled(on); };
-    diorama.session_only = true;
-    page.items.push_back(std::move(diorama));
-    page.items.push_back(setting_slider("Diorama scale",
-        "How small the world gets in diorama. 10x is an action-figure view. The diorama has its own camera distance (Camera page).",
-        "VR_WuWaDioramaScale", 2.0f, 10.0f, 1.0f, "%.0fx"));
-    page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear. More HUD options are on the HUD page.",
-        "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
-    page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
-        "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
-    page.items.push_back(record_toggle());
-    page.items.push_back(run_toggle());
-    page.items.push_back(recenter_action());
-    return page;
-}
-
-Page camera_page() {
-    Page page{"Camera"};
-    page.items.push_back(camera_choice());
-    switch (camera_mode()) {
-    case 1:
-        page.items.push_back(paragraph("Fixed third person", true));
-        page.items.push_back(setting_slider("Distance", "How far behind your character the camera stays, in game units (centimetres).",
-            "WuWaControls_FixedDistance", 0.0f, 1000.0f, 10.0f, "%.0f"));
-        page.items.push_back(setting_slider("Height", "How high above your character the camera sits, in game units. "
-            "In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.",
-            "WuWaControls_FixedHeight", -100.0f, 400.0f, 5.0f, "%.0f"));
-        break;
-    case 2:
-        page.items.push_back(paragraph("Freecam", true));
-        page.items.push_back(setting_choice("Flying style",
-            "Polar fly: simple flying. Hover drone: floats and drifts to a stop. Plane: always moves forward. Acro drone: full manual control.",
-            "WuWaControls_FreeStyle", {"Polar fly", "Hover drone", "Plane", "Acro drone"}));
-        // Only the chosen style's settings (owner, 18 Oct: Speed looked like it applied to every style).
-        switch (free_style()) {
-        case 0:
-            page.items.push_back(paragraph("Left stick moves where you look, right stick looks. LT rises, LB sinks, "
-                "RT flies 3 times faster."));
-            page.items.push_back(setting_slider("Speed", "How fast Polar fly moves, in game units (cm) a second.",
-                "WuWaControls_FreeSpeed", 50.0f, 3000.0f, 50.0f, "%.0f"));
-            page.items.push_back(setting_slider("Turn speed", "How fast the right stick turns and tilts the view, in degrees "
-                "a second.", "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f"));
-            break;
-        case 1:
-            page.items.push_back(paragraph("Left stick moves level with the ground, right stick looks. LT rises, LB sinks, "
-                "RT flies 3 times faster. Let go and it drifts to a hover."));
-            page.items.push_back(setting_slider("Speed", "Top speed of the hover drone, in game units (cm) a second.",
-                "WuWaControls_FreeSpeed", 50.0f, 3000.0f, 50.0f, "%.0f"));
-            page.items.push_back(setting_slider("Turn speed", "How fast the right stick turns and tilts the view, in degrees "
-                "a second.", "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f"));
-            page.items.push_back(setting_slider("Drift", "How quickly the drone speeds up and stops. Lower drifts longer.",
-                "WuWaControls_DroneResponse", 0.5f, 20.0f, 0.5f, "%.1f"));
-            page.items.push_back(setting_toggle("Lean the view", "Tilts the view sideways as the drone moves sideways.",
-                "WuWaControls_FlightRoll"));
-            break;
-        case 2:
-            page.items.push_back(paragraph("Always flies forward. Right stick pitches and banks, left stick steers. RT speeds "
-                "up, LT slows down, RB boosts, LB brakes."));
-            page.items.push_back(setting_slider("Cruise speed", "The plane's speed, in game units (cm) a second. RT and LT "
-                "change it in flight.", "WuWaControls_PlaneSpeed", 0.0f, 3000.0f, 50.0f, "%.0f"));
-            page.items.push_back(setting_slider("Turn speed", "How fast the plane banks, turns and climbs, in degrees a second.",
-                "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f"));
-            page.items.push_back(setting_toggle("Bank the view", "Tilts the view with the plane as it banks.",
-                "WuWaControls_FlightRoll"));
-            break;
-        default:
-            page.items.push_back(paragraph("Right stick rolls and pitches, left stick turns. Release the throttle, then tap RB "
-                "to arm; RB again disarms, LB + RB levels and stops. Gravity and momentum keep acting while armed."));
-            page.items.push_back(setting_choice("Throttle", "Right trigger, or the left stick up and down like a drone radio "
-                "(Mode 2; centred is half throttle).", "WuWaControls_AcroThrottle", {"Right trigger", "Left stick (Mode 2)"}));
-            page.items.push_back(setting_slider("Roll and pitch rate", "Fastest roll and pitch at full stick, in degrees a "
-                "second.", "WuWaControls_AcroRate", 30.0f, 1000.0f, 10.0f, "%.0f"));
-            page.items.push_back(setting_slider("Yaw rate", "Fastest turn at full stick, in degrees a second.",
-                "WuWaControls_AcroYawRate", 30.0f, 720.0f, 10.0f, "%.0f"));
-            page.items.push_back(setting_slider("Expo", "Softens the sticks near the centre for fine control; full stick "
-                "still reaches the full rate.", "WuWaControls_AcroExpo", 0.0f, 0.9f, 0.05f, "%.2f"));
-            page.items.push_back(setting_slider("Thrust", "Full throttle as a multiple of the drone's weight.",
-                "WuWaControls_AcroThrust", 1.1f, 10.0f, 0.1f, "%.1fx"));
-            page.items.push_back(setting_slider("Air drag", "How quickly the air slows the drone down.",
-                "WuWaControls_AcroDrag", 0.0f, 3.0f, 0.05f, "%.2f"));
-            page.items.push_back(setting_slider("Camera tilt", "Camera angle up from the drone's body, like a real FPV "
-                "camera. More tilt suits faster flight.", "WuWaControls_AcroTilt", 0.0f, 60.0f, 1.0f, "%.0f deg"));
-            page.items.push_back(setting_toggle("Invert pitch", "Pulling the right stick back pitches down instead of up.",
-                "WuWaControls_AcroInvertPitch"));
-            break;
-        }
-        page.items.push_back(paragraph(free_style() == 2 ?
-            "Keyboard: W / S speed up and slow down, A / D steer, the mouse pitches and banks, Shift boosts, Ctrl brakes." :
-            free_style() == 3 ?
-            "Keyboard: W / S raise and lower the throttle (it stays where you leave it), A / D turn, the mouse rolls and "
-            "pitches. Lower the throttle, then press Shift to arm; Ctrl stops, Ctrl + Shift levels and stops." :
-            "Keyboard: W A S D move, the mouse looks, Space or E rises, Ctrl or Q sinks, Shift speeds up (press it twice "
-            "for turbo)."));
-        page.items.push_back(setting_slider("Mouse look speed", "How far the view turns as the mouse moves. 1 turns about "
-            "40 degrees an inch at 800 dpi.", "WuWaControls_FreeMouse", 0.1f, 5.0f, 0.1f, "%.1f"));
-        page.items.push_back(setting_toggle("Collide with the world",
-            "Stops the freecam at walls and the ground. Experimental.", "WuWaControls_FreeCollision"));
-        page.items.push_back(action("Leave freecam", "Back to the game camera.", [] {
-            if (auto* mode = typed<int32_t>("WuWaControls_CameraMode")) mode->value() = 0;
-        }));
-        break;
-    case 3: {
-        page.items.push_back(paragraph("First person", true));
-        page.items.push_back(setting_choice("Motion",
-            "Comfort keeps your height steady and the horizon level. Animated follows your character's head as it moves. "
-            "Full animation also follows its turns (experimental). Custom uses the options in the classic menu.",
-            "WuWaControls_FirstMotion", {"Custom", "Comfort", "Animated", "Full animation"}));
-        page.items.push_back(setting_choice("Your body",
-            "What you see of your own character. Hiding the head stops it from blocking the view.",
-            "WuWaControls_MeshMode", {"Show all", "Hide body", "Hide head", "Hide body, keep shadow", "Hide head, full shadow"}));
-        page.items.push_back(setting_slider("Height", "How far above or below your character's eyes your view sits. "
-            "In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.",
-            "WuWaControls_FirstUp", -100.0f, 100.0f, 1.0f, "%+.0f cm"));
-        auto level = setting_toggle("Level horizon", "Keeps the horizon level in first person. Custom motion only.", "WuWaControls_LevelFirstPerson");
-        level.enabled = [] {
-            auto* motion = typed<int32_t>("WuWaControls_FirstMotion");
-            return typed<bool>("WuWaControls_LevelFirstPerson") != nullptr && motion && motion->value() == 0;
-        };
-        page.items.push_back(std::move(level));
-        break;
-    }
-    default:
-        page.items.push_back(paragraph(
-            "Game camera follows WuWa's own camera and its dialogue camera work. Close-up match brings you nearer "
-            "in zoomed-in shots, so they frame people like the 2D view does."));
-        page.items.push_back(lens_slider());
-        page.items.push_back(lens_nearest_slider());
-        page.items.push_back(story_nudge_toggle());
-        page.items.push_back(story_nudge_status());
-        page.items.push_back(story_nudge_reset());
-        page.items.push_back(near_hide_toggle());
-        page.items.push_back(near_hint_toggle());
-        page.items.push_back(near_clip_slider());
-        page.items.push_back(lens_status());
-        break;
-    }
-    page.items.push_back(paragraph("Everyone", true));
-    page.items.push_back(setting_slider("World scale",
-        "How big the world feels. Above 1 makes you smaller. Diorama uses its own scale and leaves this alone.",
-        "VR_WorldScale", 0.5f, 2.0f, 0.025f, "%.3fx"));
-    // Hold-RT camera adjustment is off in this menu (the trigger clicks), so the offsets are here.
-    page.items.push_back(setting_slider("Forward / back",
-        "Moves your viewpoint forward from the game camera. Forward brings dialogue close-ups nearer, closer to how the 2D shot frames them. Applies in normal play too.",
-        "VR_CameraForwardOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
-    page.items.push_back(setting_slider("Right / left", "Moves your viewpoint sideways from the game camera.",
-        "VR_CameraRightOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
-    page.items.push_back(setting_slider("Up / down", "Moves your viewpoint up or down from the game camera.",
-        "VR_CameraUpOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
-    page.items.push_back(action("Reset camera offset", "Sets all three offsets back to 0, the game camera's own position.", [] {
-        for (const char* key : {"VR_CameraForwardOffset", "VR_CameraRightOffset", "VR_CameraUpOffset"}) {
-            if (auto* v = typed<float>(key)) v->value() = 0.0f;
-        }
-    }));
-    // The diorama keeps its own offsets (VR::get_camera_*_offset); these never touch the ones above.
-    page.items.push_back(paragraph("Diorama camera", true));
-    page.items.push_back(paragraph("Used instead of the offsets above while the diorama is on. The diorama makes your eyes "
-        "far apart, so a camera that suits normal play puts the character too close and crosses your eyes. "
-        "The default, 5 m back, shows it about an arm's length away at 10x. First person keeps your view in your "
-        "character's head, with the world made small around you."));
-    page.items.push_back(setting_slider("Diorama: forward / back",
-        "Where your viewpoint sits in the diorama, from the game camera. Back (minus) moves the miniature farther away.",
-        "VR_WuWaDioramaForwardOffset", -1500.0f, 300.0f, 10.0f, "%+.0f cm"));
-    page.items.push_back(setting_slider("Diorama: right / left", "Moves your diorama viewpoint sideways.",
-        "VR_WuWaDioramaRightOffset", -300.0f, 300.0f, 5.0f, "%+.0f cm"));
-    page.items.push_back(setting_slider("Diorama: up / down", "Moves your diorama viewpoint up, to look down on the miniature, or down.",
-        "VR_WuWaDioramaUpOffset", -300.0f, 600.0f, 5.0f, "%+.0f cm"));
-    page.items.push_back(action("Reset diorama camera", "Back to the diorama defaults: 5 m back, centred. The normal offsets stay as they are.", [] {
-        for (const char* key : {"VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset"}) {
-            if (auto* v = typed<float>(key)) v->value() = v->default_value();
-        }
-    }));
-    page.items.push_back(recenter_action());
-    return page;
-}
-
-Page cinema_page() {
-    Page page{"Cinema"};
-    page.items.push_back(view_choice());
-    page.items.push_back(setting_choice("Screen lens",
-        "Game lens: the stereo screen frames every shot exactly like the 2D view, in 3D. Wide: the fixed 90 degree view used "
-        "in older versions.", "VR_WuWaScreenLens", {"Game lens", "Wide 90 degrees"}));
-    page.items.push_back(setting_slider("3D depth",
-        "How strong the 3D is on the stereo screen. 1x matches the headset's eye distance to the lens; 0 is flat.",
-        "VR_WuWaScreenDepth", 0.0f, 3.0f, 0.1f, "%.1fx"));
-    page.items.push_back(paragraph(
-        "Black bars in story scenes on the stereo or mono screen? In WuWa's Graphics settings, set Cutscene Mode to "
-        "Full Screen. In full VR they are hidden for you (Fixes page)."));
-    page.items.push_back(lens_slider());
-    page.items.push_back(lens_nearest_slider());
-    page.items.push_back(lens_subject_choice());
-    page.items.push_back(lens_follow_choice());
-    page.items.push_back(story_nudge_toggle());
-    page.items.push_back(story_nudge_keep_choice());
-    page.items.push_back(story_nudge_status());
-    page.items.push_back(story_nudge_reset());
-    page.items.push_back(story_hint_toggle());
-    page.items.push_back(near_hide_toggle());
-    page.items.push_back(near_hint_toggle());
-    page.items.push_back(near_clip_slider());
-    page.items.push_back(lens_status());
-    page.items.push_back(paragraph("Depth of field and camera effects", true));
-    page.items.push_back(setting_toggle("Depth of field",
+Item blur_toggle() {
+    auto item = setting_toggle("Background blur",
         "The 2D view's background blur, in full VR and on the stereo screen. In full VR the blur is scaled for the headset's "
-        "wider lens and the focus follows Close-up match.", "WuWaStereo_DepthOfField"));
-    page.items.push_back(setting_choice("Both eyes get",
-        "The game builds one eye from a plain default camera, so that eye misses the shot's camera settings. Blur only copies "
-        "the depth of field across; All camera effects also copies grading, vignette, exposure and the rest.",
-        "WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}));
-    page.items.push_back(setting_choice("Copy from",
-        "Auto uses the eye that has the camera's focus. If both eyes stay sharp or look wrong, try First or Second.",
-        "WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}));
-    page.items.push_back(setting_slider("Blur strength, full VR", "Multiplies the blur in full VR. 1x is the 2D view's look.",
-        "WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.25f, "%.2fx"));
-    page.items.push_back(setting_slider("Blur strength, screens", "Multiplies the blur on the stereo screen and mono theatre. 1x is the 2D view's look.",
-        "WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 0.25f, "%.2fx"));
-    page.items.push_back(paragraph("Shortcut: hold LT + RT, then click L3 to turn the blur on or off."));
-    page.items.push_back(live_text([] {
+        "wider lens and the focus follows Close-up match.", "WuWaStereo_DepthOfField");
+    item.status = [] {
         auto* on = typed<bool>("WuWaStereo_DepthOfField");
         auto* all = typed<int32_t>("WuWaStereo_EyeEffects");
-        return (on && on->value()) || (all && all->value() == 1) ? wuwa_ui::format("Both eyes: %s", wuwa_l10n::translate(wuwa_dof_sync::status.load()).c_str())
-                                                                : std::string{};
-    }));
-    page.items.push_back(setting_toggle("Cinematic scene note",
-        "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "
-        "A fallback for when automatic switching misses a scene.", "VR_CinemaHint"));
+        return (on && on->value()) || (all && all->value() == 1) ?
+            wuwa_l10n::visual(wuwa_ui::format("Both eyes: %s", wuwa_l10n::translate(wuwa_dof_sync::status.load()).c_str())) : std::string{};
+    };
+    add_keys(item, pad_and_key(keys::triggers_then(keys::press(btn::L3)), keys::vr_key_then("B")));
+    return item;
+}
+
+// Home: tiles for what you switch while playing (what was Quick, minus the sliders).
+Item tile(Item item, const char* label) {
+    item.label = label;
+    return item;
+}
+
+Page home_page() {
+    auto* vr = VR::get().get();
+    Page page{"Home"};
+    page.tiles = true;
+    page.items.push_back(view_choice());
+    page.items.push_back(camera_choice());
+    page.items.push_back(tile(game_ui_toggle(), N_("Game UI")));
+    page.items.push_back(portal_toggle());
+    page.items.push_back(tile(diorama_toggle(vr), N_("Diorama")));
+    page.items.push_back(controllers_toggle(vr));
+    page.items.push_back(record_toggle());
+    page.items.push_back(tile(recenter_action(), N_("Recenter")));
+    return page;
+}
+
+Page view_page() {
+    Page page{"View"};
+    page.items.push_back(view_choice());
+    page.items.push_back(blur_toggle());
     page.items.push_back(setting_toggle("Automatic cinematic screen",
         "Switches to a screen while a story video (mono theatre) or a story picture plays, then back to the view you had. "
         "Story scenes keep your view unless you choose otherwise below.", "VR_AutoCinema"));
@@ -978,100 +904,253 @@ Page cinema_page() {
         return automatic && automatic->value() && typed<int32_t>("VR_AutoStoryPresentation") != nullptr;
     };
     page.items.push_back(std::move(story));
+    auto lens = setting_choice("Screen lens",
+        "Game lens: the stereo screen frames every shot exactly like the 2D view, in 3D. Wide: the fixed 90 degree view used "
+        "in older versions.", "VR_WuWaScreenLens", {"Game lens", "Wide 90 degrees"});
+    lens.help_more = "Black bars in story scenes on the stereo or mono screen? In WuWa's Graphics settings, set Cutscene Mode to "
+        "Full Screen. In full VR they are hidden for you (Graphics page).";
+    page.items.push_back(std::move(lens));
+    page.items.push_back(setting_slider("3D depth",
+        "How strong the 3D is on the stereo screen. 1x matches the headset's eye distance to the lens; 0 is flat.",
+        "VR_WuWaScreenDepth", 0.0f, 3.0f, 0.1f, "%.1fx"));
+
+    std::vector<Item> more;
     auto pictures = setting_choice("Story pictures use", "What automatic switching shows while a story picture fills the screen.",
         "VR_AutoPicturePresentation", {"Keep current view", "Stereo screen", "Mono theatre"});
     pictures.enabled = [] {
         auto* automatic = typed<bool>("VR_AutoCinema");
         return automatic && automatic->value() && typed<int32_t>("VR_AutoPicturePresentation") != nullptr;
     };
-    page.items.push_back(std::move(pictures));
-    page.items.push_back(setting_toggle("Match cinematic framing",
+    more.push_back(std::move(pictures));
+    more.push_back(setting_toggle("Cinematic scene note",
+        "When a letterboxed cinematic camera starts in full VR, a short note in view reminds you of the screen shortcut. "
+        "A fallback for when automatic switching misses a scene.", "VR_CinemaHint"));
+    more.push_back(setting_choice("Both eyes get",
+        "The game builds one eye from a plain default camera, so that eye misses the shot's camera settings. Blur only copies "
+        "the depth of field across; All camera effects also copies grading, vignette, exposure and the rest.",
+        "WuWaStereo_EyeEffects", {"Blur only", "All camera effects"}));
+    more.push_back(setting_choice("Copy from",
+        "Auto uses the eye that has the camera's focus. If both eyes stay sharp or look wrong, try First or Second.",
+        "WuWaStereo_DepthOfFieldSource", {"First view", "Second view", "Auto"}));
+    more.push_back(setting_slider("Blur strength, full VR", "Multiplies the blur in full VR. 1x is the 2D view's look.",
+        "WuWaStereo_DepthOfFieldStrengthFullVR", 0.25f, 4.0f, 0.25f, "%.2fx"));
+    more.push_back(setting_slider("Blur strength, screens", "Multiplies the blur on the stereo screen and mono theatre. 1x is the 2D view's look.",
+        "WuWaStereo_DepthOfFieldStrength", 0.25f, 4.0f, 0.25f, "%.2fx"));
+    more.push_back(setting_toggle("Match cinematic framing",
         "Gives both eyes the same framing during letterboxed scenes. Leave on unless a scene looks cropped.", "VR_CinematicFramingFix"));
+    add_more(page, std::move(more));
     return page;
 }
 
-Page hud_page() {
-    Page page{"HUD"};
-    page.items.push_back(game_ui_toggle());
-    page.items.push_back(mouse_mode_toggle());
-    page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear.", "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
-    page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
-        "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
-    // 16:9 (default) or the taller 1.2.2 layout. A switch moves the hooks and the panel
-    // at once; the game's UI scaler keeps its old size until a layout refresh, so one is
-    // asked for right away (Comfort.lua hud_refresh, as after a view change).
-    if (wuwa_lgui_viewport::installed()) {
-        auto layout = make(Kind::Toggle, "16:9 UI layout",
-            "On: full VR lays out the HUD and menus like the flat game (16:9): round icons, story pictures whole, and the "
-            "mouse hits what it points at. Off: 1.2.2's taller layout, where the Terminal fits on one page and the "
-            "character screen's floor reflection keeps updating, but icons look flatter (HUD shape) and the mouse can miss.");
-        layout.get_bool = [] { return VR::get()->is_wuwa_ui_window_size_enabled(); };
-        layout.set_bool = [](bool on) {
-            if (auto* value = typed<bool>("VR_WuWaUiWindowSize")) value->value() = on;
-            if (auto* request = cached("WuWaControls_ResetHudAspect")) request->set("true");
-        };
-        page.items.push_back(std::move(layout));
-        auto story = setting_toggle("Story scenes in 16:9",
-            "With the 16:9 layout off: every conversation (story scenes and chats with people in the world) and story "
-            "videos switch to 16:9 while they play, so story pictures show whole, then the taller layout comes back. "
-            "Follows the game's own dialogue state, so it works with any controls and with the game UI hidden.",
-            "VR_WuWaUiStoryWindowSize");
-        story.enabled = [] {
-            return !VR::get()->is_wuwa_ui_window_size_enabled() && typed<bool>("VR_WuWaUiStoryWindowSize") != nullptr;
-        };
-        page.items.push_back(std::move(story));
-        auto character = setting_toggle("Character screen in the taller layout",
-            "With the 16:9 layout on: the character screen (Resonators) uses the taller layout while it is open, so its "
-            "floor reflection keeps showing the current character, then 16:9 comes back. Its icons look flatter there "
-            "and the mouse can miss.", "VR_WuWaUiCharacterTall");
-        character.enabled = [] {
-            return VR::get()->is_wuwa_ui_window_size_enabled() && typed<bool>("VR_WuWaUiCharacterTall") != nullptr;
-        };
-        page.items.push_back(std::move(character));
+// Height rows of the first person and fixed cameras: L3 + Y / X move them.
+Item height_slider(const char* help, const char* key, float min, float max, float step, const char* format) {
+    auto item = setting_slider("Height", help, key, min, max, step, format);
+    add_keys(item, l3_and_key(btn::Y, "E"), N_("Up"));
+    add_keys(item, l3_and_key(btn::X, "Q"), N_("Down"));
+    return item;
+}
+
+Page camera_page() {
+    auto* vr = VR::get().get();
+    Page page{"Camera"};
+    page.items.push_back(camera_choice());
+    std::vector<Item> more;
+    switch (camera_mode()) {
+    case 1: {
+        auto distance = setting_slider("Distance", "How far behind your character the camera stays, in game units (centimetres).",
+            "WuWaControls_FixedDistance", 0.0f, 1000.0f, 10.0f, "%.0f");
+        page.items.push_back(std::move(distance));
+        page.items.push_back(height_slider("How high above your character the camera sits, in game units. "
+            "In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.",
+            "WuWaControls_FixedHeight", -100.0f, 400.0f, 5.0f, "%.0f"));
+        break;
     }
-    // Only needed when the game lays out full VR's HUD at the eye's shape: with the
-    // 16:9 layout the HUD is the flat game's 16:9 (WuWaLguiViewport.hpp).
-    if (!wuwa_lgui_viewport::installed() || !VR::get()->is_wuwa_ui_window_size_enabled()) {
-        page.items.push_back(setting_slider("HUD shape (full VR)",
-            "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. Raise it if round "
-            "icons still look like flat ovals. The stereo screen and mono theatre always keep the game's own shape.",
-            "UI_WuWaHudShape", 0.5f, 2.0f, 0.01f, "%.2f"));
-        page.items.push_back(action("Reset HUD shape", "Back to 1.33, the full VR default.", [] {
-            if (auto* v = typed<float>("UI_WuWaHudShape")) v->value() = 4.0f / 3.0f;
-        }));
+    case 2: {
+        auto style = setting_choice("Flying style",
+            "Polar fly: simple flying. Hover drone: floats and drifts to a stop. Plane: always moves forward. Acro drone: full manual control.",
+            "WuWaControls_FreeStyle", {"Polar fly", "Hover drone", "Plane", "Acro drone"});
+        // Only the chosen style's settings (owner, 18 Oct: Speed looked like it applied to every style).
+        const auto turn = [] {
+            return setting_slider("Turn speed", "How fast the right stick turns and tilts the view, in degrees "
+                "a second.", "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f");
+        };
+        switch (free_style()) {
+        case 0:
+            style.help_more = "Left stick moves where you look, right stick looks. LT rises, LB sinks, "
+                "RT flies 3 times faster.";
+            page.items.push_back(std::move(style));
+            page.items.push_back(setting_slider("Speed", "How fast Polar fly moves, in game units (cm) a second.",
+                "WuWaControls_FreeSpeed", 50.0f, 3000.0f, 50.0f, "%.0f"));
+            page.items.push_back(turn());
+            break;
+        case 1:
+            style.help_more = "Left stick moves level with the ground, right stick looks. LT rises, LB sinks, "
+                "RT flies 3 times faster. Let go and it drifts to a hover.";
+            page.items.push_back(std::move(style));
+            page.items.push_back(setting_slider("Speed", "Top speed of the hover drone, in game units (cm) a second.",
+                "WuWaControls_FreeSpeed", 50.0f, 3000.0f, 50.0f, "%.0f"));
+            page.items.push_back(turn());
+            page.items.push_back(setting_slider("Drift", "How quickly the drone speeds up and stops. Lower drifts longer.",
+                "WuWaControls_DroneResponse", 0.5f, 20.0f, 0.5f, "%.1f"));
+            more.push_back(setting_toggle("Lean the view", "Tilts the view sideways as the drone moves sideways.",
+                "WuWaControls_FlightRoll"));
+            break;
+        case 2:
+            style.help_more = "Always flies forward. Right stick pitches and banks, left stick steers. RT speeds "
+                "up, LT slows down, RB boosts, LB brakes.";
+            page.items.push_back(std::move(style));
+            page.items.push_back(setting_slider("Cruise speed", "The plane's speed, in game units (cm) a second. RT and LT "
+                "change it in flight.", "WuWaControls_PlaneSpeed", 0.0f, 3000.0f, 50.0f, "%.0f"));
+            page.items.push_back(setting_slider("Turn speed", "How fast the plane banks, turns and climbs, in degrees a second.",
+                "WuWaControls_FreeTurn", 10.0f, 300.0f, 10.0f, "%.0f"));
+            more.push_back(setting_toggle("Bank the view", "Tilts the view with the plane as it banks.",
+                "WuWaControls_FlightRoll"));
+            break;
+        default:
+            style.help_more = "Right stick rolls and pitches, left stick turns. Release the throttle, then tap RB "
+                "to arm; RB again disarms, LB + RB levels and stops. Gravity and momentum keep acting while armed.";
+            page.items.push_back(std::move(style));
+            page.items.push_back(setting_choice("Throttle", "Right trigger, or the left stick up and down like a drone radio "
+                "(Mode 2; centred is half throttle).", "WuWaControls_AcroThrottle", {"Right trigger", "Left stick (Mode 2)"}));
+            page.items.push_back(setting_slider("Roll and pitch rate", "Fastest roll and pitch at full stick, in degrees a "
+                "second.", "WuWaControls_AcroRate", 30.0f, 1000.0f, 10.0f, "%.0f"));
+            page.items.push_back(setting_slider("Yaw rate", "Fastest turn at full stick, in degrees a second.",
+                "WuWaControls_AcroYawRate", 30.0f, 720.0f, 10.0f, "%.0f"));
+            more.push_back(setting_slider("Expo", "Softens the sticks near the centre for fine control; full stick "
+                "still reaches the full rate.", "WuWaControls_AcroExpo", 0.0f, 0.9f, 0.05f, "%.2f"));
+            more.push_back(setting_slider("Thrust", "Full throttle as a multiple of the drone's weight.",
+                "WuWaControls_AcroThrust", 1.1f, 10.0f, 0.1f, "%.1fx"));
+            more.push_back(setting_slider("Air drag", "How quickly the air slows the drone down.",
+                "WuWaControls_AcroDrag", 0.0f, 3.0f, 0.05f, "%.2f"));
+            more.push_back(setting_slider("Camera tilt", "Camera angle up from the drone's body, like a real FPV "
+                "camera. More tilt suits faster flight.", "WuWaControls_AcroTilt", 0.0f, 60.0f, 1.0f, "%.0f deg"));
+            more.push_back(setting_toggle("Invert pitch", "Pulling the right stick back pitches down instead of up.",
+                "WuWaControls_AcroInvertPitch"));
+            break;
+        }
+        auto leave = action("Leave freecam", "Back to the game camera.", [] {
+            if (auto* mode = typed<int32_t>("WuWaControls_CameraMode")) mode->value() = 0;
+        });
+        add_keys(leave, pad_and_key({keys::press(btn::R3, 2)}, keys::vr_key_then("C")));
+        page.items.push_back(std::move(leave));
+        auto mouse = setting_slider("Mouse look speed", "How far the view turns as the mouse moves. 1 turns about "
+            "40 degrees an inch at 800 dpi.", "WuWaControls_FreeMouse", 0.1f, 5.0f, 0.1f, "%.1f");
+        mouse.help_more = free_style() == 2 ?
+            N_("Keyboard: W / S speed up and slow down, A / D steer, the mouse pitches and banks, Shift boosts, Ctrl brakes.") :
+            free_style() == 3 ?
+            N_("Keyboard: W / S raise and lower the throttle (it stays where you leave it), A / D turn, the mouse rolls and "
+            "pitches. Lower the throttle, then press Shift to arm; Ctrl stops, Ctrl + Shift levels and stops.") :
+            N_("Keyboard: W A S D move, the mouse looks, Space or E rises, Ctrl or Q sinks, Shift speeds up (press it twice "
+            "for turbo).");
+        more.push_back(std::move(mouse));
+        more.push_back(setting_toggle("Collide with the world",
+            "Stops the freecam at walls and the ground. Experimental.", "WuWaControls_FreeCollision"));
+        break;
     }
-    page.items.push_back(setting_slider("Up / down", "Moves the HUD up or down.", "UI_Y_Offset", -1.5f, 1.5f, 0.05f, "%+.2f m"));
-    page.items.push_back(setting_slider("Left / right", "Moves the HUD sideways.", "UI_X_Offset", -1.5f, 1.5f, 0.05f, "%+.2f m"));
-    page.items.push_back(setting_toggle("HUD follows your head",
-        "On: the HUD stays in front of your eyes. Off: it stays put in the world and you look at it.", "UI_FollowView"));
-    page.items.push_back(action("Refresh HUD layout",
-        "Asks the game to lay out its HUD again. Try it if the HUD looks stretched or cut off after switching views.", [] {
-            if (auto* request = cached("WuWaControls_ResetHudAspect")) request->set("true");
-        }));
-    page.items.push_back(live_text([] {
-        // A plain summary; the script logs the technical status in full ("WuWaHud: ...").
-        auto* status = cached("WuWaControls_HudAspectStatus");
-        return std::string{wuwa_status_text::hud_refresh(status ? status->get() : std::string{})};
+    case 3: {
+        auto motion = setting_choice("Motion",
+            "Comfort keeps your height steady and the horizon level. Animated follows your character's head as it moves. "
+            "Full animation also follows its turns (experimental). Custom uses the options in the classic menu.",
+            "WuWaControls_FirstMotion", {"Custom", "Comfort", "Animated", "Full animation"});
+        add_keys(motion, l3_and_key(btn::Down, "G"), N_("Full animation on / off"));
+        page.items.push_back(std::move(motion));
+        page.items.push_back(setting_choice("Your body",
+            "What you see of your own character. Hiding the head stops it from blocking the view.",
+            "WuWaControls_MeshMode", {"Show all", "Hide body", "Hide head", "Hide body, keep shadow", "Hide head, full shadow"}));
+        page.items.push_back(height_slider("How far above or below your character's eyes your view sits. "
+            "In the game: hold L3 and press Y / X; L3 + Y + X together puts it back to the default.",
+            "WuWaControls_FirstUp", -100.0f, 100.0f, 1.0f, "%+.0f cm"));
+        auto level = setting_toggle("Level horizon", "Keeps the horizon level in first person. Custom motion only.", "WuWaControls_LevelFirstPerson");
+        level.enabled = [] {
+            auto* motion_value = typed<int32_t>("WuWaControls_FirstMotion");
+            return typed<bool>("WuWaControls_LevelFirstPerson") != nullptr && motion_value && motion_value->value() == 0;
+        };
+        more.push_back(std::move(level));
+        break;
+    }
+    default: {
+        auto lens = lens_slider();
+        lens.help_more = "Game camera follows WuWa's own camera and its dialogue camera work. Close-up match brings you nearer "
+            "in zoomed-in shots, so they frame people like the 2D view does.";
+        lens.status = [] {
+            auto* status = cached("WuWaControls_LensStatus");
+            const auto text = status ? status->get() : std::string{};
+            if (text.empty()) return std::string{};
+            // The script sends parts (an English format and its values); each is translated here.
+            const auto shown = wuwa_status_text::lens(text, [](std::string_view english) { return wuwa_l10n::translate_quiet(english); });
+            return wuwa_l10n::visual(wuwa_ui::format("Now: %s", shown.c_str()));
+        };
+        page.items.push_back(std::move(lens));
+        auto nudge = story_nudge_toggle();
+        nudge.status = [] {
+            auto* on = typed<bool>("WuWaControls_StoryNudge");
+            if (!on || !on->value()) return std::string{};
+            const auto now = VR::get()->get_wuwa_controls().story_nudge_now();
+            if (now.empty()) return wuwa_l10n::visual(wuwa_ui::format("Story camera nudge: waiting for a story shot"));
+            return wuwa_l10n::visual(wuwa_ui::format("Story camera nudge now: %s cm", now.c_str()));
+        };
+        add_keys(nudge, l3_and_key(btn::Y, "E"), N_("Nearer"));
+        add_keys(nudge, l3_and_key(btn::X, "Q"), N_("Back"));
+        page.items.push_back(std::move(nudge));
+        auto hide = near_hide_toggle();
+        add_keys(hide, pad_and_key(keys::triggers_then(keys::press(btn::Y)), keys::vr_key_then("N")));
+        page.items.push_back(std::move(hide));
+        more.push_back(lens_nearest_slider());
+        more.push_back(lens_subject_choice());
+        more.push_back(lens_follow_choice());
+        more.push_back(story_nudge_keep_choice());
+        auto reset = story_nudge_reset();
+        add_keys(reset, pad_and_key({keys::hold(btn::L3), keys::press(btn::Y | btn::X)}, {}));
+        more.push_back(std::move(reset));
+        more.push_back(story_hint_toggle());
+        more.push_back(near_hint_toggle());
+        more.push_back(near_clip_slider());
+        break;
+    }
+    }
+    page.items.push_back(setting_slider("World scale",
+        "How big the world feels. Above 1 makes you smaller. Diorama uses its own scale and leaves this alone.",
+        "VR_WorldScale", 0.5f, 2.0f, 0.025f, "%.3fx"));
+    page.items.push_back(recenter_action());
+    // Hold-RT camera adjustment is off in this menu (the trigger clicks), so the offsets are here.
+    more.push_back(setting_slider("Forward / back",
+        "Moves your viewpoint forward from the game camera. Forward brings dialogue close-ups nearer, closer to how the 2D shot frames them. Applies in normal play too.",
+        "VR_CameraForwardOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
+    more.push_back(setting_slider("Right / left", "Moves your viewpoint sideways from the game camera.",
+        "VR_CameraRightOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
+    more.push_back(setting_slider("Up / down", "Moves your viewpoint up or down from the game camera.",
+        "VR_CameraUpOffset", -150.0f, 150.0f, 1.0f, "%+.0f cm"));
+    more.push_back(action("Reset camera offset", "Sets all three offsets back to 0, the game camera's own position.", [] {
+        for (const char* key : {"VR_CameraForwardOffset", "VR_CameraRightOffset", "VR_CameraUpOffset"}) {
+            if (auto* v = typed<float>(key)) v->value() = 0.0f;
+        }
     }));
-    page.items.push_back(setting_toggle("Controls cards",
-        "Hold L3, or LT + RT, for half a second: a card rises under your view and shows what each button does, lighting "
-        "each one as you press it. Let go and it sinks away. On the keyboard, hold the VR key (` by default).", "WuWaControls_Cards"));
-    page.items.push_back(setting_toggle("Keep the controls card open",
-        "Shows the L3 card without holding anything. Shortcut: L3 + Menu. A loaded test plan shows its step there instead.",
-        "WuWaControls_PinCard"));
-    page.items.push_back(setting_slider("Card size", "How wide the controls card is.", "WuWaControls_CardWidth", 0.5f, 1.6f, 0.05f, "%.2f m"));
-    page.items.push_back(setting_choice("Card place",
-        "Below your view, or above it if the card is in your way down there. Card height sets how far from your line "
-        "of sight.", "WuWaControls_CardPlace", {"Below your view", "Above your view"}));
-    page.items.push_back(setting_slider("Card height",
-        "Degrees from your line of sight, below or above it (Card place). More puts the card farther out of the way "
-        "of the HUD.",
-        "WuWaControls_CardBelow", 15.0f, 75.0f, 1.0f, "%.0f\xC2\xB0"));
-    page.items.push_back(setting_slider("Card distance", "How far away the card is.", "WuWaControls_CardDistance",
-        0.5f, 1.5f, 0.05f, "%.2f m"));
-    page.items.push_back(setting_toggle("View hints",
-        "After you switch views, a line shows for 3 seconds with how to go on or come back. It switches itself off after 5 switches.",
-        "WuWaControls_ViewHints"));
+    // The diorama keeps its own offsets (VR::get_camera_*_offset); these never touch the ones above.
+    more.push_back(setting_slider("Diorama scale",
+        "How small the world gets in diorama. 10x is an action-figure view. The diorama has its own camera distance (Camera page).",
+        "VR_WuWaDioramaScale", 2.0f, 10.0f, 1.0f, "%.0fx"));
+    more.push_back(setting_toggle("Diorama: normal view in ultimates",
+        "During an ultimate the world goes back to its normal size and camera for the shot, then the diorama returns.",
+        "WuWaControls_DioramaSkillPause"));
+    auto diorama_forward = setting_slider("Diorama: forward / back",
+        "Where your viewpoint sits in the diorama, from the game camera. Back (minus) moves the miniature farther away.",
+        "VR_WuWaDioramaForwardOffset", -1500.0f, 300.0f, 10.0f, "%+.0f cm");
+    diorama_forward.help_more = "Used instead of the offsets above while the diorama is on. The diorama makes your eyes "
+        "far apart, so a camera that suits normal play puts the character too close and crosses your eyes. "
+        "The default, 5 m back, shows it about an arm's length away at 10x. First person keeps your view in your "
+        "character's head, with the world made small around you.";
+    more.push_back(std::move(diorama_forward));
+    more.push_back(setting_slider("Diorama: right / left", "Moves your diorama viewpoint sideways.",
+        "VR_WuWaDioramaRightOffset", -300.0f, 300.0f, 5.0f, "%+.0f cm"));
+    more.push_back(setting_slider("Diorama: up / down", "Moves your diorama viewpoint up, to look down on the miniature, or down.",
+        "VR_WuWaDioramaUpOffset", -300.0f, 600.0f, 5.0f, "%+.0f cm"));
+    more.push_back(action("Reset diorama camera", "Back to the diorama defaults: 5 m back, centred. The normal offsets stay as they are.", [] {
+        for (const char* key : {"VR_WuWaDioramaForwardOffset", "VR_WuWaDioramaRightOffset", "VR_WuWaDioramaUpOffset"}) {
+            if (auto* v = typed<float>(key)) v->value() = v->default_value();
+        }
+    }));
+    (void)vr;
+    add_more(page, std::move(more));
     return page;
 }
 
@@ -1087,57 +1166,251 @@ Page comfort_page() {
         return pitch && pitch->value() && typed<bool>("VR_DecoupledPitchUIAdjust") != nullptr;
     };
     page.items.push_back(std::move(hud));
+    // Lelouche, 4 Nov 2026: decoupled pitch for play, the game's framing for its own shots.
+    auto scenes = setting_toggle("Game camera tilt in story scenes and ultimates",
+        "While decoupled pitch is on, story scenes, dialogue and ultimates still use the game camera's up / down tilt, so "
+        "those shots stay framed as the game made them. Off: decoupled pitch applies there too.", "WuWaControls_PitchInScenes");
+    scenes.enabled = [] {
+        auto* pitch = typed<bool>("VR_DecoupledPitch");
+        return pitch && pitch->value();
+    };
+    page.items.push_back(std::move(scenes));
+    auto level = action("Level the game camera now",
+        "Tilts the game camera to level, once, so the horizon is level in VR without decoupled pitch. The right stick "
+        "tilts the camera again as usual.", [] { VR::get()->get_wuwa_controls().request_level_camera(); });
+    level.status = status_of([] { return VR::get()->get_wuwa_controls().level_status(); });
+    page.items.push_back(std::move(level));
     page.items.push_back(setting_toggle("Smooth camera turns",
         "Smooths the game camera's left / right turns, so quick camera swings feel gentler.", "VR_LerpCameraYaw"));
     page.items.push_back(setting_toggle("Smooth camera tilt", "Smooths the game camera's up / down tilt.", "VR_LerpCameraPitch"));
-    page.items.push_back(setting_slider("Smoothing speed", "Higher follows the game camera more closely.",
-        "VR_LerpCameraSpeed", 0.1f, 10.0f, 0.1f, "%.1f"));
     page.items.push_back(setting_toggle("Walk by default", "Walk instead of run; hold RB for normal speed.", "WuWaControls_PolarWalk"));
-    page.items.push_back(setting_toggle("L3 + A resets position too",
+    std::vector<Item> more;
+    more.push_back(setting_slider("Smoothing speed", "Higher follows the game camera more closely.",
+        "VR_LerpCameraSpeed", 0.1f, 10.0f, 0.1f, "%.1f"));
+    more.push_back(setting_toggle("L3 + A resets position too",
         "Recentering with L3 + A also moves your seated position back to the middle.", "WuWaControls_RecenterPosition"));
-    page.items.push_back(setting_toggle("Keep the mouse in the game window",
+    more.push_back(setting_toggle("Keep the mouse in the game window",
         "On: while the game is in front, the mouse stops at the window's edges, as in the flat game, so it cannot slip "
         "onto another monitor. Alt-Tab frees it. Off: the mouse moves freely between monitors.",
         "WuWaControls_KeepMouseInWindow"));
+    add_more(page, std::move(more));
     return page;
 }
 
-Page fixes_page() {
-    Page page{"Fixes"};
-    page.items.push_back(setting_toggle("Match far detail between eyes",
-        "Far trees and props switch detail together in both eyes. Recommended.", "WuWaStereo_SyncEyeLod"));
-    page.items.push_back(setting_toggle("Full ground detail",
-        "Keeps the ground near you as detailed as in the flat game, so stone steps and ledges are not covered by dirt "
-        "and your feet do not sink in. Full VR only; the stereo and mono screens keep the game's setting. Recommended.",
-        "WuWaStereo_FullTerrainDetail"));
-    page.items.push_back(setting_toggle("Hide cutscene bars in full VR",
-        "With the game's Cutscene Mode on letterbox, black bars cover the world above and below story scenes. In full VR "
-        "they are hidden; the stereo and mono screens keep them. Recommended.",
-        "WuWaStereo_HideCutsceneBars"));
-    page.items.push_back(setting_toggle("Refresh far lighting automatically",
-        "Refills the far lighting for both eyes after you start, load or teleport, and whenever the game rebuilds it in "
-        "one eye only, so distant hills and buildings are lit the same in each eye. Turning it on also refills once. "
-        "Each refill pauses the picture for a moment.",
-        "WuWaStereo_RefillFarLighting"));
-    page.items.push_back(action("Refill far lighting now",
-        "Rebuilds the far lighting for both eyes now. Use it when distant hills or buildings look darker in one eye "
-        "than the other. The picture pauses for a moment.", [] { wuwa_clv::request(); }));
-    page.items.push_back(setting_toggle("Match cinematic framing",
-        "Gives both eyes the same framing during letterboxed scenes.", "VR_CinematicFramingFix"));
+// VR controllers, sharing with an Xbox pad or treadmill, treadmill runs and the keyboard. Motion controls will
+// join this page.
+Page controls_page() {
+    auto* vr = VR::get().get();
+    Page page{"Controls"};
+    auto controllers = controllers_toggle(vr);
+    controllers.help_more = "A/B/X/Y keep their labels. Triggers = LT/RT, grips = LB/RB, stick clicks = L3/R3. Left Menu tap = Start; "
+        "left grip + Menu tap = View. Both stick clicks open the WuWa VR menu. D-pad actions are not mapped.";
+    page.items.push_back(std::move(controllers));
+    page.items.push_back(setting_choice("Sharing with Xbox / treadmill",
+        "Both together: buttons combine and each stick follows whichever is pushed further, so treadmill walking keeps "
+        "working while you look around with VR. Last used wins: the other waits until you use it. VR only: the Xbox pad "
+        "is ignored while VR controllers are on.",
+        "VR_WuWaVRControllerStyle", {"Both together", "Last used wins", "VR only (Xbox ignored)"}));
+    page.items.push_back(slot_choice());
+    page.items.push_back(run_toggle());
+    page.items.push_back(setting_toggle("Start and end runs automatically",
+        "With Reality Runner open, 10 seconds of walking starts a run and 5 minutes without walking ends it. Your route "
+        "is saved in the UEVR profile, wuwa-runs folder.", "WuWaRun_Auto"));
+    auto vr_key = setting_choice("VR key",
+        "The key you hold for the shortcuts. The key left of 1 is ` on US and UK keyboards (^ on German, \xC2\xB2 on "
+        "French); it never reaches the game. Off turns the keyboard shortcuts off.", "WuWaControls_KeyboardVrKey",
+        {"Off", "Key left of 1", "Right Ctrl"});
+    vr_key.help_more = "Hold the VR key and press a key, as L3 + a button on a controller: 1 full VR / stereo screen, 2 mono theatre, 3 "
+        "portal, 4 diorama, H game UI, R recenter, F first person, T fixed camera, C freecam. Hold it for half a second "
+        "to see them all on a card. Insert opens this menu.";
+    {
+        Shortcut card;
+        card.keyboard = {keys::key_long_press("VR", 0.5f)};
+        add_keys(vr_key, std::move(card));
+    }
+    page.items.push_back(std::move(vr_key));
+    page.items.push_back(setting_toggle("Keys fly the freecam",
+        "In freecam, W A S D move, the mouse looks, Space / Ctrl rise and sink and Shift speeds up; the game does not "
+        "get those keys or the mouse movement meanwhile. Mouse clicks still reach the game.", "WuWaControls_KeyboardFlight"));
+    return page;
+}
+
+Page interface_page() {
+    auto* vr = VR::get().get();
+    Page page{"Interface"};
+    page.items.push_back(game_ui_toggle());
+    page.items.push_back(setting_slider("HUD size", "How large the game's HUD and menus appear.", "UI_Size", 0.5f, 5.0f, 0.05f, "%.2f"));
+    page.items.push_back(setting_slider("HUD distance", "How far away the HUD sits. Its stereo depth follows this distance.",
+        "UI_Distance", 0.5f, 6.0f, 0.1f, "%.1f m"));
+    page.items.push_back(setting_toggle("HUD follows your head",
+        "On: the HUD stays in front of your eyes. Off: it stays put in the world and you look at it.", "UI_FollowView"));
+    auto cards = setting_toggle("Controls cards",
+        "Hold L3, or LT + RT, for half a second: a card rises under your view and shows what each button does, lighting "
+        "each one as you press it. Let go and it sinks away. On the keyboard, hold the VR key (` by default).", "WuWaControls_Cards");
+    {
+        Shortcut l3_card;
+        l3_card.pad = {keys::long_press(btn::L3, 0.5f)};
+        l3_card.keyboard = {keys::key_long_press("VR", 0.5f)};
+        add_keys(cards, std::move(l3_card), N_("Buttons card"));
+        Shortcut views_card;
+        views_card.pad = {keys::long_press(btn::LT | btn::RT, 0.5f)};
+        add_keys(cards, std::move(views_card), N_("Views card"));
+    }
+    page.items.push_back(std::move(cards));
+    page.items.push_back(language_choice());
+    page.items.push_back(action("VR setup",
+        "The first-launch questions again: camera, background blur, camera tilt and story scenes. Each answer takes "
+        "effect at once.", [] { start_setup_run(false); }));
+    auto move = action("Move menu",
+        "Point with a controller and pull the trigger to put it down. Or use a stick, the D-pad, the arrow keys or WASD, and "
+        "the right stick or Page Up / Down for distance; A, Enter or B puts it down. Gamepad shortcut: Y. Keyboard: M. "
+        "Mouse: drag with the right button at any time.", [] { start_moving_menu(); });
+    move.help_more = "VR controllers: point and pull the trigger, or use either stick and A. B closes, the grips change page. "
+        "Xbox: D-pad or stick, A, B, LB / RB. Keyboard: arrows, Enter, Esc, Tab. Mouse: click and scroll.";
+    move.status = status_of([vr] { return vr->menu_pointer_status(); });
+    add_keys(move, pad_and_key({keys::press(btn::Y)}, {keys::key_press("M")}));
+    page.items.push_back(std::move(move));
+
+    std::vector<Item> more;
+    more.push_back(mouse_mode_toggle());
+    // 16:9 (default) or the taller 1.2.2 layout. A switch moves the hooks and the panel
+    // at once; the game's UI scaler keeps its old size until a layout refresh, so one is
+    // asked for right away (Comfort.lua hud_refresh, as after a view change).
+    if (wuwa_lgui_viewport::installed()) {
+        auto layout = make(Kind::Toggle, "16:9 UI layout",
+            "On: full VR lays out the HUD and menus like the flat game (16:9): round icons, story pictures whole, and the "
+            "mouse hits what it points at. Off: 1.2.2's taller layout, where the Terminal fits on one page and the "
+            "character screen's floor reflection keeps updating, but icons look flatter (HUD shape) and the mouse can miss.");
+        layout.get_bool = [] { return VR::get()->is_wuwa_ui_window_size_enabled(); };
+        layout.set_bool = [](bool on) {
+            if (auto* value = typed<bool>("VR_WuWaUiWindowSize")) value->value() = on;
+            if (auto* request = cached("WuWaControls_ResetHudAspect")) request->set("true");
+        };
+        more.push_back(std::move(layout));
+        auto story = setting_toggle("Story scenes in 16:9",
+            "With the 16:9 layout off: every conversation (story scenes and chats with people in the world) and story "
+            "videos switch to 16:9 while they play, so story pictures show whole, then the taller layout comes back. "
+            "Follows the game's own dialogue state, so it works with any controls and with the game UI hidden.",
+            "VR_WuWaUiStoryWindowSize");
+        story.enabled = [] {
+            return !VR::get()->is_wuwa_ui_window_size_enabled() && typed<bool>("VR_WuWaUiStoryWindowSize") != nullptr;
+        };
+        more.push_back(std::move(story));
+        auto character = setting_toggle("Character screen in the taller layout",
+            "With the 16:9 layout on: the character screen (Resonators) uses the taller layout while it is open, so its "
+            "floor reflection keeps showing the current character, then 16:9 comes back. Its icons look flatter there "
+            "and the mouse can miss.", "VR_WuWaUiCharacterTall");
+        character.enabled = [] {
+            return VR::get()->is_wuwa_ui_window_size_enabled() && typed<bool>("VR_WuWaUiCharacterTall") != nullptr;
+        };
+        more.push_back(std::move(character));
+    }
+    // Only needed when the game lays out full VR's HUD at the eye's shape: with the
+    // 16:9 layout the HUD is the flat game's 16:9 (WuWaLguiViewport.hpp).
+    if (!wuwa_lgui_viewport::installed() || !VR::get()->is_wuwa_ui_window_size_enabled()) {
+        more.push_back(setting_slider("HUD shape (full VR)",
+            "In full VR the game lays out its HUD for a 4:3 screen, which then looks squashed; 1.33 undoes that. Raise it if round "
+            "icons still look like flat ovals. The stereo screen and mono theatre always keep the game's own shape.",
+            "UI_WuWaHudShape", 0.5f, 2.0f, 0.01f, "%.2f"));
+        more.push_back(action("Reset HUD shape", "Back to 1.33, the full VR default.", [] {
+            if (auto* v = typed<float>("UI_WuWaHudShape")) v->value() = 4.0f / 3.0f;
+        }));
+    }
+    more.push_back(setting_slider("Up / down", "Moves the HUD up or down.", "UI_Y_Offset", -1.5f, 1.5f, 0.05f, "%+.2f m"));
+    more.push_back(setting_slider("Left / right", "Moves the HUD sideways.", "UI_X_Offset", -1.5f, 1.5f, 0.05f, "%+.2f m"));
+    auto refresh = action("Refresh HUD layout",
+        "Asks the game to lay out its HUD again. Try it if the HUD looks stretched or cut off after switching views.", [] {
+            if (auto* request = cached("WuWaControls_ResetHudAspect")) request->set("true");
+        });
+    refresh.status = status_of([] {
+        // A plain summary; the script logs the technical status in full ("WuWaHud: ...").
+        auto* status = cached("WuWaControls_HudAspectStatus");
+        return std::string{wuwa_status_text::hud_refresh(status ? status->get() : std::string{})};
+    });
+    more.push_back(std::move(refresh));
+    auto pin = setting_toggle("Keep the controls card open",
+        "Shows the L3 card without holding anything. Shortcut: L3 + Menu. A loaded test plan shows its step there instead.",
+        "WuWaControls_PinCard");
+    add_keys(pin, l3_and_key(btn::Menu, "K"));
+    more.push_back(std::move(pin));
+    more.push_back(setting_slider("Card size", "How wide the controls card is.", "WuWaControls_CardWidth", 0.5f, 1.6f, 0.05f, "%.2f m"));
+    more.push_back(setting_choice("Card place",
+        "Below your view, or above it if the card is in your way down there. Card height sets how far from your line "
+        "of sight.", "WuWaControls_CardPlace", {"Below your view", "Above your view"}));
+    more.push_back(setting_slider("Card height",
+        "Degrees from your line of sight, below or above it (Card place). More puts the card farther out of the way "
+        "of the HUD.",
+        "WuWaControls_CardBelow", 15.0f, 75.0f, 1.0f, "%.0f\xC2\xB0"));
+    more.push_back(setting_slider("Card distance", "How far away the card is.", "WuWaControls_CardDistance",
+        0.5f, 1.5f, 0.05f, "%.2f m"));
+    more.push_back(setting_toggle("View hints",
+        "After you switch views, a line shows for 3 seconds with how to go on or come back. It switches itself off after 5 switches.",
+        "WuWaControls_ViewHints"));
+    // Off: nothing is written to config.txt this launch (WuWaConfigSave.hpp); the header shows NOT SAVING.
+    auto saving = make(Kind::Toggle, "Save changes for next time",
+        "On: your settings are saved whenever this menu opens or closes. Off: try things freely; nothing is saved, and the "
+        "game starts with your saved settings next time. Turning it back on saves what you have now. For each setting, "
+        "the help at the bottom says whether it is saved and what its default is.");
+    saving.get_bool = [] { return !wuwa_config_save::paused.load(); };
+    saving.set_bool = [](bool on) { wuwa_config_save::paused.store(!on); };
+    saving.session_only = true;
+    more.push_back(std::move(saving));
+    more.push_back(setting_slider("Menu size", "How much of its layer this menu fills. Smaller also reads as further away.",
+        "VR_WuWaVrMenuSize", 0.4f, 1.0f, 0.05f, "%.2f"));
+    more.push_back(setting_slider("Menu distance", "How far away this menu floats. UEVR's classic window uses the same distance.",
+        "UI_Framework_Distance", 0.8f, 4.0f, 0.1f, "%.1f m"));
+    more.push_back(menu_place_choice());
+    more.push_back(menu_angle_slider("Menu left / right", "Degrees to the right of straight ahead (left is negative).", false));
+    more.push_back(menu_angle_slider("Menu up / down", "Degrees above straight ahead (below is negative).", true));
+    more.push_back(action("All settings (classic UEVR menu)",
+        "Opens UEVR's full settings window. Every setting here edits the same values.", [] { classic = true; }));
+    auto use = setting_toggle("Use this menu when opening UEVR",
+        "Off: UEVR opens its classic window, as before. You can turn this menu back on under VR > WuWa Controls.", "VR_WuWaVrMenu");
+    use.set_bool = [](bool on) {
+        if (auto* v = typed<bool>("VR_WuWaVrMenu")) v->value() = on;
+        if (!on) classic = true;
+    };
+    add_keys(use, pad_and_key({keys::press(btn::L3 | btn::R3)}, {keys::key_press("Insert")}), N_("Open this menu"));
+    more.push_back(std::move(use));
+    add_more(page, std::move(more));
+    return page;
+}
+
+Page graphics_page() {
+    Page page{"Graphics"};
+    auto resolution = resolution_choice();
+    resolution.help_more = "Full VR draws two large eye images every frame, far more pixels than the stereo screen, so busy scenes such as "
+        "dialogue run slower there. A lower resolution is smoother and a little softer.";
+    resolution.status = [] {
+        auto* vr = VR::get().get();
+        return wuwa_l10n::visual(wuwa_ui::format("Each eye: %u x %u pixels. Now about %.0f fps.", vr->get_hmd_width(), vr->get_hmd_height(),
+            ImGui::GetIO().Framerate));
+    };
+    page.items.push_back(std::move(resolution));
     page.items.push_back(setting_toggle("Ambient occlusion",
         "Soft contact shadows in corners and under objects. On by default. It keeps the game's own setting and "
         "renders both eyes with a symmetric view, so rocks, hills and roofs shade the same in each eye; the picture is "
         "slightly softer. Off is a little faster.", "WuWaStereo_AmbientOcclusion"));
-    page.items.push_back(paragraph("Smoothness", true));
-    page.items.push_back(paragraph(
-        "Full VR draws two large eye images every frame, far more pixels than the stereo screen, so busy scenes such as "
-        "dialogue run slower there. A lower resolution is smoother and a little softer."));
-    page.items.push_back(resolution_choice());
-    page.items.push_back(live_text([] {
-        auto* vr = VR::get().get();
-        return wuwa_ui::format("Each eye: %u x %u pixels. Now about %.0f fps.", vr->get_hmd_width(), vr->get_hmd_height(),
-            ImGui::GetIO().Framerate);
-    }));
+    page.items.push_back(setting_toggle("Hide cutscene bars in full VR",
+        "With the game's Cutscene Mode on letterbox, black bars cover the world above and below story scenes. In full VR "
+        "they are hidden; the stereo and mono screens keep them. Recommended.",
+        "WuWaStereo_HideCutsceneBars"));
+    page.items.push_back(setting_toggle("Full ground detail",
+        "Keeps the ground near you as detailed as in the flat game, so stone steps and ledges are not covered by dirt "
+        "and your feet do not sink in. Full VR only; the stereo and mono screens keep the game's setting. Recommended.",
+        "WuWaStereo_FullTerrainDetail"));
+    page.items.push_back(setting_toggle("Match far detail between eyes",
+        "Far trees and props switch detail together in both eyes. Recommended.", "WuWaStereo_SyncEyeLod"));
+    std::vector<Item> more;
+    more.push_back(setting_toggle("Refresh far lighting automatically",
+        "Refills the far lighting for both eyes after you start, load or teleport, and whenever the game rebuilds it in "
+        "one eye only, so distant hills and buildings are lit the same in each eye. Turning it on also refills once. "
+        "Each refill pauses the picture for a moment.",
+        "WuWaStereo_RefillFarLighting"));
+    more.push_back(action("Refill far lighting now",
+        "Rebuilds the far lighting for both eyes now. Use it when distant hills or buildings look darker in one eye "
+        "than the other. The picture pauses for a moment.", [] { wuwa_clv::request(); }));
+    add_more(page, std::move(more));
     return page;
 }
 
@@ -1182,21 +1455,12 @@ Item microphone_choice() {
 Page record_page() {
     Page page{"Record"};
     page.items.push_back(record_toggle());
-    page.items.push_back(run_toggle());
-    page.items.push_back(live_text([] { return VR::get()->get_wuwa_controls().run_status(); }));
     page.items.push_back(setting_choice("Hide player IDs",
         "Black boxes over your UID in the corner and the profile ID row in menus. While recording: while the WuWa VR app "
         "records or a treadmill run is on, so the boxes never cover HUD you need in play. Always: for OBS and other "
         "recorders at any time. The boxes are approximate; check a short video before sharing. Other names and chat are "
         "not hidden.",
         "WuWaPrivacy_Mode", {"Off", "While recording", "Always"}));
-    auto profile = setting_toggle("Also hide the profile ID row", "Covers the ID row on the ESC profile screen too.", "WuWaPrivacy_ProfileID");
-    profile.enabled = [] {
-        auto* hide = typed<int32_t>("WuWaPrivacy_Mode");
-        return hide && hide->value() > 0 && typed<bool>("WuWaPrivacy_ProfileID") != nullptr;
-    };
-    page.items.push_back(std::move(profile));
-    page.items.push_back(live_text([] { return recorder_line(); }));
     page.items.push_back(setting_choice("Video style",
         "Side by side: both eyes, the whole view of each. Left or right eye: that eye's whole view as one video, as "
         "wide as side by side, at the game's own frame rate, not steadied; picture size is its width. Showcase: the "
@@ -1204,19 +1468,45 @@ Page record_page() {
         "or 2048 px gives 720p, 1080p, 1440p or 2160p. The eye and showcase videos need SteamVR.",
         "WuWaRecording_Style", {"Both eyes, side by side", "Showcase: one eye, steady, 16:9", "Left eye, whole view",
                                 "Right eye, whole view"}));
+    page.items.push_back(setting_toggle("Record sound",
+        "Everything your PC plays goes into the video: the game, and also voice chat and notifications. "
+        "SteamVR recordings only.", "WuWaRecording_Sound"));
+    page.items.push_back(microphone_choice());
+    auto kind = make(Kind::Choice, "What happened", "Left / right picks the kind of problem.");
+    kind.help_more = "Pick what went wrong and save. The time, the video position and your settings go into the wuwa-reports "
+        "folder of the UEVR profile. Share it together with the video.";
+    kind.session_only = true;
+    kind.get_int = [] { return report_kind; };
+    kind.set_int = [](int value) { report_kind = value; };
+    kind.choices = {"Just mark the moment", "Black bars", "Eyes don't match", "HUD or menu", "Camera position",
+        "Stutter or freeze", "Controls", "Something else"};
+    const auto choices = kind.choices;
+    page.items.push_back(std::move(kind));
+    auto save = action("Save report", "Saves the report now. Recording first makes it easy to find in the video.",
+        [choices] { save_report(choices[std::clamp(report_kind, 0, static_cast<int>(choices.size()) - 1)]); });
+    save.status = status_of([] { return report_status; });
+    page.items.push_back(std::move(save));
+
+    std::vector<Item> more;
+    auto profile = setting_toggle("Also hide the profile ID row", "Covers the ID row on the ESC profile screen too.", "WuWaPrivacy_ProfileID");
+    profile.enabled = [] {
+        auto* hide = typed<int32_t>("WuWaPrivacy_Mode");
+        return hide && hide->value() > 0 && typed<bool>("WuWaPrivacy_ProfileID") != nullptr;
+    };
+    more.push_back(std::move(profile));
     {
         auto height = setting_slider("Showcase view height",
             "Where the showcase video looks, in degrees from where your head points. People look a little below "
             "that, so the default is 12 below. Lower shows more ground, higher more sky.",
             "WuWaRecording_ShowcasePitch", -40.0f, 20.0f, 1.0f, "%.0f deg");
         height.enabled = [] { auto* style = typed<int32_t>("WuWaRecording_Style"); return style && style->value() == 1; };
-        page.items.push_back(std::move(height));
+        more.push_back(std::move(height));
     }
-    page.items.push_back(setting_choice("Frame rate", "Frames per second in the video.", "WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}));
-    page.items.push_back(setting_choice("Picture size", "Width per eye. Larger is sharper and makes bigger files. "
+    more.push_back(setting_choice("Frame rate", "Frames per second in the video.", "WuWaRecording_FPS", {"30 fps", "45 fps", "60 fps"}));
+    more.push_back(setting_choice("Picture size", "Width per eye. Larger is sharper and makes bigger files. "
         "1536 and 2048 px need SteamVR; at 2048 px, 30 or 45 fps keeps up best.",
         "WuWaRecording_Width", {"720 px", "1024 px", "1280 px", "1536 px", "2048 px"}));
-    page.items.push_back(setting_toggle("Stop if the game slows down",
+    more.push_back(setting_toggle("Stop if the game slows down",
         "Ends the recording when the game itself runs slower than the rate below for the time below, and warns you: a "
         "sound, a notice here and a window on the desktop. A PC near its limits can otherwise sink to a few frames a "
         "second while recording and stay there. What was recorded is kept.", "WuWaRecording_SlowStop"));
@@ -1225,24 +1515,20 @@ Page record_page() {
             "The game's own frame rate that counts as too slow, on average. In VR it usually runs at 25 to 40 fps while "
             "recording.", "WuWaRecording_SlowFps", 1.0f, 20.0f, 1.0f, "%.0f fps");
         rate.enabled = [] { auto* on = typed<bool>("WuWaRecording_SlowStop"); return on && on->value(); };
-        page.items.push_back(std::move(rate));
+        more.push_back(std::move(rate));
         auto time = setting_slider("For",
             "How long the game must stay that slow, on average. Loading screens can freeze it for up to about 10 seconds; "
             "time when SteamVR shows something else does not count.", "WuWaRecording_SlowSeconds", 5.0f, 60.0f, 5.0f, "%.0f s");
         time.enabled = [] { auto* on = typed<bool>("WuWaRecording_SlowStop"); return on && on->value(); };
-        page.items.push_back(std::move(time));
+        more.push_back(std::move(time));
     }
-    page.items.push_back(setting_toggle("Record sound",
-        "Everything your PC plays goes into the video: the game, and also voice chat and notifications. "
-        "SteamVR recordings only.", "WuWaRecording_Sound"));
-    page.items.push_back(microphone_choice());
     {
         auto volume = setting_slider("Microphone volume",
             "How loud your voice is in the video. At 100 it is as the microphone gives it; raise it if your voice is quiet "
             "next to the game.",
             "WuWaRecording_MicVolume", 0.0f, 300.0f, 10.0f, "%.0f%%");
         volume.enabled = [] { auto* mic = typed<std::string>("WuWaRecording_Microphone"); return mic && !mic->value().empty(); };
-        page.items.push_back(std::move(volume));
+        more.push_back(std::move(volume));
         auto files = setting_toggle("Separate sound files",
             "Besides the video with everything mixed, saves each sound alone next to it: game.wav (everything the PC "
             "plays) and microphone.wav (your voice), at the video's timing. In an edit you can then change either level "
@@ -1253,9 +1539,9 @@ Page record_page() {
             auto* mic = typed<std::string>("WuWaRecording_Microphone");
             return typed<bool>("WuWaRecording_SoundFiles") && ((sound && sound->value()) || (mic && !mic->value().empty()));
         };
-        page.items.push_back(std::move(files));
+        more.push_back(std::move(files));
     }
-    page.items.push_back(setting_toggle("Camera and controller data",
+    more.push_back(setting_toggle("Camera and controller data",
         "Saves the camera and controller movement next to the video, to help find what went wrong.", "WuWaRecording_Telemetry"));
     {
         auto scene = setting_toggle("Scene info",
@@ -1264,36 +1550,21 @@ Page record_page() {
             "moment by what was said. Your UID is never saved. Needs Camera and controller data.",
             "WuWaRecording_SceneInfo");
         scene.enabled = [] { auto* on = typed<bool>("WuWaRecording_Telemetry"); return on && on->value(); };
-        page.items.push_back(std::move(scene));
+        more.push_back(std::move(scene));
     }
-    page.items.push_back(paragraph("Desktop window", true));
-    page.items.push_back(setting_choice("HUD in the desktop window",
+    more.push_back(setting_choice("HUD in the desktop window",
         "As in the headset: the HUD sits where you see it in VR, at its distance and size. Flat: the HUD fills the "
         "window like on a monitor, a steady reference while you play. Full VR only; the stereo screen and mono theatre "
         "always show it flat.",
         "WuWaRecording_DesktopHud", {"As in the headset", "Flat, like a monitor"}));
-    page.items.push_back(setting_toggle("Steady desktop window",
+    more.push_back(setting_toggle("Steady desktop window",
         "Smooths head shake out of the game window for OBS recordings. The window then trails quick head turns a "
         "little, so leave it off while you play. The headset image is not changed.", "WuWaRecording_SteadyWindow"));
     auto steadiness = setting_slider("Steadiness", "Seconds of smoothing in the steady desktop window. More is calmer "
         "and trails turns more.", "WuWaRecording_SteadySeconds", 0.05f, 1.0f, 0.05f, "%.2f s");
     steadiness.enabled = [] { auto* on = typed<bool>("WuWaRecording_SteadyWindow"); return on && on->value(); };
-    page.items.push_back(std::move(steadiness));
-    page.items.push_back(paragraph("Report a problem", true));
-    page.items.push_back(paragraph(
-        "Pick what went wrong and save. The time, the video position and your settings go into the wuwa-reports "
-        "folder of the UEVR profile. Share it together with the video."));
-    auto kind = make(Kind::Choice, "What happened", "Left / right picks the kind of problem.");
-    kind.session_only = true;
-    kind.get_int = [] { return report_kind; };
-    kind.set_int = [](int value) { report_kind = value; };
-    kind.choices = {"Just mark the moment", "Black bars", "Eyes don't match", "HUD or menu", "Camera position",
-        "Stutter or freeze", "Controls", "Something else"};
-    page.items.push_back(kind);
-    const auto choices = kind.choices;
-    page.items.push_back(action("Save report", "Saves the report now. Recording first makes it easy to find in the video.",
-        [choices] { save_report(choices[std::clamp(report_kind, 0, static_cast<int>(choices.size()) - 1)]); }));
-    page.items.push_back(live_text([] { return report_status; }));
+    more.push_back(std::move(steadiness));
+    add_more(page, std::move(more));
     return page;
 }
 
@@ -1345,46 +1616,6 @@ Page test_page() {
     return page;
 }
 
-Page menu_page() {
-    auto* vr = VR::get().get();
-    Page page{"Menu"};
-    page.items.push_back(language_choice());
-    // Off: nothing is written to config.txt this launch (WuWaConfigSave.hpp); the header shows NOT SAVING.
-    auto saving = make(Kind::Toggle, "Save changes for next time",
-        "On: your settings are saved whenever this menu opens or closes. Off: try things freely; nothing is saved, and the "
-        "game starts with your saved settings next time. Turning it back on saves what you have now. For each setting, "
-        "the help at the bottom says whether it is saved and what its default is.");
-    saving.get_bool = [] { return !wuwa_config_save::paused.load(); };
-    saving.set_bool = [](bool on) { wuwa_config_save::paused.store(!on); };
-    saving.session_only = true;
-    page.items.push_back(std::move(saving));
-    page.items.push_back(setting_slider("Menu size", "How much of its layer this menu fills. Smaller also reads as further away.",
-        "VR_WuWaVrMenuSize", 0.4f, 1.0f, 0.05f, "%.2f"));
-    page.items.push_back(setting_slider("Menu distance", "How far away this menu floats. UEVR's classic window uses the same distance.",
-        "UI_Framework_Distance", 0.8f, 4.0f, 0.1f, "%.1f m"));
-    page.items.push_back(action("Move menu",
-        "Point with a controller and pull the trigger to put it down. Or use a stick, the D-pad, the arrow keys or WASD, and "
-        "the right stick or Page Up / Down for distance; A, Enter or B puts it down. Gamepad shortcut: Y. Keyboard: M. "
-        "Mouse: drag with the right button at any time.", [] { start_moving_menu(); }));
-    page.items.push_back(menu_place_choice());
-    page.items.push_back(menu_angle_slider("Menu left / right", "Degrees to the right of straight ahead (left is negative).", false));
-    page.items.push_back(menu_angle_slider("Menu up / down", "Degrees above straight ahead (below is negative).", true));
-    page.items.push_back(live_text([vr] { return vr->menu_pointer_status(); }));
-    page.items.push_back(paragraph(
-        "VR controllers: point and pull the trigger, or use either stick and A. B closes, the grips change page. "
-        "Xbox: D-pad or stick, A, B, LB / RB. Keyboard: arrows, Enter, Esc, Tab. Mouse: click and scroll."));
-    page.items.push_back(action("All settings (classic UEVR menu)",
-        "Opens UEVR's full settings window. Every setting here edits the same values.", [] { classic = true; }));
-    auto use = setting_toggle("Use this menu when opening UEVR",
-        "Off: UEVR opens its classic window, as before. You can turn this menu back on under VR > WuWa Controls.", "VR_WuWaVrMenu");
-    use.set_bool = [](bool on) {
-        if (auto* v = typed<bool>("VR_WuWaVrMenu")) v->value() = on;
-        if (!on) classic = true;
-    };
-    page.items.push_back(std::move(use));
-    return page;
-}
-
 // The Record page's microphone list: the launcher's microphones and the saved choice (a choice not plugged in
 // has its own row until another is chosen).
 std::string microphones_key() {
@@ -1408,23 +1639,22 @@ void refresh_pages() {
     const auto key = layout_key();
     if (!pages.empty() && key == built_key) return;
     const bool want_test = steps.loaded();
-    std::string page_title{"Quick"}, focus_label;
+    std::string page_title{"Home"}, focus_label;
     if (!pages.empty()) {
         const auto& old = pages[std::clamp(state.page, 0, static_cast<int>(pages.size()) - 1)];
         page_title = old.title;
         if (state.focus >= 0 && state.focus < static_cast<int>(old.items.size())) focus_label = old.items[state.focus].label;
     }
     pages.clear();
-    pages.push_back(quick_page());
+    pages.push_back(home_page());
     if (want_test) pages.push_back(test_page());
+    pages.push_back(view_page());
     pages.push_back(camera_page());
-    pages.push_back(cinema_page());
-    pages.push_back(hud_page());
-    pages.push_back(controllers_page());
     pages.push_back(comfort_page());
-    pages.push_back(fixes_page());
+    pages.push_back(controls_page());
+    pages.push_back(interface_page());
+    pages.push_back(graphics_page());
     pages.push_back(record_page());
-    pages.push_back(menu_page());
     int index = 0;
     for (int i = 0; i < static_cast<int>(pages.size()); ++i) {
         if (pages[i].title == page_title) index = i;
@@ -1481,6 +1711,7 @@ Moves read_moves() {
     const bool pad_back = press(direct && pad.back, pad_was.back);
     const bool pad_prev = press(direct && pad.prev_page, pad_was.prev_page);
     const bool pad_next = press(direct && pad.next_page, pad_was.next_page);
+    if (pad_accept || pad_back || pad_prev || pad_next) wuwa_input_activity::note_vr(GetTickCount64());
     Held held;
     held.up = down(ImGuiKey_GamepadDpadUp) || down(ImGuiKey_UpArrow) || dir == Dir::Up;
     held.down = down(ImGuiKey_GamepadDpadDown) || down(ImGuiKey_DownArrow) || dir == Dir::Down;
@@ -1603,6 +1834,8 @@ bool draw(const ImVec2& target_size) {
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollWithMouse |
         ImGuiWindowFlags_NoBringToFrontOnFocus);
     Look look{1.0f, wuwa_l10n::sheet_font()};
+    look.device = static_cast<wuwa_pad3d::Device>(wuwa_input_activity::last_device());
+    look.time = ImGui::GetTime();
     if (rec_since >= 0.0) look.badge = "REC " + rec_clock();
     else if (wuwa_config_save::paused.load()) look.badge = wuwa_l10n::text("NOT SAVING");
     // Move menu: a click (the laser's trigger or the mouse) puts the menu down
@@ -1624,7 +1857,12 @@ bool draw(const ImVec2& target_size) {
     }
     Moves moves{};
     if (moving_menu.load(std::memory_order_relaxed)) move_menu(); else moves = read_moves();
-    wuwa_menu::draw(pages, state, moves, pos, size, look);
+    if (setup_active) {
+        wuwa_menu::draw_setup(setup, moves, pos, size, look);
+        if (setup.result != SetupResult::Open) finish_setup();
+    } else {
+        wuwa_menu::draw(pages, state, moves, pos, size, look);
+    }
     if (moving_menu.load(std::memory_order_relaxed)) {
         const auto shown = wuwa_l10n::text(VR::get()->menu_pointer_active() ?
             N_("Moving the menu: point where you want it, thumbstick up / down for distance, then pull the trigger.") :
@@ -1662,8 +1900,22 @@ void request_open(bool classic_window) {
     open_request.store(classic_window ? 2 : 1, std::memory_order_release);
 }
 
+bool setup_pending() {
+    if (!wuwa_test::is_wuwa()) return false;
+    auto* enabled = typed<bool>("VR_WuWaVrMenu");
+    auto* done = typed<int32_t>("WuWaSetup_Version");
+    return enabled && enabled->value() && done && done->value() < setup_version;
+}
+
+void start_setup() {
+    start_setup_run(true);
+}
+
 void on_closed() {
+    // Closed half way (L3 + R3, the emergency keys): not answered, so the first-launch setup comes back next launch.
+    setup_active = false;
     classic = false;
+    more_open.clear(); // More settings closes with the menu
     state.focus = -1;
     state.dragging = -1;
     state.close_requested = false;
@@ -1808,17 +2060,17 @@ void draw_hint(ImDrawList* list, const ImVec2& size) {
         // Short and high: it shows during dialogue (test 16: the full note was in the way; 17p:
         // the overlay lifts it above the HUD, OverlayComponent).
         wuwa_menu::draw_note(list, size, font, "Hide characters at your eyes", "LT + RT, then Y",
-            "Shows 3 times, then turns itself off (Cinema page).", true);
+            "Shows 3 times, then turns itself off (Camera page).", true);
         return;
     }
     if (kind == 3) {
         // The same short, high note: it shows during dialogue too.
         wuwa_menu::draw_note(list, size, font, "Story camera nudge", "Hold L3, then Y: nearer, X: back, Y + X: reset",
-            "Shows 3 times, then turns itself off (Cinema page).", true);
+            "Shows 3 times, then turns itself off (Camera page).", true);
         return;
     }
     wuwa_menu::draw_note(list, size, font, "Cinematic scene",
         "Looks wrong? Hold LT + RT, then click R3 for the stereo screen (hold R3: mono).",
-        "Turn this note off in the menu, Cinema page.");
+        "Turn this note off in the menu, View page.");
 }
 }

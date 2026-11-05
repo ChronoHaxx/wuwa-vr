@@ -213,6 +213,16 @@ test('passthrough clears queued shortcuts while preserving focused camera eligib
     f.values.WuWaControls_Focused='false'; f:tick(); local unfocused=f:motion_sample()
     assert(unfocused.camera_active==false and unfocused.focused==false,'Focus-loss camera preference was ignored')
 end)
+test('recording samples name the view the headset shows and the diorama state',function()
+    local f=fixture(); f:sample()
+    local s=f:motion_sample()
+    assert(s.view=='full VR' and s.diorama==false,'Default view logged as '..tostring(s.view))
+    f.values.VR_2DScreenMode='true'; f.values.WuWaDiorama_Enabled='true'
+    s=f:motion_sample()
+    assert(s.view=='stereo screen' and s.diorama==true,'Stereo screen logged as '..tostring(s.view))
+    f.values.VR_MonoTheatreMode='true'
+    assert(f:motion_sample().view=='mono theatre','Mono theatre not logged')
+end)
 test('queued actions expire after .25 seconds and cannot replay while held',function()
     for _,right in ipairs({false,true}) do
         for _,age in ipairs({.249,.251}) do

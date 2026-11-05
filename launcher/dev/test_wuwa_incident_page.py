@@ -48,7 +48,7 @@ class Fixture:
         self.helper.status = lambda: copy.deepcopy(self.status)
         self.helper.static_file = lambda url: (SITE / url.removeprefix('/guide/'),
             self.helper.STATIC_TYPES.get(Path(url).suffix, 'application/octet-stream')) if url in (
-            '/guide/style.css', '/guide/config.js', '/guide/app.js', '/guide/media/mark.svg') else None
+            '/guide/style.css', '/guide/config.js', '/guide/app.js', '/guide/media/icon-32.png') else None
         self.requests, self.opened = [], []
         self.fail_save = None
         self.delay = False

@@ -1247,6 +1247,36 @@ class Tests
                 s.Remove("job"); Json.Child(s, "launch")["phase"] = "cancelled"; Json.Child(s, "launch")["current"] = true;
                 Assert(LauncherBridge.LaunchSummary(s, x => x) == "launchCancelled", "cancellation concealed");
             });
+            Test("launch phases have plain words, lit steps and an in-VR state only for a healthy current worker", () =>
+            {
+                Assert(LauncherPresentation.LaunchPhaseKey("waiting-for-play", false, false) == "phasePressPlay" &&
+                    LauncherPresentation.LaunchPhaseKey("waiting-for-play", true, false) == "phaseSteam", "Play step ignored the game route");
+                Assert(LauncherPresentation.LaunchPhaseKey("injected", false, false) == "phaseStartingVr" &&
+                    LauncherPresentation.LaunchPhaseKey("injected", false, true) == "phaseSlow", "slow VR start not distinguished");
+                Assert(LauncherPresentation.LaunchPhaseKey("waiting-game", false, false) == null && LauncherPresentation.LaunchPhaseKey("failed", false, false) == null,
+                    "an unknown or terminal phase lost the worker's own message");
+                Assert(LauncherPresentation.LaunchStep("permission-pending") == 0 && LauncherPresentation.LaunchStep("game-starting") == 1 &&
+                    LauncherPresentation.LaunchStep("injected") == 2 && LauncherPresentation.LaunchStep("settling") == 3 && LauncherPresentation.LaunchStep("failed") == -1, "wrong lit step");
+                Func<object[], Dictionary<string, object>> stop = pairs => { var d = new Dictionary<string, object>(); for (int i = 0; i < pairs.Length; i += 2) d[(string)pairs[i]] = pairs[i + 1]; return d; };
+                Assert(LauncherPresentation.StoppedStep(stop(new object[] { "reachedPhase", "injected", "outcome", "GameExited" })) == 2 &&
+                    LauncherPresentation.StoppedStep(stop(new object[] { "reachedPhase", "settling" })) == 3 &&
+                    LauncherPresentation.StoppedStep(stop(new object[] { "reachedPhase", "waiting-for-play", "outcome", "LauncherClosed" })) == 1 &&
+                    LauncherPresentation.StoppedStep(stop(new object[] { "reachedPhase", "injected", "outcome", "PreflightFailed" })) == 0, "recorded stop step misread");
+                // Workers before 1.2.7 record no reachedPhase: their evidence decides.
+                Assert(LauncherPresentation.StoppedStep(stop(new object[] { "backendLogStarted", true, "elevated", true })) == 2 &&
+                    LauncherPresentation.StoppedStep(stop(new object[] { "firstFrameSeen", true })) == 3 &&
+                    LauncherPresentation.StoppedStep(stop(new object[] { "elevated", true })) == 1 && LauncherPresentation.StoppedStep(stop(new object[0])) == 0, "legacy stop step misread");
+                Assert(LauncherPresentation.FailureKey(stop(new object[] { "outcome", "ElevationCancelled" }), true) == "failPermissionDeclined" &&
+                    LauncherPresentation.FailureKey(stop(new object[] { "outcome", "Cancelled" }), true) == "failCancelled" &&
+                    LauncherPresentation.FailureKey(stop(new object[] { "outcome", "BackendStopped" }), false) == "failNoAttach" &&
+                    LauncherPresentation.FailureKey(stop(new object[] { "outcome", "Surprise" }), false) == "failUnknown", "failure reason misread");
+                foreach (var key in new[] { "failPermissionDeclined", "failCancelled", "failPreflight", "failBlocked", "failLauncherClosed", "failTimedOut", "failGameClosed", "failNoAttach", "failLostGame", "failUnknown" })
+                    Assert(new Strings()[key] != key, "missing failure reason text " + key);
+                var s = Json.Read<Dictionary<string, object>>(Json.Write(new { launch = new { current = true, running = true, phase = "settling" } }));
+                Assert(LauncherPresentation.InVr(s), "healthy settling worker not in VR");
+                Json.Child(s, "launch")["stalled"] = true; Assert(!LauncherPresentation.InVr(s), "stalled worker shown as in VR");
+                Json.Child(s, "launch")["stalled"] = false; Json.Child(s, "launch")["current"] = false; Assert(!LauncherPresentation.InVr(s), "old worker shown as in VR");
+            });
             Test("external launch progress and cancellation require current correlated worker state", () =>
             {
                 var s = Json.Read<Dictionary<string, object>>(Json.Write(new { gameRunning = false,

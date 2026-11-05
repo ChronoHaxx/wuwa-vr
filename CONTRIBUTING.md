@@ -20,8 +20,8 @@ build/runtime are usually enough to start.
 
 ## Translations
 
-The VR mod (the WuWa VR menu, the controls cards and notices), the offline
-player guide, the launcher, the portable web tool and the website home pages
+The VR mod (the WuWa VR menu, the controls cards and notices), the player
+guide and home pages on the website, the launcher and the portable web tool
 are in English, Simplified Chinese, Japanese, Korean, Spanish, Brazilian
 Portuguese, French, German, Russian and Arabic. Most translations started as
 machine drafts, so review by speakers of each language is very welcome: a

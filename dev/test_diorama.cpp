@@ -95,6 +95,32 @@ int main() {
         Scale::Draw nested{camera, 1.0f};
         assert(!camera.shown());
     }
+    // An ultimate pauses a requested diorama (WuWaControls_DioramaSkillPause): those draws use
+    // the normal scale and camera, the request stays on, and a pause that starts or ends
+    // between the eyes waits for the next draw.
+    Scale skill;
+    skill.set_miniature(6.0f);
+    skill.request(true);
+    { Scale::Draw draw{skill, 1.0f}; assert(skill.shown() && skill.effective(1.0f) == 6.0f); }
+    {
+        Scale::Draw draw{skill, 1.0f};
+        skill.set_paused(true);
+        Scale::Draw second_eye{skill, 1.0f};
+        assert(skill.shown() && skill.effective(1.0f) == 6.0f);
+    }
+    {
+        Scale::Draw paused{skill, 1.0f};
+        assert(skill.requested() && skill.paused() && !skill.shown() && skill.effective(1.0f) == 1.0f);
+        skill.set_paused(false);
+        Scale::Draw second_eye{skill, 1.0f};
+        assert(!skill.shown() && skill.effective(1.0f) == 1.0f);
+    }
+    { Scale::Draw back{skill, 1.0f}; assert(skill.shown() && skill.effective(1.0f) == 6.0f && skill.miniature() == 6.0f); }
+    skill.request(false);
+    skill.set_paused(true);
+    { Scale::Draw off{skill, 1.0f}; assert(!skill.shown() && skill.effective(1.0f) == 1.0f); }
+    skill.set_paused(false);
+    { Scale::Draw still_off{skill, 1.0f}; assert(!skill.shown()); } // the pause never turns the diorama on
     std::cout << "PASS: five normal scales, mid-pair toggles, nested captures, reset, manual edit, exception unwind, restart, "
-                 "player diorama scale per draw and clamped, diorama camera per draw\n";
+                 "player diorama scale per draw and clamped, diorama camera per draw, skill pause per draw\n";
 }

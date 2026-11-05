@@ -109,7 +109,7 @@ if (Test-Path -LiteralPath $config) {
     $item = Assert-RegularFile $config
     $inputs += [ordered]@{ name = $item.Name; source = $item.FullName; bytes = $item.Length; sha256 = (Get-Sha256 $item.FullName) }
 }
-foreach ($name in @('README.txt', 'TEST THIS.txt', 'PlayerGuide.html', 'LICENSE.txt', 'THIRD-PARTY-NOTICES.txt')) {
+foreach ($name in @('README.txt', 'TEST THIS.txt', 'LICENSE.txt', 'THIRD-PARTY-NOTICES.txt')) {
     $item = Assert-RegularFile (Join-Path $PSScriptRoot $name)
     $inputs += [ordered]@{ name = $name; source = $item.FullName; bytes = $item.Length; sha256 = (Get-Sha256 $item.FullName) }
 }

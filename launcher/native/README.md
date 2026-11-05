@@ -7,11 +7,11 @@ first installation needs internet for the separate approximately **54 MB** ZIP.
 The portable **WuWa-VR-Launcher.zip** remains an advanced fallback using the older
 web interface; it does not install or self-update the desktop app.
 
-Use **01 Game → 02 Install VR → 03 Headset or simulator**, then **Launch in VR**,
+Check the **Game**, **VR mod** and **Headset** rows, then **Launch in VR**,
 Windows permission and, for Kuro, **Play** in its launcher. Steam dispatches through Steam. For updates, use
-**02 → Versions & updates → Check updates**. **Update launcher** downloads and verifies an update; explicit **Restart to update**
+**Troubleshooting → More options → Versions & updates → Check updates**. **Update launcher** downloads and verifies an update; explicit **Restart to update**
 applies it while idle. VR package updates remain
-separate in step 02. Settings, backups, logs and recordings are preserved.
+separate, in the VR mod row. Settings, backups, logs and recordings are preserved.
 
 The new NPC rim option starts off and removes intended nearby toon-rim lighting
 too. Its underlying stereo fault remains unresolved and headset checking is
@@ -37,7 +37,7 @@ then checks both Windows uninstall-registry views (including DisplayIcon-only
 records) and exact default folders on fixed drives. It does not scan whole disks.
 Multiple official installs require a choice; missing saved paths are reported
 instead of replaced. Steam/Epic registrations are not promoted to official routes.
-Change and Troubleshooting > Repair & recovery > Find game again remain available. Automatic suggestions
+Change and Troubleshooting > More options > Repair & recovery > Find game again remain available. Automatic suggestions
 are not persisted as explicit overrides of the helper's saved startup choices.
 
 ```powershell
@@ -92,17 +92,49 @@ through an explicit action on the home screen; it is never selected on startup.
 Player story: "I want to try WuWa in VR without learning the mod's developer
 tools. Find my game, tell me which VR version is installed, and let me launch."
 
-The home screen has three cards: game location, VR version/updates, and the
-current headset/simulator runtime. Versions and update checks belong to card 02.
+The home screen (one-screen layout, 3 November 2026, modelled on CircuitLord's VR
+Mod Installer) is a hero card and three rows. The hero says where the player is
+(ready, launching, in VR, failed) and holds **Launch in VR** and **Play without VR**,
+which opens the saved launcher or Steam with no injection. The rows are Game, VR
+mod (Update / Back to) and Headset (Change folds out headset or simulator). The
+account-risk box shows until the risk is accepted once, and while installing.
 One primary button installs on first use, then becomes Launch in VR. Returning
 players with a compatible installation and saved choices use that one launcher
 button; Windows permission and Play in the official game launcher can still be
 required. We do not claim a completely unattended game launch.
 
+A launch shows four steps (permission, Play, starting VR, in VR) in plain,
+translated words. The worker's own line stays in Details. Before the change, 133
+recorded launches showed a recoverable "needs attention" warning in 77% of
+successful starts. They also kept the launcher busy a median 38 s after VR was
+already up (the 30 s settle check). Now "Starting VR" becomes "taking longer than
+usual" only after 90 s. In VR nothing is left to stop. Closing the window then
+hides it at once and stops the helper after the check ends. Opening to ready
+measured about 1.2 s before and after (sandboxed, 4 runs each).
+
 There are no public Setup/Record/Help tabs. The footer's Developer tools link
 opens the original web launcher for recording, playtests and advanced settings,
-using the selected package and existing data. Troubleshooting is a separate
-compact view with Back, read-only controller checks and recovery. Recovery stays
+using the selected package and existing data. Troubleshooting is a separate view
+with Back. On top are three fixes: Repair mod files, Reset mod settings and
+Save a problem report. The report is one zip on the
+desktop with the diagnostics, the last three launch transcripts, UEVR's config.txt
+and log.txt and the launcher logs. The Windows user and PC names are replaced and
+any UID is hidden. Everything else is under More options: controller check,
+readiness, diagnostics, Open settings folder, stuck processes, versions, recovery
+and uninstall. Restore pre-mod settings sits with the versions: it is not a fix
+(the next launch applies the mod again) but the way to leave the mod, and Prepare
+uninstall runs it first, removing nothing if it fails.
+
+Failures show where they happened (4 Nov 2026). A broken row gets a red "!" and
+its reason under it (game moved or not found, helper connection lost, no OpenXR
+runtime or another package's simulator, a failed install, reset or check). A
+stopped launch keeps its four steps on screen with the one it stopped at marked
+"!" (failed) or "–" (cancelled), a plain reason for each worker outcome, and Get
+help beside Launch; the worker's own message is in Details. A launch that stops
+reporting reads "stopped responding" and offers stuck-process recovery. The
+footer links the website (in the player's language), Troubleshooting and Ko-fi;
+the launcher no longer ships a guide of its own. Every state is covered by
+WindowTests and rendered with `--preview` fixtures. Recovery stays
 native because the web helper cannot repair the manager's package installation.
 Reset mod settings is distinct from restoring the settings saved before the mod.
 Installation does not launch the game or silently switch the system runtime.

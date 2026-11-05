@@ -226,7 +226,7 @@ local function cinema_tick()
     -- Automatic cinema and the HUD page's "Story scenes in 16:9" and "Character screen in
     -- the taller layout" all use the detector.
     if not cinema_attempted and (status_bool("VR_AutoCinema") == true or status_bool("WuWaControls_StoryLayoutDetect") == true
-        or status_bool("WuWaControls_CharacterLayoutDetect") == true) then
+        or status_bool("WuWaControls_CharacterLayoutDetect") == true or status_bool("WuWaControls_CameraDetect") == true) then
         cinema_attempted = true
         if cinema_ok and type(cinema_module) == "table" and type(cinema_module.new) == "function" then
             local ready, instance = pcall(cinema_module.new, {api = uevr.api, types = uevr.types,
@@ -434,6 +434,25 @@ local function menu_tick(delta)
     end
 end
 
+-- "Level the game camera now" (Comfort page): the game's own camera ignores the controller's rotation, so
+-- its camera library sets the tilt to level and keeps the yaw (5 Nov 2026, simulator).
+local LEVEL_LIBRARY = "TypeScriptGeneratedClass /Game/Aki/TypeScript/Game/Camera/CameraBlueprintFunctionLibrary.CameraBlueprintFunctionLibrary_C"
+local function level_camera()
+    local api = uevr.api
+    local class = api:find_uobject(LEVEL_LIBRARY)
+    local lib = class and class:get_class_default_object()
+    local pc = api:get_player_controller(0)
+    local pcm = pc and pc.PlayerCameraManager
+    if not lib or not pcm or not class:find_function("SetCameraRotation") or not class:find_function("GetFightCameraRotation") then
+        return false
+    end
+    local r = lib:GetFightCameraRotation(pcm)
+    local yaw = r and (r.y or r.Y or r.Yaw)
+    if type(yaw) ~= "number" or yaw ~= yaw then return false end
+    lib:SetCameraRotation(Vector3f.new(0, yaw, 0), pcm)
+    return true
+end
+
 local last_mono_theatre = nil
 uevr.sdk.callbacks.on_pre_engine_tick(function(_, delta)
     cinema_tick()
@@ -444,6 +463,12 @@ uevr.sdk.callbacks.on_pre_engine_tick(function(_, delta)
         local cleared = pcall(function() vr.set_mod_value("WuWaControls_ResetHudAspect", "false") end)
         if cleared and status_bool("WuWaControls_ResetHudAspect") == false then hud_refresh:request()
         else hud_refresh.status = "HUD request could not be acknowledged / 无法确认 HUD 刷新请求" end
+    end
+    if status_bool("WuWaControls_LevelCamera") == true then
+        pcall(function() vr.set_mod_value("WuWaControls_LevelCamera", "false") end)
+        local ok, levelled = pcall(level_camera)
+        pcall(function() vr.set_mod_value("WuWaControls_LevelStatus", (ok and levelled) and "done" or "unavailable") end)
+        log.log_info("WuWaComfort: level the game camera " .. ((ok and levelled) and "done" or ("unavailable: " .. tostring(levelled))))
     end
     local mono = status_bool("WuWaControls_EffectiveMonoTheatre")
     if mono == nil then mono = status_bool("VR_MonoTheatreMode") == true end

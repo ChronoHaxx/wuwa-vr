@@ -262,6 +262,14 @@ function Test-WuWaTimingDefaultNeeded {
     return -not (@(Get-Content -LiteralPath $path -Encoding UTF8) -match '^\s*Engine_r\.OneFrameThreadLag\s*=')
 }
 
+function Test-WuWaConfigHasSettings {
+    param([string]$Path)
+    # UEVR keeps key=value lines. A missing or blank config.txt is a player resetting the mod
+    # (Lelouche, 2 Nov): UEVR would start on its own defaults instead of the supplied ones.
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+    return @(@(Get-Content -LiteralPath $Path -Encoding UTF8) -match '^\s*[^#;\s][^=]*=').Count -gt 0
+}
+
 function Initialize-WuWaTimingDefault {
     param([string]$Profile)
     # A supplied default, not a per-launch override of an explicit user choice.
@@ -324,11 +332,14 @@ function Select-WuWaBuild {
         $state = Get-WuWaBuildState $Context
         $oldRuntime = Get-WuWaSelectedRuntime $Context
         $oldId = Get-WuWaPreviousBuildId $Context $catalog $state $oldRuntime
-        $source = [IO.Path]::GetFullPath((Join-Path $Context.Root $build.seed))
+        $supplied = [IO.Path]::GetFullPath((Join-Path $Context.Root $build.seed))
+        $source = $supplied
         $saved = $state.savedProfiles.PSObject.Properties[$Id]
-        if (-not $ResetToSupplied -and $saved -and (Test-Path -LiteralPath $saved.Value)) { $source = $saved.Value }
+        # A snapshot taken while config.txt was missing is not saved settings to return to.
+        if (-not $ResetToSupplied -and $saved -and (Test-Path -LiteralPath (Join-Path $saved.Value 'config.txt') -PathType Leaf)) { $source = $saved.Value }
         if (-not (Test-Path -LiteralPath (Join-Path $source 'config.txt'))) { throw 'Target profile is missing.' }
         if (-not $ResetToSupplied -and $state.selected -eq $Id -and $oldRuntime -eq $runtime -and
+            (Test-WuWaConfigHasSettings (Join-Path $Context.Profile 'config.txt')) -and
             -not (Test-WuWaGraphicsPolicyNeeded $Context.Profile $graphicsPolicy) -and
             ($graphicsPolicy -cin $script:WuWaGraphicsPolicyNames -or -not (Test-WuWaTimingDefaultNeeded $Context.Profile))) {
             # Repair state written by older helpers: a past restore is no longer
@@ -353,10 +364,16 @@ function Select-WuWaBuild {
         if (Test-Path -LiteralPath (Join-Path $Context.Profile 'log.txt')) { Copy-Item -LiteralPath (Join-Path $Context.Profile 'log.txt') -Destination (Join-Path $backup 'backend.log') }
         $state | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $backup 'state-before.json') -Encoding UTF8
         [pscustomobject]@{ from=$oldId; to=$Id; previousRuntime=$oldRuntime; profile=$Context.Profile; targetHash=$build.sha256; startedAt=(Get-Date).ToString('o'); profileExisted=$profileExisted; injectorExisted=$injectorExisted } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $backup 'transaction.json') -Encoding UTF8
-        if (-not $ResetToSupplied -and $oldId -eq $Id -and (Test-Path -LiteralPath (Join-Path $before 'config.txt') -PathType Leaf)) {
+        if (-not $ResetToSupplied -and $oldId -eq $Id -and (Test-WuWaConfigHasSettings (Join-Path $before 'config.txt'))) {
             # Copy from the verified snapshot, never from the active directory
             # while Set-WuWaManagedProfile is replacing its managed children.
             $source = $before
+        } elseif (-not $ResetToSupplied -and $oldId -eq $Id -and (Test-Path -LiteralPath (Join-Path $supplied 'config.txt') -PathType Leaf)) {
+            # Only config.txt is missing or blank: put the supplied one back and keep
+            # every other file (cameras, CVars, personal scripts) from the snapshot.
+            $source = Join-Path $backup 'restored-config'
+            Copy-WuWaManagedProfile $before $source
+            Copy-Item -LiteralPath (Join-Path $supplied 'config.txt') -Destination (Join-Path $source 'config.txt') -Force
         } elseif (-not $ResetToSupplied -and -not ($saved -and (Test-Path -LiteralPath $saved.Value)) -and
             $oldId -and $build.PSObject.Properties['settingsFrom'] -and
             @($build.settingsFrom | Where-Object id -eq $oldId).Count -eq 1 -and

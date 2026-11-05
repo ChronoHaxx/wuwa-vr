@@ -5,3 +5,6 @@
 4823 RCDATA "wuwa-fonts/kr.ttf"
 4824 RCDATA "wuwa-fonts/arabic.ttf"
 4830 RCDATA "wuwa-languages.json"
+4840 RCDATA "wuwa-crest-72.rgba"
+4841 RCDATA "wuwa-crest-144.rgba"
+4842 RCDATA "wuwa-crest-288.rgba"

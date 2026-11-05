@@ -5986,8 +5986,8 @@ __forceinline void FFakeStereoRenderingHook::calculate_stereo_view_offset(
 
     auto vqi_norm = glm::normalize(view_quat_inverse);
 
-    // Decoupled Pitch
-    if (vr->is_decoupled_pitch_enabled()) {
+    // Decoupled Pitch (given back to the game camera in story scenes and ultimates)
+    if (vr->is_decoupled_pitch_effective()) {
         vr->set_pre_flattened_rotation(vqi_norm);
         vqi_norm = utility::math::flatten(vqi_norm);
     }

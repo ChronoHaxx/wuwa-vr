@@ -10,8 +10,10 @@ Copyright (c) 2026 ChronoHaxx. The [MIT license](LICENSES/MIT.md) applies to:
 
 - Original text in `README.md`, `SUPPORT.md`, `CONTRIBUTING.md`, `CREDITS.md`
   and `docs/`, excluding quoted third-party material.
-- Original website HTML, CSS and JavaScript under `site/`, the translated
-  getting-started text, and `site/media/mark.svg`.
+- Original website HTML, CSS and JavaScript under `site/`, and the translated
+  getting-started text.
+- The brand generator `dev/brand/abby.py` (the code, not the artwork it draws;
+  see below).
 - The original site generators and checks: `dev/build-site.cjs`,
   `dev/build-community.cjs`, `dev/site-layout.cjs`, `dev/check-site.cjs`,
   `dev/check-community.cjs`.
@@ -42,6 +44,12 @@ does not mean every bundled component has an open-source licence.
 - Game code, assets, characters, screenshots, trademarks and other owners' work.
 - The generated controller illustration is not represented as an official
   Xbox asset or as having an exclusive copyright grant from this project.
+- The Abby artwork: the app and site icons, the launcher backdrop and the site's
+  hero picture (`site/media/abby.svg`, `site/media/icon-*.png`,
+  `launcher/native/assets/*`, `launcher/dev/portable/wuwa-vr.ico`). It is an
+  original drawing of Abby, a Wuthering Waves character owned by Kuro Games,
+  wearing a VR headset: fan art, not official artwork, and not licensed by this
+  project. No rights in the character are granted.
 
 See [CREDITS.md](CREDITS.md) for component notices and provenance. The pinned
 UEVR backend's root notice is All rights reserved; its SDK's separate MIT

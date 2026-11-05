@@ -7,12 +7,12 @@ Before testing a fix, check the
 
 ## Start with the current beta
 
-Use **desktop app 1.0.1**, public release **beta-2026-10-04-cinematic**, backend
-**cinematic-20261004**, for game **3.7**. Install **WuWa-VR-Setup.exe**, open WuWa VR,
-then follow Game → Install VR → Headset or simulator. Updating the desktop app
-preserves the selected VR package: choose the cinematic package in step 02 too.
-Close the game/injector before installing or switching packages. A loaded DLL
-cannot change until the game restarts.
+Install **WuWa-VR-Setup.exe**, open WuWa VR, select **Install VR**, then **Launch in
+VR**; the [player guide](https://chronohaxx.github.io/wuwa-vr/guide.html) has the
+details. Updating the desktop app keeps the selected VR package until the app
+installs a newer one for your game version. Close the game/injector before
+installing or switching packages. A loaded DLL cannot change until the game
+restarts.
 
 Cinematic framing is **on by default**. The owner confirmed the simulator replay
 on the private **screen-comfort-r1** build; sampled frames from the latest

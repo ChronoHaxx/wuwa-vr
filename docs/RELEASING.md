@@ -26,11 +26,12 @@ matching source before publishing. Never publish live profiles, logs, account
 IDs or raw captures by default. Publication does not relicense upstream work or
 imply its authors' endorsement.
 
-Website release inputs are `dev/site-status.json`, `docs/START-HERE.md` and
-`dev/i18n/launcher-release.{en,zh-Hans}.json`. Run
-`node dev/build-site.cjs --launcher-release` to refresh only the existing
-download/setup pages, preserving unrelated content and verification files.
-The normal full generator also applies the release refresh afterward.
+Website release inputs are `dev/site-status.json`, `dev/i18n/` (home pages
+and the player guide in ten languages), `dev/site-content/` (English reference,
+risk notice, Watch videos) and `dev/i18n/launcher-release.{en,zh-Hans}.json`.
+Run `node dev/build-site.cjs --launcher-release` to rebuild the pages, the
+README and the docs pointers, preserving unrelated content and verification
+files. `python dev/i18n/check_all.py` fails if any of them is stale.
 
 The website points to the explicit beta installer asset. Upload assets and feeds
 before deploying the new download links. Keep the previous release available;

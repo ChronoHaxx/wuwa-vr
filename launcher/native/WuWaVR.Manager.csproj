@@ -19,6 +19,7 @@
     <PackageReference Include="Velopack" Version="1.2.161"/>
     <EmbeddedResource Include="catalog.json"><LogicalName>catalog.json</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="locales\*.json"/>
+    <EmbeddedResource Include="assets\*.png"><LogicalName>assets.%(Filename)%(Extension)</LogicalName></EmbeddedResource>
     <None Include="THIRD-PARTY-NOTICES.txt"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>

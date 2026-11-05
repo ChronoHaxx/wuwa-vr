@@ -76,6 +76,7 @@ local function prop(name, kind_name, nxt)
 end
 local PICTURE = "Class /Script/LGUI.UITexture"
 local SHOWROOM = "Class /Script/Engine.PlanarReflectionComponent"
+local CAMERA = "TypeScriptGeneratedClass /Game/Aki/TypeScript/Game/Camera/CameraBlueprintFunctionLibrary.CameraBlueprintFunctionLibrary_C"
 local function plot_fixture(protocol)
     local f = {objects = {}, lookups = {}, calls = 0, performing = true, samples = {}, clock = 1, generation = 0,
         textures = {}, scans = 0, reflections = {}, camera = {x = 6, y = -305, z = 63}}
@@ -109,6 +110,16 @@ local function plot_fixture(protocol)
     function f.pcm:GetCameraLocation() return f.camera end
     f.pc = object("PlayerController"); f.pc.PlayerCameraManager = f.pcm
     described(f.pc, {PlayerCameraManager = true})
+    -- The camera library (lease-v5): GetCameraMode(__WorldContext) -> byte on its default object.
+    f.mode, f.mode_calls = 0, 0
+    f.camera_cdo = object("Default__CameraBlueprintFunctionLibrary_C")
+    function f.camera_cdo:GetCameraMode(context) f.mode_calls = f.mode_calls + 1; f.mode_context = context; return f.mode end
+    f.mode_signature = prop("__WorldContext", "ObjectProperty", prop("ReturnValue", "ByteProperty"))
+    f.camera_class = object(CAMERA)
+    function f.camera_class:find_function(name)
+        return name == "GetCameraMode" and {get_child_properties = function() return f.mode_signature end} or nil
+    end
+    function f.camera_class:get_class_default_object() return f.camera_cdo end
     f.values = {VR_AutoCinema = "false", WuWaControls_StoryLayoutDetect = "true",
         WuWaControls_AutoCinemaSample = protocol or "lease-v2", WuWaControls_AutoCinemaStatus = "test", WuWaControls_AutoCinemaProducer = "0"}
     local module = assert(loadfile(module_path))()
@@ -120,6 +131,7 @@ local function plot_fixture(protocol)
                 f.lookups[#f.lookups + 1] = name
                 if name == PLOT then return not f.plot_missing and f.plot_class or nil end
                 if name == SHOWROOM then return f.showroom_class end
+                if name == CAMERA then return f.camera_class end
                 return name == PICTURE and f.picture_class or nil
             end},
         types = {UObjectHook = {get_objects_by_class = function(c)
@@ -330,4 +342,56 @@ test("the Comfort script starts the detector for the character layout alone", fu
     assert(#f.errors == 0, f.errors[1])
     assert(f.writes[1] and f.writes[1][1] == "WuWaControls_AutoCinemaProducer", "detector not started")
 end)
-print("Story layout detection tests passed (with plot, pictures and the character screen): " .. passed)
+-- The game's skill camera (lease-v5): bit 32 while GetCameraMode is 1, for the decoupled pitch
+-- and diorama pauses (native says so in WuWaControls_CameraDetect).
+local function camera_fixture(protocol)
+    local f = plot_fixture(protocol or "lease-v5")
+    f.values.WuWaControls_StoryLayoutDetect, f.values.WuWaControls_CameraDetect = "false", "true"
+    return f
+end
+local function bit32(sample) return sample.known & 32 == 32, sample.active & 32 == 32 end
+test("lease-v5: the skill camera (mode 1) is bit 32, asked with the player's camera manager", function()
+    local f = camera_fixture(); f:tick()
+    local known, active = bit32(f:last()); assert(known and not active and f.mode_context == f.pcm, f:last().detail)
+    assert(f:last().detail:find("camera mode 0", 1, true), f:last().detail)
+    f.mode = 1; f:tick(); known, active = bit32(f:last())
+    assert(known and active and f:last().detail:find("skill camera", 1, true), f:last().detail)
+    f.mode = 0; f:tick(); assert(not select(2, bit32(f:last())))
+end)
+test("camera detection alone starts the producer and also reports the plot", function()
+    local f = camera_fixture(); f:tick()
+    assert(f.values.VR_AutoCinema == "false" and f.module.token == "1" and f:last().known & 4 == 4)
+end)
+test("other camera modes are known and clear", function()
+    local f = camera_fixture(); f.mode = 3; f:tick()
+    local known, active = bit32(f:last()); assert(known and not active and f:last().detail:find("camera mode 3", 1, true))
+end)
+test("an unexpected camera mode signature, or no camera manager, is unknown and never called", function()
+    local f = camera_fixture()
+    f.mode_signature = prop("__WorldContext", "ObjectProperty", prop("ReturnValue", "IntProperty"))
+    f:tick(); assert(f.mode_calls == 0 and not bit32(f:last()) and f:last().detail:find("signature", 1, true))
+    f = camera_fixture(); f.pc = nil; f:tick()
+    assert(f.mode_calls == 0 and not bit32(f:last()) and f:last().detail:find("camera manager unavailable", 1, true))
+end)
+test("lease-v4 backends, or camera detection off, never look up or call the camera library", function()
+    local f = camera_fixture("lease-v4"); f.values.VR_AutoCinema = "true"; for _ = 1, 5 do f:tick() end
+    for _, name in ipairs(f.lookups) do assert(name ~= CAMERA, "camera lookup on lease-v4") end
+    assert(f.mode_calls == 0 and not bit32(f:last()))
+    f = camera_fixture(); f.values.WuWaControls_CameraDetect = "false"; f.values.VR_AutoCinema = "true"
+    for _ = 1, 5 do f:tick() end
+    for _, name in ipairs(f.lookups) do assert(name ~= CAMERA, "camera lookup with detection off") end
+    assert(f.mode_calls == 0 and not bit32(f:last()))
+end)
+test("the Comfort script starts the detector for camera detection alone", function()
+    local old_path, old_loaded = package.path, package.loaded.wuwa_auto_cinema
+    package.loaded.wuwa_auto_cinema = nil
+    package.path = (module_path:match("^(.*)[/\\]") or ".") .. "/?.lua;" .. old_path
+    local f = comfort_fixture(); f:load()
+    package.path = old_path
+    f:tick(); assert(#f.writes == 0, "nothing before any setting")
+    f.values.WuWaControls_CameraDetect = "true"; f:tick()
+    package.loaded.wuwa_auto_cinema = old_loaded
+    assert(#f.errors == 0, f.errors[1])
+    assert(f.writes[1] and f.writes[1][1] == "WuWaControls_AutoCinemaProducer", "detector not started")
+end)
+print("Story layout detection tests passed (with plot, pictures, the character screen and the skill camera): " .. passed)

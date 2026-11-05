@@ -35,7 +35,7 @@ function header({lang = 'en', prefix = '', labels = {}, links, languageHref} = {
   const t = {...english, ...labels};
   const items = links || [[`${prefix}index.html`, t.home], [`${prefix}guide.html`, t.guide], [`${prefix}record.html`, t.capture], [`${prefix}feedback.html`, t.feedback]];
   return `<header class="site-header"><div class="wrap header-row">` +
-    `<a class="brand" href="${prefix}index.html" lang="en" dir="ltr"><img src="${prefix}media/mark.svg" width="32" height="32" alt=""><span>WuWa VR</span></a>` +
+    `<a class="brand" href="${prefix}index.html" lang="en" dir="ltr"><img src="${prefix}media/icon-64.png" width="32" height="32" alt=""><span>WuWa VR</span></a>` +
     `<nav class="site-nav" aria-label="${escape(t.nav)}">${items.map(([href, label]) => `<a href="${href}">${escape(label)}</a>`).join('')}</nav>` +
     `<div class="header-actions">${languageMenu({lang, prefix, label: t.language, href: languageHref})}` +
     `<a class="button primary header-download" href="${installerUrl()}">${escape(t.download)}</a></div></div></header>`;
@@ -44,13 +44,15 @@ function footer({prefix = '', labels = {}} = {}) {
   const t = {...english, ...labels};
   const link = (href, label, extra = '') => `<a href="${href}"${extra}>${escape(label)}</a>`;
   return `<footer class="site-footer"><div class="wrap footer-grid">` +
-    `<div class="footer-brand"><a class="brand" href="${prefix}index.html" lang="en" dir="ltr"><img src="${prefix}media/mark.svg" width="28" height="28" alt=""><span>WuWa VR</span></a><p>${escape(t.tagline)}</p></div>` +
+    `<div class="footer-brand"><a class="brand" href="${prefix}index.html" lang="en" dir="ltr"><img src="${prefix}media/icon-64.png" width="28" height="28" alt=""><span>WuWa VR</span></a><p>${escape(t.tagline)}</p></div>` +
     `<nav aria-label="${escape(t.explore)}"><p class="footer-title">${escape(t.explore)}</p>${link(prefix + 'guide.html', t.guide)}${link(prefix + 'record.html', t.capture)}${link(prefix + 'feedback.html', t.feedback)}${link(prefix + 'languages.html', t.languages)}</nav>` +
     `<nav aria-label="${escape(t.project)}"><p class="footer-title">${escape(t.project)}</p>${link(prefix + 'developers.html', t.code)}<a data-project-link="code" hidden rel="noopener noreferrer">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer">${escape(t.releases)}</a>${link(prefix + 'risk.html', t.risk)}${link(prefix + 'license.html', t.license)}${link(prefix + 'support.html', t.support)}${link(prefix + 'credits.html', t.credits)}</nav>` +
     `</div><div class="wrap footer-note"><p>${escape(t.mit)}</p></div></footer>`;
 }
+// Abby in a VR headset (fan art, see LICENSE.md): the visor crop at 32 px, the head at 64.
+const icons = prefix => `<link rel="icon" href="${prefix}media/icon-32.png" sizes="32x32" type="image/png"><link rel="icon" href="${prefix}media/icon-64.png" sizes="64x64" type="image/png"><link rel="apple-touch-icon" href="${prefix}media/icon-180.png">`;
 function head({lang = 'en', title, description, prefix = '', extra = ''}) {
-  return `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#0b0b0c"><title>${escape(title)}</title><link rel="icon" href="${prefix}media/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="${prefix}style.css"><script src="${prefix}config.js" defer></script><script src="${prefix}app.js" defer></script>${extra}</head>`;
+  return `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#080b17"><title>${escape(title)}</title>${icons(prefix)}<link rel="stylesheet" href="${prefix}style.css"><script src="${prefix}config.js" defer></script><script src="${prefix}app.js" defer></script>${extra}</head>`;
 }
 function shell(title, description, body, {lang = 'en', dir = 'ltr', prefix = '', labels = {}} = {}) {
   return `<!doctype html><html lang="${lang}" dir="${dir}">${head({lang, title: `${title} — WuWa VR`, description, prefix})}<body><a class="skip" href="#main">${escape({...english, ...labels}.skip)}</a>${header({lang, prefix, labels})}<main class="wrap page" id="main">${body}</main>${footer({prefix, labels})}</body></html>\n`;
@@ -65,7 +67,8 @@ function refreshChrome(site, files) {
       .replace(/<header class="(?:header wrap|site-header)"[\s\S]*?<\/header>/, () => header({prefix}))
       .replace(/<footer class="(?:footer wrap|site-footer)"[\s\S]*?<\/footer>/, () => footer({prefix}))
       .replace(/<main class="wrap" id="main">/, '<main class="wrap page" id="main">')
-      .replace(/<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#0b0b0c">');
+      .replace(/<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#080b17">')
+      .replace(/<link rel="icon" href="[^"]*mark\.svg" type="image\/svg\+xml">/, () => icons(prefix));
     if (!/<header class="site-header"/.test(next) || !/<footer class="site-footer"/.test(next)) throw Error('Missing page chrome: ' + file);
     if (next !== html) { fs.writeFileSync(full, next); changed++; }
   }

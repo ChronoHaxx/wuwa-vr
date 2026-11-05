@@ -10,9 +10,11 @@ namespace WuWaVR.Manager
     public sealed class Strings
     {
         // Picker order: the two original languages first, then by code. Names are
-        // written in their own language so a reader can always find theirs.
+        // written in their own language so a reader can always find theirs, then in
+        // English for a player stuck in a language they can't read (Lelouche, Oct 2026).
         public static readonly string[] Codes = { "en", "zh-Hans", "ar", "de", "es", "fr", "ja", "ko", "pt-BR", "ru" };
-        public static readonly string[] Names = { "English", "简体中文", "العربية", "Deutsch", "Español", "Français", "日本語", "한국어", "Português (Brasil)", "Русский" };
+        public static readonly string[] Names = { "English", "简体中文 · Chinese", "العربية · Arabic", "Deutsch · German", "Español · Spanish", "Français · French",
+            "日本語 · Japanese", "한국어 · Korean", "Português (Brasil) · Portuguese", "Русский · Russian" };
         public static bool RightToLeft(string code) { return code == "ar"; }
         public static string Supported(string code) { return Codes.Contains(code) ? code : "en"; }
         // Maps a Windows UI culture (zh-CN, pt-BR, de-AT…) to a launcher language.

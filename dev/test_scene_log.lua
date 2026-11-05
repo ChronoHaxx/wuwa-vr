@@ -55,7 +55,7 @@ local title = item("TxtTitle", item("PnlTitle", info), true, "Simulacrum of the 
 local step = item("TxtParent", item("PnlSubTitle", item("PnlParent", info)), true, "Return to the Heart of Bloom")
 local distance = item("TxtParentDistance", item("PnlParent", info), true, "518m<texture=/Game/Arrow.Arrow>")
 local uid_view = item("UiView_UID_Prefab", item("BattleViewUnitNode", root))
-local uid = item("UID", item("UIC", uid_view), true, "User ID: 701123532")
+local uid = item("UID", item("UIC", uid_view), true, "User ID: 123456789")
 local watermark = item("TxtTime", item("PnlInfo", item("PnlPos", item("PnlPosition", root))), true, "2026-10-21 09:23:25+1 *")
 local hidden_view = item("UiView_Plot", root, false)
 local hidden = item("TxtTalk", hidden_view, true, "A line nobody sees")
@@ -80,7 +80,7 @@ local function count(t) local n = 0; for _ in pairs(t or {}) do n = n + 1 end; r
 check(M.clean("<size=16>Lv.</size>60") == "Lv.60", "rich-text tags are removed")
 check(M.clean("6568/6568") == nil and M.clean("518m<texture=/Game/A.A>") == nil and M.clean("299ms") == nil,
     "numbers, distances and ping readings are dropped")
-check(M.clean("User ID: 701123532") == "User ID: #########", "7+ digit runs are masked")
+check(M.clean("User ID: 123456789") == "User ID: #########", "7+ digit runs are masked")
 check(M.clean("Talk to the Celestials\0garbage") == "Talk to the Celestials", "text ends at the first NUL")
 check(M.clean("  Head   to\nthe  anomaly ") == "Head to the anomaly", "whitespace collapses")
 check(M.clean("New Text") == nil, "LGUI's placeholder text is dropped")
@@ -127,7 +127,7 @@ check(p and p.full and p.texts["PnlInfo/PnlTitle/TxtTitle"] == "Cerulean Echoes"
 
 -- A widget address reused by a new widget after a list refresh is described afresh (no stale key/skip).
 local reused = object({displayName = "UID\0", AttachParent = item("UIC", uid_view), bIsUIActive = true,
-    text = "User ID: 701123532\0", Alpha = 1}, nil, title.get_address())
+    text = "User ID: 123456789\0", Alpha = 1}, nil, title.get_address())
 list = {reused, step}
 s:tick(50) -- list refresh (4 s passed)
 check(s.shown["PnlInfo/PnlTitle/TxtTitle"] == nil, "the reused address is not read as the old title")

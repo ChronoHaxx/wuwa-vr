@@ -2,8 +2,11 @@
 #include "WuWaShortcutSheet.hpp"
 #include "WuWaLocalization.hpp"
 #include "WuWaKeyboard.hpp"
+#include "WuWaBrand.hpp"
+#include "WuWaPad3D.hpp"
 #include "uevr-imgui/font_robotomedium.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
@@ -38,12 +41,6 @@ constexpr ImU32 leader_lit = IM_COL32(249, 232, 180, 230);
 constexpr ImU32 gold = IM_COL32(214, 175, 91, 255);
 constexpr ImU32 gold_dim = IM_COL32(214, 175, 91, 64);
 constexpr ImU32 gold_thin = IM_COL32(214, 175, 91, 178);
-constexpr ImU32 pad_fill = IM_COL32(19, 17, 13, 255);
-constexpr ImU32 pad_line = IM_COL32(214, 178, 98, 105);
-constexpr ImU32 button_fill = IM_COL32(31, 27, 20, 255);
-constexpr ImU32 button_line = IM_COL32(214, 178, 98, 128);
-constexpr ImU32 well_fill = IM_COL32(11, 10, 8, 255);
-constexpr ImU32 well_line = IM_COL32(214, 178, 98, 72);
 constexpr ImU32 lit_text = IM_COL32(26, 18, 6, 255);
 constexpr ImU32 green = IM_COL32(139, 212, 110, 255);
 constexpr ImU32 red = IM_COL32(255, 122, 107, 255);
@@ -64,6 +61,7 @@ struct Canvas {
     ImVec2 origin{};
     bool rtl{}, vr{};
     bool keyboard{}; // {tokens} are keyboard keys: no controller colours or VR controller names
+    bool playstation{}; // PlayStation names: L1 R2 Create Options, the face buttons as their shapes (1.2.7)
     ImVec2 at(float x, float y) const { return {origin.x + x * s, origin.y + y * s}; }
     float width(float px, const std::string& text) const { return font->CalcTextSizeA(px * s, FLT_MAX, 0.0f, text.c_str()).x / s; }
     void text(float x, float y, float px, ImU32 color, const std::string& visual) const {
@@ -71,7 +69,7 @@ struct Canvas {
     }
 };
 
-Canvas canvas(ImDrawList* list, ImVec2 size, ImFont* font, bool vr = false, bool keyboard = false) {
+Canvas canvas(ImDrawList* list, ImVec2 size, ImFont* font, bool vr = false, bool keyboard = false, bool playstation = false) {
     Canvas c;
     c.list = list;
     c.font = font;
@@ -82,12 +80,14 @@ Canvas canvas(ImDrawList* list, ImVec2 size, ImFont* font, bool vr = false, bool
     c.rtl = wuwa_l10n::right_to_left();
     c.vr = vr && !keyboard;
     c.keyboard = keyboard;
+    c.playstation = playstation && !c.vr && !keyboard;
     return c;
 }
 
-// What a {token} names, as printed on its key cap. VR controllers: UEVR maps the
-// triggers to LT / RT, the grips to LB / RB, the stick clicks to L3 / R3, the
-// left controller's lower button to B and the right's upper button to X.
+// What a {token} names, as printed on its key cap. VR controllers (the mod's sightseeing pad, 1.2.7): the
+// triggers are LT / RT, the grips LB / RB, the stick clicks L3 / R3, A B X Y the buttons of those names, the left
+// Menu button Menu and the left grip + Menu View. PlayStation: L1 R1 L2 R2, Create, Options, and the face
+// buttons' shapes (glyph names, drawn by chip()).
 std::string key_name(const Canvas& c, const std::string& token) {
     if (c.keyboard) {
         // {VR}: the VR key; {W} {A} {S} {D}: the freecam keys by position; named keys are translated.
@@ -108,8 +108,19 @@ std::string key_name(const Canvas& c, const std::string& token) {
         if (token == "RB") return tr("R grip");
         if (token == "L3") return tr("L stick");
         if (token == "R3") return tr("R stick");
-        if (token == "B") return "X";
-        if (token == "X") return "B";
+        if (token == "View") return c.rtl ? tr("Menu") + " + " + tr("L grip") : tr("L grip") + " + " + tr("Menu");
+    }
+    if (c.playstation) {
+        if (token == "LT") return "L2";
+        if (token == "RT") return "R2";
+        if (token == "LB") return "L1";
+        if (token == "RB") return "R1";
+        if (token == "A") return "cross";
+        if (token == "B") return "circle";
+        if (token == "X") return "square";
+        if (token == "Y") return "triangle";
+        if (token == "View") return tr("Create");
+        if (token == "Menu") return tr("Options");
     }
     if (token == "Down") return tr("D-pad");
     if (token == "View" || token == "Menu") return tr(token);
@@ -117,12 +128,19 @@ std::string key_name(const Canvas& c, const std::string& token) {
 }
 ImU32 key_color(const Canvas& c, const std::string& token) {
     if (c.vr || c.keyboard) return gold_hi;
+    if (c.playstation) {
+        return token == "A" ? IM_COL32(124, 178, 238, 255) : token == "B" ? red : token == "X" ? IM_COL32(236, 146, 204, 255)
+            : token == "Y" ? IM_COL32(88, 222, 170, 255) : gold_hi;
+    }
     return token == "A" ? green : token == "B" ? red : token == "X" ? blue : token == "Y" ? yellow : gold_hi;
 }
 
 // A key cap: the name on a dark cap with a heavier lower edge, gold when lit.
+bool glyph_cap(const Canvas& c, const std::string& name) { return !c.keyboard && wuwa_pad3d::is_glyph(name); }
 float chip_width(const Canvas& c, float px, const std::string& token) {
-    float w = c.width(px, key_name(c, token)) + px * 0.64f;
+    const auto name = key_name(c, token);
+    if (glyph_cap(c, name)) return px * 1.6f;
+    float w = c.width(px, name) + px * 0.64f;
     if (token == "Down") w += px * 0.7f;
     return (std::max)(w, px * 1.6f);
 }
@@ -133,6 +151,14 @@ float chip(const Canvas& c, float x, float middle, float px, const std::string& 
     c.list->AddRect(c.at(x, top), c.at(x + w, top + h), lit ? lit_line : key_line, 7.0f * c.s, 0, 1.2f * c.s);
     c.list->AddLine(c.at(x + 5.0f, top + h - 1.0f), c.at(x + w - 5.0f, top + h - 1.0f), lit ? lit_line : key_line, 2.5f * c.s);
     const ImU32 color = lit ? lit_text : key_color(c, token);
+    if (glyph_cap(c, name)) {
+        wuwa_pad3d::glyph(c.list, c.at(x + w * 0.5f, middle), px * 0.46f * c.s, name, color, (std::max)(1.5f, px * 0.09f * c.s));
+        return w;
+    }
+    if (c.keyboard && token == "VR" && name.size() == 1 && !std::isalnum(static_cast<unsigned char>(name[0]))) {
+        c.text(x + (w - c.width(px * 1.5f, name)) * 0.5f, middle - px * 0.45f, px * 1.5f, color, name);
+        return w;
+    }
     const float tx = token == "Down" ? x + px * 0.32f : x + (w - c.width(px, name)) * 0.5f;
     c.text(tx, middle - px * 0.56f, px, color, name);
     if (token == "Down") {
@@ -237,148 +263,113 @@ void pill(const Canvas& c, float x, float middle, float px, const std::string& e
 
 void frame(const Canvas& c) {
     c.list->AddRectFilled(c.at(0, 0), c.at(1600, 900), card_bg, 22.0f * c.s);
+    // A faint warm light from the top, as on the menu, and a hairline under the header.
+    c.list->AddRectFilledMultiColor(c.at(22, 1), c.at(1578, 160), IM_COL32(214, 175, 91, 24), IM_COL32(214, 175, 91, 24),
+        IM_COL32(214, 175, 91, 0), IM_COL32(214, 175, 91, 0));
     c.list->AddRect(c.at(0, 0), c.at(1600, 900), frame_line, 22.0f * c.s, 0, 1.5f * c.s);
+    c.list->AddLine(c.at(58, 116), c.at(1542, 116), row_line, 1.0f * c.s);
 }
 
+// The crest and the name, then the card's title and a hint. Without the crest in this font atlas, the name alone.
 void header(const Canvas& c, const std::string& title, const std::string& hint) {
-    c.text(58, 54, 30, accent, "WuWa VR");
-    c.list->AddLine(c.at(222, 46), c.at(222, 98), row_line, 1.2f * c.s);
-    const float hint_width = rich(c, 1542, 58, 24, muted, hint, 560, 1.0f);
-    rich(c, 246, 42, 44, ink, title, 1542 - 246 - hint_width - 48);
+    float x = 58.0f;
+    const float crest = wuwa_brand::draw_crest(c.list, c.at(46, 28), 72.0f * c.s) / c.s;
+    if (crest > 0.0f) x = 46.0f + crest + 14.0f;
+    c.text(x, 48, 32, accent, "WuWa VR");
+    const float divider = x + c.width(32, "WuWa VR") + 24.0f;
+    c.list->AddLine(c.at(divider, 40), c.at(divider, 98), row_line, 1.2f * c.s);
+    const float title_x = divider + 24.0f;
+    const float hint_width = rich(c, 1542, 54, 25, muted, hint, 520, 1.0f);
+    rich(c, title_x, 38, 44, ink, title, 1542 - title_x - hint_width - 40);
 }
 
-// The controller, from the site's drawing (viewBox 640 x 400).
-struct Pad {
-    const Canvas& c;
-    ImVec2 o;
-    float k;
-    ImVec2 at(float x, float y) const { return c.at(o.x + x * k, o.y + y * k); }
-    float r(float v) const { return v * k * c.s; }
-    void label(float x, float y, float px, ImU32 color, const char* text) const {
-        const float w = c.width(px * k, text);
-        c.text(o.x + x * k - w * 0.5f, o.y + y * k - px * k * 0.56f, px * k, color, text);
+// The live 3D controller (utility/WuWaPad3D.hpp, as in the WuWa VR menu) showing what is held now and turning
+// slowly; the rows' leaders run to where each button is drawn. 1.2.7 (owner, 5 Nov 2026).
+wuwa_pad3d::Device pad_device(const Canvas& c) {
+    return c.vr ? wuwa_pad3d::Device::vr : c.playstation ? wuwa_pad3d::Device::playstation : wuwa_pad3d::Device::xbox;
+}
+std::uint32_t pad_bits(unsigned xinput) {
+    namespace b = wuwa_pad3d::button;
+    static constexpr struct { unsigned x; std::uint32_t bit; } map[] = {{0x0001, b::Up}, {0x0002, b::Down}, {0x0004, b::Left},
+        {0x0008, b::Right}, {0x0010, b::Menu}, {0x0020, b::View}, {0x0040, b::L3}, {0x0080, b::R3}, {0x0100, b::LB},
+        {0x0200, b::RB}, {0x1000, b::A}, {0x2000, b::B}, {0x4000, b::X}, {0x8000, b::Y}};
+    std::uint32_t bits = 0;
+    for (const auto& m : map) if (xinput & m.x) bits |= m.bit;
+    return bits;
+}
+std::uint32_t token_bits(const Canvas& c, std::string_view token) {
+    namespace b = wuwa_pad3d::button;
+    if (token == "LT") return b::LT;
+    if (token == "RT") return b::RT;
+    if (token == "LB") return b::LB;
+    if (token == "RB") return b::RB;
+    if (token == "L3") return b::L3;
+    if (token == "R3") return b::R3;
+    if (token == "A") return b::A;
+    if (token == "B") return b::B;
+    if (token == "X") return b::X;
+    if (token == "Y" || token == "YX") return b::Y;
+    if (token == "Menu") return b::Menu;
+    if (token == "View") return c.vr ? b::Menu : b::View; // VR: the left grip + Menu; the leader goes to Menu
+    if (token == "Down") return c.vr ? 0u : b::dpad;      // VR controllers have no D-pad
+    return 0;
+}
+using Anchors = std::vector<wuwa_pad3d::Anchor>;
+Anchors draw_pad3d(const Canvas& c, float x0, float y0, float x1, float y1, std::uint32_t held) {
+    wuwa_pad3d::Moment now;
+    now.held = held;
+    wuwa_pad3d::Look look;
+    look.sway = 0.14f;
+    look.sway_seconds = 12.0f;
+    look.fill = 0.94f;
+    Anchors anchors;
+    wuwa_pad3d::draw_moment(c.list, c.font, c.at(x0, y0), c.at(x1, y1), pad_device(c), now, ImGui::GetTime(), look, &anchors);
+    return anchors;
+}
+// A leader from (x, y) on a row's edge to its button on the controller, stopping at the button's rim.
+void draw_leader(const Canvas& c, const Anchors& anchors, std::string_view token, float x, float y, bool left, bool lit) {
+    const auto bits = token_bits(c, token);
+    const wuwa_pad3d::Anchor* found = nullptr;
+    for (const auto& anchor : anchors) {
+        if (bits && (anchor.control & bits)) { found = &anchor; break; }
     }
-    // A rounded rectangle turned about its centre.
-    void slab(float cx, float cy, float w, float h, float radius, float degrees, bool lit, const char* name) const {
-        const float a = degrees * 3.14159265f / 180.0f, ca = std::cos(a), sa = std::sin(a);
-        const float hx = w * 0.5f - radius, hy = h * 0.5f - radius;
-        const struct { float x, y, start; } corners[] = {{hx, -hy, -90.0f}, {hx, hy, 0.0f}, {-hx, hy, 90.0f}, {-hx, -hy, 180.0f}};
-        ImVec2 points[28];
-        int n = 0;
-        for (const auto& corner : corners) {
-            for (int i = 0; i <= 6; ++i) {
-                const float t = (corner.start + i * 15.0f) * 3.14159265f / 180.0f;
-                const float lx = corner.x + radius * std::cos(t), ly = corner.y + radius * std::sin(t);
-                points[n++] = at(cx + lx * ca - ly * sa, cy + lx * sa + ly * ca);
-            }
-        }
-        c.list->AddConvexPolyFilled(points, n, lit ? gold : button_fill);
-        c.list->AddPolyline(points, n, lit ? lit_line : button_line, ImDrawFlags_Closed, (lit ? 2.5f : 1.5f) * c.s);
-        label(cx, cy, 17.0f, lit ? lit_text : gold_hi, name);
+    if (!found) return;
+    const ImVec2 start = c.at(x, y), bend = c.at(left ? x + 18.0f : x - 18.0f, y);
+    ImVec2 end = found->at;
+    const float dx = end.x - bend.x, dy = end.y - bend.y, length = std::sqrt(dx * dx + dy * dy);
+    if (length > 1.0f) {
+        const float back = (found->radius * 1.15f + 3.0f * c.s) / length;
+        end = {end.x - dx * back, end.y - dy * back};
     }
-    void face(float cx, float cy, float radius, bool lit, ImU32 text, const char* name) const {
-        c.list->AddCircleFilled(at(cx, cy), r(radius), lit ? gold : button_fill, 40);
-        c.list->AddCircle(at(cx, cy), r(radius), lit ? lit_line : button_line, 40, (lit ? 2.5f : 1.5f) * c.s);
-        label(cx, cy, 17.0f, lit ? lit_text : text, name);
-    }
-    void stick(float cx, float cy, float outer, float inner, bool lit, const char* name) const {
-        c.list->AddCircleFilled(at(cx, cy), r(outer), well_fill, 48);
-        c.list->AddCircle(at(cx, cy), r(outer), lit ? leader_lit : well_line, 48, 1.5f * c.s);
-        face(cx, cy, inner, lit, gold_hi, name);
-    }
-    void dpad_key(float x, float y, float w, float h, bool lit) const {
-        c.list->AddRectFilled(at(x, y), at(x + w, y + h), lit ? gold : button_fill, r(4));
-        c.list->AddRect(at(x, y), at(x + w, y + h), lit ? lit_line : button_line, r(4), 0, (lit ? 2.5f : 1.5f) * c.s);
-    }
-    void body() const {
-        // M210 92, then cubic segments (and one line) around the outline.
-        static constexpr float path[][6] = {
-            {250, 82, 390, 82, 430, 92}, {505, 104, 548, 132, 572, 196}, {600, 280, 606, 352, 566, 372},
-            {532, 389, 500, 368, 478, 334}, {460, 306, 438, 292, 404, 292}, {404, 292, 236, 292, 236, 292},
-            {202, 292, 180, 306, 162, 334}, {140, 368, 108, 389, 74, 372}, {34, 352, 40, 280, 68, 196},
-            {92, 132, 135, 104, 210, 92}};
-        std::vector<ImVec2> outline;
-        float px = 210, py = 92;
-        for (const auto& s : path) {
-            for (int i = 1; i <= 12; ++i) {
-                const float t = i / 12.0f, u = 1.0f - t;
-                const float x = u * u * u * px + 3 * u * u * t * s[0] + 3 * u * t * t * s[2] + t * t * t * s[4];
-                const float y = u * u * u * py + 3 * u * u * t * s[1] + 3 * u * t * t * s[3] + t * t * t * s[5];
-                outline.push_back(at(x, y));
-            }
-            px = s[4]; py = s[5];
-        }
-        // The outline is not convex, but every point of it is visible from here.
-        const ImVec2 hub = at(320, 150);
-        for (size_t i = 0; i < outline.size(); ++i)
-            c.list->AddTriangleFilled(hub, outline[i], outline[(i + 1) % outline.size()], pad_fill);
-        c.list->AddPolyline(outline.data(), static_cast<int>(outline.size()), pad_line, ImDrawFlags_Closed, 2.0f * c.s);
-    }
-};
-
-void controller(const Canvas& c, ImVec2 o, float k, const CardState& st, bool l3_modifier) {
-    const Pad pad{c, o, k};
-    const auto held = [&](unsigned mask) { return (st.buttons & mask) != 0; };
-    pad.slab(182, 39, 84, 34, 14, -8, st.lt, "LT");
-    pad.slab(458, 39, 84, 34, 14, 8, st.rt, "RT");
-    pad.slab(182, 74, 128, 24, 12, -8, held(lb), "LB");
-    pad.slab(458, 74, 128, 24, 12, 8, held(rb), "RB");
-    pad.body();
-    c.list->AddCircleFilled(pad.at(320, 124), pad.r(17), IM_COL32(12, 11, 9, 255), 32);
-    c.list->AddCircle(pad.at(320, 124), pad.r(17), well_line, 32, 1.5f * c.s);
-    // View (two squares) and Menu (three lines).
-    for (const bool is_menu : {false, true}) {
-        const float x = is_menu ? 344.0f : 270.0f;
-        const bool lit = held(is_menu ? menu : view);
-        c.list->AddRectFilled(pad.at(x, 150), pad.at(x + 26, 167), lit ? gold : button_fill, pad.r(6));
-        c.list->AddRect(pad.at(x, 150), pad.at(x + 26, 167), lit ? lit_line : button_line, pad.r(6), 0, (lit ? 2.5f : 1.5f) * c.s);
-        const ImU32 glyph = lit ? lit_text : gold_hi;
-        if (is_menu) {
-            for (const float y : {155.0f, 158.5f, 162.0f}) c.list->AddLine(pad.at(351, y), pad.at(363, y), glyph, 1.5f * c.s);
-        } else {
-            c.list->AddRect(pad.at(277, 155), pad.at(284, 161), glyph, 0.0f, 0, 1.5f * c.s);
-            c.list->AddLine(pad.at(281, 161), pad.at(281, 164), glyph, 1.5f * c.s);
-            c.list->AddLine(pad.at(281, 164), pad.at(288, 164), glyph, 1.5f * c.s);
-            c.list->AddLine(pad.at(288, 164), pad.at(288, 158), glyph, 1.5f * c.s);
-            c.list->AddLine(pad.at(288, 158), pad.at(284, 158), glyph, 1.5f * c.s);
-        }
-        pad.label(x + 13, 184, 14, muted, is_menu ? "Menu" : "View");
-    }
-    pad.stick(200, 170, 40, 27, l3_modifier || held(l3), "L3");
-    pad.dpad_key(253, 217, 18, 22, held(0x0001));
-    pad.dpad_key(235, 235, 22, 18, held(0x0004));
-    pad.dpad_key(267, 235, 22, 18, held(0x0008));
-    pad.dpad_key(253, 249, 18, 22, held(dpad_down));
-    pad.stick(388, 244, 37, 25, held(r3), "R3");
-    // VR controllers: the letters of the controller button that presses each.
-    pad.face(456, 134, 17, held(button_y), c.vr ? gold_hi : yellow, "Y");
-    pad.face(422, 168, 17, held(button_x), c.vr ? gold_hi : blue, c.vr ? "B" : "X");
-    pad.face(490, 168, 17, held(button_b), c.vr ? gold_hi : red, c.vr ? "X" : "B");
-    pad.face(456, 202, 17, held(button_a), c.vr ? gold_hi : green, "A");
+    const ImU32 color = lit ? leader_lit : leader;
+    c.list->AddLine(start, bend, color, 1.5f * c.s);
+    c.list->AddLine(bend, end, color, 1.5f * c.s);
+    c.list->AddCircleFilled(end, 4.0f * c.s, lit ? lit_line : gold, 12);
 }
 
-// One row beside the controller: key cap(s), what they do, an optional state
-// pill, and a leader to the button. Left rows keep the cap next to the controller.
+// One row beside the controller: key cap(s), what they do, an optional state pill. Left rows keep the cap next
+// to the controller; the leader runs from the row's inner edge.
 struct Row {
     const char* token;
     const char* english;
     bool lit;
-    float tx, ty, radius;   // the button, in pad units
     const char* state;
     ImU32 state_color;
-    bool dim = false;       // does nothing in the current camera
-    const char* note = nullptr; // a smaller second line under the label
+    bool dim = false;            // does nothing in the current camera
+    const char* note = nullptr;  // a smaller second line under the label
     const char* value = nullptr; // a pill with text already translated (a value), in place of state
 };
-void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, const Row& row) {
-    constexpr float w = 440.0f, h = 62.0f, key_px = 26.0f;
-    const float middle = top + h * 0.5f;
-    c.list->AddRectFilled(c.at(x, top), c.at(x + w, top + h), row.lit ? row_lit_bg : row_bg, 8.0f * c.s);
-    c.list->AddRect(c.at(x, top), c.at(x + w, top + h), row.lit ? lit_line : row_line, 8.0f * c.s, 0, (row.lit ? 2.5f : 1.0f) * c.s);
+constexpr float row_w = 446.0f, row_h = 66.0f, row_step = 92.0f;
+void callout(const Canvas& c, const Anchors& anchors, float x, float top, bool left, const Row& row) {
+    constexpr float key_px = 27.0f, pill_px = 21.0f;
+    const float middle = top + row_h * 0.5f;
+    c.list->AddRectFilled(c.at(x, top), c.at(x + row_w, top + row_h), row.lit ? row_lit_bg : row_bg, 9.0f * c.s);
+    c.list->AddRect(c.at(x, top), c.at(x + row_w, top + row_h), row.lit ? lit_line : row_line, 9.0f * c.s, 0, (row.lit ? 2.5f : 1.0f) * c.s);
     const bool two = std::string_view{row.token} == "YX";
     const float slash = two ? c.width(key_px, "/") + 8.0f : 0.0f;
     const float keys = two ? chip_width(c, key_px, "Y") + chip_width(c, key_px, "X") + slash : chip_width(c, key_px, row.token);
-    float key_x = left ? x + w - 16.0f - keys : x + 16.0f;
+    float key_x = left ? x + row_w - 16.0f - keys : x + 16.0f;
+    const float upper = row.note ? middle - 13.0f : middle;
     if (two) {
         key_x += chip(c, key_x, middle, key_px, "Y", row.lit);
         c.text(key_x + 4.0f, middle - key_px * 0.56f, key_px, muted, "/");
@@ -387,84 +378,83 @@ void callout(const Canvas& c, const Pad& pad, float x, float top, bool left, con
         chip(c, key_x, middle, key_px, row.token, row.lit);
     }
     const std::string state = row.value ? std::string{row.value} : row.state ? tr(row.state) : std::string{};
-    const float state_w = state.empty() ? 0.0f : pill_text_width(c, state, 18.0f) + 12.0f;
-    const float text_w = w - 32.0f - keys - 16.0f - state_w;
+    const float state_w = state.empty() ? 0.0f : pill_text_width(c, state, pill_px) + 12.0f;
+    const float text_w = row_w - 32.0f - keys - 16.0f - state_w;
     const float text_x = left ? x + 16.0f + state_w : x + 16.0f + keys + 16.0f;
+    const float align = left ? 1.0f : 0.0f;
     if (row.note) {
-        draw_fit(c, fit(c, row.english, 25.0f, text_w, false), text_x, middle - 12.0f, row.dim ? muted : ink, left ? 1.0f : 0.0f, text_w);
-        draw_fit(c, fit(c, row.note, 19.0f, text_w, false), text_x, middle + 14.0f, row.dim ? muted : accent, left ? 1.0f : 0.0f, text_w);
+        draw_fit(c, fit(c, row.english, 26.0f, text_w, false), text_x, upper, row.dim ? muted : ink, align, text_w);
+        const float note_x = left ? x + 16.0f : text_x, note_w = text_w + state_w;
+        draw_fit(c, fit(c, row.note, 21.0f, note_w, false), note_x, middle + 15.0f, row.dim ? muted : accent, align, note_w);
     } else {
-        draw_fit(c, fit(c, row.english, 27.0f, text_w), text_x, middle, row.dim ? muted : ink, left ? 1.0f : 0.0f, text_w);
+        draw_fit(c, fit(c, row.english, 28.0f, text_w), text_x, middle, row.dim ? muted : ink, align, text_w);
     }
-    if (!state.empty()) pill_text(c, left ? x + 16.0f : x + w - 16.0f - state_w + 12.0f, middle, 18.0f, state, row.state_color);
-    // Leader: out from the box, then straight to the button's edge.
-    const ImVec2 start = c.at(left ? x + w : x, middle), bend = c.at(left ? x + w + 16.0f : x - 16.0f, middle);
-    ImVec2 end = pad.at(row.tx, row.ty);
-    const float dx = end.x - bend.x, dy = end.y - bend.y, length = std::sqrt(dx * dx + dy * dy);
-    if (length > 1.0f && row.radius > 0.0f) {
-        const float back = pad.r(row.radius + 3.0f) / length;
-        end = {end.x - dx * back, end.y - dy * back};
-    }
-    const ImU32 color = row.lit ? leader_lit : leader;
-    c.list->AddLine(start, bend, color, 1.4f * c.s);
-    c.list->AddLine(bend, end, color, 1.4f * c.s);
-    c.list->AddCircleFilled(end, 3.5f * c.s, row.lit ? lit_line : gold, 12);
+    if (!state.empty()) pill_text(c, left ? x + 16.0f : x + row_w - 16.0f - state_w + 12.0f, upper, pill_px, state, row.state_color);
+    draw_leader(c, anchors, row.token, left ? x + row_w : x, middle, left, row.lit);
 }
 
 void l3_card(const Canvas& c, const CardState& st) {
     header(c, "Hold {L3}, then press", "Hold {LT}+{RT} for views");
-    const ImVec2 o{532.0f, 278.0f};
-    const float k = 0.834f;
-    const Pad pad{c, o, k};
     const auto held = [&](unsigned mask) { return (st.buttons & mask) != 0; };
     const bool camera_moves = st.first_person || st.fixed_camera;
-    // The story camera nudge in use now, as on the Cinema page's status line.
+    // The story camera nudge in use now, as on the Camera page's status line.
     std::string nudge;
     if (st.story_nudge && std::fabs(st.story_nudge_cm) >= 1.0f) {
         char text[48]{};
         std::snprintf(text, sizeof(text), wuwa_l10n::translate("%+.0f cm").c_str(), st.story_nudge_cm);
         nudge = wuwa_l10n::visual(text);
     }
+    // VR controllers have no D-pad, so no full-animation row there.
     const Row left[] = {
-        {"LT", N_("Portal window"), st.lt, 182, 39, 17, st.portal ? N_("On") : nullptr, green},
-        {"LB", N_("HUD / mouse mode"), held(lb), 182, 74, 12, st.mouse_mode ? N_("On") : nullptr, green},
-        {"View", N_("First person"), held(view), 283, 158.5f, 9, st.first_person ? N_("On") : nullptr, green},
-        {"Down", N_("First person: full animation"), held(dpad_down), 262, 260, 9, nullptr, 0, !st.first_person},
+        {"LT", N_("Portal window"), st.lt, st.portal ? N_("On") : nullptr, green},
+        {"LB", N_("HUD / mouse mode"), held(lb), st.mouse_mode ? N_("On") : nullptr, green},
+        {"View", N_("First person"), held(view), st.first_person ? N_("On") : nullptr, green},
+        {"Down", N_("First person: full animation"), held(dpad_down), nullptr, 0, !st.first_person},
     };
     const Row right[] = {
-        {"RT", N_("Diorama (10\xC3\x97)"), st.rt, 458, 39, 17, st.diorama ? N_("On") : nullptr, green},
-        {"RB", N_("Game / fixed camera"), held(rb), 458, 74, 12, st.fixed_camera ? N_("Fixed") : nullptr, green},
-        {"Menu", N_("Keep this card open"), held(menu), 357, 158.5f, 9, st.pinned ? N_("Pinned") : nullptr, green},
+        {"RT", N_("Diorama (10\xC3\x97)"), st.rt, st.diorama ? N_("On") : nullptr, green},
+        {"RB", N_("Game / fixed camera"), held(rb), st.fixed_camera ? N_("Fixed") : nullptr, green},
+        {"Menu", N_("Keep this card open"), held(menu), st.pinned ? N_("Pinned") : nullptr, green},
         // Y / X move the camera up and down in first person and the fixed camera, and along the shot in story
         // scenes on the game camera (the story camera nudge); both together reset it.
-        {"YX", st.story_nudge ? N_("Story camera: nearer / back") : N_("Camera up / down"), held(button_x | button_y),
-            439, 151, 0, nullptr, green, !camera_moves && !st.story_nudge,
-            st.story_nudge ? N_("Y + X together: back to the game's spot")
-                : camera_moves ? N_("Y + X together: back to default") : N_("Only in first person, the fixed camera and story scenes"),
+        {"YX", st.story_nudge ? N_("Story camera: nearer / back") : N_("Camera up / down"), held(button_x | button_y), nullptr, green,
+            !camera_moves && !st.story_nudge,
+            camera_moves || st.story_nudge ? N_("Both together: reset") : N_("Not in this camera"),
             nudge.empty() ? nullptr : nudge.c_str()},
-        {"B", N_("Show / hide game UI"), held(button_b), 490, 168, 17, st.ui_hidden ? N_("Hidden") : nullptr, red},
-        {"A", N_("Recenter view"), held(button_a), 456, 202, 17, nullptr, 0},
-        {"R3", N_("WuWa VR menu"), held(r3), 388, 244, 25, nullptr, 0},
+        {"B", N_("Show / hide game UI"), held(button_b), st.ui_hidden ? N_("Hidden") : nullptr, red},
+        {"A", N_("Recenter view"), held(button_a), nullptr, 0},
+        {"R3", N_("WuWa VR menu"), held(r3), nullptr, 0},
     };
-    // The leaders run over the controller to each button, as on the site.
-    controller(c, o, k, st, true);
-    for (int i = 0; i < 4; ++i) callout(c, pad, 58, 272.0f + i * 90.0f, true, left[i]);
-    for (int i = 0; i < 7; ++i) callout(c, pad, 1102, 152.0f + i * 90.0f, false, right[i]);
+    // The controller in the middle with L3 held; the rows either side, leaders to their buttons.
+    std::uint32_t lit = wuwa_pad3d::button::L3 | pad_bits(st.buttons);
+    if (st.lt) lit |= wuwa_pad3d::button::LT;
+    if (st.rt) lit |= wuwa_pad3d::button::RT;
+    ImDrawListSplitter layers;
+    layers.Split(c.list, 2);
+    layers.SetCurrentChannel(c.list, 1);
+    const auto anchors = draw_pad3d(c, 522, 156, 1082, 744, lit);
+    layers.SetCurrentChannel(c.list, 0);
+    constexpr float right_top = 140.0f, middle_y = right_top + (7 * row_h + 6 * (row_step - row_h)) * 0.5f;
+    const int left_count = c.vr ? 3 : 4;
+    const float left_top = middle_y - (left_count * row_h + (left_count - 1) * (row_step - row_h)) * 0.5f;
+    for (int i = 0; i < left_count; ++i) callout(c, anchors, 50, left_top + i * row_step, true, left[i]);
+    for (int i = 0; i < 7; ++i) callout(c, anchors, 1104, right_top + i * row_step, false, right[i]);
+    layers.Merge(c.list);
 
-    c.list->AddLine(c.at(58, 806), c.at(1542, 806), row_line, 1.2f * c.s);
-    float x = 58.0f;
+    c.list->AddLine(c.at(50, 794), c.at(1550, 794), row_line, 1.2f * c.s);
+    float x = 50.0f;
     const auto twice = tr("Click twice");
-    c.text(x, 832, 22, accent, twice);
-    x += c.width(22, twice) + 34.0f;
+    c.text(x, 820, 25, accent, twice);
+    x += c.width(25, twice) + 30.0f;
     for (const auto& [token, english] : {std::pair{"R3", N_("Freecam")}, std::pair{"L3", N_("Screenshot")}}) {
-        x += chip(c, x, 846, 22, token) + 6.0f;
-        c.text(x, 834, 20, accent, "\xC3\x97" "2");
-        x += c.width(20, "\xC3\x97" "2") + 10.0f;
-        const auto f = fit(c, english, 25, 220, false);
-        c.text(x, 846 - f.px * 0.56f, f.px, ink, f.lines[0]);
-        x += c.width(f.px, f.lines[0]) + 34.0f;
+        x += chip(c, x, 836, 25, token) + 6.0f;
+        c.text(x, 822, 23, accent, "\xC3\x97" "2");
+        x += c.width(23, "\xC3\x97" "2") + 10.0f;
+        const auto f = fit(c, english, 27, 230, false);
+        c.text(x, 836 - f.px * 0.56f, f.px, ink, f.lines[0]);
+        x += c.width(f.px, f.lines[0]) + 30.0f;
     }
-    rich(c, 1542, 830, 25, muted, "Everything else: {L3}+{R3} opens the WuWa VR menu", 1542 - x, 1.0f);
+    rich(c, 1550, 820, 26, muted, "Everything else: {L3}+{R3} opens the WuWa VR menu", 1550 - x, 1.0f);
 }
 
 // One row of the keyboard card: its key caps ("E/Q" draws two), what they do and an optional state pill.
@@ -479,7 +469,7 @@ struct KeyRow {
     const char* value = nullptr;    // a pill with text already translated (a value), in place of state
 };
 void key_row(const Canvas& c, float x, float top, float w, const KeyRow& row) {
-    constexpr float h = 60.0f, key_px = 26.0f;
+    constexpr float h = 62.0f, key_px = 27.0f, pill_px = 20.0f;
     const float middle = top + h * 0.5f;
     c.list->AddRectFilled(c.at(x, top), c.at(x + w, top + h), row.lit ? row_lit_bg : row_bg, 8.0f * c.s);
     c.list->AddRect(c.at(x, top), c.at(x + w, top + h), row.lit ? lit_line : row_line, 8.0f * c.s, 0, (row.lit ? 2.5f : 1.0f) * c.s);
@@ -500,17 +490,17 @@ void key_row(const Canvas& c, float x, float top, float w, const KeyRow& row) {
         key_x += chip(c, key_x, middle, key_px, caps[i], row.lit);
     }
     const std::string state = row.value ? std::string{row.value} : row.state ? tr(row.state) : std::string{};
-    const float state_w = state.empty() ? 0.0f : pill_text_width(c, state, 18.0f) + 12.0f;
+    const float state_w = state.empty() ? 0.0f : pill_text_width(c, state, pill_px) + 12.0f;
     const float text_w = w - 32.0f - keys_w - 16.0f - state_w;
     const float text_x = c.rtl ? x + 16.0f + state_w : x + 16.0f + keys_w + 16.0f;
     const float align = c.rtl ? 1.0f : 0.0f;
     if (row.note) {
-        draw_fit(c, fit(c, row.english, 25.0f, text_w, false), text_x, middle - 12.0f, row.dim ? muted : ink, align, text_w);
-        draw_fit(c, fit(c, row.note, 19.0f, text_w, false), text_x, middle + 14.0f, row.dim ? muted : accent, align, text_w);
+        draw_fit(c, fit(c, row.english, 26.0f, text_w, false), text_x, middle - 13.0f, row.dim ? muted : ink, align, text_w);
+        draw_fit(c, fit(c, row.note, 21.0f, text_w, false), text_x, middle + 15.0f, row.dim ? muted : accent, align, text_w);
     } else {
-        draw_fit(c, fit(c, row.english, 27.0f, text_w), text_x, middle, row.dim ? muted : ink, align, text_w);
+        draw_fit(c, fit(c, row.english, 28.0f, text_w), text_x, middle, row.dim ? muted : ink, align, text_w);
     }
-    if (!state.empty()) pill_text(c, c.rtl ? x + 16.0f : x + w - 16.0f - state_w + 12.0f, middle, 18.0f, state, row.state_color);
+    if (!state.empty()) pill_text(c, c.rtl ? x + 16.0f : x + w - 16.0f - state_w + 12.0f, middle, pill_px, state, row.state_color);
 }
 
 // Hold the VR key (1.2.7): the keyboard version of the L3 and views cards together.
@@ -554,14 +544,14 @@ void keyboard_card(const Canvas& c, const CardState& st) {
         {"M", N_("HUD / mouse mode"), held(Action::adjust), st.mouse_mode ? N_("On") : nullptr, green},
         {"K", N_("Keep this card open"), held(Action::pin_card), st.pinned ? N_("Pinned") : nullptr, green},
     };
-    constexpr float column_w = 722.0f, top = 128.0f, step = 72.0f;
+    constexpr float column_w = 730.0f, top = 132.0f, step = 72.0f;
     // Views and the screen on one side, cameras and the card on the other (mirrored right to left).
-    const float first_x = c.rtl ? 820.0f : 58.0f, second_x = c.rtl ? 58.0f : 820.0f;
+    const float first_x = c.rtl ? 820.0f : 50.0f, second_x = c.rtl ? 50.0f : 820.0f;
     for (size_t i = 0; i < std::size(left); ++i) key_row(c, first_x, top + i * step, column_w, left[i]);
     for (size_t i = 0; i < std::size(right); ++i) key_row(c, second_x, top + i * step, column_w, right[i]);
-    c.list->AddLine(c.at(58, 790), c.at(1542, 790), row_line, 1.2f * c.s);
-    rich(c, c.rtl ? 1542.0f : 58.0f, 818, 25, st.freecam ? ink : muted,
-        "Freecam: {W}{A}{S}{D} move, the mouse looks, {Space} / {Ctrl} up / down, {Shift} faster (twice: turbo)", 1484, c.rtl ? 1.0f : 0.0f);
+    c.list->AddLine(c.at(50, 796), c.at(1550, 796), row_line, 1.2f * c.s);
+    rich(c, c.rtl ? 1550.0f : 50.0f, 818, 26, st.freecam ? ink : muted,
+        "Freecam: {W}{A}{S}{D} move, the mouse looks, {Space} / {Ctrl} up / down, {Shift} faster (twice: turbo)", 1500, c.rtl ? 1.0f : 0.0f);
 }
 
 // Both ways: R3 switches between two views and back (test 17k).
@@ -601,54 +591,62 @@ void views_card(const Canvas& c, const CardState& st) {
     static constexpr const char* notes[]{N_("You are in the scene"), N_("A big 3D screen; best for cutscenes"), N_("Flat screen; easiest on the eyes")};
     for (int i = 0; i < 3; ++i) {
         const bool now = st.view == i;
-        const float x0 = 192.0f + i * 414.0f, x1 = x0 + 330.0f, y0 = now ? 150.0f : 166.0f, y1 = now ? 432.0f : 416.0f;
+        const float x0 = 192.0f + i * 414.0f, x1 = x0 + 330.0f, y0 = now ? 138.0f : 148.0f, y1 = now ? 392.0f : 382.0f;
         if (now) c.list->AddRect(c.at(x0 - 6, y0 - 6), c.at(x1 + 6, y1 + 6), IM_COL32(249, 232, 180, 70), 16.0f * c.s, 0, 5.0f * c.s);
         c.list->AddRectFilled(c.at(x0, y0), c.at(x1, y1), now ? IM_COL32(40, 32, 16, 235) : row_bg, 12.0f * c.s);
         c.list->AddRect(c.at(x0, y0), c.at(x1, y1), now ? lit_line : IM_COL32(214, 178, 98, 64), 12.0f * c.s, 0, (now ? 2.0f : 1.0f) * c.s);
-        icon(c, i, x0 + 165.0f, y0 + 78.0f);
-        draw_fit(c, fit(c, names[i], 34, 300, false), x0 + 15.0f, y0 + 166.0f, ink, 0.5f, 300.0f);
-        draw_fit(c, fit(c, notes[i], 22, 290), x0 + 20.0f, y0 + 222.0f, muted, 0.5f, 290.0f);
+        icon(c, i, x0 + 165.0f, y0 + 68.0f);
+        draw_fit(c, fit(c, names[i], 34, 300, false), x0 + 15.0f, y0 + 148.0f, ink, 0.5f, 300.0f);
+        draw_fit(c, fit(c, notes[i], 23, 296), x0 + 17.0f, y0 + 204.0f, muted, 0.5f, 296.0f);
         if (now) {
-            const float w = pill_width(c, "now", 18.0f);
-            pill(c, x0 + 165.0f - w * 0.5f, y0, 18.0f, "now", gold, true);
+            const float w = pill_width(c, "now", 19.0f);
+            pill(c, x0 + 165.0f - w * 0.5f, y0, 19.0f, "now", gold, true);
         }
     }
     // Click R3: full VR <-> stereo screen. Hold R3: mono theatre and back (from either view).
-    arrow2(c, 564, 291);
-    arrow2(c, 978, 291);
-    chip(c, 564.0f - chip_width(c, 20, "R3") * 0.5f, 252, 20, "R3");
-    {
-        const float w = chip_width(c, 20, "R3") + 8.0f + c.width(18, "0.8 s");
-        const float x = 978.0f - w * 0.5f;
-        chip(c, x, 252, 20, "R3");
-        c.text(x + chip_width(c, 20, "R3") + 8.0f, 252.0f - 18.0f * 0.56f, 18, accent, "0.8 s");
-    }
+    arrow2(c, 564, 284);
+    arrow2(c, 978, 284);
+    // The caps fit the 84-unit gap between tiles (VR names are longer); the hold time sits under its arrow.
+    const float r3_px = (std::min)(21.0f, 21.0f * 78.0f / chip_width(c, 21, "R3"));
+    for (const float x : {564.0f, 978.0f}) chip(c, x - chip_width(c, r3_px, "R3") * 0.5f, 244, r3_px, "R3");
+    c.text(978.0f - c.width(19, "0.8 s") * 0.5f, 304, 19, accent, "0.8 s");
     const bool r3_held = (st.buttons & r3) != 0, l3_held = (st.buttons & l3) != 0, y_held = (st.buttons & button_y) != 0;
-    const struct { const char* token; const char* extra; const char* english; bool lit; } moves[]{
-        {"R3", nullptr, N_("Click: full VR / stereo screen"), r3_held},
-        {"R3", "0.8 s", N_("Hold: mono theatre on / off"), r3_held},
-        {"L3", nullptr, N_("Click: blur on / off"), l3_held},
-        {"Y", nullptr, N_("Press: hide characters at your eyes"), y_held},
+    const struct { const char* token; const char* extra; const char* english; bool lit; int kind; } moves[]{
+        {"Y", nullptr, N_("Press: hide characters at your eyes"), y_held, 2},
+        {"L3", nullptr, N_("Click: blur on / off"), l3_held, 1},
+        {"R3", nullptr, N_("Click: full VR / stereo screen"), r3_held, 0},
+        {"R3", "0.8 s", N_("Hold: mono theatre on / off"), r3_held, 0},
     };
+    // The controller with both triggers held at the lower left, drawn over the leaders; the moves at the right.
+    ImDrawListSplitter layers;
+    layers.Split(c.list, 2);
+    layers.SetCurrentChannel(c.list, 1);
+    const auto anchors = draw_pad3d(c, 50, 418, 636, 784, wuwa_pad3d::button::LT | wuwa_pad3d::button::RT | pad_bits(st.buttons));
+    layers.SetCurrentChannel(c.list, 0);
+    constexpr float x0 = 690.0f, x1 = 1550.0f, key_px = 28.0f, extra_px = 21.0f;
+    float keys_w = 0.0f;
+    for (const auto& m : moves) keys_w = (std::max)(keys_w, chip_width(c, key_px, m.token) + (m.extra ? 8.0f + c.width(extra_px, m.extra) : 0.0f));
+    const float text_x = x0 + 22.0f + keys_w + 22.0f;
     for (int i = 0; i < 4; ++i) {
         const auto& m = moves[i];
-        const float top = 468.0f + i * 82.0f, middle = top + 34.0f;
-        c.list->AddRectFilled(c.at(351, top), c.at(1249, top + 68), m.lit ? row_lit_bg : row_bg, 8.0f * c.s);
-        c.list->AddRect(c.at(351, top), c.at(1249, top + 68), m.lit ? lit_line : row_line, 8.0f * c.s, 0, (m.lit ? 2.5f : 1.0f) * c.s);
-        float x = 372.0f + chip(c, 372, middle, 26, m.token, m.lit);
-        if (m.extra) c.text(x + 8.0f, middle - 20.0f * 0.56f, 20, accent, m.extra);
-        const bool blur = i == 2, hide = i == 3;
+        const float top = 424.0f + i * 88.0f, middle = top + 37.0f;
+        c.list->AddRectFilled(c.at(x0, top), c.at(x1, top + 74), m.lit ? row_lit_bg : row_bg, 9.0f * c.s);
+        c.list->AddRect(c.at(x0, top), c.at(x1, top + 74), m.lit ? lit_line : row_line, 9.0f * c.s, 0, (m.lit ? 2.5f : 1.0f) * c.s);
+        const float x = x0 + 22.0f + chip(c, x0 + 22.0f, middle, key_px, m.token, m.lit);
+        if (m.extra) c.text(x + 8.0f, middle - extra_px * 0.56f, extra_px, accent, m.extra);
+        const bool blur = m.kind == 1, hide = m.kind == 2;
         const bool on = blur ? st.blur : st.hide_near;
         const char* state = blur ? (st.blur ? N_("Blur on") : N_("Blur off")) :
             hide ? (st.hide_near ? N_("Hiding on") : N_("Hiding off")) : nullptr;
-        const float state_w = state ? pill_width(c, state, 20.0f) + 20.0f : 0.0f;
-        const auto f = fit(c, m.english, 29, 1249.0f - 543.0f - 24.0f - state_w, false);
-        c.text(543, middle - f.px * 0.56f, f.px, ink, f.lines[0]);
-        if (state) pill(c, 543.0f + c.width(f.px, f.lines[0]) + 20.0f, middle, 20.0f, state, on ? green : muted);
+        const float state_w = state ? pill_width(c, state, 21.0f) + 20.0f : 0.0f;
+        const auto f = fit(c, m.english, 30, x1 - text_x - 22.0f - state_w, false);
+        c.text(text_x, middle - f.px * 0.56f, f.px, ink, f.lines[0]);
+        if (state) pill(c, text_x + c.width(f.px, f.lines[0]) + 20.0f, middle, 21.0f, state, on ? green : muted);
+        draw_leader(c, anchors, m.token, x0, middle, false, m.lit);
     }
-    c.list->AddLine(c.at(58, 810), c.at(1542, 810), row_line, 1.2f * c.s);
-    const auto f = fit(c, "Keep both triggers held to click or hold R3 again.", 25, 1480, false);
-    c.text(1542.0f - c.width(f.px, f.lines[0]), 832, f.px, muted, f.lines[0]);
+    layers.Merge(c.list);
+    c.list->AddLine(c.at(50, 800), c.at(1550, 800), row_line, 1.2f * c.s);
+    rich(c, 1550, 822, 26, muted, "Keep both triggers held to click or hold {R3} again.", 1500, 1.0f);
 }
 
 void centered_text(const Canvas& c, ImVec2 size, float y, float px, ImU32 color, const std::string& value) {
@@ -684,7 +682,7 @@ void set_key_names(const std::string& vr_key, const std::array<std::string, 4>& 
 
 void draw_card(ImDrawList* draw, ImVec2 size, ImFont* font, const CardState& state) {
     const bool keyboard = state.card == Card::keyboard;
-    const auto c = canvas(draw, size, font, state.vr_controllers, keyboard);
+    const auto c = canvas(draw, size, font, state.vr_controllers, keyboard, state.playstation);
     if (!c.font) return;
     draw->PushClipRect(c.at(0, 0), c.at(1600, 900), true);
     frame(c);
@@ -695,8 +693,8 @@ void draw_card(ImDrawList* draw, ImVec2 size, ImFont* font, const CardState& sta
 }
 
 void draw_tip(ImDrawList* draw, ImVec2 size, ImFont* font, const std::string& lead, const std::string& line, bool vr_controllers,
-    const std::string& note, bool keyboard) {
-    const auto c = canvas(draw, size, font, vr_controllers, keyboard);
+    const std::string& note, bool keyboard, bool playstation) {
+    const auto c = canvas(draw, size, font, vr_controllers, keyboard, playstation);
     if (!c.font) return;
     constexpr float px = 26.0f, top = 618.0f, h = 58.0f;
     const auto lead_text = lead.empty() ? std::string{} : tr(lead);
@@ -733,7 +731,7 @@ void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool sh
         draw->AddRectFilled(c.at(175, 535), c.at(1425, 680), IM_COL32(55, 8, 12, 232), 18 * c.s);
         centered(c, size, 552, 42, IM_COL32(255, 100, 104, 255), "GAME UI HIDDEN - MENUS ARE HIDDEN TOO");
         if (shortcut_available && keyboard) centered_key(c, size, 609, 34, IM_COL32(255, 255, 255, 255), "%s + H  =  SHOW UI");
-        else centered(c, size, 609, 34, IM_COL32(255, 255, 255, 255), shortcut_available ? "L3 + B  =  SHOW UI" : "INSERT > Quick > Show game UI");
+        else centered(c, size, 609, 34, IM_COL32(255, 255, 255, 255), shortcut_available ? "L3 + B  =  SHOW UI" : "INSERT > Home > Game UI");
         draw->PopClipRect();
         return;
     }
@@ -746,9 +744,9 @@ void draw_hidden_ui_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool sh
         centered_key(c, size, 523, 28, IM_COL32(255, 206, 210, 255), "Hold %s, then press H.");
     } else {
         centered(c, size, 454, 52, IM_COL32(255, 255, 255, 255), shortcut_available ? "L3 + B  =  SHOW UI" : "INSERT  =  WUWA VR MENU");
-        centered(c, size, 523, 28, IM_COL32(255, 206, 210, 255), shortcut_available ? "L3 means click and hold the left stick, then press B." : "Then Quick > Show game UI");
+        centered(c, size, 523, 28, IM_COL32(255, 206, 210, 255), shortcut_available ? "L3 means click and hold the left stick, then press B." : "Then Home > Game UI");
     }
-    centered(c, size, 601, 26, IM_COL32(255, 206, 210, 255), shortcut_available ? "Or: WuWa VR menu (L3 + R3 or Insert) > Quick > Show game UI" : "Polar shortcuts are disabled or bypassed.");
+    centered(c, size, 601, 26, IM_COL32(255, 206, 210, 255), shortcut_available ? "Or: WuWa VR menu (L3 + R3 or Insert) > Home > Game UI" : "Polar shortcuts are disabled or bypassed.");
     draw->PopClipRect();
 }
 
@@ -777,9 +775,9 @@ void draw_mouse_mode_warning(ImDrawList* draw, ImVec2 size, ImFont* font, bool a
     centered(c, size, top + 15, 43, IM_COL32(255, 208, 99, 255), "HUD / MOUSE MODE ON");
     if (adjustment && keyboard) {
         centered_key(c, size, top + 70, 36, IM_COL32(255, 255, 255, 255), "%s + M  =  RETURN TO GAME CONTROLS");
-        centered(c, size, top + 124, 27, IM_COL32(245, 224, 181, 255), "Or: WuWa VR menu > HUD > HUD / mouse mode: Off");
+        centered(c, size, top + 124, 27, IM_COL32(245, 224, 181, 255), "Or: WuWa VR menu > Interface > HUD / mouse mode: Off");
     } else {
-        centered(c, size, top + 70, 36, IM_COL32(255, 255, 255, 255), adjustment ? "L3 + LB  =  RETURN TO GAME CONTROLS" : "WuWa VR menu > HUD > HUD / mouse mode: Off");
+        centered(c, size, top + 70, 36, IM_COL32(255, 255, 255, 255), adjustment ? "L3 + LB  =  RETURN TO GAME CONTROLS" : "WuWa VR menu > Interface > HUD / mouse mode: Off");
         centered(c, size, top + 124, 27, IM_COL32(245, 224, 181, 255), adjustment ? "Click left stick + left bumper, then release all controls." : "Activated automatically in this menu: cursor only. L3 + R3 opens the WuWa VR menu.");
     }
     draw->PopClipRect();

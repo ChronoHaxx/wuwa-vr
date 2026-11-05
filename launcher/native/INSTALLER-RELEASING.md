@@ -46,7 +46,7 @@ Only these files enter `app-stage`:
 
 - `WuWa VR.exe`, `Velopack.dll`, `Newtonsoft.Json.dll`, and `WuWa VR.exe.config`
   when the build emits one.
-- Current `README.txt`, `TEST THIS.txt`, `PlayerGuide.html`, `LICENSE.txt` and
+- Current `README.txt`, `TEST THIS.txt`, `LICENSE.txt` and
   `THIRD-PARTY-NOTICES.txt` from this native source directory.
 
 The allowlist excludes PDBs, test executables, source/obj folders, stale backend DLLs

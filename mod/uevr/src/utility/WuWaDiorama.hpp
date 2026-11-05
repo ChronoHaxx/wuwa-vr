@@ -16,6 +16,10 @@ public:
 
     bool requested() const noexcept { return requested_.load(); }
     void request(bool value) noexcept { requested_.store(value); }
+    // A requested diorama can give way for a moment (an ultimate's shot): the request and
+    // the saved scale stay; draws use the normal scale and camera until the pause ends.
+    bool paused() const noexcept { return paused_.load(); }
+    void set_paused(bool value) noexcept { paused_.store(value); }
     void set_miniature(float value) noexcept {
         miniature_.store(std::isfinite(value) ? std::clamp(value, min_miniature, max_miniature) : default_miniature);
     }
@@ -30,7 +34,7 @@ public:
                 value_ = previous_->value_;
                 active_ = previous_->active_;
             } else {
-                active_ = owner.requested();
+                active_ = owner.requested() && !owner.paused();
                 owner.active_.store(active_);
                 value_ = active_ ? owner.miniature() : normal;
             }
@@ -66,6 +70,7 @@ public:
 
 private:
     std::atomic<bool> requested_{false};
+    std::atomic<bool> paused_{false};
     std::atomic<bool> active_{false};
     std::atomic<float> miniature_{default_miniature};
 };

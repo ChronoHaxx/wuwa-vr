@@ -17,7 +17,7 @@ function generate(...args) {
     {cwd: fixture, env: process.env, encoding: 'utf8', timeout: 30000, windowsHide: true});
 }
 function verify() {
-  assert.equal(metadata.pages.length, 22);
+  assert.equal(metadata.pages.length, 41);  // 32 + the feedback form in nine more languages (5 Nov 2026)
   for (const file of metadata.pages) {
     const html = fs.readFileSync(path.join(site, file), 'utf8');
     assert.deepEqual(managedValues(html, /<link rel="canonical" href="([^"]+)">/g),
@@ -33,7 +33,7 @@ function verify() {
   const sitemap = fs.readFileSync(path.join(site, 'sitemap.xml'), 'utf8');
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
   assert.deepEqual(urls, metadata.pages.map(metadata.canonicalUrl));
-  assert.equal(new Set(urls).size, 22);
+  assert.equal(new Set(urls).size, 41);
   assert(urls.includes(metadata.baseUrl));
   assert(!urls.some(url => /index\.html|google3ebe|launcher-updates/.test(url)));
   for (const file of ['index.html', 'guide.html', 'l/en.html', 'l/zh-Hans.html']) {
@@ -49,8 +49,9 @@ function verify() {
 }
 function verifyReleaseSections() {
   const guide = fs.readFileSync(path.join(site, 'guide.html'), 'utf8');
-  const controls = /<section id="controls">([\s\S]*?)<\/section>/.exec(guide)[1];
-  const recovery = /<section id="recovery">([\s\S]*?)<\/section>/.exec(guide)[1];
+  const reference = fs.readFileSync(path.join(site, 'reference.html'), 'utf8');
+  const controls = /<section id="controls">([\s\S]*?)<\/section>/.exec(reference)[1];
+  const recovery = /<section id="recovery">([\s\S]*?)<\/section>/.exec(reference)[1];
   assert(controls.includes('Fixture: current controls source.'));
   assert(recovery.includes('Fixture: current recovery source.'));
   for (const text of ['Switch between full VR and the stereo screen', 'Open/close the WuWa VR menu', 'Toggle stereoscopic screen', 'Toggle the temporary diorama', 'Optional Quest controllers for walking']) {
@@ -66,17 +67,18 @@ function verifyReleaseSections() {
     .filter(([, context]) => context.toLowerCase().includes('quest')).map(([, , body]) => body);
   assert(questRows.some(row => row.includes('Right A / B')) && questRows.some(row => row.includes('Left Menu')),
     'Quest heading must remain searchable through each mapping row context');
-  assert(recovery.includes('Cinematic framing is on by default') && recovery.includes('advanced portable fallback'));
-  assert(recovery.includes('story-video detection has not been confirmed'));
-  assert(recovery.includes('Headset comfort') && recovery.includes('Reset HUD aspect'));
+  // Automatic cinema and Steam startup were confirmed on game 3.7 (owner, 5 Nov 2026): neither may come back as a limit.
+  assert(recovery.includes('Automatic cinematic screen') && recovery.includes('Portable ZIP'));
+  assert(recovery.includes('Refresh HUD layout') && !recovery.includes('not yet confirmed'));
   for (const file of ['index.html', 'l/en.html', 'l/zh-Hans.html']) {
     const html = fs.readFileSync(path.join(site, file), 'utf8');
-    assert(html.includes(file.includes('zh-Hans') ? '剧情视频检测尚未在游戏 3.7 上确认' : 'story-video detection is not yet confirmed'), file);
+    assert(!html.includes(file.includes('zh-Hans') ? '剧情视频检测尚未在游戏 3.7 上确认' : 'story-video detection is not yet confirmed'), file);
+    assert(!/Steam startup still fails/.test(html) && html.includes('Bigscreen Beyond'), file);
   }
   const risk = fs.readFileSync(path.join(site, 'risk.html'), 'utf8');
   assert(!risk.includes('combined-mod distribution remains pending'));
   assert(risk.includes('Publication does not change') && risk.includes('Account restrictions'));
-  for (const [name, html] of [['guide.html', guide], ['risk.html', risk]]) {
+  for (const [name, html] of [['guide.html', guide], ['reference.html', reference], ['risk.html', risk]]) {
     for (const [, href] of html.matchAll(/href="([^"]*)"/g)) {
       if (/^(https?:|mailto:)/.test(href)) continue;
       const url = new URL(href, 'https://fixture.invalid/' + name);
@@ -92,10 +94,10 @@ try {
   // Copy only generator inputs. Videos are existence-only fixtures: generators
   // do not decode media, and copying large recordings would add no coverage.
   fs.cpSync(path.join(root, 'site'), site, {recursive: true, filter: file => !/\.(mp4|webm)$/i.test(file)});
-  for (const directory of ['docs', 'LICENSES', 'mod/localization/wuwa']) fs.cpSync(path.join(root, directory), path.join(fixture, directory), {recursive: true});
+  for (const directory of ['docs', 'LICENSES', 'mod/localization/wuwa', 'dev/site-content']) fs.cpSync(path.join(root, directory), path.join(fixture, directory), {recursive: true});
   for (const file of ['CREDITS.md', 'SUPPORT.md', 'CONTRIBUTING.md',
     'release/site-media.json', 'dev/build-site.cjs', 'dev/site-metadata.cjs', 'dev/site-layout.cjs',
-    'dev/build-community.cjs', 'dev/build-home.cjs', 'dev/controls-section.cjs', 'mod/controls.json', 'dev/site-report.cjs', 'dev/site-status.json',
+    'dev/build-community.cjs', 'dev/build-home.cjs', 'dev/build-guide.cjs', 'dev/build-readme.cjs', 'dev/controls-section.cjs', 'mod/controls.json', 'dev/site-report.cjs', 'dev/site-status.json', 'README.md',
     'release/security-reports.json']) {
     fs.mkdirSync(path.dirname(path.join(fixture, file)), {recursive: true});
     fs.copyFileSync(path.join(root, file), path.join(fixture, file));
@@ -112,7 +114,7 @@ try {
   const first = snapshot();
   for (const file of metadata.pages) assert.equal(outsideHead(first[file]), outsideHead(before[file]), 'Body/shell changed: ' + file);
   for (const file of protectedFiles) assert.equal(first[file], before[file], 'Protected bytes changed: ' + file);
-  checks.push('22 self canonicals and share tags; EN/zh entry text; root sitemap; body/shell/verification/feed preserved');
+  checks.push('41 self canonicals and share tags; EN/zh entry text; root sitemap; body/shell/verification/feed preserved');
   generate('--metadata-only');
   assert.deepEqual(snapshot(), first);
   checks.push('metadata-only regeneration is byte-identical');
@@ -123,8 +125,8 @@ try {
   assert.throws(() => metadata.updateHtml('google3ebe097a88f39e29.html', '<head><title>x</title><meta name="description" content="x"></head>'), /Not a public content page/);
   checks.push('stale/duplicate owned metadata replaced; verification page rejected');
 
-  fs.appendFileSync(path.join(fixture, 'docs/CONTROLS.md'), '\n\nFixture: current controls source.\n');
-  fs.appendFileSync(path.join(fixture, 'docs/TROUBLESHOOTING.md'), '\n\nFixture: current recovery source.\n');
+  fs.appendFileSync(path.join(fixture, 'dev/site-content/controls.md'), '\n\nFixture: current controls source.\n');
+  fs.appendFileSync(path.join(fixture, 'dev/site-content/troubleshooting.md'), '\n\nFixture: current recovery source.\n');
   generate('--launcher-release');
   verify();
   verifyReleaseSections();

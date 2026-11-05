@@ -1,0 +1,61 @@
+{
+  "about": "Videos on the home page's Watch section (the treadmill run, N3yqYROPPww, is the hero video), all public on the owner's channel (checked with YouTube oEmbed on 4 Nov 2026). Titles are the YouTube titles without the [3.7 Spoilers] tag; spoiler videos sit behind a reveal. Posters are local, so nothing loads from YouTube until a visitor chooses a video. source says where each poster came from: an uploaded YouTube thumbnail (thumbs-20261030/out, slot 1 of ab.json) or a still with no game UI or UID label (checked with the UID label templates).",
+  "channel": "https://www.youtube.com/@chronohax7186",
+  "featured": [
+    {
+      "id": "3nn-Au5w9ds",
+      "title": "She eats the apples mid-juggle 🍎 Wuthering Waves in VR (3D)",
+      "poster": "media/watch/juggler.webp",
+      "width": 960,
+      "height": 540,
+      "source": "builds/thumbs-20261030/j-apples.png (no UI, no UID label)"
+    }
+  ],
+  "story": [
+    {
+      "id": "QkO7uGlnqf4",
+      "title": "The Wuthering Waves 3.7 finale in 25 minutes, in VR (3D)",
+      "poster": "media/watch/finale.webp",
+      "width": 640,
+      "height": 360,
+      "source": "builds/thumbs-20261030/out/highlights-B-25min.jpg (uploaded thumbnail)"
+    },
+    {
+      "id": "pG6UksvQHJE",
+      "title": "I played the Wuthering Waves 3.7 story in VR (Part 1)",
+      "poster": "media/watch/part1.webp",
+      "width": 640,
+      "height": 360,
+      "source": "builds/thumbs-20261030/out/part1-B-hsin.jpg (uploaded thumbnail)"
+    },
+    {
+      "id": "p-h4oY8A-Ro",
+      "title": "Suoming, up close in VR | Wuthering Waves 3.7, Part 2 (3D)",
+      "poster": "media/watch/part2.webp",
+      "width": 640,
+      "height": 360,
+      "source": "builds/thumbs-20261030/out/part2-B-close.jpg (uploaded thumbnail)"
+    },
+    {
+      "id": "psTj5I1pjjQ",
+      "title": "Face to face with Hsin in VR | Wuthering Waves 3.7, Part 3 (3D)",
+      "poster": "media/watch/part3.webp",
+      "width": 640,
+      "height": 360,
+      "source": "builds/thumbs-20261030/out/part3-B-face.jpg (uploaded thumbnail)"
+    },
+    {
+      "id": "PgdYiWAUSy0",
+      "title": "Wuthering Waves in VR: Part 4, the Waking Moon Festival (3D)",
+      "poster": "media/watch/part4.webp",
+      "width": 640,
+      "height": 360,
+      "source": "builds/thumbs-20261030/out/part4-B-moon.jpg (uploaded thumbnail)"
+    }
+  ],
+  "hero": {
+    "image": "media/watch/hero-cliffs-1920.webp",
+    "small": "media/watch/hero-cliffs-960.webp",
+    "source": "builds/thumbs-20261030/p2-cliffs.png (scenery from the Part 2 recording; no UI, no UID label)"
+  }
+}

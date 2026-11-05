@@ -385,6 +385,22 @@ def check():
             issue = translation_problem(k, v)
             if issue:
                 problems.append(f'{code}: "{k[:60]}": {issue}')
+    # The plugin refuses a catalog over its limits and falls back to English for that language (1.2.7: the cap was
+    # 1200 strings and the catalogs reached 1212). Fail while any catalog is within 75% of a limit.
+    loader = (SRC / 'utility/WuWaLocalization.cpp').read_text(encoding='utf-8')
+    cap = re.search(r'max_catalog_strings=(\d+)', loader)
+    size_cap = re.search(r'max_override_bytes=(\d+)\*(\d+)', loader)
+    if not cap or not size_cap:
+        problems.append('WuWaLocalization.cpp: max_catalog_strings / max_override_bytes not found; update this check')
+    else:
+        most, most_bytes = int(cap.group(1)), int(size_cap.group(1)) * int(size_cap.group(2))
+        for code in ['en'] + LANGUAGES:
+            count = len(catalog(code)['strings'])
+            size = (CATALOGS / f'{code}.json').stat().st_size
+            if count > most * 0.75:
+                problems.append(f'{code}: {count} strings, near the plugin\'s limit of {most}; raise max_catalog_strings')
+            if size > most_bytes * 0.75:
+                problems.append(f'{code}: {size} bytes, near the plugin\'s limit of {most_bytes}; raise max_override_bytes')
     bundle = subprocess.run([sys.executable, str(ROOT / 'dev/bundle-languages.py'), '--check'], capture_output=True, text=True)
     if bundle.returncode:
         problems.append('mod/uevr/src/assets/wuwa-languages.json is out of date; run: python dev/bundle-languages.py')

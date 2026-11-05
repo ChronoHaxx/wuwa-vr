@@ -24,10 +24,12 @@ const ICON = {
   View: '<svg class="kbd-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M2.5 4.5h7v6h-7zM6.5 10.5v1.5h7v-6h-4"/></svg>',
   Menu: '<svg class="kbd-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3 4.5h10M3 8h10M3 11.5h10"/></svg>'
 };
+// VR controller names (the mod's sightseeing pad), in the language being rendered; set by language().
+let vrNames = {};
 function chip(text, keyboard = false) {
   if (keyboard) return `<kbd>${esc(text)}</kbd>`;
-  const ps = toPs(text), face = /^[ABXY]$/.test(text) ? ` data-face="${text}"` : '';
-  const label = ps !== text ? `<span data-ps="${esc(ps)}">${esc(text)}</span>` : esc(text);
+  const ps = toPs(text), vr = vrNames[text], face = /^[ABXY]$/.test(text) ? ` data-face="${text}"` : '';
+  const label = ps !== text || vr ? `<span data-ps="${esc(ps)}"${vr ? ` data-vr="${esc(vr)}"` : ''}>${esc(text)}</span>` : esc(text);
   return `<kbd${face}>${ICON[text] || ''}${label}</kbd>`;
 }
 // Keyboard keys: "VR key + E / Q", "W A S D / Mouse", "Shift / Double Shift". Named keys come
@@ -106,6 +108,8 @@ const CHIP = {YX: 'Y / X'};
 function language(code) {
   const cat = catalog(code), en = catalog('en');
   const t = key => cat[key] ?? key;
+  vrNames = {LT: t('L trigger'), RT: t('R trigger'), LB: t('L grip'), RB: t('R grip'), L3: t('L stick'), R3: t('R stick'),
+    View: `${t('L grip')} + ${t('Menu')}`};
   for (const group of controls.groups) for (const row of group.rows) {
     assert(en[row.action] !== undefined, `mod/controls.json action missing from en catalog: ${row.action}`);
     if (group.device === 'keyboard') {
@@ -122,7 +126,7 @@ function language(code) {
   return t;
 }
 function toolbar(copy, image, code) {
-  return `<div class="pad-toolbar"><div class="pad-switch" role="group" aria-label="${esc(copy.names)}" hidden><button type="button" data-pad-choice="xbox" aria-pressed="true">Xbox</button><button type="button" data-pad-choice="ps" aria-pressed="false">PlayStation</button></div><a class="pad-save" href="${image}" download="wuwa-vr-controls-${code}.png">${esc(copy.image)}</a></div>`;
+  return `<div class="pad-toolbar"><div class="pad-switch" role="group" aria-label="${esc(copy.names)}" hidden><button type="button" data-pad-choice="xbox" aria-pressed="true">Xbox</button><button type="button" data-pad-choice="ps" aria-pressed="false">PlayStation</button><button type="button" data-pad-choice="vr" aria-pressed="false">VR</button></div><a class="pad-save" href="${image}" download="wuwa-vr-controls-${code}.png">${esc(copy.image)}</a></div>`;
 }
 // The "hold L3, then press" card: callouts either side of the drawing, then gestures.
 function card({dir, copy, t}) {
@@ -161,16 +165,20 @@ function tableRows(group, t, copy, {hover = false} = {}) {
   }).join('');
 }
 
-// Home page section, in every language.
-function render({code, dir, copy, prefix, guideLink}) {
+// The card and every shortcut table, in one language: the player guide's controls.
+function block({code, dir, copy, prefix, tables = true}) {
   const t = language(code);
-  const tables = controls.groups.map(g => `<section class="pad-group" aria-labelledby="pad-${g.id}"><h3 id="pad-${g.id}">${esc(t(g.title).replace(/^\d+\s+/, ''))}</h3><div class="table-scroll"><table class="shortcut-table"><tbody>${tableRows(g, t, copy)}</tbody></table></div></section>`).join('');
-  return `<section id="controls" class="section alt"><div class="wrap">
-<div class="section-head"><h2>${esc(copy.title)}</h2><p>${esc(copy.intro)}</p></div>
-${toolbar(copy, `${prefix}media/controls/${code}.png`, code)}
+  const groups = controls.groups.map(g => `<section class="pad-group" aria-labelledby="pad-${g.id}"><h3 id="pad-${g.id}">${esc(t(g.title).replace(/^\d+\s+/, ''))}</h3><div class="table-scroll"><table class="shortcut-table"><tbody>${tableRows(g, t, copy)}</tbody></table></div></section>`).join('');
+  return `${toolbar(copy, `${prefix}media/controls/${code}.png`, code)}
 ${card({dir, copy, t})}
 <p class="pad-note small">${esc(copy.psNote)}</p>
-<h3 class="pad-all">${esc(copy.all)}</h3><div class="pad-groups">${tables}</div>
+${tables ? `<h3 class="pad-all">${esc(copy.all)}</h3><div class="pad-groups">${groups}</div>` : ''}`;
+}
+// Home page section, in every language: the card only; the tables live in the guide.
+function render({code, dir, copy, prefix, guideLink}) {
+  return `<section id="controls" class="section alt"><div class="wrap">
+<div class="section-head"><h2>${esc(copy.title)}</h2><p>${esc(copy.intro)}</p></div>
+${block({code, dir, copy, prefix, tables: false})}
 <p class="section-foot">${guideLink}</p></div></section>`;
 }
 
@@ -183,7 +191,7 @@ const PAGE_NOTES = {
   cameras: 'The fixed camera, Polar walk and freecam.',
   menus: 'The V / Tab utility and HUD / mouse adjustment.',
   menu: 'Driving the WuWa VR menu with a gamepad. VR controllers point and pull the trigger.',
-  keyboard: 'Every shortcut on the keyboard: hold the VR key (the key left of 1: ` on US and UK keyboards) for half a second and the keyboard card shows. Change it or turn it off on the WuWa VR menu\'s Controllers page.'
+  keyboard: 'Every shortcut on the keyboard: hold the VR key (the key left of 1: ` on US and UK keyboards) for half a second and the keyboard card shows. Change it or turn it off on the WuWa VR menu\'s Controls page.'
 };
 function renderGuide({copy}) {
   const t = language('en');
@@ -202,4 +210,4 @@ ${card({dir: 'ltr', copy, t})}
 <div class="pad-pages">${pages}</div></section>`;
 }
 
-module.exports = {render, renderGuide, controls, catalog, buttonsOf};
+module.exports = {render, renderGuide, block, controls, catalog, buttonsOf};

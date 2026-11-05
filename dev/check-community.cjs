@@ -32,10 +32,11 @@ const server=http.createServer((req,res)=>{
       assert.equal(await page.locator('html').getAttribute('lang'),code);
       assert.equal(await page.locator('html').getAttribute('dir'),code==='ar'?'rtl':'ltr');
       assert.equal(await page.locator('h1').count(),1);
-      assert.equal(await page.locator('#controls .pad-groups th[scope=row]').count(),padRows);
+      // The home page shows the controls card; every shortcut table is in that language's guide.
+      assert.equal(await page.locator('#controls .pad-card').count(),1);
       assert.equal(await page.locator('#controls kbd').evaluateAll(k=>k.filter(e=>!e.closest('bdi[dir=ltr]')).length),0);
-      assert(await page.locator('#report-form').isVisible());
-      assert.equal(await page.locator('#report-form').getAttribute('data-lang'),code);
+      // The feedback form has its own page in each language (5 Nov 2026), linked from the header.
+      assert.equal(await page.locator('#report-form').count(),0);
       assert(await page.evaluate(()=>document.querySelector('.risk').compareDocumentPosition(document.querySelector('#start'))&Node.DOCUMENT_POSITION_FOLLOWING));
       const duplicate=await page.evaluate(()=>{const ids=[...document.querySelectorAll('[id]')].map(e=>e.id);return ids.filter((v,i)=>ids.indexOf(v)!==i);});
       assert.deepEqual(duplicate,[]);
@@ -58,7 +59,32 @@ const server=http.createServer((req,res)=>{
         await page.locator('[data-pad-choice=xbox]').click();assert.equal(await a.textContent(),'A');
         checks.push('controller section: Xbox / PlayStation names switch, persist and switch back');
       }
-      checks.push('locale, risk placement, links, form and 320px reflow: '+code);
+      const feedbackPage=code==='en'?'/feedback.html':'/l/'+code+'-feedback.html';
+      assert.equal(await page.locator(`.site-nav a[href$="${feedbackPage.split('/').pop()}"]`).count(),1);
+      await page.goto(base+feedbackPage);
+      assert.equal(await page.locator('html').getAttribute('lang'),code);
+      assert.equal(await page.locator('html').getAttribute('dir'),code==='ar'?'rtl':'ltr');
+      assert(await page.locator('#report-form').isVisible());
+      assert.equal(await page.locator('#report-form').getAttribute('data-lang'),code);
+      // The player guide in the same language: every shortcut, key chips kept left to right, local links and reflow.
+      const guide=code==='en'?'/guide.html':'/l/'+code+'-guide.html';
+      await page.goto(base+guide);
+      assert.equal(await page.locator('html').getAttribute('lang'),code);
+      assert.equal(await page.locator('html').getAttribute('dir'),code==='ar'?'rtl':'ltr');
+      assert.equal(await page.locator('#controls .pad-groups th[scope=row]').count(),padRows);
+      assert.equal(await page.locator('#controls kbd').evaluateAll(k=>k.filter(e=>!e.closest('bdi[dir=ltr]')).length),0);
+      const guideIds=await page.evaluate(()=>{const ids=[...document.querySelectorAll('[id]')].map(e=>e.id);return ids.filter((v,i)=>ids.indexOf(v)!==i);});
+      assert.deepEqual(guideIds,[]);
+      for(const href of await page.locator('a[href]').evaluateAll(a=>a.map(x=>x.getAttribute('href')))){
+        if(/^https?:/.test(href))continue;
+        const target=new URL(href,base+guide),file=path.join(site,target.pathname);
+        assert(fs.existsSync(file),'Missing '+href+' on '+guide);
+        if(target.hash)assert(fs.readFileSync(file,'utf8').includes(`id="${target.hash.slice(1)}"`),'Missing anchor '+href+' on '+guide);
+      }
+      await page.setViewportSize({width:320,height:720});
+      assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Narrow overflow: '+guide);
+      await page.setViewportSize({width:1280,height:900});
+      checks.push('locale, risk placement, links, form and 320px reflow: '+code+'; its guide: every shortcut, links, reflow');
     }
     await page.setViewportSize({width:390,height:844});await page.goto(base+'/l/ar.html');
     await page.screenshot({path:path.join(output,'arabic-mobile.png')});
@@ -111,9 +137,12 @@ const server=http.createServer((req,res)=>{
     await configure('https://github.com/ExampleOwner/example-repo');await fill();
     assert(await page.locator('#issue-link').isVisible());checks.push('missing optional notice does not break submission interception');
     const plain=await browser.newContext({javaScriptEnabled:false,viewport:{width:320,height:720}});
-    const nojs=await plain.newPage();await nojs.goto(base+'/l/ar.html');assert(await nojs.locator('#report-form').isHidden());
-    assert(await nojs.locator('noscript').isVisible());assert(await nojs.locator('.risk').isVisible());assert.equal(await nojs.locator('#controls tr').count(),padTableRows);
-    await plain.close();checks.push('without JavaScript: readable risk, controls and manual feedback instructions; no unhandled form');
+    const nojs=await plain.newPage();await nojs.goto(base+'/l/ar.html');
+    assert(await nojs.locator('.risk').isVisible());assert.equal(await nojs.locator('#controls .pad-card').count(),1);
+    assert(await nojs.locator('#controls .pad-svg').isVisible());
+    await nojs.goto(base+'/l/ar-feedback.html');assert(await nojs.locator('#report-form').isHidden());assert(await nojs.locator('noscript').isVisible());
+    await nojs.goto(base+'/l/ar-guide.html');assert.equal(await nojs.locator('#controls .pad-groups tr').count(),padTableRows);
+    await plain.close();checks.push('without JavaScript: readable risk, controls card, every shortcut in the guide and manual feedback instructions; no unhandled form');
     assert.equal(sent,0);assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(output,'verification.json'),JSON.stringify({checkedAt:new Date().toISOString(),checks,errors,networkPosts:sent,scope:'Local browser fixtures only; no GitHub submission, payment, game or headset acceptance.'},null,2));
     console.log(JSON.stringify({passed:checks.length,errors,networkPosts:sent,output}));

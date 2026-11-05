@@ -22,3 +22,7 @@ SOFTWARE.
 
 This licence covers the desktop manager source. Downloaded mod packages retain
 their own licence and attribution files. See THIRD-PARTY-NOTICES.txt.
+
+It does not cover the Abby artwork in assets/ (the app icon, the header mark
+and the backdrop): an original drawing of Abby, a Wuthering Waves character
+owned by Kuro Games. That is fan art, not licensed by this project.

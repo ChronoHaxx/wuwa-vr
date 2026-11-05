@@ -23,7 +23,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'bin/Release/WuWa VR.exe') -Dest
 foreach ($runtimeFile in Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'bin/Release') -File | Where-Object { $_.Extension -in @('.dll', '.config') }) {
     Copy-Item -LiteralPath $runtimeFile.FullName -Destination $stage
 }
-foreach ($name in @('README.txt','TEST THIS.txt','PlayerGuide.html','LICENSE.txt','THIRD-PARTY-NOTICES.txt')) {
+foreach ($name in @('README.txt','TEST THIS.txt','LICENSE.txt','THIRD-PARTY-NOTICES.txt')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $stage
 }
 if ($OfflineArchive) {

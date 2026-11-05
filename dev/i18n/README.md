@@ -26,7 +26,7 @@ python dev/i18n/check_all.py --accept-english
 | What players see | Source | Built by | Checked by |
 | --- | --- | --- | --- |
 | VR mod: the WuWa VR menu, controls cards, tips, notices, the classic UEVR panel | English in `mod/uevr/src`; translations in `mod/localization/wuwa/<lang>.json` | `dev/bundle-languages.py` (embedded in the plugin) | `mod_strings.py check` |
-| Offline player guide (opened by the launcher) | `dev/i18n/guide/<lang>.json` | `dev/i18n/build_guide.py` → `launcher/native/PlayerGuide.html` | `build_guide.py --check` |
+| Player guide on the website (`guide.html`, `l/<lang>-guide.html`) | `dev/i18n/guide/<lang>.json` | `dev/build-guide.cjs` (run by `dev/build-home.cjs`) | `node dev/build-guide.cjs --check` |
 | Launcher app | `launcher/native/locales/<lang>.json` | the launcher build | `launcher/native/check-locales.py` |
 | Portable web tool | `launcher/localization/launcher/<lang>.json` | served as is | `check_all.py` (same keys and list lengths as English) |
 | Website home pages | `dev/i18n/home/<lang>.json` | `dev/build-home.cjs` | the site build |
@@ -70,31 +70,48 @@ first if you want to reuse most of them.
 
 ## The player guide
 
+The website is the one place player docs are written; the launcher and the
+GitHub README link to it.
+
 `dev/i18n/guide/en.json` holds the English guide as small HTML fragments (only
 `<strong>`, `<code>`, `<em>` and links). Each language file has the
 same keys, the same `{version}`, `{tag}` and `{game}` fields, tags and links.
-After editing, run `python dev/i18n/build_guide.py` to rebuild
-`launcher/native/PlayerGuide.html`; `--check` fails if the built file is out
-of date. The launcher opens it at `#<lang>` (`#zh` for Simplified Chinese).
+Links to `https://chronohaxx.github.io/wuwa-vr/...` become relative on the site.
+`dev/build-guide.cjs` builds `site/guide.html` (English) and
+`site/l/<lang>-guide.html`, with the controls card and tables from
+`mod/controls.json`; `--check` fails on a missing key or different markup.
+
+The deeper English reference (`site/reference.html`: every shortcut with a
+search, comfort, known issues) comes from `dev/site-content/*.md`, and the risk
+notice from `dev/site-content/risk.md`. The GitHub README and the old
+`docs/START-HERE.md`, `CONTROLS.md`, `COMFORT.md`, `TROUBLESHOOTING.md` and
+`RISK.md` paths are generated pointers (`dev/build-readme.cjs`): never edit them
+by hand.
+
+After any change, rebuild from the repository root with
+`node dev/build-site.cjs --launcher-release`. `node dev/check-site-sync.cjs`
+rebuilds into a temporary copy and fails if any page, the README or a pointer
+differs from what is committed; `check_all.py` runs it.
 
 ## Adding a language
 
 Add `<lang>.json` beside the others in each source above (copy English and
 translate), add the code to `LANGUAGES` in `mod_strings.py` and `check_all.py` and to
-`ORDER` in `build_guide.py`, and to the launcher's language list. The plugin builds its
+`languages` in `dev/site-layout.cjs`, and to the launcher's language list. The plugin builds its
 font ranges from the catalog's own characters; a script none of the bundled
 fonts cover needs a font too.
 
 # Site text
 
-`home/<code>.json` holds the home page in ten languages: hero, setup steps,
-features, first person, FAQ, limits and credits. Every file must have exactly
-the English keys and list lengths, as plain text (the builder rejects markup).
-Step names match the desktop launcher's own card titles in that language.
+`home/<code>.json` holds the home page in ten languages: hero, the Watch
+section, setup steps, features, first person, FAQ, limits and credits. Every
+file must have exactly the English keys and list lengths, as plain text (the
+builder rejects markup). The Watch videos and their posters are listed in
+`dev/site-content/watch.json`, with where each poster came from.
 Risk text and the feedback form come from `site/languages/<code>.js`.
 
-`launcher-release.<en|zh-Hans>.json` describe the installed desktop app for the
-English player guide and reference pages.
+`launcher-release.<en|zh-Hans>.json` describe the current release for the
+credits, test-notes and explainer pages.
 
 From the repository root:
 

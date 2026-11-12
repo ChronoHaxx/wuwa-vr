@@ -312,6 +312,7 @@ namespace WuWaVR.Manager
             // FileName is a separate API field (spaces need no shell quoting);
             // Arguments contains exactly one fixed, argument-free read command.
             return new ProcessStartInfo { FileName = Path.GetFullPath(path), Arguments = command, UseShellExecute = false,
+                WorkingDirectory = Program.StartDirectory(Path.GetFullPath(path)),
                 CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardOutput = true,
                 RedirectStandardError = true, RedirectStandardInput = true };
         }

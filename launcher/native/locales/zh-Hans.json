@@ -323,6 +323,7 @@
   "gameSteamUpdateRequired": "已选择 Steam。请在 VR 模组一行安装更新的 VR 包；游戏选择会保留。",
   "launcherUpdateBar": "WuWa VR 应用有新版本（{0}）可用。",
   "launcherUpdateBarReady": "WuWa VR 应用 {0} 已下载。重启即可完成更新。",
+  "launcherUpdateFailed": "应用更新到 {0} 未能安装：另一个程序正在使用 WuWa VR 应用文件夹（通常是托盘中的游戏启动器）。请关闭游戏及其启动器，然后重试。",
   "updatePackage": "更新 VR 安装包",
   "updatePackageTo": "更新到 {0}",
   "rollbackPackage": "回到上一个版本",

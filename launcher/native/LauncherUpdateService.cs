@@ -44,6 +44,11 @@ namespace WuWaVR.Manager
         readonly object sync = new object();
         LauncherUpdate available;
         bool ready, checkFailed, checkedOnce, busy;
+        // A failed apply leaves no trace in the app: Velopack relaunches the old version (1.2.6 -> 1.2.7,
+        // 12 Nov 2026, another program held the install folder). RestartAsync notes the attempt; the next start
+        // compares versions and keeps the version that didn't install, so the update bar can say so.
+        string attemptPath, failedVersion;
+        public string FailedApplyVersion { get { lock (sync) return failedVersion; } }
         public bool Installed { get { return adapter != null && adapter.Installed; } }
         public string CurrentVersion { get { return adapter == null ? Version : adapter.CurrentVersion; } }
         public string AvailableVersion { get { lock (sync) return available?.Version; } }
@@ -57,6 +62,36 @@ namespace WuWaVR.Manager
         public LauncherUpdateService(ILauncherUpdateAdapter adapter = null) { this.adapter = adapter; }
         public static LauncherUpdateService CreateInstalled()
         { return new LauncherUpdateService(new VelopackLauncherUpdateAdapter()); }
+
+        // Reads (once) and removes the note of the last apply attempt kept at path.
+        public void TrackApplyAttempts(string path)
+        {
+            if (String.IsNullOrEmpty(path)) return;
+            lock (sync) attemptPath = path;
+            if (!Installed || !File.Exists(path)) return;
+            try
+            {
+                var note = Json.Read<Dictionary<string, object>>(File.ReadAllText(path));
+                string target = Json.Text(note, "to");
+                System.Version wanted, now;
+                if (System.Version.TryParse(target, out wanted) && System.Version.TryParse(CurrentVersion, out now) && now < wanted)
+                    lock (sync) failedVersion = target;
+            }
+            catch (IOException) { } catch (ArgumentException) { } catch (FormatException) { } catch (InvalidOperationException) { }
+            try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+        void NoteAttempt(string target)
+        {
+            string path; lock (sync) { path = attemptPath; failedVersion = null; }
+            if (String.IsNullOrEmpty(path)) return;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                File.WriteAllText(path, Json.Write(new Dictionary<string, object> {
+                    { "from", CurrentVersion }, { "to", target }, { "utc", DateTime.UtcNow.ToString("o") } }));
+            }
+            catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
 
         public async Task CheckAsync(CancellationToken cancel)
         {
@@ -112,6 +147,7 @@ namespace WuWaVR.Manager
                     // before the explicit app restart, regardless of selected mod.
                     await requireIdle(linked.Token).ConfigureAwait(false);
                     linked.Token.ThrowIfCancellationRequested();
+                    NoteAttempt(target.Version);
                     adapter.ApplyAndRestart(target);
                 }
                 finally { lock (sync) busy = false; serial.Release(); }

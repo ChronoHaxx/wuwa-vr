@@ -435,7 +435,7 @@ WuWaControlsComponent::WuWaControlsComponent() {
         m_cinema_producer, m_cinema_sample, m_cinema_status, m_effective_mono, m_toggle_mono, m_toggle_screen, m_effective_screen, m_scene_detect, m_character_detect, m_camera_detect,
         *m_pitch_scenes, *m_diorama_skills, m_level_request, m_level_status,
         *m_video_fps, *m_video_width, *m_video_telemetry, *m_video_scene, *m_video_sound, *m_video_microphone, *m_video_mic_volume, *m_video_sound_files, *m_video_style, *m_showcase_pitch, *m_video_slow_stop, *m_video_slow_fps, *m_video_slow_seconds, *m_steady_desktop, *m_steady_desktop_seconds, *m_desktop_hud,
-        *m_privacy, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
+        *m_privacy, m_uid_hidden, m_profile_id_hidden, m_menu_shown, *m_privacy_profile, *m_privacy_profile_scope, *m_uid_left, *m_uid_top, *m_uid_right, *m_uid_bottom,
         *m_id_left, *m_id_top, *m_id_right, *m_id_bottom, *m_id169_left, *m_id169_top, *m_id169_right, *m_id169_bottom};
 }
 
@@ -885,7 +885,7 @@ void WuWaControlsComponent::on_draw_recording() {
     wuwa_ui::draw(*m_privacy,"Streamer privacy: cover player IDs");
     if (m_privacy->value()) {
         if (m_privacy->value()==1) wuwa_ui::TextWrapped("While recording: the boxes appear while the WuWa VR app records and during treadmill runs. Recording with other software (OBS) at other times needs Always.");
-        wuwa_ui::TextWrapped("Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.");
+        wuwa_ui::TextWrapped("Your UID and the ESC profile ID row are hidden at the source, so the game doesn't draw them. When that can't be confirmed, black boxes cover them in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.");
         if (wuwa_ui::TreeNode("Privacy box placement")) {
             wuwa_ui::draw(*m_privacy_profile,"Also cover the ESC profile ID row");
             wuwa_ui::draw(*m_privacy_profile_scope,"When to show the profile ID box");
@@ -1601,8 +1601,14 @@ std::array<wuwa_privacy::Rect, 2> WuWaControlsComponent::privacy_rectangles(int3
     const bool profile=m_privacy_profile->value() && wuwa_menu::profile_mask(m_privacy_profile_scope->value(),GetTickCount64(),fresh_menu_cursor());
     // The ESC terminal follows the UI layout: the 16:9 layout puts its ID row lower than the taller one.
     const bool layout169=VR::get()->is_wuwa_ui_window_size_active();
-    return {wuwa_privacy::pixels(m_uid_left->value(),m_uid_top->value(),m_uid_right->value(),m_uid_bottom->value(),width,height),
-        !profile ? wuwa_privacy::Rect{} : layout169 ?
+    // A text the script keeps hidden at the source needs no box (wuwa_privacy::SourceHide); the boxes stay as the
+    // fallback whenever that isn't confirmed. With no box left, D3D12Component skips the switch hold as well.
+    const auto now=GetTickCount64();
+    const bool uid_box=!wuwa_privacy::uid_text.hidden(now);
+    const bool profile_box=profile && !wuwa_privacy::profile_id_text.hidden(now);
+    return {!uid_box ? wuwa_privacy::Rect{} :
+            wuwa_privacy::pixels(m_uid_left->value(),m_uid_top->value(),m_uid_right->value(),m_uid_bottom->value(),width,height),
+        !profile_box ? wuwa_privacy::Rect{} : layout169 ?
             wuwa_privacy::pixels(m_id169_left->value(),m_id169_top->value(),m_id169_right->value(),m_id169_bottom->value(),width,height) :
             wuwa_privacy::pixels(m_id_left->value(),m_id_top->value(),m_id_right->value(),m_id_bottom->value(),width,height)};
 }

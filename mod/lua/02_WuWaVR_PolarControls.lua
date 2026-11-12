@@ -51,16 +51,24 @@ do
     if ready and type(instance)=="table" then scene.log=instance
     else functions.log_warn("[WuWaScene] module unavailable: "..tostring(found and instance or module)) end
 end
--- The user ID hidden at the source (wuwa_uid_hide.lua, 1.2.7): the game never draws it, so no view switch can show it.
-local uid={error=nil,said=nil,hide={tick=function() end,restore=function() end,status="UID: module unavailable"}}
+-- The user ID texts hidden at the source (wuwa_uid_hide.lua, 1.2.7): the game never draws them, so no view switch can
+-- show them. 1.2.8: the HUD UID and the ESC profile ID row; each reports a steady hide to the plugin, which then
+-- drops that black box (WuWaPrivacy_UidHidden / _ProfileIdHidden; any other state keeps the box).
+local uid={items={}}
 do
     local found,module=pcall(require,"wuwa_uid_hide")
-    local ready,instance=false,nil
-    if found and type(module)=="table" and type(module.new)=="function" then
-        ready,instance=pcall(module.new,{api=uevr.api,types=uevr.types})
+    for _,item in ipairs({{key="WuWaPrivacy_UidHidden",spec="UID"},{key="WuWaPrivacy_ProfileIdHidden",spec="PROFILE",menu=true}}) do
+        local ready,instance=false,nil
+        if found and type(module)=="table" and type(module.new)=="function" then
+            ready,instance=pcall(module.new,{api=uevr.api,types=uevr.types},module[item.spec])
+        end
+        if ready and type(instance)=="table" then item.hide=instance
+        else
+            item.hide={tick=function() end,restore=function() end,status=item.spec..": module unavailable"}
+            functions.log_warn("[WuWaUID] module unavailable: "..tostring(found and instance or module))
+        end
+        uid.items[#uid.items+1]=item
     end
-    if ready and type(instance)=="table" then uid.hide=instance
-    else functions.log_warn("[WuWaUID] module unavailable: "..tostring(found and instance or module)) end
 end
 local function set(k,v) vr.set_mod_value(k,tostring(v)) end
 local function has(b,mask) return b & mask ~= 0 end
@@ -2201,13 +2209,26 @@ cb.on_pre_viewport_client_draw(function()
         if hider.error~=tostring(hide_err) then hider.error=tostring(hide_err); functions.log_warn("[WuWaHide] "..hider.error:sub(1,200)) end
     end
     -- Whenever the privacy setting isn't Off, not only while recording: a hidden ID costs the player nothing.
-    local uid_ok,uid_err=pcall(uid.hide.tick,uid.hide,now(),number("WuWaPrivacy_Mode",1,0,2)>0)
-    if not uid_ok then
-        pcall(uid.hide.restore,uid.hide,"error")
-        if uid.error~=tostring(uid_err) then uid.error=tostring(uid_err); functions.log_warn("[WuWaUID] "..uid.error:sub(1,200)) end
-    end
-    if uid.said~=uid.hide.status and uid.hide.status~="UID: looking" then
-        uid.said=uid.hide.status; functions.log_info("[WuWaUID] "..tostring(uid.said))
+    local want_hidden,t=number("WuWaPrivacy_Mode",1,0,2)>0,now()
+    for _,item in ipairs(uid.items) do
+        local hide=item.hide
+        -- The ESC row follows "Also hide the profile ID row", like its box.
+        local want=want_hidden and (not item.menu or enabled("WuWaPrivacy_ProfileID"))
+        local scan=not item.menu or get("WuWaPrivacy_MenuShown")=="1"
+        local uid_ok,uid_err=pcall(hide.tick,hide,t,want,scan)
+        if not uid_ok then
+            pcall(hide.restore,hide,"error")
+            if item.error~=tostring(uid_err) then item.error=tostring(uid_err); functions.log_warn("[WuWaUID] "..item.error:sub(1,200)) end
+        end
+        local status=tostring(hide.status)
+        if item.said~=status and not status:find(": looking$") and not status:find(": waiting for a menu$") then
+            item.said=status; functions.log_info("[WuWaUID] "..status)
+        end
+        -- "1" only while the text stayed at alpha 0; refreshed every 0.25 s, since the plugin trusts it for 1 s.
+        local steady=uid_ok and hide.hidden==true and hide.steady==true
+        if steady~=item.sent or (steady and (t<(item.sent_at or 0) or t-(item.sent_at or 0)>=0.25)) then
+            set(item.key,steady and "1" or "0"); item.sent,item.sent_at=steady,t
+        end
     end
     if not enabled("WuWaControls_Recording") then
         if scene.recording then scene.recording=false; pcall(scene.log.reset,scene.log) end

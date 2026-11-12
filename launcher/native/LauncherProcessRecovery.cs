@@ -111,7 +111,7 @@ namespace WuWaVR.Manager
                     ScanHash = scan == null ? null : RepoClient.Hash(Paths.Inside(scan.Directory, "result.json")) };
                 string requestPath = Paths.Inside(folder, "request.json"); Json.Save(requestPath, request);
                 var info = new ProcessStartInfo(current.MainModule.FileName, "--process-recovery \"" + requestPath + "\"")
-                { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden, WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory };
+                { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden, WorkingDirectory = Environment.SystemDirectory };
                 try
                 {
                     using (var worker = Process.Start(info))

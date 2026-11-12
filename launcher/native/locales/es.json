@@ -323,6 +323,7 @@
   "gameSteamUpdateRequired": "Steam seleccionado. Instala el paquete VR actualizado en la fila Mod VR; se conservará tu elección de juego.",
   "launcherUpdateBar": "Hay una nueva versión de la aplicación WuWa VR ({0}) disponible.",
   "launcherUpdateBarReady": "La aplicación WuWa VR {0} está descargada. Reinicia para terminar de actualizar.",
+  "launcherUpdateFailed": "La actualización de la app a {0} no se instaló: otro programa estaba usando la carpeta de la app WuWa VR (a menudo el lanzador del juego en la bandeja). Cierra el juego y su lanzador e inténtalo de nuevo.",
   "updatePackage": "Actualizar el paquete VR",
   "updatePackageTo": "Actualizar a {0}",
   "rollbackPackage": "Volver a la versión anterior",

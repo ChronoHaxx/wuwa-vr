@@ -609,6 +609,29 @@ private:
     std::atomic<uint64_t> m_recording_live_seen{0};
     std::atomic<uint64_t> m_recording_stop_asked{0};
     void refresh_recording_live();
+    // Transient reports from wuwa_uid_hide.lua (1.2.8): "1" while an ID text stays at alpha 0, "0" when the script
+    // had to hide it again, lost it or stopped. Never saved, so a new session starts with the boxes.
+    struct SourceHideReport : ModString {
+        wuwa_privacy::SourceHide& target;
+        SourceHideReport(const char* key, wuwa_privacy::SourceHide& t) : ModString{key, ""}, target{t} {}
+        std::string get() const override { return {}; }
+        void set(const std::string& value) override { target.report(value == "1", GetTickCount64()); }
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    };
+    SourceHideReport m_uid_hidden{"WuWaPrivacy_UidHidden", wuwa_privacy::uid_text};
+    SourceHideReport m_profile_id_hidden{"WuWaPrivacy_ProfileIdHidden", wuwa_privacy::profile_id_text};
+    // Read by the script: "1" while a game menu is detected, so it searches for the profile ID row only then.
+    struct MenuShown : ModString {
+        const WuWaControlsComponent& owner;
+        explicit MenuShown(const WuWaControlsComponent& o) : ModString{"WuWaPrivacy_MenuShown", "0"}, owner{o} {}
+        std::string get() const override {
+            return wuwa_menu::detected(GetTickCount64(), owner.fresh_menu_cursor()) ? "1" : "0";
+        }
+        void set(const std::string&) override {}
+        void config_load(const utility::Config&, bool) override {}
+        void config_save(utility::Config&) override {}
+    } m_menu_shown{*this};
     const ModToggle::Ptr m_privacy_profile{ModToggle::create("WuWaPrivacy_ProfileID",true)};
     const ModCombo::Ptr m_privacy_profile_scope{ModCombo::create("WuWaPrivacy_ProfileScope", {"ESC / overlay menus (detected)", "All detected menus", "Always (manual mask)"},0)};
     const ModSlider::Ptr m_uid_left{ModSlider::create("WuWaPrivacy_UIDLeft",0.0f,1.0f,0.78f)};

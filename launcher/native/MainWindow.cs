@@ -129,6 +129,7 @@ namespace WuWaVR.Manager
         {
             this.store = store; this.preview = preview; bridge = new LauncherBridge(backendData);
             this.launcherUpdates = preview ? new LauncherUpdateService() : launcherUpdates ?? new LauncherUpdateService();
+            if (!preview) this.launcherUpdates.TrackApplyAttempts(Path.Combine(backendData, "launcher-update-attempt.json"));
             text.Language = Strings.Supported(language ?? store.State.language);
             Title = "WuWa VR"; Width = 780; Height = 720; MinWidth = 640; MinHeight = 580;
             Background = background; Foreground = foreground; FontFamily = new FontFamily("Segoe UI"); FontSize = 14;
@@ -392,7 +393,7 @@ namespace WuWaVR.Manager
         }
         Action<string> openOverride = null;
         void Open(string target)
-        { if (!preview) { if (openOverride != null) openOverride(target); else Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); } }
+        { if (!preview) { if (openOverride != null) openOverride(target); else Process.Start(new ProcessStartInfo(target) { UseShellExecute = true, WorkingDirectory = Program.StartDirectory(target) }); } }
         StackPanel Row(params UIElement[] elements)
         { var row = new StackPanel { Orientation = Orientation.Horizontal }; foreach (var e in elements) row.Children.Add(e); return row; }
         WrapPanel Wrap(params UIElement[] elements)
@@ -1493,7 +1494,7 @@ namespace WuWaVR.Manager
                 }
                 finally { if (File.Exists(partial)) File.Delete(partial); }
             }, c);
-            if (!preview) { if (openOverride != null) openOverride(target); else Process.Start("explorer.exe", "/select,\"" + target + "\""); }
+            if (!preview) { if (openOverride != null) openOverride(target); else Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + target + "\"") { UseShellExecute = true, WorkingDirectory = Environment.SystemDirectory }); }
             operationText.Text = String.Format(text["reportSaved"], Path.GetFileName(target));
         }
         async Task<Tuple<string, bool>> DiagnosticsText(CancellationToken c)
@@ -1848,7 +1849,10 @@ namespace WuWaVR.Manager
             launcherUpdateButton.Content = text[launcherUpdates.ReadyToRestart ? "restartLauncher" : "updateLauncher"];
             launcherUpdateButton.Visibility = launcherUpdates.AvailableVersion == null ? Visibility.Collapsed : Visibility.Visible;
             launcherUpdateBar.Visibility = launcherUpdateButton.Visibility;
-            launcherUpdateBarText.Text = String.Format(text[launcherUpdates.ReadyToRestart ? "launcherUpdateBarReady" : "launcherUpdateBar"], launcherUpdates.AvailableVersion);
+            // The last restart didn't install it: say why instead of offering it as new.
+            string failed = launcherUpdates.FailedApplyVersion;
+            launcherUpdateBarText.Text = failed != null && !launcherUpdates.ReadyToRestart ? String.Format(text["launcherUpdateFailed"], failed) :
+                String.Format(text[launcherUpdates.ReadyToRestart ? "launcherUpdateBarReady" : "launcherUpdateBar"], launcherUpdates.AvailableVersion);
         }
         async Task Runtime(string mode, CancellationToken c)
         {

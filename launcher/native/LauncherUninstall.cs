@@ -74,7 +74,7 @@ namespace WuWaVR.Manager
             // Keep a visible explanation after Velopack exits this callback.
             if (!result.Success && File.Exists(result.ReportPath))
                 try { Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32/notepad.exe"),
-                    "\"" + result.ReportPath + "\"") { UseShellExecute = false }); } catch { }
+                    "\"" + result.ReportPath + "\"") { UseShellExecute = false, WorkingDirectory = Environment.SystemDirectory }); } catch { }
         }
 
         static EnvironmentHooks Production()

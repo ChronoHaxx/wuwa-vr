@@ -16,10 +16,41 @@ namespace WuWaVR.Manager
             AppContext.SetSwitch("Switch.System.IO.UseLegacyPathHandling", false);
             AppContext.SetSwitch("Switch.System.IO.BlockLongPaths", false);
         }
+        // Velopack starts the app (and Windows starts it from the shortcut) with the install's current\ folder as
+        // the working directory, and every process the app starts without its own directory inherits it. The
+        // official game launcher stays in the tray, so one "Play without VR" kept current\ open and Windows refused
+        // to move it: the 1.2.6 -> 1.2.7 update failed four times on 12 Nov 2026 ("being used by another process").
+        // The app never needs a working directory (every path is absolute), so it leaves the install folder first.
+        // A preview render resolves its argument against the directory it was given, so it keeps it.
+        public static void LeaveInstallFolder()
+        {
+            try { Directory.SetCurrentDirectory(Environment.SystemDirectory); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+        // The working directory for anything the app starts: a program's own folder (as Explorer would use),
+        // otherwise System32. Never the install folder, whatever the app's own directory is.
+        public static string StartDirectory(string target)
+        {
+            try
+            {
+                if (!String.IsNullOrEmpty(target) && Path.IsPathRooted(target) && File.Exists(target))
+                {
+                    string folder = Path.GetDirectoryName(Path.GetFullPath(target));
+                    if (!String.IsNullOrEmpty(folder) && !InsideInstall(folder)) return folder;
+                }
+            }
+            catch (ArgumentException) { } catch (NotSupportedException) { } catch (IOException) { }
+            return Environment.SystemDirectory;
+        }
+        static bool InsideInstall(string folder)
+        {
+            string install = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory).TrimEnd('\\') + "\\";
+            return (Path.GetFullPath(folder).TrimEnd('\\') + "\\").StartsWith(install, StringComparison.OrdinalIgnoreCase);
+        }
         [STAThread]
         public static int Main(string[] args)
         {
             ConfigureRuntime();
+            if (!(args.Length >= 2 && args[0] == "--preview")) LeaveInstallFolder();
             string root = Environment.GetEnvironmentVariable("WUWA_VR_MANAGER_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WuWa VR Manager");
             string data = Environment.GetEnvironmentVariable("WUWA_VR_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WuWa VR Launcher");
             // Velopack's uninstall callback has a hard 30-second lifetime. Cleanup

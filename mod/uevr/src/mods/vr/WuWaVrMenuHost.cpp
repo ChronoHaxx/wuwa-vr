@@ -1456,10 +1456,10 @@ Page record_page() {
     Page page{"Record"};
     page.items.push_back(record_toggle());
     page.items.push_back(setting_choice("Hide player IDs",
-        "Black boxes over your UID in the corner and the profile ID row in menus. While recording: while the WuWa VR app "
-        "records or a treadmill run is on, so the boxes never cover HUD you need in play. Always: for OBS and other "
-        "recorders at any time. The boxes are approximate; check a short video before sharing. Other names and chat are "
-        "not hidden.",
+        "Your UID in the corner and the ID row in the ESC menu are hidden at the source: the game doesn't draw them, in "
+        "any view. If that can't be confirmed (after a game update, say), black boxes cover them instead. While "
+        "recording: the boxes only while the WuWa VR app records or a treadmill run is on. Always: for OBS and other "
+        "recorders at any time. Check a short video before sharing. Other names and chat are not hidden.",
         "WuWaPrivacy_Mode", {"Off", "While recording", "Always"}));
     page.items.push_back(setting_choice("Video style",
         "Side by side: both eyes, the whole view of each. Left or right eye: that eye's whole view as one video, as "
@@ -1488,7 +1488,7 @@ Page record_page() {
     page.items.push_back(std::move(save));
 
     std::vector<Item> more;
-    auto profile = setting_toggle("Also hide the profile ID row", "Covers the ID row on the ESC profile screen too.", "WuWaPrivacy_ProfileID");
+    auto profile = setting_toggle("Also hide the profile ID row", "Hides the ID row in the ESC menu too.", "WuWaPrivacy_ProfileID");
     profile.enabled = [] {
         auto* hide = typed<int32_t>("WuWaPrivacy_Mode");
         return hide && hide->value() > 0 && typed<bool>("WuWaPrivacy_ProfileID") != nullptr;

@@ -30,7 +30,8 @@ public static class LauncherUpdateTests
     internal sealed class Adapter : ILauncherUpdateAdapter
     {
         public bool Installed { get; set; } = true;
-        public string CurrentVersion { get { return "1.0.0"; } }
+        public string Current = "1.0.0";
+        public string CurrentVersion { get { return Current; } }
         public int Checks, Downloads, Applies;
         public LauncherUpdate Next = new LauncherUpdate("1.1.0");
         public Func<CancellationToken, Task<LauncherUpdate>> OnCheck;
@@ -151,6 +152,58 @@ public static class LauncherUpdateTests
                 Check(service.ReadyToRestart && fake.Applies == 0 && fake.Checks == 2, "download/check applied or replaced candidate");
             }
             Check(fake.Applies == 0, "dispose auto-applied");
+        });
+        test("an update that didn't install is named once on the next start; one that did leaves no note", () => {
+            string note = Path.Combine(root, "attempt-" + Guid.NewGuid().ToString("N"), "launcher-update-attempt.json");
+            var fake = new Adapter();
+            using (var service = Ready(fake)) {
+                service.TrackApplyAttempts(note);
+                Check(service.FailedApplyVersion == null, "fresh start reported a failure");
+                Wait(service.RestartAsync(Idle, () => { }, CancellationToken.None));
+                Check(fake.Applies == 1 && File.Exists(note), "apply attempt not noted");
+            }
+            // Velopack relaunched the old version: still 1.0.0, so 1.1.0 didn't install.
+            using (var again = new LauncherUpdateService(fake)) {
+                again.TrackApplyAttempts(note);
+                Check(again.FailedApplyVersion == "1.1.0" && !File.Exists(note), "failed apply not reported once");
+            }
+            using (var third = new LauncherUpdateService(fake)) {
+                third.TrackApplyAttempts(note);
+                Check(third.FailedApplyVersion == null, "failure reported twice");
+            }
+            // Retrying clears the report; this time the new version starts.
+            File.WriteAllText(note, Json.Write(new Dictionary<string, object> { { "from", "1.0.0" }, { "to", "1.1.0" } }));
+            using (var service = Ready(fake)) {
+                service.TrackApplyAttempts(note);
+                Check(service.FailedApplyVersion == "1.1.0", "failure not read before the retry");
+                Wait(service.RestartAsync(Idle, () => { }, CancellationToken.None));
+                Check(service.FailedApplyVersion == null && File.Exists(note), "retry kept the old failure or wrote no note");
+            }
+            fake.Current = "1.1.0";
+            using (var updated = new LauncherUpdateService(fake)) {
+                updated.TrackApplyAttempts(note);
+                Check(updated.FailedApplyVersion == null && !File.Exists(note), "a successful update reported a failure");
+            }
+            // A broken note is removed, never fatal.
+            File.WriteAllText(note, "{not json");
+            using (var broken = new LauncherUpdateService(fake)) {
+                broken.TrackApplyAttempts(note);
+                Check(broken.FailedApplyVersion == null && !File.Exists(note), "broken note kept or reported");
+            }
+        });
+        test("the app leaves its install folder; started programs get their own folder", () => {
+            string before = Directory.GetCurrentDirectory();
+            try {
+                Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
+                Program.LeaveInstallFolder();
+                Check(String.Equals(Directory.GetCurrentDirectory().TrimEnd('\\'), Environment.SystemDirectory.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase), "still in the app folder");
+            } finally { Directory.SetCurrentDirectory(before); }
+            string notepad = Path.Combine(Environment.SystemDirectory, "notepad.exe");
+            Check(String.Equals(Program.StartDirectory(notepad), Path.GetDirectoryName(notepad), StringComparison.OrdinalIgnoreCase), "program folder not used");
+            Check(Program.StartDirectory("https://chronohaxx.github.io/wuwa-vr/") == Environment.SystemDirectory, "URL not started from System32");
+            Check(Program.StartDirectory("steam://rungameid/3513350") == Environment.SystemDirectory, "URI not started from System32");
+            string own = Assembly.GetExecutingAssembly().Location;
+            Check(Program.StartDirectory(own) == Environment.SystemDirectory, "a program inside the app folder got the app folder");
         });
         test("cancelled or failed download cannot become ready; retry works", () => {
             var fake = new Adapter(); using (var service = new LauncherUpdateService(fake)) {

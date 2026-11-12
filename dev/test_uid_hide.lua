@@ -119,5 +119,41 @@ s4:tick(1000, true)
 check(s4.status == "UID: text class unavailable", "class unavailable said: " .. s4.status)
 texts = saved
 
+-- 1.2.8: steady means the text was already at alpha 0 before this tick, so its box may go
+local s5 = M.new({api = api, types = types})
+local view5 = item("UiView_UID_Prefab", item("BattleViewUnitNode", root))
+local uid5 = item("UID", item("UIContainerActor535", view5), 1)
+texts = {uid5}
+s5:tick(2000, true)
+check(s5.hidden and not s5.steady, "the tick that hides it is not steady")
+s5:tick(2000.02, true)
+check(s5.steady, "steady on the next tick with the alpha still 0")
+uid5.alpha = 1
+s5:tick(2000.04, true)
+check(s5.hidden and not s5.steady and uid5.alpha == 0, "the game showed it: hidden again, not steady")
+s5:tick(2000.06, true)
+check(s5.steady, "steady again after a tick at 0")
+s5:tick(2000.08, false)
+check(not s5.steady and not s5.hidden, "privacy off: neither hidden nor steady")
+
+-- the ESC menu's ID row (3.8 shape), searched only while a menu is shown
+local menu = item("UiView_MainMenu", root)
+local btn = item("BtnUID", item("RoleInfo", item("PnlInfo", item("PnlLeft", item("UiItem_LayerUi", menu)))))
+local row = item("TxtUID", btn, 1)
+local other = item("TxtUID", item("PnlFriend", root), 1)
+texts = {other, row}
+local p = M.new({api = api, types = types}, M.PROFILE)
+local before5 = listings
+p:tick(3000, true, false)
+check(listings == before5 and row.alpha == 1, "no menu: not searched")
+check(p.status == "Profile ID: waiting for a menu", "status says waiting: " .. p.status)
+p:tick(3000.02, true, true)
+check(row.alpha == 0 and other.alpha == 1, "menu shown: the row under BtnUID is hidden, not another TxtUID")
+p:tick(3000.04, true, false)
+check(p.steady and row.alpha == 0, "menu closed: the found row stays hidden and steady")
+p:tick(3000.06, false, false)
+check(math.abs(row.alpha - 1) < 1e-6, "privacy off: the row comes back")
+texts = saved
+
 print(string.format("uid hide: %d passed, %d failed", passed, failed))
 if failed > 0 then error("uid hide tests failed") end

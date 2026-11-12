@@ -375,12 +375,6 @@
   "Black bars": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
-  "Black boxes cover the bottom-right UID and the ESC profile ID row in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.": [
-    "mods/vr/WuWaControlsComponent.cpp"
-  ],
-  "Black boxes over your UID in the corner and the profile ID row in menus. While recording: while the WuWa VR app records or a treadmill run is on, so the boxes never cover HUD you need in play. Always: for OBS and other recorders at any time. The boxes are approximate; check a short video before sharing. Other names and chat are not hidden.": [
-    "mods/vr/WuWaVrMenuHost.cpp"
-  ],
   "Blocked": [
     "mods/vr/WuWaControlsComponent.cpp"
   ],
@@ -626,9 +620,6 @@
     "utility/WuWaDofSync.hpp"
   ],
   "Copy from": [
-    "mods/vr/WuWaVrMenuHost.cpp"
-  ],
-  "Covers the ID row on the ESC profile screen too.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Create": [
@@ -1365,6 +1356,9 @@
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Hide player IDs": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Hides the ID row in the ESC menu too.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Hides the captured HUD and menus together. UEVR settings stay available; individual HUD elements cannot yet be moved separately.": [
@@ -3585,6 +3579,12 @@
     "utility/WuWaShortcutSheet.cpp"
   ],
   "You did not stop it, so this note tells you.": [
+    "mods/vr/WuWaVrMenuHost.cpp"
+  ],
+  "Your UID and the ESC profile ID row are hidden at the source, so the game doesn't draw them. When that can't be confirmed, black boxes cover them in the extracted game UI, including its VR/portal and spectator copies. Check a short recording before sharing: other layouts, names, chat and diagnostics are not anonymized.": [
+    "mods/vr/WuWaControlsComponent.cpp"
+  ],
+  "Your UID in the corner and the ID row in the ESC menu are hidden at the source: the game doesn't draw them, in any view. If that can't be confirmed (after a game update, say), black boxes cover them instead. While recording: the boxes only while the WuWa VR app records or a treadmill run is on. Always: for OBS and other recorders at any time. Check a short video before sharing. Other names and chat are not hidden.": [
     "mods/vr/WuWaVrMenuHost.cpp"
   ],
   "Your answer: ": [

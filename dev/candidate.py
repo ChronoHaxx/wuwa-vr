@@ -105,6 +105,7 @@ def main() -> None:
     p.add_argument('--notes', type=Path, required=True)
     p.add_argument('--receipt', type=Path)
     p.add_argument('--base', type=Path)
+    p.add_argument('--game-version', help='game version this candidate targets (defaults to the base package)')
     p.add_argument('--plan', type=Path)
     p.add_argument('--skip-unit', action='store_true')
     p.add_argument('--recorder', type=Path, help='a rebuilt wuwa-recorder.exe (dev/build-recorder.py --out)')
@@ -227,6 +228,7 @@ def main() -> None:
         shutil.copy2(a.recorder, out / 'app/dev-tools/wuwa-recorder.exe')
         print('recorder from', a.recorder, flush=True)
     entry = dict(old, id=build, name=label, runtime=runtime, seed=seed, sha256=sha(backend / 'UEVRBackend.dll'),
+                 gameVersion=a.game_version or old.get('gameVersion', '3.7'),
                  savedAt=datetime.now(timezone.utc).isoformat(), description=a.title, summary=a.title, known=scope,
                  settingsFrom=[{k: old[k] for k in ('id', 'sha256', 'graphicsPolicy') if k in old}] + old.get('settingsFrom', []))
     write(out / 'app/dev/wuwa-builds.json', {'schema': 1, 'builds': [entry]})
@@ -242,7 +244,7 @@ def main() -> None:
     run(folder, 'package', [sys.executable, REPO / 'dev/package-beta.py', '--source', out, '--build', build,
         '--out', folder / 'portable', '--tag', tag, '--folder-name', f'WuWa VR test {a.name}', '--notes', folder / 'TEST THIS.txt'])
     archive = folder / 'portable/WuWa-VR-Launcher.zip'
-    package = dict(id=tag, displayName=a.title, gameVersion=old.get('gameVersion', '3.7'), buildId=build,
+    package = dict(id=tag, displayName=a.title, gameVersion=entry['gameVersion'], buildId=build,
                    channel='candidate', created=datetime.now(timezone.utc).isoformat(), sha256=sha(archive),
                    size=archive.stat().st_size)
 

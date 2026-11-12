@@ -12,6 +12,7 @@
 #include "WuWaMenuSignals.hpp"
 #include "WuWaMotionTrace.hpp"
 #include "WuWaSelfPort.hpp"
+#include "WuWaLgui38.hpp"
 #include "Logging.hpp"
 #include <cmath>
 #include <intrin.h>
@@ -108,17 +109,38 @@ inline void record_invalid(State& s, std::atomic<uint64_t>& reason) noexcept {
     ++s.invalid;
 }
 
+// Exact 3.8 UI ranges and layout coexist with the unchanged 3.7/self-port path.
+inline const wuwa_lgui_38::Layout& ui_layout() {
+    return wuwa_lgui_38::layout(wuwa_self_port::live().timestamp);
+}
+inline uintptr_t ui_address(uint32_t reference) {
+    const auto& live = wuwa_self_port::live();
+    if (const auto rva = wuwa_lgui_38::address(live.timestamp, reference)) return live.base + *rva;
+    return wuwa_self_port::at(reference);
+}
+inline bool ui_range_matches(const compatibility::CodeRange& range) {
+    const auto& live = wuwa_self_port::live();
+    const auto reviewed = wuwa_lgui_38::check(live.timestamp, range.rva, range.size, range.fingerprint,
+        [&](uint32_t rva, std::span<uint8_t> bytes) {
+            return uint64_t(rva) + bytes.size() <= live.image_size &&
+                checked::executable_site(live.base + rva, bytes.size(), GetModuleHandleW(nullptr)) &&
+                checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(live.base + rva), bytes.size());
+        });
+    return reviewed ? *reviewed : wuwa_self_port::range_matches({range.rva, range.size, range.fingerprint});
+}
+
 // Each range at its place in the running build: raw hash on the reference build, unchanged
 // apart from moved call/jump targets and RIP displacements on a self-ported one.
 template<size_t N> inline bool verify_code(const std::array<compatibility::CodeRange, N>& ranges, const char* route) {
     size_t matched{}, total_bytes{};
     for (const auto& range : ranges) {
-        if (wuwa_self_port::range_matches({uint32_t(range.rva), uint32_t(range.size), range.fingerprint})) {
+        if (ui_range_matches(range)) {
             ++matched;
         } else {
             // The pre-self-port wording (qa/matrix.json known_off matches it), plus the live place when moved.
             const auto& live = wuwa_self_port::live();
-            const auto found = wuwa_self_port::find_rva(uint32_t(range.rva));
+            const auto reviewed = wuwa_lgui_38::address(live.timestamp, range.rva);
+            const auto found = reviewed ? reviewed : wuwa_self_port::find_rva(uint32_t(range.rva));
             std::vector<uint8_t> bytes(range.size);
             const bool readable = found && range.size && uint64_t(*found) + range.size <= live.image_size &&
                 checked::executable_site(live.base + *found, range.size, GetModuleHandleW(nullptr)) &&
@@ -131,7 +153,7 @@ template<size_t N> inline bool verify_code(const std::array<compatibility::CodeR
         total_bytes += range.size;
     }
     spdlog::info("[WuWaLguiRedirect] code compatibility route={} matched={}/{} bytes={} build={}",
-        route, matched, ranges.size(), total_bytes, wuwa_self_port::state_name());
+        route, matched, ranges.size(), total_bytes, wuwa_self_port::live().timestamp == wuwa_lgui_38::timestamp ? "reviewed-3.8" : wuwa_self_port::state_name());
     return matched == ranges.size();
 }
 
@@ -198,6 +220,8 @@ inline std::string describe_rejected(const RejectedDescription& value) {
 }
 
 inline nlohmann::json sample_view_gate(uintptr_t view) {
+    if (wuwa_self_port::live().timestamp == wuwa_lgui_38::timestamp)
+        return {{"unavailable", "3.8 world-label predicates have not been ported"}};
     // Raw inputs to the shipped 0x3825870 eligibility helper, inspected in
     // _docs/lgui-menu-stage0-contract-2026-09-24.md. No predicate is bypassed
     // and no helper is called. Unknown reads stay unknown, never "false".
@@ -215,7 +239,7 @@ inline nlohmann::json sample_view_gate(uintptr_t view) {
 
 inline void sample_menu_stages(State& s, uintptr_t renderer, uintptr_t view, ViewContext view_context,
         const wuwa_lgui_route::Target& target) noexcept {
-    // The setup's early gate walks renderer+0x108/+0x110, stride 0xe940;
+    // The setup's early gate walks the build's renderer view array;
     // it does not inspect only the view argument. Both count arrays are
     // required. See _docs/lgui-cvar-render-route-2026-09-08.md. These are
     // read-only observations, not claims that visibility predicates passed.
@@ -228,8 +252,8 @@ inline void sample_menu_stages(State& s, uintptr_t renderer, uintptr_t view, Vie
     try {
         uintptr_t list{};
         int32_t count{};
-        if (!checked::read_field(renderer, 0x108, list) || !checked::read_field(renderer, 0x110, count) ||
-            !list || count < 1 || count > 8 || list > UINTPTR_MAX - size_t(count) * 0xe940) {
+        if (!checked::read_field(renderer, ui_layout().renderer_views, list) || !checked::read_field(renderer, ui_layout().renderer_count, count) ||
+            !list || count < 1 || count > 8 || list > UINTPTR_MAX - size_t(count) * ui_layout().view_stride) {
             SPDLOG_INFO_EVERY_N_SEC(5, "[WuWaLguiRedirect] menu_stages unavailable context={} renderer={:x} list={:x} count={}",
                 names[context], renderer, list, count);
             return;
@@ -244,11 +268,11 @@ inline void sample_menu_stages(State& s, uintptr_t renderer, uintptr_t view, Vie
         bool view_in_array{};
         for (int32_t j = 0; j < count; ++j) {
             auto& sample = samples[j];
-            sample.address = list + size_t(j) * 0xe940;
+            sample.address = list + size_t(j) * ui_layout().view_stride;
             view_in_array |= sample.address == view;
             for (size_t i = 0; i < 6; ++i) {
-                const bool a = checked::read_field(sample.address, 0x2164 + i * 4, sample.early[i]);
-                const bool b = checked::read_field(sample.address, 0x922c + i * 0x320, sample.dispatch[i]);
+                const bool a = checked::read_field(sample.address, ui_layout().early_counts + i * 4, sample.early[i]);
+                const bool b = checked::read_field(sample.address, ui_layout().dispatch_counts + i * 0x320, sample.dispatch[i]);
                 if (!a || sample.early[i] < 0 || sample.early[i] > 100000) sample.early[i] = -1;
                 if (!b || sample.dispatch[i] < 0 || sample.dispatch[i] > 100000) sample.dispatch[i] = -1;
                 if (sample.early[i] >= 0 && sample.dispatch[i] >= 0) sample.valid_mask |= 1U << i;
@@ -436,7 +460,7 @@ inline SetupRoute route_setup(uintptr_t renderer, uintptr_t builder, uintptr_t c
         if (!transient_menu && source == target.game) sample_menu_stages(s, renderer, view, ViewContext::hud, target);
         else if (!transient_menu && target.capture && source == target.capture)
             sample_menu_stages(s, renderer, view, ViewContext::capture, target);
-        if (!checked::read_field(view, 0x25ac, depth_flag)) { record_invalid(s, s.invalid_view); return unchanged; }
+        if (!checked::read_field(view, ui_layout().depth_flag, depth_flag)) { record_invalid(s, s.invalid_view); return unchanged; }
         if (!transient_menu) learn_eye(s, view, source, target);
         s.last_source.store(source, std::memory_order_relaxed);
         s.last_ui.store(target.ui, std::memory_order_relaxed);
@@ -509,8 +533,8 @@ inline SetupRoute route_menu_setup(uintptr_t builder, uintptr_t color, uintptr_t
         int32_t early{}, dispatch{};
         uint8_t depth_flag{}, constrain_flag{};
         float aspect{};
-        const bool view_ok = checked::read_field(view, 0x2170, early) && checked::read_field(view, 0x9b8c, dispatch) &&
-            checked::read_field(view, 0x25ac, depth_flag) && checked::read_field(view, 0x2d9, constrain_flag) &&
+        const bool view_ok = checked::read_field(view, ui_layout().early_counts + 3 * 4, early) && checked::read_field(view, ui_layout().dispatch_counts + 3 * 0x320, dispatch) &&
+            checked::read_field(view, ui_layout().depth_flag, depth_flag) && checked::read_field(view, 0x2d9, constrain_flag) &&
             checked::read_field(view, 0x2dc, aspect);
         const bool populated = view_ok && early > 0 && early <= 100000 && dispatch > 0 && dispatch <= 100000;
         {
@@ -644,9 +668,9 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
         // from another caller, monoscopic capture, Native Fix or AFR family.
         wuwa_world_labels::Layout layout{};
         uintptr_t views{}, cv{}, dv{}, color_rhi{};
-        if (!checked::read_field(renderer, 0x108, views) || !views ||
-            !checked::read_field(renderer, 0x110, layout.views) || layout.views != 2 ||
-            views > UINTPTR_MAX - 0xe940 || view != views + 0xe940 ||
+        if (!checked::read_field(renderer, ui_layout().renderer_views, views) || !views ||
+            !checked::read_field(renderer, ui_layout().renderer_count, layout.views) || layout.views != 2 ||
+            views > UINTPTR_MAX - ui_layout().view_stride || view != views + ui_layout().view_stride ||
             !checked::read(color, result.color) || !checked::read(depth, result.depth) ||
             !checked::read(result.color.graph, cv) || !checked::read(result.depth.graph, dv) ||
             cv != s.live.graph_vtable || dv != cv ||
@@ -655,8 +679,8 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
             !extent(result.color.graph, layout.color_extent) || !extent(result.depth.graph, layout.depth_extent) ||
             !checked::read_field(views, 0xc90, layout.first_pass) ||
             !checked::read_field(view, 0xc90, layout.second_pass) ||
-            !checked::read_field(views, 0x2164, layout.first_early_count) ||
-            !checked::read_field(views, 0x922c, layout.first_dispatch_count)) {
+            !checked::read_field(views, ui_layout().early_counts, layout.first_early_count) ||
+            !checked::read_field(views, ui_layout().dispatch_counts, layout.first_dispatch_count)) {
             ++s.world_guard_skips;
             return result;
         }
@@ -665,9 +689,9 @@ inline WorldRoute world_route(uintptr_t renderer, uintptr_t color, uintptr_t dep
         layout.color_input = result.color.rect;
         layout.depth_input = result.depth.rect;
         for (size_t i = 0; i < 2; ++i) {
-            const auto eye = views + i * 0xe940;
+            const auto eye = views + i * ui_layout().view_stride;
             if (!checked::read_field(eye, 0x2f8, layout.rects_2f8[i]) ||
-                !checked::read_field(eye, 0x1e70, layout.rects_1e30[i])) {
+                !checked::read_field(eye, ui_layout().render_rect, layout.rects_1e30[i])) {
                 ++s.world_guard_skips;
                 return result;
             }
@@ -724,8 +748,8 @@ inline void world_setup_callback(uintptr_t renderer, uintptr_t builder, uintptr_
 inline void install_world_labels(State& s) noexcept {
     try {
         checked::require(verify_code(compatibility::world_label_code_ranges, "world-labels"), "World-label route code mismatch");
-        s.live.world_caller = wuwa_self_port::at(0x4116523);
-        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x4116a70)),
+        s.live.world_caller = ui_address(0x4116523);
+        auto hook = safetyhook::InlineHook::create(reinterpret_cast<void*>(ui_address(0x4116a70)),
             &world_setup_callback, safetyhook::InlineHook::StartDisabled);
         checked::require(hook.has_value(), "Cannot create world-label setup hook");
         s.world_setup = std::move(*hook);
@@ -755,11 +779,11 @@ inline void observe_stage0(safetyhook::Context& context,bool dispatch) noexcept 
         wuwa_lgui_stage0::Payload payload{};
         if (!checked::read(address,payload) || !payload.renderer || !payload.view) return;
         uintptr_t views{};int32_t count{};
-        if (!checked::read_field(payload.renderer,0x108,views) || !checked::read_field(payload.renderer,0x110,count) ||
+        if (!checked::read_field(payload.renderer,ui_layout().renderer_views,views) || !checked::read_field(payload.renderer,ui_layout().renderer_count,count) ||
             !views || count<1 || count>8 || payload.view<views) return;
         const auto distance=payload.view-views;
-        if (distance%0xe940 || distance/0xe940>=static_cast<uint64_t>(count)) return;
-        const auto index=static_cast<size_t>(distance/0xe940);
+        if (distance%ui_layout().view_stride || distance/ui_layout().view_stride>=static_cast<uint64_t>(count)) return;
+        const auto index=static_cast<size_t>(distance/ui_layout().view_stride);
         const auto now=GetTickCount64();auto& next=s.next_stage0_sample[(dispatch ? 8 : 0)+index];
         auto prior=next.load(std::memory_order_relaxed);
         if (now<prior || !next.compare_exchange_strong(prior,now+1000)) return;
@@ -791,8 +815,8 @@ inline void disable_stage0_probe(State& s) noexcept {
 inline void install_stage0_probe(State& s) noexcept {
     try {
         checked::require(verify_code(compatibility::stage0_probe_code_ranges,"stage0-recording"),"Stage-0 probe code mismatch");
-        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x40f7be0)),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
-        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(wuwa_self_port::at(0x40fb64c)),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
+        auto constructor=safetyhook::MidHook::create(reinterpret_cast<void*>(ui_address(0x40f7be0)),&stage0_construct_callback,safetyhook::MidHook::StartDisabled);
+        auto dispatch=safetyhook::MidHook::create(reinterpret_cast<void*>(ui_address(0x40fb64c)),&stage0_dispatch_callback,safetyhook::MidHook::StartDisabled);
         checked::require(constructor.has_value() && dispatch.has_value(),"Cannot create stage-0 recording probe");
         s.stage0_construct=std::move(*constructor);s.stage0_dispatch=std::move(*dispatch);
         checked::require(s.stage0_construct.enable().has_value() && s.stage0_dispatch.enable().has_value(),"Cannot enable stage-0 recording probe");
@@ -814,10 +838,10 @@ inline void install_menu(State& s) noexcept {
         checked::require(verify_code(compatibility::menu_code_ranges, "menu-stage3"),
             "Menu stage code changed; preserving HUD-only hooks");
         uintptr_t thunk{};
-        checked::require(checked::read(wuwa_self_port::at(0x7feada8) + sizeof(uintptr_t), thunk) &&
-            thunk == wuwa_self_port::at(0x410bfc0), "Menu execute vtable changed; preserving HUD-only hooks");
-        s.live.menu_setup = wuwa_self_port::at(menu_setup_rva);
-        s.live.menu_pass = wuwa_self_port::at(menu_pass_rva);
+        checked::require(checked::read(ui_address(0x7feada8) + sizeof(uintptr_t), thunk) &&
+            thunk == ui_address(0x410bfc0), "Menu execute vtable changed; preserving HUD-only hooks");
+        s.live.menu_setup = ui_address(menu_setup_rva);
+        s.live.menu_pass = ui_address(menu_pass_rva);
         auto setup = safetyhook::InlineHook::create(reinterpret_cast<void*>(s.live.menu_setup),
             &menu_setup_callback, safetyhook::InlineHook::StartDisabled);
         checked::require(setup.has_value(), "Cannot create menu setup hook");
@@ -887,7 +911,7 @@ inline void install_viewport(State& s) noexcept {
         // Callers are matched by return address in the running build; one not found counts as "other".
         wuwa_lgui_viewport::set_live_returns([](uint32_t rva) { return wuwa_self_port::find_rva(rva).value_or(0); });
         std::array<uintptr_t, viewport_sites.size()> sites{};
-        for (size_t i = 0; i < viewport_sites.size(); ++i) sites[i] = wuwa_self_port::at(uint32_t(viewport_sites[i].rva));
+        for (size_t i = 0; i < viewport_sites.size(); ++i) sites[i] = ui_address(uint32_t(viewport_sites[i].rva));
         constexpr std::array<safetyhook::MidHookFn, 5> callbacks{viewport_callback<0>, viewport_callback<1>,
             viewport_callback<2>, viewport_callback<3>, viewport_callback<4>};
         static_assert(callbacks.size() == viewport_sites.size());
@@ -971,14 +995,14 @@ inline void tick(HMODULE backend, Provider provider) noexcept {
             constexpr std::array<uintptr_t, 4> sites{setup_rva, pass_rva, wrap_rva, register_rva};
             for (size_t i = 0; i < sites.size(); ++i)
                 checked::require(wuwa_self_port::code_matches(uint32_t(sites[i]), signatures[i]), "Engine signature mismatch");
-            s.live.setup = wuwa_self_port::at(setup_rva);
-            s.live.pass = wuwa_self_port::at(pass_rva);
-            s.live.wrap = wuwa_self_port::at(wrap_rva);
-            s.live.registration = wuwa_self_port::at(register_rva);
-            s.live.graph_vtable = wuwa_self_port::at(graph_vtable_rva);
-            s.live.pooled_vtable = wuwa_self_port::at(pooled_vtable_rva);
-            s.live.release = wuwa_self_port::at(release_rva);
-            s.live.addref = wuwa_self_port::at(addref_rva);
+            s.live.setup = ui_address(setup_rva);
+            s.live.pass = ui_address(pass_rva);
+            s.live.wrap = ui_address(wrap_rva);
+            s.live.registration = ui_address(register_rva);
+            s.live.graph_vtable = ui_address(graph_vtable_rva);
+            s.live.pooled_vtable = ui_address(pooled_vtable_rva);
+            s.live.release = ui_address(release_rva);
+            s.live.addref = ui_address(addref_rva);
             uintptr_t release{}, addref{};
             checked::require(checked::read(s.live.pooled_vtable + 0x38, addref) && addref == s.live.addref &&
                 checked::read(s.live.pooled_vtable + 0x40, release) &&

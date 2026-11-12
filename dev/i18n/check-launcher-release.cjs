@@ -31,21 +31,27 @@ const server = http.createServer((req, res) => {
         await page.goto(base + '/' + name);
         assert.equal(await page.locator('h1').count(), 1);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Overflow: ${name} ${width}`);
-        const primary = page.locator('#release-download a.primary').first();
         const expected = `https://github.com/ChronoHaxx/wuwa-vr/releases/download/${tag}/WuWa-VR-Setup.exe`;
-        if (name === 'guide.html') assert.equal(await page.getByRole('link', {name: 'Download WuWa-VR-Setup.exe', exact: true}).getAttribute('href'), expected);
-        else assert.equal(await primary.getAttribute('href'), expected);
-        assert(await page.locator(`a[href$="/${tag}/WuWa-VR-Launcher.zip"]`).count() > 0);
-        assert(await page.locator(`a[href$="/tag/${release.previousTag}"]`).count() > 0);
         assert.equal(await page.locator('.visual-steps img').count(), 0, 'Obsolete launcher screenshots remain');
-        assert.equal(await page.locator(name === 'guide.html' ? '#start > ol:first-of-type > li' : '#start .launcher-steps > li').count(), 3);
+        if (name === 'guide.html') {
+          // Since the 5 Nov site pass the guide links the installer and describes the one-screen launcher;
+          // the portable ZIP and the previous release are on the home pages.
+          assert(await page.locator(`a[href="${expected}"]`).count() > 0, 'Guide lost the installer link');
+          assert(await page.locator('#start .doc-list > li').count() >= 3, 'Guide lost the launcher rows');
+        } else {
+          assert.equal(await page.locator('#release-download a.primary').first().getAttribute('href'), expected);
+          assert(await page.locator(`a[href$="/${tag}/WuWa-VR-Launcher.zip"]`).count() > 0);
+          assert(await page.locator(`a[href$="/tag/${release.previousTag}"]`).count() > 0);
+          assert.equal(await page.locator('#start .launcher-steps > li').count(), 3);
+        }
         // Caveats can be collapsed for a quieter page; they must remain in the document.
         const text = await page.locator('main').textContent();
         assert(text.includes(release.appVersion) && text.includes(release.game));
-        assert(text.includes(name.includes('zh-Hans') ? '剧情视频检测尚未' : 'story-video detection'));
-        // The deeper rendering caveat lives in the guide; home pages carry the short limits list.
-        if (name === 'guide.html') assert(text.includes('underlying stereo rendering fault is unresolved'));
-        else assert.equal(await page.locator('#limits li').count(), 4);
+        // Automatic cinema works on the story (owner, 5 Nov 2026): the old caveat must stay gone.
+        assert(!text.includes(name.includes('zh-Hans') ? '剧情视频检测尚未' : 'story-video detection'), 'Stale automatic cinema caveat: ' + name);
+        // Known issues live in the guide; home pages carry the short limits list (trimmed in the 5 Nov site pass).
+        if (name === 'guide.html') assert(text.includes('Known issues include'), 'Guide lost its known issues');
+        else assert(await page.locator('#limits li').count() > 0, 'Home page lost its limits list: ' + name);
         for (const href of await page.locator('a[href]').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))) {
           if (/^(https?:|mailto:)/.test(href)) continue;
           const target = new URL(href, base + '/' + name), file = path.join(site, decodeURIComponent(target.pathname));
@@ -53,7 +59,7 @@ const server = http.createServer((req, res) => {
           if (target.hash) assert(fs.readFileSync(file, 'utf8').includes(`id="${decodeURIComponent(target.hash.slice(1))}"`), `Missing anchor: ${name} ${href}`);
         }
         if (width !== 320 && name !== 'l/en.html') await page.screenshot({path: path.join(out, `${name.replaceAll('/', '-').replace('.html', '')}-${width}.png`), fullPage: true});
-        checks.push(`${name}: ${width}px layout, installer/portable/previous links, three steps, beta limits, local anchors`);
+        checks.push(`${name}: ${width}px layout, installer link, start section, beta limits, local anchors`);
       }
     }
     for (const code of ['ja', 'ko', 'es', 'pt-BR', 'fr', 'de', 'ru', 'ar']) {

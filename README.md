@@ -3,7 +3,7 @@
 
 A free, fan-made VR mod for Windows. Walk Solaris-3 at full scale with head tracking, a first-person body and controller shortcuts. Built on praydog's UEVR.
 
-**[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-6/WuWa-VR-Setup.exe)** · 1.2.6 beta · Wuthering Waves 3.7 · Windows 10/11, 64-bit
+**[Download WuWa-VR-Setup.exe](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-7/WuWa-VR-Setup.exe)** · 1.2.7 beta · Wuthering Waves 3.8 · Windows 10/11, 64-bit
 
 **[Website](https://chronohaxx.github.io/wuwa-vr/)**: setup, the [player guide](https://chronohaxx.github.io/wuwa-vr/guide.html), [controls](https://chronohaxx.github.io/wuwa-vr/guide.html#controls), [troubleshooting](https://chronohaxx.github.io/wuwa-vr/guide.html#recovery) and [videos](https://chronohaxx.github.io/wuwa-vr/#watch). In ten languages: [简体中文](https://chronohaxx.github.io/wuwa-vr/l/zh-Hans.html) · [日本語](https://chronohaxx.github.io/wuwa-vr/l/ja.html) · [한국어](https://chronohaxx.github.io/wuwa-vr/l/ko.html) · [Español](https://chronohaxx.github.io/wuwa-vr/l/es.html) · [Português (Brasil)](https://chronohaxx.github.io/wuwa-vr/l/pt-BR.html) · [Français](https://chronohaxx.github.io/wuwa-vr/l/fr.html) · [Deutsch](https://chronohaxx.github.io/wuwa-vr/l/de.html) · [Русский](https://chronohaxx.github.io/wuwa-vr/l/ru.html) · [العربية](https://chronohaxx.github.io/wuwa-vr/l/ar.html).
 
@@ -15,7 +15,7 @@ Run the installer, open **WuWa VR**, select **Install VR**, then **Launch in VR*
 
 - [Desktop launcher](launcher/native/): MIT, [licence](launcher/native/LICENSE.txt).
 - [Mod source, Lua and translations](mod/): our changes and pinned patches, [build instructions](mod/BUILD.md). Upstream and community components keep their own licences; the combined mod is not under one open-source licence ([component licences](LICENSE.md)).
-- [Release 1.2.6](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-6): installer, [portable ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-6/WuWa-VR-Launcher.zip) (advanced fallback), matching source and SHA-256 checksums.
+- [Release 1.2.7](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-7): installer, [portable ZIP](https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-7/WuWa-VR-Launcher.zip) (advanced fallback), matching source and SHA-256 checksums.
 - Website and player docs: `dev/i18n/` (ten languages), `dev/site-content/` (English reference), built into `site/` by `node dev/build-site.cjs --launcher-release`. [Contributing](CONTRIBUTING.md).
 
 Built on community work: praydog and the UEVR contributors, mirudo2 (polar), SannpoKun, Indath, endlessfalls, Elliott Tate and others. [Credits](CREDITS.md). Free fan project, not affiliated with Kuro Games; [optional Ko-fi support](https://ko-fi.com/chronohax).

@@ -1,13 +1,13 @@
-# Mod source — 1.2.6 beta
+# Mod source — 1.2.7 beta
 
 The release target is
-[beta-1-2-6](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-6),
-launcher **1.2.6**, backend/package build **recording-voice-1-2-6**, for game
-**3.7**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. Headset results and open checks are below.
+[beta-1-2-7](https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-7),
+launcher **1.2.7**, backend/package build **game-3-8-1-2-7**, for game
+**3.8**. Source reconstruction, launcher checks, isolated package installation, updater packaging and website checks passed. Headset results and open checks are below.
 The matching `checkpoint.json` and release receipt must identify the final
 artifacts before publication.
 
-The owner played 1.2.0 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with a Reality Runner treadmill), 1.2.1, an earlier 1.2.3 test build and the 1.2.5 test builds in the headset with the Kuro launcher copy of the game, and the 1.2.6 release build in the headset (SteamVR, Bigscreen Beyond, Kuro launcher copy), including the controls card above the view and a recording with the microphone. On the OpenXR simulator, with both the Steam and the Kuro launcher copies and the game's 3.7.16 update: the UI redirect starts and the stereo fixes pass their code checks; first person with the diorama stays in the head; the cutscene bars are hidden in full VR; the far lighting is refilled when the game rebuilds it in one eye. The far lighting refill after a real long glide has not been seen in the headset yet. In Move menu the VR thumbstick does not change the distance yet (use Menu distance). Many dialogue close-ups still sit wider than the 2D shot. See [the 1.2.6 release notes](../docs/launch-kit/RECORDING-VOICE-1.2.6.md).
+The owner played 1.2.0 to 1.2.6 in the headset (Valve Index controllers with a Bigscreen Beyond; a Meta Quest Pro with Virtual Desktop and a Reality Runner treadmill), and the 1.2.7 work on game 3.8 in the headset (SteamVR, Bigscreen Beyond, Kuro launcher copy): the new VR menu, the controls cards and about 70 minutes of recording, on the test build before the last four 3.8 rendering fixes. This release build ran on the OpenXR simulator with the Kuro launcher copy of 3.8: the UI redirect, the menus and four of the five stereo code routes pass their checks, god rays are hooked, and the far lighting refill caught a game refresh in one eye. The Steam copy had not downloaded 3.8 yet, so it is not checked on 3.8. The story camera tilt in ultimates and the VR setup questions have not been played through in the headset yet. Many dialogue close-ups still sit wider than the 2D shot. See [the 1.2.7 release notes](../docs/launch-kit/GAME-3.8-VR-MENU-1.2.7.md).
 
 Update the app, then explicitly install the new VR package in step 02: the app
 update preserves the existing selection. Keep the previous package for rollback.

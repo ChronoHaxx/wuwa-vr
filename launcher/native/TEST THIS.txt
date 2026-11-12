@@ -1,22 +1,23 @@
-WUWA VR — 1.2.6 BETA / FOCUSED USER CHECKS
-App 1.2.6 | Package beta-1-2-6 | Build recording-voice-1-2-6 | Game 3.7 (16 Oct update, 3.7.16) | 25 Oct 14:18 GMT
+WUWA VR — 1.2.7 BETA / FOCUSED USER CHECKS
+App 1.2.7 | Package beta-1-2-7 | Build game-3-8-1-2-7 | Game 3.8 | 12 Nov 12:16 GMT
 
 Record Pass / Fail / Blocked / Not tested. Automated checks are not user results.
 Close game and injector before updating package or changing runtime.
 
-[ ] Update app to 1.2.6 and restart it with the game closed: step 02 shows
-    VR package 1.2.6 beta, installed by itself, and offers Back to 1.2.5.
-    If using simulator, explicitly choose Use bundled simulator. Confirm ready.
-[ ] Record page: pick your headset's microphone and record a minute while
-    talking: the video has your voice with the game, in sync; game.wav and
-    microphone.wav sit next to it.
-[ ] Record page, Video style "Left eye, whole view": a square video of one eye.
-[ ] A story scene in full VR with the game's Cutscene Mode on letterbox: no
-    black bars in full VR; the stereo screen still shows them.
-[ ] HUD page, Card place: Above your view puts the controls card above the HUD.
-[ ] First person, then the diorama: your view stays in your character's head.
-[ ] Steam copy and Kuro launcher copy: the HUD and menus sit on the VR panel
-    in the 16:9 layout.
+[ ] Update the app to 1.2.7 and restart it with the game closed: the VR mod
+    row offers Update to 1.2.7 beta; after it, Back to previous version
+    returns to 1.2.6. If using simulator, explicitly choose Use bundled
+    simulator. Confirm ready.
+[ ] First launch: "Welcome to VR" opens by itself; each answer takes effect.
+[ ] Hold L3: the 3D controller card; hold LT + RT: the views card with "Now".
+[ ] L3 + R3 (or Insert): the new menu; LB / RB change pages; the button chips
+    match the device you used last.
+[ ] Decoupled pitch on: story scenes and ultimates get the game camera's tilt.
+[ ] The UID is gone in full VR, the stereo screen and mono theatre.
+[ ] Record a minute in SteamVR: the video plays, gpu.jsonl is next to it.
+[ ] Steam copy and Kuro launcher copy on 3.8: the HUD and menus sit on the VR
+    panel; the log shows the UI redirect installed.
 
 PS4/PS5 hardware and physical-headset comfort remain separate pending checks.
-Controls, recovery and remaining rendering limitations are on the website: https://chronohaxx.github.io/wuwa-vr/
+See the player guide on the website (BUILD GUIDE.html links it in ten languages) for controls,
+recovery and remaining rendering limitations.

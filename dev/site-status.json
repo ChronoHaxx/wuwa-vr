@@ -1,8 +1,8 @@
 {
-  "tag": "beta-1-2-6",
-  "previousTag": "beta-1-2-5",
-  "game": "3.7",
-  "appVersion": "1.2.6",
-  "buildId": "recording-voice-1-2-6",
+  "tag": "beta-1-2-7",
+  "previousTag": "beta-1-2-6",
+  "game": "3.8",
+  "appVersion": "1.2.7",
+  "buildId": "game-3-8-1-2-7",
   "installer": "WuWa-VR-Setup.exe"
 }

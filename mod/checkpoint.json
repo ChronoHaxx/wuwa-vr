@@ -1,37 +1,37 @@
 {
   "schema": 3,
-  "build": "recording-voice-1-2-6",
+  "build": "game-3-8-1-2-7",
   "privateCandidate": false,
-  "launcherVersion": "1.2.6",
+  "launcherVersion": "1.2.7",
   "uevrBase": "4ee5c6b6162dee2291fc75f9dfc57667f6d45a2d",
   "uesdkBase": "14478dfae61e8385e0e62116718925c4099b1d18",
-  "backendSha256": "652291444b4e0086642a7d2c457e1bff8da02e18e0246e8dcc6a96b3d8ff2ac9",
-  "frozenPatchSha256": "ddcf74ff3aa945218a0fd3e18798247c2476b1167e1256a9a607f4277a026e84",
-  "sourceReconstructedTree": "101fa92fe468a03063be7360788cdb3f791056bb",
-  "buildCompleted": "2026-10-23T13:41:38+0100",
+  "backendSha256": "b856c94550f3addfa04707492c886986bd07a355810f94dfef3419c671cbf6e0",
+  "frozenPatchSha256": "1c8d354095803dc48998747a56f0ce08c857e9c32b6604346b8d281653c1ae71",
+  "sourceReconstructedTree": "4229a63e3079929f39426cd732944e52a8c77af0",
+  "buildCompleted": "2026-11-12T11:31:47+0000",
   "package": {
     "file": "WuWa-VR-Launcher.zip",
-    "bytes": 53141327,
-    "sha256": "7c2affee0c0ba991858263ccf4d84bd2195ee949a1b2d3d8b06e54412013b7e5",
+    "bytes": 53821799,
+    "sha256": "c67d52efcea2e67f05312bf3825a4da3dc14477201ea05d9bb198b5f6dac9766",
     "public": true
   },
-  "liveAcceptance": "Test 21j, this exact build, played in the headset by the owner on 25 Oct (SteamVR, Bigscreen Beyond, Kuro launcher copy): the controls card above the view and recordings with the Beyond microphone (game.wav and microphone.wav beside the video). On the OpenXR simulator, game build 0x6ace6377 with the 3.7.16 resource update: both copies with the five stereo code routes verified and the UI redirect installed (both-copies.json: Kuro from the 25 Oct headset session, Steam on the simulator the same day); first person with the diorama stays in the head while the diorama camera still applies to the other camera modes (23 Oct); cutscene letterbox bars hidden in full VR on the Steam copy (Test 21); the far lighting refilled when the game rebuilt one eye alone (Test 21b). Recorder self-tests: mixer timing, microphone and game files, forced stops, one-eye pictures. Pending: the far lighting refill after a real long glide in the headset, the full VR frame rate after many view switches, PlayStation hardware and broad headset compatibility.",
+  "liveAcceptance": "The 1.2.7 work on game 3.8 (PE 0x6ae17e03) in the headset by the owner on 12 Nov (SteamVR, Bigscreen Beyond, Kuro launcher copy): Test 24, this build without the four 3.8 render ports and the rebuilt recorder, with the new VR menu, controls cards and about 70 minutes of recording. Test 24b, this exact build, on the OpenXR simulator with the Kuro copy of 3.8 (12 Nov): HUD 30/30, menu 22/22 and viewport 6/6 reviewed ranges, the UI redirect installed, four stereo code routes verified (mono authored camera and cinematic aspect from the reviewed 3.8 table), god-ray pass hooked, and the far lighting detector reported a forced r.CLV.TriggerRefresh in one eye and refilled both. Custom reflection capture refused on 3.8 (not ported). Steam copy: not on 3.8 yet (no game executable), not checked. Recorder self-tests: SBS, showcase, large SBS with sound, GPU memory, mixer, killed and stalled writers. Pending: Steam copy on 3.8, the story camera tilt in ultimates and the VR setup in the headset, PlayStation hardware and broad headset compatibility.",
   "previousPublicRelease": {
-    "tag": "beta-1-2-5",
-    "backendSha256": "8eb5151f6cb15f34fad3001797c0684e353889babcac3af0ba4e8087b4d8b980"
+    "tag": "beta-1-2-6",
+    "backendSha256": "652291444b4e0086642a7d2c457e1bff8da02e18e0246e8dcc6a96b3d8ff2ac9"
   },
-  "sourceIdentity": "claude/1-2-6 at 67239a7 (Test 21j): tests 21 to 21j on top of 1.2.5 (game build 0x6ace6377): microphone and separate sound files in recordings, one-eye recordings, scene info, recordings without the hour limit and crash-safe, the far lighting refill, cutscene bars hidden in full VR, the controls card above the view, first person in the diorama. See docs/launch-kit/RECORDING-VOICE-1.2.6.md. 1.2.5 story nudge, self-port, 1.2.4 port, 1.2.3 features, 1.2.2 fixes, Steam identity, AO, VR menu, DX12 handoff and graphics policy retained.",
+  "sourceIdentity": "claude/1-2-7 at bc59133 (Test 24b): Tests 22b to 24b on top of 1.2.6, for game 3.8 (0x6ae17e03): the lean VR menu with VR setup, 3D controls cards, keyboard shortcuts and WASD freecam, story camera tilt in story scenes and ultimates, UID hidden at the source, slow-game recording stop, privacy boxes over view switches, the leaner launcher with the Abby look; the reviewed 3.8 UI table (WuWaLgui38.hpp) and render table (WuWaRender38.hpp). See docs/launch-kit/GAME-3.8-VR-MENU-1.2.7.md. 1.2.6 recording voice, 1.2.5 story nudge, self-port, 1.2.4 port, 1.2.3 features, 1.2.2 fixes, Steam identity, AO, VR menu, DX12 handoff and graphics policy retained.",
   "injector": {
     "base": "95d7eee535dda4c59cfe812e4e7942ac05da5541",
     "sha256": "244104e019a1b6dd5bc63775a6407e56cde61fbb781130643941adc108170384",
     "buildCompleted": "2026-10-06T10:28:48.125316+00:00",
     "sourceOverlay": "mod/injector/GUI"
   },
-  "rendererBuild": "recording-voice-1-2-6",
+  "rendererBuild": "game-3-8-1-2-7",
   "previousRendererAcceptance": "Owner launched r2 on 2026-10-06. Saved-profile cleanup passed: the two repaired override files remained empty after startup. A single cached-only graphics query still timed out at 8 seconds; its matching response arrived after 8.989 seconds with 4 values, 34 uncached getters and 3 missing variables. Live-reader latency remains unaccepted; no retry or graphics/input changes. Headset appearance and performance acceptance remain pending.",
-  "releaseTag": "beta-1-2-6",
+  "releaseTag": "beta-1-2-7",
   "sdkPatchSha256": "3fde0cac206f631094d7931c346642ef470f8ca0e3b118b1047e24c8088e1bdc",
   "sdkReconstructedTree": "0ad1702a10fec58469ec88265fa7297365fffab6",
-  "launcherSha256": "89b21b07b9cbaf2a50b1a17b43b2f86baadc9b32d6a8092a8adbab1730ddfaee",
-  "setupSha256": "a3cabd36bebd48f98db337bd5b14e8717c4c49f67c3dd44237fcba54689c2127"
+  "launcherSha256": "67938c3b2cdb8df0d1af1f4c9a951aed43a7ba7a601b1a04c379708997892af6",
+  "setupSha256": "d8dc29db2496a125f97b3f88c826335d2c9c6b2602f80291a07657939694ac8a"
 }

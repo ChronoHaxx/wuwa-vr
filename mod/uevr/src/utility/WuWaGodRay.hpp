@@ -36,6 +36,7 @@
 #include <cmath>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 
 #include <nlohmann/json.hpp>
 #include <safetyhook.hpp>
@@ -47,11 +48,22 @@
 namespace wuwa_god_ray {
 namespace checked = wuwa_lgui_probe::detail;
 
-inline constexpr const char* pass_pattern =
-    "40 57 41 54 41 56 48 81 EC 20 01 00 00 4C 8B B1 08 01 00 00 48 8B FA 4C 8B E1 "
-    "41 83 BE 6C CA 00 00 00 0F 8E ? ? ? ? 49 8B 06 48 8B 48 20 48 8B 01 FF 90 00 06 00 00 "
-    "48 85 C0 0F 84 ? ? ? ? 48 8B 10 48 8B C8 FF 92 E8 01 00 00";
-inline constexpr uint32_t views_offset = 0x108, view_count_offset = 0x110;
+// The pass, per game build, with the renderer's Views array offset it reads (the count follows at +8).
+// 3.8 (12 Nov 2026, RVA 0x37abe30): the same 0x4f0-byte function; only renderer Views 0x108 -> 0x110,
+// a view field 0xca6c -> 0xcacc, a local view field 0xc770 -> 0xc7d0 and two RHI vtable slots
+// (+0x600 -> +0x618, +0x1e8 -> +0x1f0) changed. The Views[0] fields this hook reads (0x360, 0x3e0, 0x520,
+// 0xc90, 0xca4) are written at the same offsets by both builds' view constructors (docs/RENDER-3.8-PORT.md).
+// Exactly one hit across all patterns is required, so a build matching two places hooks nothing.
+struct PassPattern { const char* pattern; uint32_t views; };
+inline constexpr std::array<PassPattern, 2> pass_patterns{{
+    {"40 57 41 54 41 56 48 81 EC 20 01 00 00 4C 8B B1 08 01 00 00 48 8B FA 4C 8B E1 "
+     "41 83 BE 6C CA 00 00 00 0F 8E ? ? ? ? 49 8B 06 48 8B 48 20 48 8B 01 FF 90 00 06 00 00 "
+     "48 85 C0 0F 84 ? ? ? ? 48 8B 10 48 8B C8 FF 92 E8 01 00 00", 0x108},
+    {"40 57 41 54 41 56 48 81 EC 20 01 00 00 4C 8B B1 10 01 00 00 48 8B FA 4C 8B E1 "
+     "41 83 BE CC CA 00 00 00 0F 8E ? ? ? ? 49 8B 06 48 8B 48 20 48 8B 01 FF 90 18 06 00 00 "
+     "48 85 C0 0F 84 ? ? ? ? 48 8B 10 48 8B C8 FF 92 F0 01 00 00", 0x110},
+}};
+inline uint32_t views_offset = 0x108, view_count_offset = 0x110; // set by install() before the hook exists
 inline constexpr uint32_t pass_offset = 0xc90, fov_offset = 0xca4;
 inline constexpr uint32_t view_matrix_offset = 0x3e0, translated_view_offset = 0x520;
 inline constexpr uint32_t projection_no_aa_offset = 0x360; // ViewMatrices + 0x40
@@ -215,12 +227,29 @@ inline void pass_hook(void* renderer, void* graph) {
 inline bool install() {
     std::call_once(install_once, [] {
         const auto module = GetModuleHandleW(nullptr);
-        const auto found = utility::scan(module, pass_pattern);
-        if (!found) {
+        const auto start_ms = GetTickCount64();
+        const auto base = reinterpret_cast<uintptr_t>(module);
+        const auto dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(module);
+        const auto nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+        const auto end = base + nt->OptionalHeader.SizeOfImage;
+        std::optional<uintptr_t> found{};
+        uint32_t views{}, hits{};
+        for (const auto& candidate : pass_patterns) {
+            for (auto at = utility::scan(base, end - base, candidate.pattern); at && hits < 3;
+                 at = *at + 1 < end ? utility::scan(*at + 1, end - (*at + 1), candidate.pattern) : std::optional<uintptr_t>{}) {
+                ++hits;
+                found = at;
+                views = candidate.views;
+            }
+        }
+        if (hits != 1) {
             install_result = -1;
-            spdlog::error("[WuWaGodRay] god-ray pass not found in this build; camera setting unavailable");
+            if (hits == 0) spdlog::error("[WuWaGodRay] god-ray pass not found in this build; camera setting unavailable");
+            else spdlog::error("[WuWaGodRay] god-ray pass matched {} places; camera setting unavailable", hits);
             return;
         }
+        views_offset = views;
+        view_count_offset = views + 8;
         auto created = safetyhook::InlineHook::create(reinterpret_cast<void*>(*found), reinterpret_cast<void*>(&pass_hook));
         if (!created) {
             install_result = -1;
@@ -229,7 +258,8 @@ inline bool install() {
         }
         hook = std::move(*created);
         install_result = 1;
-        spdlog::info("[WuWaGodRay] god-ray pass hooked at {:x}", *found);
+        spdlog::info("[WuWaGodRay] god-ray pass hooked at {:x} (views +{:x}; scan {} ms)", *found, views_offset,
+            GetTickCount64() - start_ms);
     });
     return install_result.load() == 1;
 }

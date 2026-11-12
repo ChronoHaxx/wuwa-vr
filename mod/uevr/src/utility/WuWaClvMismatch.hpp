@@ -15,34 +15,57 @@
 #include "WuWaClvRefresh.hpp"
 #include "WuWaLguiProbe.hpp"
 #include "WuWaSelfPort.hpp"
+#include "WuWaRender38.hpp"
 
 namespace wuwa_clv {
 inline constexpr uint32_t volume_offset_rva = 0x3eaf373;
 inline constexpr std::array<uint8_t, 7> volume_offset_code{0x48, 0x81, 0xc6, 0xa8, 0x27, 0x00, 0x00};
 inline constexpr uintptr_t view_state_offset = 8;        // FSceneView -> view state (constructor-proven)
-inline constexpr uintptr_t state_volume_offset = 0x27a8;
+inline uintptr_t state_volume_offset = 0x27a8;            // 3.7; 3.8 0x27b8 (WuWaRender38.hpp); set before watching
 inline constexpr uintptr_t volume_textures_offset = 0xd0;
 inline MismatchDetector mismatch_detector{};             // game thread
 
-// The volume and its texture pointers folded into one value; 0 when anything is unreadable.
+// The volume and its texture pointers folded into one value; 0 when anything is unreadable. A slot that
+// is not an aligned pointer means the layout is not what was measured, so it reads as unreadable too
+// (12 Nov 2026: one-sided garbage would otherwise refill up to four times before the detector stops).
 inline uint64_t volume_signature(uintptr_t state) {
     namespace checked = wuwa_lgui_probe::detail;
     uintptr_t volume{};
     std::array<uint64_t, 11> textures{};
-    if (!checked::read_field(state, state_volume_offset, volume) || volume == 0 ||
+    if (!checked::read_field(state, state_volume_offset, volume) || volume == 0 || (volume & 7) != 0 ||
         !checked::read_field(volume, volume_textures_offset, textures)) return 0;
     uint64_t hash = 1469598103934665603ull ^ volume;
-    for (const auto texture : textures) hash = (hash ^ texture) * 1099511628211ull;
+    for (const auto texture : textures) {
+        if ((texture & 7) != 0 || (texture != 0 && texture < 0x10000)) return 0;
+        hash = (hash ^ texture) * 1099511628211ull;
+    }
     return hash ? hash : 1;
+}
+
+// The code that forms ViewState + volume offset, at its place in the running build.
+inline bool volume_offset_code_matches() {
+    const auto& live = wuwa_self_port::live();
+    if (live.timestamp == wuwa_render_38::timestamp) {
+        namespace checked = wuwa_lgui_probe::detail;
+        std::array<uint8_t, wuwa_render_38::clv_code.size()> bytes{};
+        const auto at = live.base + wuwa_render_38::clv_site;
+        if (!checked::executable_site(at, bytes.size(), GetModuleHandleW(nullptr)) ||
+            !checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(at), bytes.size()) ||
+            bytes != wuwa_render_38::clv_code) return false;
+        state_volume_offset = wuwa_render_38::clv_state_volume_offset;
+        return true;
+    }
+    return wuwa_self_port::code_matches(volume_offset_rva, volume_offset_code);
 }
 
 // Game thread, once per native-stereo eye pair, after on_stereo_frame.
 inline void observe_pair(const void* first_view, const void* second_view) {
     auto state = detector_state.load();
     if (state == 0) {
-        state = wuwa_self_port::code_matches(volume_offset_rva, volume_offset_code) ? 1 : -1;
+        state = volume_offset_code_matches() ? 1 : -1;
         detector_state = state;
-        spdlog::info("[WuWaCLV] one-eye rebuild detector: {}", state == 1 ? "watching" : "this game build differs; off");
+        spdlog::info("[WuWaCLV] one-eye rebuild detector: {} (volume at view state +{:x})",
+            state == 1 ? "watching" : "this game build differs; off", state_volume_offset);
     }
     if (state != 1 || first_view == nullptr || second_view == nullptr) return;
     namespace checked = wuwa_lgui_probe::detail;

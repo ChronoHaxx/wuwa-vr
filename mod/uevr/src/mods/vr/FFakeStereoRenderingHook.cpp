@@ -361,13 +361,13 @@ bool ensure_mono_projection_hook(bool bootstrap_ready) noexcept {
         {0x56354c0, 0x19a, 0x859f1b3dc2a1336bULL}}};
     try {
         wuwa_code_check::verify_portable("Mono authored camera", ranges);
-        const auto target = wuwa_self_port::at(0x526f1a0);
+        const auto target = wuwa_code_check::live_address(0x526f1a0);
         if (discovered_projection_data && discovered_projection_data != target)
             throw std::runtime_error("Discovered GetProjectionData differs from verified native-camera route");
         mono_projection_hook = safetyhook::create_inline(reinterpret_cast<void*>(target),
             &mono_get_projection_data, safetyhook::InlineHook::StartDisabled);
         if (!mono_projection_hook) throw std::runtime_error("Could not create native-camera hook");
-        native_constrained_rect = wuwa_self_port::at(0x56354c0);
+        native_constrained_rect = wuwa_code_check::live_address(0x56354c0);
         // +0x299 lies inside the verified 0xc7a-byte function, unchanged apart from moved fields.
         authored_camera_hook = safetyhook::create_mid(reinterpret_cast<void*>(target + 0x299),
             &capture_authored_camera, safetyhook::MidHook::StartDisabled);

@@ -113,8 +113,8 @@ class Site:
 def source_files(src: Path):
     files = sorted((src / "utility").glob("WuWa*.hpp")) + sorted((src / "mods" / "vr").glob("WuWa*.hpp"))
     files += [src / "mods" / "vr" / "FFakeStereoRenderingHook.cpp", src / "Framework.cpp"]
-    # Generated fingerprints and the separate reviewed 3.8 table are not reference-build source pins.
-    return [f for f in files if f.is_file() and f.name not in ("WuWaSelfPortTable.hpp", "WuWaLgui38.hpp")]
+    # Generated fingerprints and the separate reviewed 3.8 tables are not reference-build source pins.
+    return [f for f in files if f.is_file() and f.name not in ("WuWaSelfPortTable.hpp", "WuWaLgui38.hpp", "WuWaRender38.hpp")]
 
 
 def collect(src: Path, old: Image) -> list[Site]:

@@ -31,6 +31,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -174,6 +175,17 @@ def main() -> None:
         if sha(base / name) != digest:
             sys.exit(f'{base / name} does not match its manifest')
     old = read(base / 'app/dev/wuwa-builds.json')['builds'][0]
+    # The recorder that ships must accept every option the branch's recorder source parses, because the branch's
+    # record-wuwa.py sends them: Tests 23 and 24 shipped 1.2.6's recorder, and every SteamVR recording failed with
+    # "Unknown option" (--min-game-fps). The options are wide literals, so each must be in the binary as UTF-16.
+    shipped_recorder = a.recorder or base / 'app/dev-tools/wuwa-recorder.exe'
+    source_options = sorted(set(re.findall(r'option(?:==|\.starts_with\()L"(--[a-z-]+=?)"',
+        (REPO / 'launcher/dev/steamvr-capture/record.cpp').read_text(encoding='utf-8', errors='replace'))))
+    recorder_bytes = shipped_recorder.read_bytes()
+    missing_options = [o for o in source_options if o.encode('utf-16-le') not in recorder_bytes]
+    if not source_options or missing_options:
+        sys.exit(f'{shipped_recorder} predates the branch recorder (no {", ".join(missing_options) or "options found"}): '
+                 'build it with dev/build-recorder.py --out <folder> and pass --recorder <folder>/wuwa-recorder.exe')
     print(f'{tag}: {build} from {branch} {commit[:8]} on {base.name}', flush=True)
 
     folder.mkdir(parents=True)

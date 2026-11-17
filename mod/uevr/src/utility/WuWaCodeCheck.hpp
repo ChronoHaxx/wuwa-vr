@@ -40,7 +40,10 @@ inline uintptr_t verify(const char* route, std::span<const contract::Range> rang
 // the self-port. Routes verified with verify_portable take their hook addresses from here.
 inline uintptr_t live_address(uint32_t reference) {
     const auto& live = wuwa_self_port::live();
-    if (const auto rva = wuwa_render_38::address(live.timestamp, reference)) return live.base + *rva;
+    const auto& build = wuwa_self_port::build38();
+    if (const auto rva = wuwa_render_38::address(build, reference)) return live.base + *rva;
+    if (build.family() && wuwa_render_38::listed(reference))
+        throw std::runtime_error(fmt::format("game build {:x} (3.8) has no match for reviewed site {:x}", live.timestamp, reference));
     return wuwa_self_port::at(reference);
 }
 
@@ -51,12 +54,13 @@ inline uintptr_t live_address(uint32_t reference) {
 inline void verify_portable(const char* route, std::span<const contract::Range> ranges) {
     const auto& live = wuwa_self_port::live();
     if (live.state == wuwa_self_port::State::reference) { (void)verify(route, ranges); return; }
-    if (live.state != wuwa_self_port::State::moved)
+    const auto& build = wuwa_self_port::build38();
+    if (live.state != wuwa_self_port::State::moved && !build.family())
         throw std::runtime_error(fmt::format("{} refused: game build {:x} is not supported ({})", route, live.timestamp, live.reason));
     const auto module = GetModuleHandleW(nullptr);
     size_t reviewed{};
     for (const auto& range : ranges) {
-        const auto approved = wuwa_render_38::check(live.timestamp, range.rva, range.size, range.hash,
+        const auto approved = wuwa_render_38::check(build, range.rva, range.size, range.hash,
             [&](uint32_t rva, std::span<uint8_t> bytes) {
                 return uint64_t(rva) + bytes.size() <= live.image_size &&
                     memory::executable_site(live.base + rva, bytes.size(), module) &&
@@ -75,7 +79,8 @@ inline void verify_portable(const char* route, std::span<const contract::Range> 
                 range.size, found ? fmt::format("changed at {:x}", *found) : std::string{"not found"}, live.timestamp));
         }
     }
-    spdlog::info("[WuWaStereoCode] route={} verified_ranges={} image_size={:x} timestamp={:x} self_ported_from={:x} reviewed_3_8={}",
-        route, ranges.size(), live.image_size, live.timestamp, wuwa_self_port::table::reference_timestamp, reviewed);
+    spdlog::info("[WuWaStereoCode] route={} verified_ranges={} image_size={:x} timestamp={:x} self_ported_from={:x} reviewed_3_8={}{}",
+        route, ranges.size(), live.image_size, live.timestamp, wuwa_self_port::table::reference_timestamp, reviewed,
+        build.sibling() ? " (another 3.8 build, through the 3.8 self-port)" : "");
 }
 } // namespace wuwa_code_check

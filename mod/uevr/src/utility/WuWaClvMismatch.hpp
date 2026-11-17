@@ -45,10 +45,13 @@ inline uint64_t volume_signature(uintptr_t state) {
 // The code that forms ViewState + volume offset, at its place in the running build.
 inline bool volume_offset_code_matches() {
     const auto& live = wuwa_self_port::live();
-    if (live.timestamp == wuwa_render_38::timestamp) {
+    const auto& build = wuwa_self_port::build38();
+    if (build.family()) { // 3.8: the reviewed build, or another 3.8 build where the 3.8 self-port found the site
         namespace checked = wuwa_lgui_probe::detail;
         std::array<uint8_t, wuwa_render_38::clv_code.size()> bytes{};
-        const auto at = live.base + wuwa_render_38::clv_site;
+        const auto site = build.at(wuwa_render_38::clv_site);
+        if (!site) return false;
+        const auto at = live.base + *site;
         if (!checked::executable_site(at, bytes.size(), GetModuleHandleW(nullptr)) ||
             !checked::guarded_copy(bytes.data(), reinterpret_cast<const void*>(at), bytes.size()) ||
             bytes != wuwa_render_38::clv_code) return false;

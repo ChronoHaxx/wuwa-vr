@@ -95,3 +95,17 @@ fix.
   - `Cinematic native aspect metadata ... reviewed_3_8=4`
   - `[WuWaGodRay] god-ray pass hooked`
   - `[WuWaCLV] one-eye rebuild detector: watching (volume at view state +27b8)`
+
+## Other 3.8 builds (17 Nov 2026)
+
+This table also applies to other 3.8 builds, such as a player's client on PE
+`6ae17bd7`. They are reached through `WuWaSelfPortTable38.hpp` and
+`wuwa_self_port::build38()`; see the matching section in `UI-3.8-PORT.md`.
+On such a build:
+- each listed range must be found and be unchanged apart from moved
+  call/jump targets and RIP displacements;
+- the far-lighting site must hold `clv_code` at its found address;
+- a listed address that was not found refuses, rather than falling back to
+  the 3.7 self-port.
+
+The log says `reviewed_3_8=N (another 3.8 build, through the 3.8 self-port)`.

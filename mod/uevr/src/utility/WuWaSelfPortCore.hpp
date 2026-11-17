@@ -8,6 +8,10 @@
 // the spot a nearby found site's shift predicts, a data address only where every located
 // reference agrees, and a pointer slot only when one aligned slot holds the found pointee.
 // Anything else stays unmapped, and the routes that need it refuse.
+//
+// Two tables share the matcher: the 3.7 reference table (every pinned site, WuWaSelfPortTable.hpp)
+// and the reviewed 3.8 table (WuWaSelfPortTable38.hpp), which finds the reviewed 3.8 code in another
+// 3.8 build. Each call takes a TableView; the default is the 3.7 table.
 
 #include <algorithm>
 #include <array>
@@ -20,11 +24,29 @@
 #include <vector>
 
 #include "WuWaSelfPortTable.hpp"
+#include "WuWaSelfPortTable38.hpp"
 
 namespace wuwa_self_port {
 namespace table = wuwa_self_port_table;
 
 struct Span { uint32_t begin, end; }; // readable RVA range [begin, end)
+
+// One generated table (the 3.8 table reuses the 3.7 header's types).
+struct TableView {
+    uint32_t reference_timestamp;
+    const uint8_t* pool;
+    std::span<const table::Window> windows;
+    std::span<const table::Site> sites;
+    std::span<const table::Ref> refs;
+    std::span<const table::Range> ranges;
+    std::span<const table::Field> fields;
+    uint32_t twin_span;
+};
+inline constexpr TableView reference_table{table::reference_timestamp, table::pool, table::windows, table::sites,
+    table::refs, table::ranges, table::fields, table::twin_span};
+namespace table38 = wuwa_self_port_table_38;
+inline constexpr TableView reviewed38_table{table38::reference_timestamp, table38::pool, table38::windows, table38::sites,
+    table38::refs, table38::ranges, table38::fields, table38::twin_span};
 
 // What the matcher needs from an image: its readable spans and a bounded copy.
 struct Memory {
@@ -54,15 +76,15 @@ struct Result {
 };
 
 namespace detail {
-inline const uint8_t* window_bytes(const table::Window& w) noexcept { return table::pool + w.pool; }
-inline const uint8_t* window_mask(const table::Window& w) noexcept { return table::pool + w.pool + w.size; }
+inline const uint8_t* window_bytes(const table::Window& w, const TableView& t = reference_table) noexcept { return t.pool + w.pool; }
+inline const uint8_t* window_mask(const table::Window& w, const TableView& t = reference_table) noexcept { return t.pool + w.pool + w.size; }
 
-inline bool masked_equal(const Memory& m, int64_t at, const table::Window& w) {
+inline bool masked_equal(const Memory& m, int64_t at, const table::Window& w, const TableView& t = reference_table) {
     if (at < 0 || uint64_t(at) + w.size > m.image_size) return false;
     std::array<uint8_t, 512> live{};
     if (w.size > live.size() || !m.copy(uint32_t(at), live.data(), w.size)) return false;
-    const auto* ref = window_bytes(w);
-    const auto* mask = window_mask(w);
+    const auto* ref = window_bytes(w, t);
+    const auto* mask = window_mask(w, t);
     for (uint32_t i = 0; i < w.size; ++i)
         if (mask[i] && live[i] != ref[i]) return false;
     return true;
@@ -76,11 +98,11 @@ inline uint64_t load64(const uint8_t* p) noexcept { uint64_t v; std::memcpy(&v, 
 
 // Every place each listed window matches (up to cap), in one pass over the code spans.
 inline std::unordered_map<uint16_t, std::vector<uint32_t>> find_windows(const Memory& m,
-    const std::vector<uint16_t>& wanted, size_t cap) {
+    const std::vector<uint16_t>& wanted, size_t cap, const TableView& t) {
     std::vector<std::pair<uint64_t, uint16_t>> keys;
     for (auto index : wanted) {
-        const auto& w = table::windows[index];
-        keys.emplace_back(load64(window_bytes(w) + w.anchor), index);
+        const auto& w = t.windows[index];
+        keys.emplace_back(load64(window_bytes(w, t) + w.anchor), index);
     }
     std::sort(keys.begin(), keys.end());
     std::vector<uint64_t> filter(1 << 10); // 64K-bit prefilter on a multiplicative hash
@@ -101,9 +123,9 @@ inline std::unordered_map<uint16_t, std::vector<uint32_t>> find_windows(const Me
                 for (; it != keys.end() && it->first == k; ++it) {
                     auto& list = hits[it->second];
                     if (list.size() >= cap) continue;
-                    const auto& w = table::windows[it->second];
+                    const auto& w = t.windows[it->second];
                     const int64_t at = int64_t(begin) + i - w.anchor;
-                    if (masked_equal(m, at, w)) list.push_back(uint32_t(at));
+                    if (masked_equal(m, at, w, t)) list.push_back(uint32_t(at));
                 }
             }
         }
@@ -133,48 +155,48 @@ inline uint32_t find_pointer_slot(const Memory& m, uint64_t value, uint32_t& cou
 }
 } // namespace detail
 
-inline Result locate(const Memory& m) {
+inline Result locate(const Memory& m, const TableView& t = reference_table) {
     using namespace detail;
     Result r;
     std::vector<uint16_t> wanted;
-    for (const auto& s : table::sites) {
+    for (const auto& s : t.sites) {
         if (s.kind == table::kind_code && s.window != table::no_window) wanted.push_back(s.window);
-        for (uint16_t i = 0; i < s.refs; ++i) wanted.push_back(table::refs[s.first_ref + i].window);
+        for (uint16_t i = 0; i < s.refs; ++i) wanted.push_back(t.refs[s.first_ref + i].window);
     }
     std::sort(wanted.begin(), wanted.end());
     wanted.erase(std::unique(wanted.begin(), wanted.end()), wanted.end());
-    const auto hits = find_windows(m, wanted, 2);
+    const auto hits = find_windows(m, wanted, 2, t);
     const auto hits_of = [&](uint16_t w) -> const std::vector<uint32_t>* {
         auto it = hits.find(w); return it == hits.end() ? nullptr : &it->second;
     };
     // 1. Unique windows.
-    for (const auto& s : table::sites) {
-        if (s.kind != table::kind_code || s.window == table::no_window || table::windows[s.window].twins != 1) continue;
+    for (const auto& s : t.sites) {
+        if (s.kind != table::kind_code || s.window == table::no_window || t.windows[s.window].twins != 1) continue;
         const auto* h = hits_of(s.window);
         if (h && h->size() == 1) r.sites[s.rva] = {(*h)[0], "window"};
     }
     // 2. Twins and windows found more than once: the spot a nearby found site's shift predicts.
     std::vector<std::pair<uint32_t, uint32_t>> unique;
     for (const auto& [ref, map] : r.sites) unique.emplace_back(ref, map.live);
-    for (const auto& s : table::sites) {
+    for (const auto& s : t.sites) {
         if (s.kind != table::kind_code || s.window == table::no_window || r.sites.contains(s.rva)) continue;
         std::vector<std::pair<uint32_t, std::pair<uint32_t, uint32_t>>> nearby;
         for (const auto& u : unique) {
             const auto distance = u.first > s.rva ? u.first - s.rva : s.rva - u.first;
-            if (distance <= table::twin_span) nearby.push_back({distance, u});
+            if (distance <= t.twin_span) nearby.push_back({distance, u});
         }
         std::sort(nearby.begin(), nearby.end());
         for (size_t i = 0; i < nearby.size() && i < 3; ++i) {
             const int64_t spot = int64_t(s.rva) + int64_t(nearby[i].second.second) - int64_t(nearby[i].second.first);
-            if (masked_equal(m, spot, table::windows[s.window])) { r.sites[s.rva] = {uint32_t(spot), "twin_shift"}; break; }
+            if (masked_equal(m, spot, t.windows[s.window], t)) { r.sites[s.rva] = {uint32_t(spot), "twin_shift"}; break; }
         }
     }
     // 3. Through rel32 references: data, and code the steps above left open.
-    for (const auto& s : table::sites) {
+    for (const auto& s : t.sites) {
         if (!s.refs || r.sites.contains(s.rva)) continue;
         std::vector<uint32_t> targets;
         for (uint16_t i = 0; i < s.refs; ++i) {
-            const auto& ref = table::refs[s.first_ref + i];
+            const auto& ref = t.refs[s.first_ref + i];
             const auto* h = hits_of(ref.window);
             if (!h || h->size() != 1) continue;
             int32_t disp{};
@@ -186,17 +208,17 @@ inline Result locate(const Memory& m) {
             r.sites[s.rva] = {targets[0], "refs"};
     }
     // 4. Pointer slots: the one aligned slot holding the found pointee.
-    for (const auto& s : table::sites) {
+    for (const auto& s : t.sites) {
         if (s.kind != table::kind_pointer || r.sites.contains(s.rva)) continue;
         auto pointee = r.sites.find(s.pointee);
         if (pointee == r.sites.end()) continue;
         uint32_t count{};
         if (const auto slot = find_pointer_slot(m, m.va_base + pointee->second.live, count)) r.sites[s.rva] = {slot, "pointer"};
     }
-    for (const auto& s : table::sites)
+    for (const auto& s : t.sites)
         if (!r.sites.contains(s.rva)) r.refused.push_back(s.rva);
     // Ranges: moved code is accepted only when every byte outside the moved fields is unchanged.
-    for (const auto& range : table::ranges) {
+    for (const auto& range : t.ranges) {
         auto it = r.sites.find(range.rva);
         if (it == r.sites.end()) { ++r.ranges_unmapped; continue; }
         std::vector<uint8_t> live(range.size);
@@ -204,7 +226,7 @@ inline Result locate(const Memory& m) {
             ++r.ranges_unmapped; continue;
         }
         for (uint16_t i = 0; i < range.fields; ++i) {
-            const auto& f = table::fields[range.first_field + i];
+            const auto& f = t.fields[range.first_field + i];
             std::memset(live.data() + f.offset, 0, (std::min)(uint32_t(f.length), range.size - f.offset));
         }
         if (fnv(live) == range.masked) ++r.ranges_ok;
@@ -215,16 +237,17 @@ inline Result locate(const Memory& m) {
 
 // The masked check of one source range at its live address. The range must be in the table with
 // the source's own hash, so a table generated from different source refuses rather than guesses.
-inline bool range_unchanged(const Memory& m, const Result& r, uint32_t rva, uint32_t size, uint64_t hash) {
-    const auto* range = std::find_if(std::begin(table::ranges), std::end(table::ranges),
+inline bool range_unchanged(const Memory& m, const Result& r, uint32_t rva, uint32_t size, uint64_t hash,
+        const TableView& t = reference_table) {
+    const auto range = std::find_if(t.ranges.begin(), t.ranges.end(),
         [&](const table::Range& x) { return x.rva == rva && x.size == size; });
-    if (range == std::end(table::ranges) || range->hash != hash) return false;
+    if (range == t.ranges.end() || range->hash != hash) return false;
     auto it = r.sites.find(rva);
     if (it == r.sites.end()) return false;
     std::vector<uint8_t> live(size);
     if (!detail::in_spans(m.code, it->second.live, size) || !m.copy(it->second.live, live.data(), size)) return false;
     for (uint16_t i = 0; i < range->fields; ++i) {
-        const auto& f = table::fields[range->first_field + i];
+        const auto& f = t.fields[range->first_field + i];
         std::memset(live.data() + f.offset, 0, (std::min)(uint32_t(f.length), size - f.offset));
     }
     return fnv(live) == range->masked;

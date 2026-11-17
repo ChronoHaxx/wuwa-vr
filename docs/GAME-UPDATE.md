@@ -116,6 +116,16 @@ The 3.7 update (30 Sep to 1 Oct 2026) is the worked example used below:
    The second line runs the plugin's matching on the previous build. Every site it maps must
    agree with the port report (it may also correct one: on 16 Oct it found the LguiRoute slot
    the port tool got wrong). Then update `dev/test_self_port.cpp` to the new captures.
+
+   While reviewed exact-build tables exist (3.8: `WuWaLgui38.hpp`, `WuWaRender38.hpp`), also
+   regenerate their own self-port table whenever they change, so that other builds of the same
+   version (another client, a hotfix) find that code too:
+   ```powershell
+   # PowerShell, in the repository
+   python launcher\dev\wuwa_self_port_table.py --reviewed38 --image ..\data\game-3.8\client-6ae17e03-kuro.bin --header mod\uevr\src\utility\WuWaSelfPortTable38.hpp --simulate ..\data\game-3.7-6ace6377\client-6ace6377-kuro.bin
+   ```
+   The simulation on 3.7 must stay well under 90% of ranges unchanged (44/68 on 17 Nov), the
+   share at which the plugin treats a build as 3.8 (`build38()` in `utility/WuWaSelfPort.hpp`).
 6. Rebuild, check-sums, register the candidate, launch on **both** copies:
    `python dev\qa.py session <log> --baseline <day-0 log>`. Every route the old build
    verified must verify again, and no new error kinds may appear.

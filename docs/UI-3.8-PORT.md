@@ -60,3 +60,27 @@ on this build until those separate fields are reviewed.
 the real capture, rejects corrupted code and changed source contracts, checks
 unknown-build/read-failure refusal, and verifies the menu vtable and jump target.
 Runtime, simulator screenshots and headset acceptance must be recorded separately.
+
+## Other 3.8 builds (17 Nov 2026)
+
+A player's 3.8 client is PE `6ae17bd7` (image `aafc000`), not `6ae17e03`. 1.2.7
+refused it: the exact-build table did not apply, and the 3.7 self-port cannot port
+the LGUI code that 3.8 changed, so the HUD lost its 16:9 layout (minimap, quests
+and team out of view).
+
+`WuWaSelfPortTable38.hpp` now holds fingerprints of this table's live code (all
+58 ranges, plus the menu vtable's execute slot `7d3a3c0`, since slot 0 points at
+a function four vtables share). On a build that is neither reference, the plugin
+scans for them. If at least 90% of the ranges are found unchanged apart from moved
+call/jump targets and RIP displacements, the build counts as 3.8
+(`wuwa_self_port::build38()`):
+- this table applies at the found addresses, each range still checked on its own;
+- the 3.8 layout applies.
+
+The 3.7 captures reach 44/68 and stay out.
+
+`dev/test_self_port.cpp` runs the table on the 3.8 capture and on a copy moved by
+`0x1000`. There, all 69 sites map to `+0x1000`, all 58 UI and 9 render ranges are
+accepted, and a changed compared byte refuses only its own range. In game,
+`wuwa-self-port-force.txt` beside the backend makes `6ae17e03` take the same path
+(every site must map to itself).

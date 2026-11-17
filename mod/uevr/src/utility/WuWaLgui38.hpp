@@ -1,7 +1,9 @@
 #pragma once
 // Reviewed 3.8 UI port, PE timestamp 0x6ae17e03. The reference remains 3.7.
-// Only HUD, menu and viewport ranges are accepted here; every byte is checked,
-// including relative targets. No change to the generic self-port acceptance rules.
+// Only HUD, menu and viewport ranges are accepted here. On that build every byte is
+// checked, including relative targets. On another 3.8 build (WuWaBuild38.hpp) the same
+// code must have been found by the 3.8 self-port table and be unchanged apart from moved
+// call/jump targets and RIP displacements. No change to the generic self-port rules.
 // Evidence and review: docs/UI-3.8-PORT.md; full captures stay outside the repo.
 #include <array>
 #include <cstdint>
@@ -9,8 +11,13 @@
 #include <span>
 #include <vector>
 
+#include "WuWaBuild38.hpp"
+
 namespace wuwa_lgui_38 {
-inline constexpr uint32_t timestamp = 0x6ae17e03;
+using wuwa_build_38::Build;
+inline constexpr uint32_t timestamp = wuwa_build_38::timestamp;
+// The menu pass vtable; its execute thunk is at +8 (the 3.8 self-port table finds that slot).
+inline constexpr uint32_t menu_vtable = 0x7d3a3b8;
 struct Range { uint32_t reference, live, size; uint64_t reference_hash, hash; };
 inline constexpr std::array<Range, 58> ranges{{
     {0xf09af0, 0xa17d20, 0x258, 0xedae9041b63c8f2eULL, 0x1c247812aaca4ed9ULL},
@@ -77,33 +84,51 @@ inline uint64_t fingerprint(std::span<const uint8_t> bytes) {
     for (const auto value : bytes) { hash ^= value; hash *= 0x100000001b3ULL; }
     return hash;
 }
-// nullopt means this is not the reviewed build; use the original compatibility gate.
+// nullopt means this is not a 3.8 build; use the original compatibility gate.
 // On 3.8, an unknown/modified source range is refused, not silently accepted.
-template<class Read> std::optional<bool> check(uint32_t build, uint32_t reference, uint32_t size,
+template<class Read> std::optional<bool> check(const Build& build, uint32_t reference, uint32_t size,
         uint64_t reference_hash, Read read) {
-    if (build != timestamp) return std::nullopt;
+    if (!build.family()) return std::nullopt;
     for (const auto& r : ranges) {
         if (r.reference != reference || r.size != size || r.reference_hash != reference_hash) continue;
+        if (build.sibling()) return build.unchanged(r.live, size, r.hash);
         std::vector<uint8_t> bytes(size);
         return read(r.live, std::span<uint8_t>{bytes}) && fingerprint(bytes) == r.hash;
     }
     return false;
 }
-inline std::optional<uint32_t> address(uint32_t build, uint32_t reference) {
-    if (build != timestamp) return std::nullopt;
+template<class Read> std::optional<bool> check(uint32_t build, uint32_t reference, uint32_t size,
+        uint64_t reference_hash, Read read) {
+    return check(Build{build}, reference, size, reference_hash, read);
+}
+// A reference this table places on 3.8 (a range start or the menu vtable).
+inline bool listed(uint32_t reference) {
+    if (reference == 0x7feada8) return true;
+    for (const auto& r : ranges) if (r.reference == reference) return true;
+    return false;
+}
+// nullopt: not a 3.8 build, not listed, or (another 3.8 build) not found there; ui_address
+// refuses a listed reference rather than falling back to the 3.7 self-port.
+inline std::optional<uint32_t> address(const Build& build, uint32_t reference) {
+    if (!build.family()) return std::nullopt;
     // The execute thunk is found through its jump to 0x3e59e00. A similar thunk
     // at 0x3e64da0 calls another function and must never be used here.
-    if (reference == 0x7feada8) return 0x7d3a3b8; // vtable: execute at +8
-    for (const auto& r : ranges) if (r.reference == reference) return r.live;
+    if (reference == 0x7feada8) { // vtable: execute at +8
+        const auto slot = build.at(menu_vtable + 8);
+        return slot ? std::optional<uint32_t>{*slot - 8} : std::nullopt;
+    }
+    for (const auto& r : ranges) if (r.reference == reference) return build.at(r.live);
     return std::nullopt;
 }
+inline std::optional<uint32_t> address(uint32_t build, uint32_t reference) { return address(Build{build}, reference); }
 struct Layout {
     uint32_t renderer_views, renderer_count, view_stride;
     uint32_t early_counts, dispatch_counts, depth_flag, render_rect;
 };
 inline constexpr Layout reference_layout{0x108, 0x110, 0xe940, 0x2164, 0x922c, 0x25ac, 0x1e70};
 inline constexpr Layout reviewed_layout{0x110, 0x118, 0xe9b0, 0x21a4, 0x928c, 0x25f4, 0x1eb0};
-inline const Layout& layout(uint32_t build) {
-    return build == timestamp ? reviewed_layout : reference_layout;
+inline const Layout& layout(const Build& build) {
+    return build.family() ? reviewed_layout : reference_layout;
 }
+inline const Layout& layout(uint32_t build) { return layout(Build{build}); }
 } // namespace wuwa_lgui_38

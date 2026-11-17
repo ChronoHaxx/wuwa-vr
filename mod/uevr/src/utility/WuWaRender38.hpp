@@ -4,6 +4,8 @@
 // aligned instruction by instruction against the 3.7 capture; every difference that is not a moved call/jump
 // target or RIP displacement is listed below and reviewed. Only exact live bytes are accepted (live hash).
 // Evidence and method: docs/RENDER-3.8-PORT.md. Same shape as WuWaLgui38.hpp (HUD/menu, by Codex).
+// Another 3.8 build (WuWaBuild38.hpp) uses the same table through the 3.8 self-port: each range must have
+// been found there and be unchanged apart from moved call/jump targets and RIP displacements.
 //
 // Mono authored camera (FFakeStereoRenderingHook.cpp ensure_mono_projection_hook):
 //   GetProjectionData 0x526f1a0 -> 0x5014d50, same 0xc7a bytes and 728 instructions. Only the stack frame
@@ -21,8 +23,11 @@
 #include <span>
 #include <vector>
 
+#include "WuWaBuild38.hpp"
+
 namespace wuwa_render_38 {
-inline constexpr uint32_t timestamp = 0x6ae17e03;
+using wuwa_build_38::Build;
+inline constexpr uint32_t timestamp = wuwa_build_38::timestamp;
 struct Range { uint32_t reference, live, size; uint64_t reference_hash, hash; };
 inline constexpr std::array<Range, 9> ranges{{
     // Mono authored camera
@@ -44,27 +49,44 @@ inline uint64_t fingerprint(std::span<const uint8_t> bytes) {
     return hash;
 }
 
-// nullopt: not the reviewed build, or a range this table does not list (the caller's own rule applies).
-// A listed range on 3.8 must match its source contract and its exact live bytes, or it is refused.
-template<class Read> std::optional<bool> check(uint32_t build, uint32_t reference, uint32_t size,
+// nullopt: not a 3.8 build, or a range this table does not list (the caller's own rule applies).
+// A listed range on 3.8 must match its source contract and its live code, or it is refused.
+template<class Read> std::optional<bool> check(const Build& build, uint32_t reference, uint32_t size,
         uint64_t reference_hash, Read read) {
-    if (build != timestamp) return std::nullopt;
+    if (!build.family()) return std::nullopt;
     for (const auto& r : ranges) {
         if (r.reference != reference) continue;
         if (r.size != size || r.reference_hash != reference_hash) return false;
+        if (build.sibling()) return build.unchanged(r.live, size, r.hash);
         std::vector<uint8_t> bytes(size);
         return read(r.live, std::span<uint8_t>{bytes}) && fingerprint(bytes) == r.hash;
     }
     return std::nullopt;
 }
+template<class Read> std::optional<bool> check(uint32_t build, uint32_t reference, uint32_t size,
+        uint64_t reference_hash, Read read) {
+    return check(Build{build}, reference, size, reference_hash, read);
+}
 
-// Live RVA of a listed range start (or a place inside one, at the same distance) on 3.8.
-inline std::optional<uint32_t> address(uint32_t build, uint32_t reference) {
-    if (build != timestamp) return std::nullopt;
+// A reference inside a listed range.
+inline bool listed(uint32_t reference) {
     for (const auto& r : ranges)
-        if (reference >= r.reference && reference - r.reference < r.size) return r.live + (reference - r.reference);
+        if (reference >= r.reference && reference - r.reference < r.size) return true;
+    return false;
+}
+
+// Live RVA of a listed range start (or a place inside one, at the same distance) on 3.8. nullopt also
+// when another 3.8 build lacks that range; live_address then refuses instead of using the 3.7 self-port.
+inline std::optional<uint32_t> address(const Build& build, uint32_t reference) {
+    if (!build.family()) return std::nullopt;
+    for (const auto& r : ranges)
+        if (reference >= r.reference && reference - r.reference < r.size) {
+            const auto live = build.at(r.live);
+            return live ? std::optional<uint32_t>{*live + (reference - r.reference)} : std::nullopt;
+        }
     return std::nullopt;
 }
+inline std::optional<uint32_t> address(uint32_t build, uint32_t reference) { return address(Build{build}, reference); }
 
 // Far lighting: the one-eye rebuild detector's code proof (WuWaClvMismatch.hpp). 3.8 forms the view
 // state's CLV volume address with `mov rdi,[rdi+0x1ec8]; add rdi,0x27b8` at 0x3bf3f40 (3.7: rsi, 0x1e88,

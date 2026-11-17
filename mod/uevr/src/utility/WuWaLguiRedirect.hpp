@@ -109,18 +109,22 @@ inline void record_invalid(State& s, std::atomic<uint64_t>& reason) noexcept {
     ++s.invalid;
 }
 
-// Exact 3.8 UI ranges and layout coexist with the unchanged 3.7/self-port path.
+// Exact 3.8 UI ranges and layout coexist with the unchanged 3.7/self-port path. Another 3.8
+// build uses the same reviewed ranges through the 3.8 self-port (wuwa_self_port::build38()).
 inline const wuwa_lgui_38::Layout& ui_layout() {
-    return wuwa_lgui_38::layout(wuwa_self_port::live().timestamp);
+    return wuwa_lgui_38::layout(wuwa_self_port::build38());
 }
 inline uintptr_t ui_address(uint32_t reference) {
     const auto& live = wuwa_self_port::live();
-    if (const auto rva = wuwa_lgui_38::address(live.timestamp, reference)) return live.base + *rva;
+    const auto& build = wuwa_self_port::build38();
+    if (const auto rva = wuwa_lgui_38::address(build, reference)) return live.base + *rva;
+    if (build.family() && wuwa_lgui_38::listed(reference))
+        throw std::runtime_error(fmt::format("game build {:x} (3.8) has no match for reviewed site {:x}", live.timestamp, reference));
     return wuwa_self_port::at(reference);
 }
 inline bool ui_range_matches(const compatibility::CodeRange& range) {
     const auto& live = wuwa_self_port::live();
-    const auto reviewed = wuwa_lgui_38::check(live.timestamp, range.rva, range.size, range.fingerprint,
+    const auto reviewed = wuwa_lgui_38::check(wuwa_self_port::build38(), range.rva, range.size, range.fingerprint,
         [&](uint32_t rva, std::span<uint8_t> bytes) {
             return uint64_t(rva) + bytes.size() <= live.image_size &&
                 checked::executable_site(live.base + rva, bytes.size(), GetModuleHandleW(nullptr)) &&
@@ -139,7 +143,7 @@ template<size_t N> inline bool verify_code(const std::array<compatibility::CodeR
         } else {
             // The pre-self-port wording (qa/matrix.json known_off matches it), plus the live place when moved.
             const auto& live = wuwa_self_port::live();
-            const auto reviewed = wuwa_lgui_38::address(live.timestamp, range.rva);
+            const auto reviewed = wuwa_lgui_38::address(wuwa_self_port::build38(), range.rva);
             const auto found = reviewed ? reviewed : wuwa_self_port::find_rva(uint32_t(range.rva));
             std::vector<uint8_t> bytes(range.size);
             const bool readable = found && range.size && uint64_t(*found) + range.size <= live.image_size &&
@@ -153,7 +157,7 @@ template<size_t N> inline bool verify_code(const std::array<compatibility::CodeR
         total_bytes += range.size;
     }
     spdlog::info("[WuWaLguiRedirect] code compatibility route={} matched={}/{} bytes={} build={}",
-        route, matched, ranges.size(), total_bytes, wuwa_self_port::live().timestamp == wuwa_lgui_38::timestamp ? "reviewed-3.8" : wuwa_self_port::state_name());
+        route, matched, ranges.size(), total_bytes, wuwa_self_port::build38_name());
     return matched == ranges.size();
 }
 
@@ -220,7 +224,7 @@ inline std::string describe_rejected(const RejectedDescription& value) {
 }
 
 inline nlohmann::json sample_view_gate(uintptr_t view) {
-    if (wuwa_self_port::live().timestamp == wuwa_lgui_38::timestamp)
+    if (wuwa_self_port::build38().family())
         return {{"unavailable", "3.8 world-label predicates have not been ported"}};
     // Raw inputs to the shipped 0x3825870 eligibility helper, inspected in
     // _docs/lgui-menu-stage0-contract-2026-09-24.md. No predicate is bypassed

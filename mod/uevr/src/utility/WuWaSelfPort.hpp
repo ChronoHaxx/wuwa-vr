@@ -10,7 +10,15 @@
 // wuwa_code_check::verify_portable(); a route still on base + RVA keeps its strict build check.
 //
 // Test switch: an empty file wuwa-self-port-force.txt beside the loaded backend scans even on
-// the reference build, where every found site must map to itself.
+// the reference build, where every found site must map to itself. On the reviewed 3.8 build it
+// also runs the 3.8 scan below, so the sibling path is used (and must map every site to itself).
+//
+// 3.8 sibling builds (build38()): the reviewed 3.8 tables are exact for PE 0x6ae17e03, but other 3.8
+// builds exist (another client on 0x6ae17bd7, 16 Nov 2026) and 3.8 changed code the 3.7 table cannot
+// port. On any build that is neither reference, a second scan looks for the reviewed 3.8 code
+// (WuWaSelfPortTable38.hpp). When at least 90% of its ranges are found unchanged (both 3.7 captures
+// reach 65%), the build counts as 3.8 and the reviewed tables apply through the found sites, each
+// range still checked on its own.
 
 #include <chrono>
 #include <filesystem>
@@ -22,6 +30,7 @@
 #include <windows.h>
 #include <spdlog/spdlog.h>
 
+#include "WuWaBuild38.hpp"
 #include "WuWaCodeCompatibility.hpp"
 #include "WuWaLguiProbe.hpp"
 #include "WuWaSelfPortCore.hpp"
@@ -29,6 +38,8 @@
 namespace wuwa_self_port {
 static_assert(table::reference_timestamp == wuwa_code_compatibility::timestamp,
     "WuWaSelfPortTable.hpp is not generated from the build the source is pinned to");
+static_assert(table38::reference_timestamp == wuwa_build_38::timestamp,
+    "WuWaSelfPortTable38.hpp is not generated from the reviewed 3.8 build");
 namespace memory = wuwa_lgui_probe::detail;
 
 struct LiveModule final : Memory {
@@ -196,5 +207,71 @@ inline const char* state_name() {
     case State::moved: return "self-ported";
     default: return "unsupported";
     }
+}
+
+// The 3.8 scan (see the top of this file).
+struct Live38 {
+    bool scanned{}, sibling{};
+    Result result;
+};
+
+namespace detail {
+inline Live38 inspect38() {
+    Live38 v;
+    const auto& l = live();
+    std::error_code ignored;
+    const bool forced = std::filesystem::exists(backend_directory() / L"wuwa-self-port-force.txt", ignored);
+    if (l.state == State::reference) return v;                        // the 3.7 reference build
+    if (l.timestamp == wuwa_build_38::timestamp && !forced) return v; // the reviewed 3.8 build: tables as written
+    if (l.module.code.empty()) return v;                              // headers unreadable: nothing to scan
+    const auto started = std::chrono::steady_clock::now();
+    v.scanned = true;
+    v.result = locate(l.module, reviewed38_table);
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+    const size_t total = std::size(table38::ranges);
+    v.sibling = total && size_t(v.result.ranges_ok) * 10 >= total * 9;
+    spdlog::info("[WuWaSelfPort] 3.8 check: game build {:x} (reviewed 3.8 {:x}{}): found {}/{} sites; ranges {} unchanged, "
+        "{} changed, {} not found; {} ms; {}", l.timestamp, table38::reference_timestamp, forced ? ", forced scan" : "",
+        v.result.sites.size(), std::size(table38::sites), v.result.ranges_ok, v.result.ranges_changed, v.result.ranges_unmapped,
+        ms, v.sibling ? "another 3.8 build: the reviewed 3.8 tables apply through these sites" : "not a 3.8 build");
+    return v;
+}
+} // namespace detail
+
+inline const Live38& live38() {
+    static const Live38 value = [] {
+        try {
+            return detail::inspect38();
+        } catch (const std::exception& e) {
+            spdlog::error("[WuWaSelfPort] 3.8 check failed: {}", e.what());
+            return Live38{};
+        }
+    }();
+    return value;
+}
+
+// The running build as the reviewed 3.8 tables see it (WuWaBuild38.hpp).
+inline const wuwa_build_38::Build& build38() {
+    static const wuwa_build_38::Build value = [] {
+        wuwa_build_38::Build b{live().timestamp};
+        if (live38().sibling) {
+            b.map = [](uint32_t rva38) -> std::optional<uint32_t> {
+                const auto& sites = live38().result.sites;
+                const auto it = sites.find(rva38);
+                if (it == sites.end()) return std::nullopt;
+                return it->second.live;
+            };
+            b.unchanged = [](uint32_t rva38, uint32_t size, uint64_t hash38) {
+                return range_unchanged(live().module, live38().result, rva38, size, hash38, reviewed38_table);
+            };
+        }
+        return b;
+    }();
+    return value;
+}
+
+inline const char* build38_name() {
+    const auto& b = build38();
+    return b.sibling() ? "3.8-sibling" : b.reviewed() ? "reviewed-3.8" : state_name();
 }
 } // namespace wuwa_self_port

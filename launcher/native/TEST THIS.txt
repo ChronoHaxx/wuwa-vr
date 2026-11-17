@@ -1,20 +1,19 @@
-WUWA VR — 1.2.7 BETA / FOCUSED USER CHECKS
-App 1.2.7 | Package beta-1-2-7 | Build game-3-8-1-2-7 | Game 3.8 | 12 Nov 12:16 GMT
+WUWA VR — 1.2.8 BETA / FOCUSED USER CHECKS
+App 1.2.8 | Package beta-1-2-8 | Build clients-uid-1-2-8 | Game 3.8 | 17 Nov 15:33 GMT
 
 Record Pass / Fail / Blocked / Not tested. Automated checks are not user results.
 Close game and injector before updating package or changing runtime.
 
-[ ] Update the app to 1.2.7 and restart it with the game closed: the VR mod
-    row offers Update to 1.2.7 beta; after it, Back to previous version
-    returns to 1.2.6. If using simulator, explicitly choose Use bundled
-    simulator. Confirm ready.
-[ ] First launch: "Welcome to VR" opens by itself; each answer takes effect.
-[ ] Hold L3: the 3D controller card; hold LT + RT: the views card with "Now".
-[ ] L3 + R3 (or Insert): the new menu; LB / RB change pages; the button chips
-    match the device you used last.
-[ ] Decoupled pitch on: story scenes and ultimates get the game camera's tilt.
-[ ] The UID is gone in full VR, the stereo screen and mono theatre.
-[ ] Record a minute in SteamVR: the video plays, gpu.jsonl is next to it.
+[ ] Update the app to 1.2.8 and restart it with the game closed: it installs
+    1.2.8 beta by itself; Back to previous version returns to 1.2.7.
+    If using simulator, explicitly choose Use bundled simulator. Confirm ready.
+[ ] Record page, Hide player IDs on While recording: the corner UID is gone in
+    every view, with no black box; it comes back when the setting is Off.
+[ ] Also hide the profile ID row on: the ID row in the ESC menu is empty.
+[ ] Record a minute in SteamVR: no UID digits in any frame, at most a 2-second
+    black box at the start.
+[ ] Another 3.8 client (not the Kuro global one): the HUD is whole in full VR;
+    the log has "[WuWaSelfPort] 3.8 check: ... another 3.8 build".
 [ ] Steam copy and Kuro launcher copy on 3.8: the HUD and menus sit on the VR
     panel; the log shows the UI redirect installed.
 

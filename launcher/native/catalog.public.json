@@ -2,6 +2,18 @@
   "schema": 1,
   "releases": [
     {
+      "id": "beta-1-2-8",
+      "displayName": "1.2.8 beta · 17 Nov 15:33 GMT",
+      "gameVersion": "3.8",
+      "buildId": "clients-uid-1-2-8",
+      "channel": "beta",
+      "published": "2026-11-17T15:34:50.973847+00:00",
+      "url": "https://github.com/ChronoHaxx/wuwa-vr/releases/download/beta-1-2-8/WuWa-VR-Launcher.zip",
+      "sha256": "9c0a09687a8c86234db15aa96d2774c7082cfc9a8c7523579b5df8ddf302d92c",
+      "size": 53831874,
+      "notesUrl": "https://github.com/ChronoHaxx/wuwa-vr/releases/tag/beta-1-2-8"
+    },
+    {
       "id": "beta-1-2-7",
       "displayName": "1.2.7 beta · 12 Nov 12:16 GMT",
       "gameVersion": "3.8",

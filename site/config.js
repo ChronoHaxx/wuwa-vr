@@ -7,6 +7,8 @@ window.WUWA_SITE = Object.freeze({
   // Usage counts (docs/TRACKING-PLAN.md). Empty: nothing is counted or sent.
   // analyticsEndpoint: the shared Cloudflare collector's https address.
   // webAnalyticsToken: the Cloudflare Web Analytics site token (32 hex characters).
+  // siteBuild: replaced with the deployed commit's short id by .github/workflows/pages.yml.
   "analyticsEndpoint": "",
-  "webAnalyticsToken": ""
+  "webAnalyticsToken": "",
+  "siteBuild": "dev"
 });

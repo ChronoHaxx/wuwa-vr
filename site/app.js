@@ -1,11 +1,12 @@
 "use strict";
-// Cookie-free usage counts, exactly as listed in docs/TRACKING-PLAN.md. Nothing identifies a
-// visitor in the browser; nothing is sent off the published site, by automated browsers, with
-// Global Privacy Control or Do Not Track on, after "Don't count my visits", or with no endpoint.
+// Cookie-free usage counts, exactly as listed in docs/TRACKING-PLAN.md, in the shared usage-counter
+// collector's format. Nothing identifies a visitor in the browser; nothing is sent off the published
+// site, by automated browsers, with Global Privacy Control or Do Not Track on, after "Don't count my
+// visits", or with no endpoint.
 window.WuWaTrack = (() => {
   const languages = ["en", "zh-Hans", "ja", "ko", "es", "pt-BR", "fr", "de", "ru", "ar"];
   const EVENTS = {
-    page_viewed: {},
+    app_loaded: {},
     download_clicked: {asset: ["installer", "portable_zip", "release_notes", "previous_release", "source"], placement: ["header", "hero", "closing", "guide", "page"]},
     guide_section_reached: {section: ["start", "controls", "updates", "recovery", "recording", "comfort"]},
     outbound_link_clicked: {target: ["github_issues", "github_repo", "youtube", "kofi", "uevr_docs", "game"]},
@@ -29,35 +30,39 @@ window.WuWaTrack = (() => {
     const allowed = () => l.protocol === "https:" && l.hostname === HOST && n.webdriver !== true && !signal() && !optedOut();
     const page = () => { const p = l.pathname.startsWith(BASE + "/") ? l.pathname.slice(BASE.length) : l.pathname; return p.endsWith("/") ? p + "index.html" : p; };
     const lang = () => languages.includes(d.documentElement.lang) ? d.documentElement.lang : "other";
+    // The collector takes lowercase ids: "/l/ja-guide.html" is sent as "l.ja-guide".
+    const pageId = () => page().replace(/^\//, "").replace(/\.html$/, "").replace(/\//g, ".").toLowerCase();
+    const width = w.innerWidth || 0, formFactor = width < 640 ? "phone" : width < 1024 ? "tablet" : "desktop";
+    const build = /^(?:[0-9a-f]{7}|dev)$/.test(config.siteBuild || "") ? config.siteBuild : "dev";
     let queue = [], timer = null, sent = 0;
     const flush = () => {
       if (timer) { env.clearTimeout(timer); timer = null; }
       if (!queue.length) return;
-      const body = JSON.stringify({app: "wuwa-vr", schema: 1, events: queue});
+      const body = JSON.stringify({app: "wuwa-vr", schema: 1, form_factor: formFactor, build, events: queue});
       queue = [];
       if (!allowed() || !endpoint) return;
-      try { if (n.sendBeacon && n.sendBeacon(endpoint, body)) return; } catch { /* fall through */ }
-      try { env.fetch?.(endpoint, {method: "POST", body, keepalive: true, mode: "no-cors", credentials: "omit", headers: {"Content-Type": "text/plain"}}).catch(() => {}); } catch { /* never throw */ }
+      try { if (env.fetch) { env.fetch(endpoint, {method: "POST", body, keepalive: true, mode: "no-cors", credentials: "omit", headers: {"Content-Type": "text/plain"}}).catch(() => {}); return; } } catch { /* fall through */ }
+      try { n.sendBeacon?.(endpoint, body); } catch { /* never throw */ }
     };
-    // Unknown events and properties are dropped; a value outside its list becomes "other".
+    // Unknown events and properties are dropped; every listed property is sent, and a value outside
+    // its list (or missing) becomes "other", because the collector keeps only exact matches.
     function track(name, props = {}, {now = false} = {}) {
       try {
         const spec = EVENTS[name];
         if (!spec || !endpoint || !allowed() || sent >= MAX_PER_PAGE) return false;
-        const clean = {page: page(), lang: lang()};
+        const clean = {page: pageId(), lang: lang()};
         for (const [key, values] of Object.entries(spec)) {
-          if (!(key in props)) continue;
-          const value = String(props[key]);
+          const value = String(props[key] ?? "");
           clean[key] = values === "youtube" ? (/^[\w-]{11}$/.test(value) && env.videos?.includes(value) ? value : "other") : values.includes(value) ? value : "other";
         }
-        queue.push({name, props: clean}); sent++;
+        queue.push({e: name, p: clean}); sent++;
         if (now || queue.length >= MAX_BATCH) flush();
         else if (!timer) timer = env.setTimeout(flush, FLUSH_MS);
         return true;
       } catch { return false; }
     }
     const setOptOut = off => { try { off ? storage()?.setItem(OPT_OUT, "off") : storage()?.removeItem(OPT_OUT); } catch { /* storage blocked */ } if (off) queue = []; };
-    return {track, flush, allowed, signal, optedOut, setOptOut, page, get endpoint() { return endpoint; }};
+    return {track, flush, allowed, signal, optedOut, setOptOut, page, pageId, get endpoint() { return endpoint; }};
   }
   if (typeof document === "undefined") return {create, EVENTS};
   const videos = [...document.querySelectorAll("[data-youtube]")].map(el => el.dataset.youtube);
@@ -399,7 +404,7 @@ window.WuWaTrack = (() => {
   }
 
   // Usage counts (docs/TRACKING-PLAN.md). Each call is a no-op unless measurement is on.
-  track("page_viewed");
+  track("app_loaded");
   const here = location.href, path = location.pathname;
   const currentTag = (/\/releases\/download\/([^/]+)\//.exec(document.querySelector(".header-download")?.href || "") || [])[1];
   const onGuide = /(guide|reference)\.html$/.test(path);

@@ -10,8 +10,11 @@ Layer 1 (download counts) needs no tracking; see [METRICS.md](METRICS.md).
 The launcher is covered in [LAUNCHER-METRICS-PROPOSAL.md](LAUNCHER-METRICS-PROPOSAL.md).
 
 This plan follows the shared contract in THE FINALS Outfit Studio's plan
-(`docs/analytics-tracking-plan.md` in ChronoHaxx/the-finals-outfit, PR #90):
-the same collector, naming scheme, envelope, visitor definition and opt-out.
+(`docs/analytics-tracking-plan.md` in ChronoHaxx/the-finals-outfit, PR #90) and
+its collector, `usage-counter` (`workers/usage-counter/` there, Analytics Engine
+dataset `usage_events`): the same naming scheme, envelope, visitor definition
+and opt-out. Release downloads stay on the GitHub API (layer 1); only the
+site's events go through the collector.
 
 ## Rules
 
@@ -31,11 +34,14 @@ the same collector, naming scheme, envelope, visitor definition and opt-out.
 
 ## Definitions
 
-- **Page view:** one page load (`page_viewed`).
+- **Page load:** `app_loaded`, once per page. (The name is the shared one; on
+  this multi-page site it fires on every page.)
 - **Daily visitor:** the collector hashes the request's IP address and browser
-  string with a random salt for that UTC day, shared by all four apps and
-  deleted after 48 hours. The hash goes on `page_viewed` only; other events
-  carry no visitor key.
+  string with a random salt for that UTC day and the app's name
+  (SHA-256, first 64 bits). The salt expires an hour after its day ends, so no
+  hash can be tied to an address or to another day, and the app's name in it
+  keeps one person's hashes on two apps apart. The hash goes on `app_loaded`
+  only; other events carry no visitor key.
 - **Weekly and monthly visitors:** a daily salt cannot recognise the same
   person on two different days, so a weekly or monthly figure is the sum of
   daily visitors. Report it as "visitor-days" or "monthly visits", never as
@@ -46,9 +52,9 @@ the same collector, naming scheme, envelope, visitor definition and opt-out.
 | Question | Measure | Decision it informs |
 | --- | --- | --- |
 | How many download and install, per release? | Layer 1: `installer`, `mod_package`, `app_update` per release | Whether a release reached people; how fast existing installs update |
-| How many people visit? | Daily visitors from `page_viewed`; visitor-days per month | Growth, for showcasing |
-| Which guides and pages are read, in which languages? | `page_viewed` by `page` and `lang` | Which pages to keep current first; which translations deserve a native speaker's review |
-| Where do people drop off between landing, download and setup guide? | Landing `page_viewed` → `download_clicked` (installer) → GitHub `installer` count → guide `page_viewed` and `guide_section_reached` | Which step to fix first |
+| How many people visit? | Daily visitors from `app_loaded`; visitor-days per month | Growth, for showcasing |
+| Which guides and pages are read, in which languages? | `app_loaded` by `page` and `lang` | Which pages to keep current first; which translations deserve a native speaker's review |
+| Where do people drop off between landing, download and setup guide? | Landing `app_loaded` → `download_clicked` (installer) → GitHub `installer` count → guide `app_loaded` and `guide_section_reached` | Which step to fix first |
 | Which features or settings do people not know about? | `faq_opened`, `shortcut_searched`, `guide_section_reached` on controls | What to move into the home page, the guide or the launcher |
 
 **The funnel compares daily totals.** Without a key shared between events, the
@@ -63,14 +69,19 @@ site's steps, so a step can exceed the one before it.
 - Names never include the app's name; the envelope carries `app`.
 - Property names: snake_case. Values: lowercase ids from a fixed list; `other` for anything unexpected.
   Booleans are `true`/`false`.
-- Envelope added by the wrapper to every batch: `app` (`"wuwa-vr"`) and `schema` (`1`). The collector adds the time.
-- WuWa VR adds two properties to every event: `page` (path only, e.g. `/guide.html`, `/l/ja-guide.html`) and `lang` (the page's language code).
+- Envelope added by the wrapper to every batch: `app` (`"wuwa-vr"`), `schema` (`1`), `form_factor`
+  (`phone` under 640 px wide, `tablet` under 1024 px, else `desktop`) and `build` (the deployed
+  commit's short id, stamped into `site/config.js` by the Pages workflow; `dev` otherwise). The
+  collector adds the time.
+- WuWa VR adds two properties to every event: `page` (an id from the path: `index`, `guide`,
+  `l.ja-guide`, `l.zh-hans-privacy`) and `lang` (the page's language code, e.g. `zh-Hans`). With them,
+  every event has at most four properties, the collector's limit.
 
 ## Events
 
 | Event | Fires when | Properties (fixed values only) | Decision |
 | --- | --- | --- | --- |
-| `page_viewed` | Once per page load, after the gate passes | `page`, `lang` (common) | Visitors, pages and languages that matter |
+| `app_loaded` | Once per page load, after the gate passes | `page`, `lang` (common) | Visitors, pages and languages that matter |
 | `download_clicked` | A download or release link is clicked | `asset`: `installer`, `portable_zip`, `release_notes`, `previous_release`, `source`; `placement`: `header`, `hero`, `closing`, `guide`, `page` | Which placement drives installs; whether the portable ZIP still earns its place in the hero |
 | `guide_section_reached` | A guide or reference section first scrolls into view, once per section per page load | `section`: `start`, `controls`, `updates`, `recovery`, `recording`, `comfort` | How far down the setup guide people get; what to shorten or move up |
 | `outbound_link_clicked` | A link leaves the site (other than downloads) | `target`: `github_issues`, `github_repo`, `youtube`, `kofi`, `uevr_docs`, `game`, `other` | Which channels people use |
@@ -81,20 +92,22 @@ site's steps, so a step can exceed the one before it.
 | `language_chosen` | A language is picked | `to`: language code; `via`: `menu`, `suggestion` | Whether the language suggestion works |
 | `controls_card_used` | The controls card is switched or saved | `pad`: `xbox`, `ps`, `vr`; `action`: `switched`, `saved_image` | Demand for PlayStation and VR controller labels |
 
-Values outside a list become `other`. The wrapper drops unknown events and
-properties, and the collector's allowlist (built from all four apps' plans)
-drops them again.
+Every listed property is always sent; a value outside its list, or a missing
+one, becomes `other`. The wrapper drops unknown events and properties, and the
+collector drops any event whose properties are not exactly its listed ones.
 
 ## Delivery
 
 - **One wrapper:** `track(event, props)` in `site/app.js` (already loaded with
   `defer`, so no new request). It checks the event and properties against the
   table above, adds `page` and `lang`, and queues the event.
-- **Batching:** the queue is sent as one `navigator.sendBeacon` with a
-  `text/plain` body (no CORS preflight) when the page is hidden, every
-  15 seconds while events wait, or at 20 events. Nothing is retried, and the
-  wrapper never throws. A download click therefore never waits for it.
-- **Body:** `{"app":"wuwa-vr","schema":1,"events":[{"name":"download_clicked","props":{...}}]}`.
+- **Batching:** the queue is sent as one `fetch` with `keepalive`,
+  `credentials: "omit"`, `mode: "no-cors"` and a `text/plain` body (no CORS
+  preflight; `navigator.sendBeacon` only where `fetch` is missing) when the
+  page is hidden, every 15 seconds while events wait, at 20 events, or at once
+  for a download or outbound click. At most 60 events per page load. Nothing is
+  retried, and the wrapper never throws, so a click never waits for it.
+- **Body:** `POST /e`, `{"app":"wuwa-vr","schema":1,"form_factor":"desktop","build":"e295ae9","events":[{"e":"download_clicked","p":{"page":"index","lang":"en","asset":"installer","placement":"hero"}}]}`.
 - **Endpoint:** the shared collector's address, set in `site/config.js`
   (`analyticsEndpoint`). Empty means nothing is sent: the site ships ready and
   switches on when the collector is deployed.
@@ -104,6 +117,42 @@ drops them again.
 - **Opt-out:** GPC, DNT, or the "Don't count my visits" switch on the privacy
   page, which stores `wuwa-analytics = "off"`. It stops both the wrapper and
   the Cloudflare beacon.
+
+## Registering with the collector
+
+The collector accepts an app only once it is listed in `APPS` in
+`workers/usage-counter/src/schema.ts` (the-finals-outfit). WuWa VR's entry, as
+proposed; every payload the site produces was run through the collector's own
+`readEnvelope` and `checkEvent` with it (39 events from three pages, phone,
+tablet and desktop: all accepted; a foreign origin rejected):
+
+```ts
+// WuWa VR guide site (github.com/ChronoHaxx/wuwa-vr, docs/TRACKING-PLAN.md). A multi-page site: one app_loaded per
+// page load. Every event carries the page (an id such as "l.ja-guide") and the page's language.
+const wuwaLangs = ["en", "zh-Hans", "ja", "ko", "es", "pt-BR", "fr", "de", "ru", "ar", "other"] as const;
+const wuwaPage = [["page", id], ["lang", oneOf(...wuwaLangs)]] as const;
+const youtube: Check = v => typeof v === "string" && /^(?:[\w-]{11}|other)$/.test(v);
+const wuwaVr: AppSpec = {
+  origins: ["https://chronohaxx.github.io"],
+  events: {
+    app_loaded: wuwaPage,
+    download_clicked: [...wuwaPage, ["asset", oneOf("installer", "portable_zip", "release_notes", "previous_release", "source", "other")], ["placement", oneOf("header", "hero", "closing", "guide", "page", "other")]],
+    guide_section_reached: [...wuwaPage, ["section", id]],
+    outbound_link_clicked: [...wuwaPage, ["target", oneOf("github_issues", "github_repo", "youtube", "kofi", "uevr_docs", "game", "other")]],
+    feedback_draft_used: [...wuwaPage, ["action", oneOf("copied", "opened_github", "other")], ["kind", oneOf("bug", "feature", "language", "other")]],
+    faq_opened: [...wuwaPage, ["question", id]],
+    shortcut_searched: [...wuwaPage, ["result", oneOf("found", "none", "other")]],
+    video_played: [...wuwaPage, ["video", youtube], ["placement", oneOf("feature", "grid", "story", "other")]],
+    language_chosen: [...wuwaPage, ["to", oneOf(...wuwaLangs)], ["via", oneOf("menu", "suggestion", "other")]],
+    controls_card_used: [...wuwaPage, ["pad", oneOf("xbox", "ps", "vr", "other")], ["action", oneOf("switched", "saved_image", "other")]],
+  },
+};
+// ...and in APPS:  "wuwa-vr": wuwaVr,
+```
+
+Columns in `usage_events`: index1 `wuwa-vr`, blob1 event, blob2 form factor,
+blob3 build, blob4 visitor hash (`app_loaded` only), blob5 `page`, blob6
+`lang`, blob7–8 the event's own properties in the order above.
 
 ## Retention and reports
 

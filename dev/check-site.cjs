@@ -177,7 +177,7 @@ const server=http.createServer((req,res)=>{
         await context.addInitScript(gpc=>{Object.defineProperty(Navigator.prototype,'webdriver',{get:()=>false});if(gpc)Object.defineProperty(Navigator.prototype,'globalPrivacyControl',{get:()=>true});},gpc);
         await context.route('**/*',route=>{
           const url=new URL(route.request().url());
-          if(url.href.startsWith(collector)){beacons.push(JSON.parse(route.request().postData()));return route.fulfill({status:204});}
+          if(url.href.startsWith(collector)){assert.equal(route.request().headers()['content-type'],'text/plain');beacons.push(JSON.parse(route.request().postData()));return route.fulfill({status:204});}
           if(url.hostname==='static.cloudflareinsights.com'){cloudflare.push(url.href);return route.fulfill({contentType:'text/javascript',body:''});}
           if(url.origin!=='https://chronohaxx.github.io'||!url.pathname.startsWith('/wuwa-vr/'))return route.abort();
           if(config&&url.pathname==='/wuwa-vr/config.js')return route.fulfill({contentType:'text/javascript',body:`window.WUWA_SITE=${JSON.stringify({repositoryUrl:'https://github.com/ChronoHaxx/wuwa-vr',analyticsEndpoint:collector,webAnalyticsToken:token})};`});
@@ -197,21 +197,21 @@ const server=http.createServer((req,res)=>{
       await s.tab.locator('#release-download a').filter({hasText:'Advanced: portable ZIP'}).click();
       await s.tab.locator('.faq summary').first().click();await s.tab.waitForTimeout(100);
       await s.leave();await s.tab.waitForTimeout(200);
-      assert.deepEqual(s.beacons.map(b=>[b.app,b.schema]),s.beacons.map(()=>['wuwa-vr',1]));
+      assert.deepEqual(s.beacons.map(b=>[b.app,b.schema,b.form_factor,b.build]),s.beacons.map(()=>['wuwa-vr',1,'desktop','dev']));
       assert.deepEqual(s.events(),[
-        {name:'page_viewed',props:{page:'/index.html',lang:'en'}},
-        {name:'download_clicked',props:{page:'/index.html',lang:'en',asset:'installer',placement:'header'}},
-        {name:'download_clicked',props:{page:'/index.html',lang:'en',asset:'portable_zip',placement:'hero'}},
-        {name:'faq_opened',props:{page:'/index.html',lang:'en',question:'q1'}}]);
+        {e:'app_loaded',p:{page:'index',lang:'en'}},
+        {e:'download_clicked',p:{page:'index',lang:'en',asset:'installer',placement:'header'}},
+        {e:'download_clicked',p:{page:'index',lang:'en',asset:'portable_zip',placement:'hero'}},
+        {e:'faq_opened',p:{page:'index',lang:'en',question:'q1'}}]);
       assert.equal(s.cloudflare.length,1,'Cloudflare Web Analytics loads once, after the page');
       assert.deepEqual(await s.context.cookies(),[],'No cookies');
       assert.deepEqual(await s.tab.evaluate(()=>Object.keys(localStorage)),[],'Counting stores nothing');
       await s.tab.goto(live+'l/ja-guide.html',{waitUntil:'load'});
       for(const id of ['controls','updates','recovery','recording']){await s.tab.locator('#'+id).scrollIntoViewIfNeeded();await s.tab.waitForTimeout(100);}
       await s.leave();await s.tab.waitForTimeout(200);
-      const reached=s.events().filter(e=>e.name==='guide_section_reached').map(e=>[e.props.page,e.props.lang,e.props.section]);
+      const reached=s.events().filter(e=>e.e==='guide_section_reached').map(e=>[e.p.page,e.p.lang,e.p.section]);
       assert.deepEqual(reached.map(r=>r[2]).sort(),['controls','recording','recovery','start','updates']);
-      assert(reached.every(r=>r[0]==='/l/ja-guide.html'&&r[1]==='ja'));
+      assert(reached.every(r=>r[0]==='l.ja-guide'&&r[1]==='ja'));
       // The privacy page switch: off stores one value and stops both the beacon and Cloudflare.
       await s.tab.goto(live+'privacy.html',{waitUntil:'load'});
       assert.equal(await s.tab.locator('#analytics-state').innerText(),'Counting is on for this browser.');
@@ -233,7 +233,7 @@ const server=http.createServer((req,res)=>{
           assert(await quiet.tab.locator('#analytics-switch').isDisabled());}
         await quiet.context.close();
       }
-      checks.push('usage counts on the published address: page view, download and FAQ events with allowed fields only, guide sections in Japanese, Cloudflare beacon after load, no cookies or storage; opt-out switch, GPC and an empty config send nothing');
+      checks.push('usage counts on the published address in the shared collector format: page load, download and FAQ events with allowed fields only, guide sections in Japanese, Cloudflare beacon after load, no cookies or storage; opt-out switch, GPC and an empty config send nothing');
     }
     assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(output,'verification.json'),JSON.stringify({checkedAt:new Date().toISOString(),basePath:'/wuwa-vr/',checks,errors,scope:'Local browser and static presentation only; no game/headset acceptance.'},null,2));

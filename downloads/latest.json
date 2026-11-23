@@ -1,0 +1,1792 @@
+{
+  "schema": 1,
+  "repository": "ChronoHaxx/wuwa-vr",
+  "date": "2026-11-23",
+  "note": "Cumulative GitHub release asset download counts. See docs/METRICS.md on main for what each category means.",
+  "totals": {
+    "all": 955,
+    "installer": 190,
+    "app_update": 111,
+    "mod_package": 464,
+    "source": 40,
+    "docs": 142,
+    "other": 8
+  },
+  "releases": [
+    {
+      "tag": "beta-1-2-8",
+      "published": "2026-11-17",
+      "all": 45,
+      "installer": 9,
+      "app_update": 9,
+      "mod_package": 19,
+      "source": 1,
+      "docs": 7,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.8-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 9
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 4
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 19
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 9
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-2-7",
+      "published": "2026-11-12",
+      "all": 99,
+      "installer": 22,
+      "app_update": 15,
+      "mod_package": 48,
+      "source": 4,
+      "docs": 10,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.7-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 15
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 3
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 5
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 48
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 22
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 4
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-2-6",
+      "published": "2026-10-25",
+      "all": 91,
+      "installer": 28,
+      "app_update": 10,
+      "mod_package": 48,
+      "source": 1,
+      "docs": 4,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.6-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 10
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 48
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 28
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-2-5",
+      "published": "2026-10-18",
+      "all": 111,
+      "installer": 30,
+      "app_update": 8,
+      "mod_package": 55,
+      "source": 4,
+      "docs": 14,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.5-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 8
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 5
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 7
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 55
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 30
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 4
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-2-4",
+      "published": "2026-10-16",
+      "all": 52,
+      "installer": 14,
+      "app_update": 5,
+      "mod_package": 27,
+      "source": 1,
+      "docs": 5,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.4-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 5
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 27
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 14
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-2-3",
+      "published": "2026-10-15",
+      "all": 31,
+      "installer": 2,
+      "app_update": 6,
+      "mod_package": 19,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.3-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 6
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 19
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-2-2",
+      "published": "2026-10-14",
+      "all": 36,
+      "installer": 5,
+      "app_update": 6,
+      "mod_package": 21,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.2-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 6
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 21
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 5
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-2-1",
+      "published": "2026-10-13",
+      "all": 36,
+      "installer": 6,
+      "app_update": 6,
+      "mod_package": 19,
+      "source": 2,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.1-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 6
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 19
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 6
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 2
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-2-0",
+      "published": "2026-10-12",
+      "all": 45,
+      "installer": 10,
+      "app_update": 5,
+      "mod_package": 25,
+      "source": 2,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.2.0-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 5
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 25
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 10
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 2
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-1-2",
+      "published": "2026-10-07",
+      "all": 52,
+      "installer": 14,
+      "app_update": 4,
+      "mod_package": 26,
+      "source": 1,
+      "docs": 7,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.1.2-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 4
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 3
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 3
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 26
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 14
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-window-startup",
+      "published": "2026-10-06",
+      "all": 14,
+      "installer": 4,
+      "app_update": 3,
+      "mod_package": 3,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.6-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 3
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 3
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 4
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-window-filter",
+      "published": "2026-10-06",
+      "all": 11,
+      "installer": 2,
+      "app_update": 3,
+      "mod_package": 2,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.7-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 3
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-steam",
+      "published": "2026-10-06",
+      "all": 24,
+      "installer": 5,
+      "app_update": 3,
+      "mod_package": 12,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.2-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 3
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 12
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 5
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-stalled-launch",
+      "published": "2026-10-06",
+      "all": 14,
+      "installer": 3,
+      "app_update": 3,
+      "mod_package": 4,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.4-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 3
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 4
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 3
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-renderer-startup",
+      "published": "2026-10-06",
+      "all": 11,
+      "installer": 2,
+      "app_update": 3,
+      "mod_package": 2,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.5-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 3
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-renderer-handoff",
+      "published": "2026-10-06",
+      "all": 13,
+      "installer": 2,
+      "app_update": 4,
+      "mod_package": 3,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.8-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 4
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 3
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-recovery",
+      "published": "2026-10-06",
+      "all": 15,
+      "installer": 5,
+      "app_update": 3,
+      "mod_package": 3,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.3-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 3
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 3
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 5
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-enum-startup",
+      "published": "2026-10-06",
+      "all": 12,
+      "installer": 2,
+      "app_update": 4,
+      "mod_package": 2,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.10-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 4
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-06-device-dispatch",
+      "published": "2026-10-06",
+      "all": 11,
+      "installer": 2,
+      "app_update": 3,
+      "mod_package": 2,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.9-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 3
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-1-1",
+      "published": "2026-10-06",
+      "all": 32,
+      "installer": 8,
+      "app_update": 2,
+      "mod_package": 16,
+      "source": 1,
+      "docs": 5,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.1.1-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 2
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 16
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 8
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-1-1-0",
+      "published": "2026-10-06",
+      "all": 24,
+      "installer": 3,
+      "app_update": 2,
+      "mod_package": 15,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.1.0-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 2
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 15
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 3
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-04-launcher",
+      "published": "2026-10-04",
+      "all": 20,
+      "installer": 5,
+      "app_update": 2,
+      "mod_package": 9,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.0-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 2
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 9
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 5
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-04-cinematic",
+      "published": "2026-10-04",
+      "all": 18,
+      "installer": 7,
+      "app_update": 2,
+      "mod_package": 5,
+      "source": 1,
+      "docs": 3,
+      "other": 0,
+      "assets": [
+        {
+          "name": "ChronoHaxx.WuWaVR-1.0.1-win-beta-full.nupkg",
+          "category": "app_update",
+          "downloads": 2
+        },
+        {
+          "name": "releases.win-beta.json",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 5
+        },
+        {
+          "name": "WuWa-VR-Setup.exe",
+          "category": "installer",
+          "downloads": 7
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-01-1817",
+      "published": "2026-10-01",
+      "all": 47,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 38,
+      "source": 3,
+      "docs": 6,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 4
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 38
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 3
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-10-01",
+      "published": "2026-10-01",
+      "all": 9,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 6,
+      "source": 1,
+      "docs": 2,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 6
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "experimental-2026-09-28-1628",
+      "published": "2026-09-28",
+      "all": 22,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 8,
+      "source": 3,
+      "docs": 7,
+      "other": 4,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 3
+        },
+        {
+          "name": "UNDERSTANDING-WUWA-VR.md",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Explained-60s.mp4",
+          "category": "other",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Explained-60s.srt",
+          "category": "other",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Launcher-Experimental.zip",
+          "category": "mod_package",
+          "downloads": 8
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 3
+        }
+      ]
+    },
+    {
+      "tag": "checkpoint-menu-camera-qol-20260924",
+      "published": "2026-09-26",
+      "all": 5,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 3,
+      "source": 0,
+      "docs": 2,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Recovery-Kit.zip",
+          "category": "mod_package",
+          "downloads": 3
+        }
+      ]
+    },
+    {
+      "tag": "checkpoint-camera-tested-20260924",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Recovery-Kit.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "checkpoint-accessible-menu-20260925",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Recovery-Kit.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-230213",
+      "published": "2026-09-26",
+      "all": 20,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 7,
+      "source": 2,
+      "docs": 7,
+      "other": 4,
+      "assets": [
+        {
+          "name": "PROMO-CAPTION.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "PROMO-SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 7
+        },
+        {
+          "name": "WuWa-VR-Promo-Landscape.mp4",
+          "category": "other",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Promo-Vertical.mp4",
+          "category": "other",
+          "downloads": 2
+        },
+        {
+          "name": "WuWa-VR-Source.zip",
+          "category": "source",
+          "downloads": 2
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-203715",
+      "published": "2026-09-26",
+      "all": 3,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 2,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-201527",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-194327",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-191129",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-174215",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-163700",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-163341",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-162959",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-154801",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-142031",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-015853",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-26-012351",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-25-225904",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-25-222334",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    },
+    {
+      "tag": "beta-2026-09-25-110319",
+      "published": "2026-09-26",
+      "all": 2,
+      "installer": 0,
+      "app_update": 0,
+      "mod_package": 1,
+      "source": 0,
+      "docs": 1,
+      "other": 0,
+      "assets": [
+        {
+          "name": "SHA256SUMS.txt",
+          "category": "docs",
+          "downloads": 1
+        },
+        {
+          "name": "START-HERE.txt",
+          "category": "docs",
+          "downloads": 0
+        },
+        {
+          "name": "WuWa-VR-Launcher.zip",
+          "category": "mod_package",
+          "downloads": 1
+        }
+      ]
+    }
+  ]
+}

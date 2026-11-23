@@ -123,7 +123,7 @@ collector drops any event whose properties are not exactly its listed ones.
 The collector accepts an app only once it is listed in `APPS` in
 `workers/usage-counter/src/schema.ts` (the-finals-outfit). WuWa VR's entry, as
 proposed; every payload the site produces was run through the collector's own
-`readEnvelope` and `checkEvent` with it (39 events from three pages, phone,
+`readEnvelope` and `checkEvent` with it, against collector commit ec9c128 (39 events from three pages, phone,
 tablet and desktop: all accepted; a foreign origin rejected):
 
 ```ts
@@ -134,6 +134,8 @@ const wuwaPage = [["page", id], ["lang", oneOf(...wuwaLangs)]] as const;
 const youtube: Check = v => typeof v === "string" && /^(?:[\w-]{11}|other)$/.test(v);
 const wuwaVr: AppSpec = {
   origins: ["https://chronohaxx.github.io"],
+  visitorEvent: "app_loaded",
+  envelope: "full",
   events: {
     app_loaded: wuwaPage,
     download_clicked: [...wuwaPage, ["asset", oneOf("installer", "portable_zip", "release_notes", "previous_release", "source", "other")], ["placement", oneOf("header", "hero", "closing", "guide", "page", "other")]],

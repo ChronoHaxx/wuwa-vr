@@ -6,8 +6,8 @@ Real numbers only: nothing here is an estimate unless it says so.
 | Layer | What | Status |
 | --- | --- | --- |
 | 1. Downloads | GitHub's own download counter on each release asset, snapshotted daily | Built: `.github/workflows/download-stats.yml` |
-| 2. Website | Page views, download clicks, guide sections reached, outbound clicks (cookie-free) | Plan awaiting sign-off: [TRACKING-PLAN.md](TRACKING-PLAN.md) |
-| 3. Launcher | Nothing. Options proposed, none chosen | Proposal: [LAUNCHER-METRICS-PROPOSAL.md](LAUNCHER-METRICS-PROPOSAL.md) |
+| 2. Website | Daily visitors, page views, download clicks, guide sections reached, outbound clicks (cookie-free) | Signed off: [TRACKING-PLAN.md](TRACKING-PLAN.md) |
+| 3. Launcher | Nothing (Option 0: the download counts above) | Decided: [LAUNCHER-METRICS-PROPOSAL.md](LAUNCHER-METRICS-PROPOSAL.md) |
 
 ## 1. Download counts
 
@@ -69,7 +69,7 @@ So never add the categories together and call it "users".
 - "*N* installer downloads across *M* public beta releases since *first release date*."
 - "Each release is installed by about *K* existing launchers within a week"
   (the release's `app_update` count, 7 days after `published`, from `assets.csv`).
-- Say "downloads", not "users" or "players", unless layer 2 or 3 adds a measure of people.
+- Say "downloads", not "users" or "players". Layer 2 counts daily visitors to the site; a month's figure is visitor-days, not unique people.
 
 ## Metrics snapshot
 
@@ -81,6 +81,6 @@ December 2026). Every figure gets its date and source.
 | Total installer downloads | — | — | `daily.csv`, `installer` |
 | VR mod installs (all releases) | — | — | `daily.csv`, `mod_package` |
 | Downloads per release | — | — | `latest.json` |
-| Monthly site visits (not unique people: nothing identifies a visitor) | — | — | Layer 2, once live |
+| Daily site visitors (average) and monthly visitor-days | — | — | Layer 2, once live |
 | Top guides and languages | — | — | Layer 2, once live |
 | Biggest drop-off between landing, download and setup guide | — | — | Layers 1 and 2 |

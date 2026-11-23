@@ -1,7 +1,7 @@
-# Launcher metrics: proposal (owner's decision, nothing built)
+# Launcher metrics: proposal and decision
 
-**Status: proposal only.** The launcher sends no usage data today and nothing
-here gets built without the owner's explicit go-ahead. Silent telemetry is off
+**Status: decided 23 Nov 2026: Option 0.** The launcher sends no usage data,
+and nothing here gets built without the owner's explicit go-ahead. Silent telemetry is off
 the table: modding communities react badly to it, rightly.
 
 ## What the launcher contacts today
@@ -92,5 +92,6 @@ Proposed events:
 
 ## Decision
 
-- [ ] 0 only  - [ ] A  - [ ] B  - [ ] A and B
-- Signed: ________ Date: ________
+- [x] 0 only  - [ ] A  - [ ] B  - [ ] A and B
+- Claude, delegated by Hazimi ("do them all for me"), 23 Nov 2026, following the recommendation above.
+  A and B stay open: either needs Hazimi's own go-ahead before any launcher code changes.

@@ -69,7 +69,8 @@ properties, so a mistake in the page can never send something new.
 
 ## Provider
 
-**Recommendation: Cloudflare for both halves.** Cloudflare Web Analytics for
+**Chosen by the owner (23 Nov 2026) for all four projects: Cloudflare for both
+halves.** Cloudflare Web Analytics for
 page views, and a small Cloudflare Worker that writes events to Workers
 Analytics Engine. It is the only option here that keeps no visitor identifier
 at all, it is free for all four projects, and Cloudflare is already in use
@@ -88,9 +89,6 @@ at all, it is free for all four projects, and Cloudflare is already in use
 What Cloudflare costs you: about an hour of setup (below), and no
 click-around dashboard for the custom events. Unique visitors are not
 available with any no-identifier setup; report "visits" and say so.
-
-**Open question for the owner:** which tool do the other projects use, so all
-four share one provider and this naming scheme?
 
 ## How it works once approved
 
@@ -175,7 +173,8 @@ four share one provider and this naming scheme?
 
 ## Done when
 
-- [ ] Owner signs off this plan and names the provider.
+- [x] Provider named: Cloudflare (23 Nov 2026).
+- [ ] Owner signs off the events and the privacy note.
 - [ ] `track()` and its tests are in; tests pass.
 - [ ] Events seen live in the counter (sent from a test page with `site=wuwa-vr-test`).
 - [ ] DevTools on the live site: no cookies, no analytics storage, only allowed fields in requests.
@@ -185,6 +184,6 @@ four share one provider and this naming scheme?
 ## Sign-off
 
 - [ ] Events (strike any priority 2 rows you don't want): ________
-- [ ] Provider: ________
+- [x] Provider: Cloudflare Web Analytics + Worker with Analytics Engine (owner, 23 Nov 2026)
 - [ ] Privacy note wording: ________
 - Signed: ________ Date: ________

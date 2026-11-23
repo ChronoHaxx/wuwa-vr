@@ -1,5 +1,80 @@
 "use strict";
+// Cookie-free usage counts, exactly as listed in docs/TRACKING-PLAN.md. Nothing identifies a
+// visitor in the browser; nothing is sent off the published site, by automated browsers, with
+// Global Privacy Control or Do Not Track on, after "Don't count my visits", or with no endpoint.
+window.WuWaTrack = (() => {
+  const languages = ["en", "zh-Hans", "ja", "ko", "es", "pt-BR", "fr", "de", "ru", "ar"];
+  const EVENTS = {
+    page_viewed: {},
+    download_clicked: {asset: ["installer", "portable_zip", "release_notes", "previous_release", "source"], placement: ["header", "hero", "closing", "guide", "page"]},
+    guide_section_reached: {section: ["start", "controls", "updates", "recovery", "recording", "comfort"]},
+    outbound_link_clicked: {target: ["github_issues", "github_repo", "youtube", "kofi", "uevr_docs", "game"]},
+    feedback_draft_used: {action: ["copied", "opened_github"], kind: ["bug", "feature", "language"]},
+    faq_opened: {question: Array.from({length: 12}, (_, i) => "q" + (i + 1))},
+    shortcut_searched: {result: ["found", "none"]},
+    video_played: {video: "youtube", placement: ["feature", "grid", "story"]},
+    language_chosen: {to: languages, via: ["menu", "suggestion"]},
+    controls_card_used: {pad: ["xbox", "ps", "vr"], action: ["switched", "saved_image"]}
+  };
+  const OPT_OUT = "wuwa-analytics", HOST = "chronohaxx.github.io", BASE = "/wuwa-vr";
+  const MAX_BATCH = 20, FLUSH_MS = 15000, MAX_PER_PAGE = 60;
+  function create(env) {
+    const {window: w, document: d, navigator: n, location: l} = env, config = env.config || {};
+    const storage = () => { try { return w.localStorage; } catch { return null; } };
+    let endpoint = "";
+    try { const u = new URL(config.analyticsEndpoint || ""); if (u.protocol === "https:" && !u.username && !u.password) endpoint = u.href; } catch { /* unset: nothing is sent */ }
+    const signal = () => n.globalPrivacyControl === true || n.doNotTrack === "1" || w.doNotTrack === "1";
+    const optedOut = () => { try { return storage()?.getItem(OPT_OUT) === "off"; } catch { return false; } };
+    // Measurement runs only on the published site, for people, without a privacy signal or opt-out.
+    const allowed = () => l.protocol === "https:" && l.hostname === HOST && n.webdriver !== true && !signal() && !optedOut();
+    const page = () => { const p = l.pathname.startsWith(BASE + "/") ? l.pathname.slice(BASE.length) : l.pathname; return p.endsWith("/") ? p + "index.html" : p; };
+    const lang = () => languages.includes(d.documentElement.lang) ? d.documentElement.lang : "other";
+    let queue = [], timer = null, sent = 0;
+    const flush = () => {
+      if (timer) { env.clearTimeout(timer); timer = null; }
+      if (!queue.length) return;
+      const body = JSON.stringify({app: "wuwa-vr", schema: 1, events: queue});
+      queue = [];
+      if (!allowed() || !endpoint) return;
+      try { if (n.sendBeacon && n.sendBeacon(endpoint, body)) return; } catch { /* fall through */ }
+      try { env.fetch?.(endpoint, {method: "POST", body, keepalive: true, mode: "no-cors", credentials: "omit", headers: {"Content-Type": "text/plain"}}).catch(() => {}); } catch { /* never throw */ }
+    };
+    // Unknown events and properties are dropped; a value outside its list becomes "other".
+    function track(name, props = {}, {now = false} = {}) {
+      try {
+        const spec = EVENTS[name];
+        if (!spec || !endpoint || !allowed() || sent >= MAX_PER_PAGE) return false;
+        const clean = {page: page(), lang: lang()};
+        for (const [key, values] of Object.entries(spec)) {
+          if (!(key in props)) continue;
+          const value = String(props[key]);
+          clean[key] = values === "youtube" ? (/^[\w-]{11}$/.test(value) && env.videos?.includes(value) ? value : "other") : values.includes(value) ? value : "other";
+        }
+        queue.push({name, props: clean}); sent++;
+        if (now || queue.length >= MAX_BATCH) flush();
+        else if (!timer) timer = env.setTimeout(flush, FLUSH_MS);
+        return true;
+      } catch { return false; }
+    }
+    const setOptOut = off => { try { off ? storage()?.setItem(OPT_OUT, "off") : storage()?.removeItem(OPT_OUT); } catch { /* storage blocked */ } if (off) queue = []; };
+    return {track, flush, allowed, signal, optedOut, setOptOut, page, get endpoint() { return endpoint; }};
+  }
+  if (typeof document === "undefined") return {create, EVENTS};
+  const videos = [...document.querySelectorAll("[data-youtube]")].map(el => el.dataset.youtube);
+  const api = create({window, document, navigator, location, config: window.WUWA_SITE, videos,
+    setTimeout: (f, ms) => setTimeout(f, ms), clearTimeout: id => clearTimeout(id), fetch: window.fetch?.bind(window)});
+  addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") api.flush(); });
+  addEventListener("pagehide", () => api.flush());
+  // Cloudflare Web Analytics (page views) loads after the page, under the same rules.
+  const token = window.WUWA_SITE?.webAnalyticsToken;
+  if (/^[0-9a-f]{32}$/.test(token || "") && api.allowed()) {
+    const load = () => { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({token, spa: false}); document.head.append(s); };
+    document.readyState === "complete" ? load() : addEventListener("load", load, {once: true});
+  }
+  return {...api, create, EVENTS};
+})();
 (() => {
+  const track = (...args) => window.WuWaTrack?.track(...args);
   // One destination for navigation, forks and reviewable issue drafts.
   let repository;
   try {
@@ -33,6 +108,12 @@
   if (search) {
     document.querySelector(".control-filter").hidden = false;
     search.addEventListener("input", filterControls);
+    // Count whether a search found anything, once typing stops; never the words typed.
+    let searchTimer;
+    search.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => { if (search.value.trim()) track("shortcut_searched", {result: rows.some(row => !row.hidden) ? "found" : "none"}); }, 1500);
+    });
     document.getElementById("clear-search").addEventListener("click", () => {search.value = ""; filterControls(); search.focus();});
     filterControls();
   }
@@ -93,6 +174,7 @@
     player.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
     player.allowFullscreen = true;
     player.referrerPolicy = "strict-origin-when-cross-origin";
+    track("video_played", {video: id, placement: box.id === "run-video" ? "feature" : box.closest(".story") ? "story" : "grid"});
     box.replaceChildren(player);
     box.classList.add("is-playing");
     box.scrollIntoView({block: "center", behavior: still ? "auto" : "smooth"});
@@ -227,6 +309,7 @@
       document.getElementById("draft-heading").focus();
     });
     document.getElementById("copy-report").addEventListener("click", async () => {
+      track("feedback_draft_used", {action: "copied", kind: kind.value});
       try {
         if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
         await navigator.clipboard.writeText(draft.value);
@@ -236,6 +319,7 @@
         state.textContent = message("fallback");
       }
     });
+    issue.addEventListener("click", () => track("feedback_draft_used", {action: "opened_github", kind: kind.value}, {now: true}));
     // A usable form is only revealed after submission is intercepted locally.
     const notice = document.querySelector(".report-intro .notice");
     if (repository && notice) notice.hidden = true;
@@ -298,10 +382,11 @@
     };
     padSwitch.addEventListener("click", event => {
       const button = event.target.closest("[data-pad-choice]");
-      if (button) choose(button.dataset.padChoice, true);
+      if (button) { choose(button.dataset.padChoice, true); track("controls_card_used", {pad: button.dataset.padChoice, action: "switched"}); }
     });
     try { const saved = localStorage.getItem("wuwa-pad"); if (saved === "ps" || saved === "vr") choose(saved, false); } catch { /* optional */ }
     padSwitch.hidden = false;
+    pad.querySelector(".pad-save")?.addEventListener("click", () => track("controls_card_used", {pad: pad.dataset.pad || "xbox", action: "saved_image"}));
     const light = (id, on) => padCard.querySelectorAll(`.pad-svg [data-btn~="${id}"], .pad-list [data-btn="${id}"], .pad-leaders [data-btn="${id}"]`).forEach(el => el.classList.toggle("is-hot", on));
     padCard.querySelectorAll(".pad-list li[data-btn]").forEach(li => {
       for (const [type, on] of [["mouseenter", true], ["mouseleave", false]]) li.addEventListener(type, () => light(li.dataset.btn, on));
@@ -311,5 +396,67 @@
       const mark = on => ids.forEach(id => page.querySelectorAll(`.pad-svg [data-btn~="${id}"]`).forEach(el => el.classList.toggle("is-hot", on)));
       row.addEventListener("mouseenter", () => mark(true)); row.addEventListener("mouseleave", () => mark(false));
     });
+  }
+
+  // Usage counts (docs/TRACKING-PLAN.md). Each call is a no-op unless measurement is on.
+  track("page_viewed");
+  const here = location.href, path = location.pathname;
+  const currentTag = (/\/releases\/download\/([^/]+)\//.exec(document.querySelector(".header-download")?.href || "") || [])[1];
+  const onGuide = /(guide|reference)\.html$/.test(path);
+  const placement = link => link.closest(".site-header") ? "header" : link.closest("#release-download") ? "hero"
+    : link.closest(".closing-card") ? "closing" : onGuide ? "guide" : "page";
+  const outbound = url => {
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "github.com") return /^\/ChronoHaxx\/wuwa-vr\/issues(\/|$)/i.test(url.pathname) ? "github_issues" : /^\/ChronoHaxx\/wuwa-vr(\/|$)/i.test(url.pathname) ? "github_repo" : "other";
+    if (host === "youtube.com" || host === "youtu.be") return "youtube";
+    if (host === "ko-fi.com") return "kofi";
+    if (host === "docs.uevr.io") return "uevr_docs";
+    if (/(^|\.)kurogames\.com$|(^|\.)steampowered\.com$/.test(host)) return "game";
+    return "other";
+  };
+  document.addEventListener("click", event => {
+    const link = event.target.closest?.("a[href]");
+    if (!link || link.matches("[data-youtube-open], #issue-link")) return;
+    if (link.dataset.language) { track("language_chosen", {to: link.dataset.language, via: link.closest("#language-suggest") ? "suggestion" : "menu"}); return; }
+    let url; try { url = new URL(link.href, here); } catch { return; }
+    if (url.origin === location.origin) return;
+    const release = /^\/ChronoHaxx\/wuwa-vr\/releases\/(?:download\/([^/]+)\/([^/?#]+)|tag\/([^/?#]+))/i.exec(url.hostname === "github.com" ? url.pathname : "");
+    if (release) {
+      const [, , file, notes] = release;
+      const asset = notes ? (notes === currentTag ? "release_notes" : "previous_release")
+        : /setup[^/]*\.exe$/i.test(file) ? "installer" : /source[^/]*\.zip$/i.test(file) ? "source" : /\.zip$/i.test(file) ? "portable_zip" : "other";
+      track("download_clicked", {asset, placement: placement(link)}, {now: true});
+      return;
+    }
+    track("outbound_link_clicked", {target: outbound(url)}, {now: true});
+  }, true);
+  // How far down the guide and reference pages people read: each section once per page load.
+  if (onGuide && "IntersectionObserver" in window) {
+    const sections = new Set(window.WuWaTrack?.EVENTS.guide_section_reached.section || []);
+    const seen = new IntersectionObserver(entries => entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      seen.unobserve(entry.target);
+      track("guide_section_reached", {section: entry.target.id});
+    }));
+    document.querySelectorAll("section[id]").forEach(section => { if (sections.has(section.id)) seen.observe(section); });
+  }
+  // Which questions people open: by position, once each per page load.
+  document.querySelectorAll(".faq details").forEach((item, index) => {
+    let counted = false;
+    item.addEventListener("toggle", () => { if (item.open && !counted) { counted = true; track("faq_opened", {question: "q" + (index + 1)}); } });
+  });
+  // The privacy page's "Don't count my visits" switch.
+  const optSwitch = document.getElementById("analytics-switch"), optState = document.getElementById("analytics-state");
+  if (optSwitch && optState && window.WuWaTrack) {
+    const show = () => {
+      const signal = window.WuWaTrack.signal(), off = signal || window.WuWaTrack.optedOut();
+      optState.textContent = signal ? optState.dataset.signal : off ? optState.dataset.off : optState.dataset.on;
+      optSwitch.textContent = off ? optSwitch.dataset.on : optSwitch.dataset.off;
+      optSwitch.setAttribute("aria-pressed", String(off));
+      optSwitch.disabled = signal;
+    };
+    optSwitch.addEventListener("click", () => { window.WuWaTrack.setOptOut(!window.WuWaTrack.optedOut()); show(); });
+    optSwitch.hidden = false; optState.hidden = false;
+    show();
   }
 })();

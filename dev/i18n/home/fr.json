@@ -26,7 +26,8 @@
     "support": "Soutien facultatif",
     "credits": "Crédits",
     "mit": "Le site et les guides originaux sont sous licence MIT. Les composants tiers conservent leurs propres conditions.",
-    "suggest": "Voir cette page en français"
+    "suggest": "Voir cette page en français",
+    "privacy": "Confidentialité"
   },
   "english": " (en anglais)",
   "hero": {
@@ -190,5 +191,34 @@
     "title": "Langues",
     "intro": "La page d'accueil, le guide du joueur, les commandes de base et le formulaire de retour en dix langues. La référence détaillée et le menu propre à UEVR sont en anglais.",
     "request": "Demander une langue ou corriger une traduction"
+  },
+  "privacy": {
+    "title": "Confidentialité",
+    "intro": "Ce site compte la façon dont il est utilisé, pour savoir quels guides aident et où les gens bloquent. Il n'utilise aucun cookie et n'enregistre rien qui vous identifie.",
+    "countedTitle": "Ce qui est compté",
+    "counted": "Les pages ouvertes et leur langue ; les clics sur Télécharger et sur les liens vers GitHub, YouTube et Ko-fi ; jusqu'où le guide est lu ; les questions ouvertes ; si la recherche de raccourcis a trouvé quelque chose (jamais ce que vous avez tapé) ; et les boutons du formulaire de retours.",
+    "howTitle": "Comment",
+    "how": "Cloudflare Web Analytics compte les pages vues, et un petit compteur à nous, lui aussi sur Cloudflare, compte le reste. Pour compter les visiteurs par jour, votre adresse IP et votre navigateur sont mélangés à une clé aléatoire jetée chaque jour ; votre adresse IP n'est jamais enregistrée. Les données restent 3 mois chez Cloudflare, puis sont supprimées. Seuls les totaux par jour sont consultés.",
+    "notDoneTitle": "Jamais fait",
+    "notDone": "Pas de publicité, pas de suivi entre sites, pas d'enregistrement d'écran, ni vente ni partage de données.",
+    "choiceTitle": "Votre choix",
+    "choice": "Si votre navigateur envoie Global Privacy Control ou Do Not Track, rien n'est compté. Vous pouvez aussi désactiver le comptage sur ce navigateur avec le bouton ci-dessous. Il enregistre un seul réglage dans votre navigateur, rien d'autre.",
+    "switchOff": "Ne pas compter mes visites",
+    "switchOn": "Compter à nouveau mes visites",
+    "stateOn": "Le comptage est activé sur ce navigateur.",
+    "stateOff": "Le comptage est désactivé sur ce navigateur.",
+    "stateSignal": "Le signal de confidentialité de votre navigateur désactive déjà le comptage.",
+    "noScript": "Sans JavaScript, rien n'est compté.",
+    "downloadsTitle": "Téléchargements",
+    "downloads": "GitHub compte combien de fois chaque fichier de version est téléchargé. Nous copions ces totaux une fois par jour.",
+    "appTitle": "L'application WuWa VR",
+    "app": "L'application n'envoie aucune donnée d'utilisation. Elle contacte GitHub uniquement pour chercher les mises à jour et télécharger le mod VR.",
+    "storedTitle": "Enregistré dans votre navigateur",
+    "stored": "Votre langue et les noms de boutons de manette, si vous en choisissez, pour que la page suivante corresponde. Cela ne quitte jamais votre navigateur.",
+    "otherTitle": "Autres sites",
+    "other": "Les vidéos ne se lisent depuis youtube-nocookie.com qu'une fois que vous en choisissez une. GitHub, YouTube et Ko-fi ont leurs propres politiques de confidentialité.",
+    "questions": "Des questions ?",
+    "issueLink": "Ouvrez un ticket sur GitHub",
+    "description": "Ce que le site de WuWa VR compte, comment, et comment le désactiver."
   }
 }

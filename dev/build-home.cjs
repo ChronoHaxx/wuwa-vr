@@ -117,7 +117,7 @@ function home(t, prefix) {
   const closing = `<section id="credits" class="section"><div class="wrap closing-grid">
 <div id="open" class="closing-card"><h2>${esc(t.open.title)}</h2><p>${esc(t.open.text)}</p><div class="link-row"><a class="button" href="${L.repo}/tree/main/launcher/native">${esc(t.open.launcher)}</a><a class="button" href="${L.repo}/tree/main/mod">${esc(t.open.mod)}</a><a class="button" href="${releaseUrl}">${esc(t.open.release)}</a></div></div>
 <div class="closing-card credits"><h2>${esc(t.credits.title)}</h2><p>${esc(t.credits.text)}</p><p class="link-row"><a href="${prefix}credits.html" hreflang="en">${toEnglish(t.credits.more)}</a><a href="${prefix}support.html" hreflang="en">${esc(t.credits.support)}</a><a href="${feedbackPage(t.code, prefix)}">${esc(s.feedback)}</a></p></div></div></section>`;
-  const body = `<a class="skip" href="#main">${esc(labels.skip)}</a>${L.header({lang: t.code, prefix, labels, links, languageHref})}${t.code === 'en' ? `<p class="language-suggest wrap" id="language-suggest" hidden data-options="${esc(JSON.stringify(Object.fromEntries(locales.filter(l => l.code !== 'en').map(l => [l.code, [l.chrome.suggest, `l/${l.code}.html`]]))))}"></p>` : ''}<main id="main" class="home" data-home="${t.code}">${hero}${risk}${watchSection}${start}${features}${firstPerson}${controls}${faq}${limits}${closing}</main>${L.footer({prefix, labels})}`;
+  const body = `<a class="skip" href="#main">${esc(labels.skip)}</a>${L.header({lang: t.code, prefix, labels, links, languageHref})}${t.code === 'en' ? `<p class="language-suggest wrap" id="language-suggest" hidden data-options="${esc(JSON.stringify(Object.fromEntries(locales.filter(l => l.code !== 'en').map(l => [l.code, [l.chrome.suggest, `l/${l.code}.html`]]))))}"></p>` : ''}<main id="main" class="home" data-home="${t.code}">${hero}${risk}${watchSection}${start}${features}${firstPerson}${controls}${faq}${limits}${closing}</main>${L.footer({prefix, labels, lang: t.code})}`;
   const headExtra = alternates();
   return `<!doctype html><html lang="${t.code}" dir="${t.dir}">${L.head({lang: t.code, title: t.meta.title, description: t.meta.description, prefix, extra: headExtra})}<body>${body}</body></html>\n`;
 }
@@ -126,8 +126,24 @@ const feedbackPage = (code, prefix) => code === 'en' ? `${prefix}feedback.html` 
 function feedback(t) {
   const prefix = '../', s = t.strings, labels = t.chrome;
   const links = [[`${prefix}l/${t.code}.html`, labels.home], [guide(t.code, prefix), labels.guide], [prefix + 'record.html', labels.capture]];
-  const body = `<a class="skip" href="#main">${esc(labels.skip)}</a>${L.header({lang: t.code, prefix, labels, links, languageHref: code => feedbackPage(code, prefix)})}<main class="wrap page" id="main"><h1>${esc(s.feedback)}</h1><section id="feedback">${report(s)}</section></main>${L.footer({prefix, labels})}`;
+  const body = `<a class="skip" href="#main">${esc(labels.skip)}</a>${L.header({lang: t.code, prefix, labels, links, languageHref: code => feedbackPage(code, prefix)})}<main class="wrap page" id="main"><h1>${esc(s.feedback)}</h1><section id="feedback">${report(s)}</section></main>${L.footer({prefix, labels, lang: t.code})}`;
   return `<!doctype html><html lang="${t.code}" dir="${t.dir}">${L.head({lang: t.code, title: `${s.feedback} — WuWa VR`, description: t.meta.description, prefix})}<body>${body}</body></html>\n`;
+}
+// What the site counts and the opt-out switch (docs/TRACKING-PLAN.md): privacy.html and l/<code>-privacy.html.
+const privacyPage = (code, prefix) => code === 'en' ? `${prefix}privacy.html` : `${prefix}l/${code}-privacy.html`;
+function privacy(t) {
+  const prefix = t.code === 'en' ? '' : '../', p = t.privacy, labels = t.chrome;
+  const links = [[t.code === 'en' ? 'index.html' : `${prefix}l/${t.code}.html`, labels.home], [guide(t.code, prefix), labels.guide],
+    [prefix + 'record.html', labels.capture], [feedbackPage(t.code, prefix), labels.feedback]];
+  const part = (id, title, text) => `<section id="${id}"><h2>${esc(title)}</h2><p>${esc(text)}</p>`;
+  const body = `<a class="skip" href="#main">${esc(labels.skip)}</a>${L.header({lang: t.code, prefix, labels, links, languageHref: code => privacyPage(code, prefix)})}` +
+    `<main class="wrap page" id="main"><h1>${esc(p.title)}</h1><p class="intro">${esc(p.intro)}</p><div class="guide-content">` +
+    `${part('counted', p.countedTitle, p.counted)}</section>${part('how', p.howTitle, p.how)}</section>${part('never', p.notDoneTitle, p.notDone)}</section>` +
+    `${part('choice', p.choiceTitle, p.choice)}<p class="opt-out"><button id="analytics-switch" class="button" type="button" hidden aria-pressed="false" data-off="${esc(p.switchOff)}" data-on="${esc(p.switchOn)}">${esc(p.switchOff)}</button> ` +
+    `<span id="analytics-state" role="status" hidden data-on="${esc(p.stateOn)}" data-off="${esc(p.stateOff)}" data-signal="${esc(p.stateSignal)}"></span></p><noscript><p class="small">${esc(p.noScript)}</p></noscript></section>` +
+    `${part('downloads', p.downloadsTitle, p.downloads)}</section>${part('app', p.appTitle, p.app)}</section>${part('stored', p.storedTitle, p.stored)}</section>${part('other-sites', p.otherTitle, p.other)}</section>` +
+    `<p>${esc(p.questions)} <a href="${L.repo}/issues">${esc(p.issueLink)}</a></p></div></main>${L.footer({prefix, labels, lang: t.code})}`;
+  return `<!doctype html><html lang="${t.code}" dir="${t.dir}">${L.head({lang: t.code, title: `${p.title} — WuWa VR`, description: p.description, prefix})}<body>${body}</body></html>\n`;
 }
 function languagesPage() {
   const t = en.languagesPage;
@@ -156,6 +172,7 @@ for (const t of locales) {
   if (t.code === 'en') fs.writeFileSync(path.join(site, 'index.html'), home(t, ''));
   fs.writeFileSync(path.join(site, 'l', t.code + '.html'), home(t, '../'));
   if (t.code !== 'en') fs.writeFileSync(path.join(site, 'l', t.code + '-feedback.html'), feedback(t));
+  fs.writeFileSync(path.join(site, privacyPage(t.code, '')), privacy(t));
 }
 fs.writeFileSync(path.join(site, 'languages.html'), languagesPage());
 fs.writeFileSync(path.join(site, 'record.html'), recordPage());

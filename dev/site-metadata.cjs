@@ -8,7 +8,8 @@ const pages = [
   ...['ar', 'de', 'en', 'es', 'fr', 'ja', 'ko', 'pt-BR', 'ru', 'zh-Hans'].map(code => `l/${code}.html`),
   ...['ar', 'de', 'es', 'fr', 'ja', 'ko', 'pt-BR', 'ru', 'zh-Hans'].map(code => `l/${code}-guide.html`),
   ...['ar', 'de', 'es', 'fr', 'ja', 'ko', 'pt-BR', 'ru', 'zh-Hans'].map(code => `l/${code}-feedback.html`),
-  'languages.html', 'license.html', 'record.html', 'reference.html', 'risk.html', 'support.html', 'testing.html', 'understanding.html'
+  ...['ar', 'de', 'es', 'fr', 'ja', 'ko', 'pt-BR', 'ru', 'zh-Hans'].map(code => `l/${code}-privacy.html`),
+  'languages.html', 'license.html', 'privacy.html', 'record.html', 'reference.html', 'risk.html', 'support.html', 'testing.html', 'understanding.html'
 ];
 const entryPages = {
   'index.html': {

@@ -156,10 +156,18 @@ copied from query output with the date range, never estimated.
 ## Done when
 
 - [x] Plan signed off; provider and visitor count chosen.
-- [ ] `track()` and its tests are in; tests pass, including nothing sent on opt-out.
-- [ ] Privacy page live in ten languages and linked from every footer.
-- [ ] Performance unchanged on a before/after comparison.
-- [ ] Shared collector deployed and its address in `site/config.js`; Web Analytics token in `site/config.js` (owner, needs the Cloudflare login).
+- [x] `track()` in `site/app.js`; `node dev/test-track.cjs` (19 checks, including nothing sent with GPC, DNT,
+  the switch, automated browsers, other hosts or no endpoint).
+- [x] `node dev/check-site.cjs` runs the pages under the published address with a fixture collector: the
+  events and fields sent, guide sections in Japanese, the Cloudflare beacon after `load`, no cookies, no
+  storage, and nothing sent after the switch, with GPC, or with the empty published config.
+- [x] Privacy page in ten languages (`privacy.html`, `l/<code>-privacy.html`), linked from every footer.
+- [x] Performance (local, median of 5, 23 Nov 2026): same requests before `load` (15 home, 10 guide), no
+  external requests, no cookies; LCP and DOMContentLoaded within run-to-run noise. Cost: `app.js` +3.4 KB
+  gzipped (6.1 to 9.6 KB), loaded with `defer`.
+- [ ] Privacy page published (merge to `main`).
+- [ ] Shared collector deployed and its address in `site/config.js` (`analyticsEndpoint`); Web Analytics
+  token in `site/config.js` (`webAnalyticsToken`). Needs the owner's Cloudflare login.
 - [ ] Events seen live in the collector.
 - [ ] DevTools on the live site: no cookies, no analytics storage, only allowed fields in requests.
 

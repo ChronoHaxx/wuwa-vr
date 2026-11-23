@@ -16,7 +16,7 @@ const english = {
   install: 'Install', features: 'Features', faq: 'FAQ', download: 'Download', language: 'Language',
   tagline: 'Free, unofficial fan project. Not affiliated with Kuro Games.', explore: 'Explore', project: 'Project',
   languages: 'All languages', code: 'Code & contribute', releases: 'Releases', risk: 'Account risk & disclaimer',
-  license: 'License scope', support: 'Optional support', credits: 'Credits',
+  license: 'License scope', support: 'Optional support', credits: 'Credits', privacy: 'Privacy',
   mit: 'Original independent website and guide work: MIT. Upstream components keep their own terms.'
 };
 const globe = '<svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>';
@@ -40,13 +40,15 @@ function header({lang = 'en', prefix = '', labels = {}, links, languageHref} = {
     `<div class="header-actions">${languageMenu({lang, prefix, label: t.language, href: languageHref})}` +
     `<a class="button primary header-download" href="${installerUrl()}">${escape(t.download)}</a></div></div></header>`;
 }
-function footer({prefix = '', labels = {}} = {}) {
+// lang picks the privacy page in the same language (privacy.html or l/<code>-privacy.html).
+function footer({prefix = '', labels = {}, lang = 'en'} = {}) {
   const t = {...english, ...labels};
+  const privacy = lang === 'en' ? `${prefix}privacy.html` : `${prefix}l/${lang}-privacy.html`;
   const link = (href, label, extra = '') => `<a href="${href}"${extra}>${escape(label)}</a>`;
   return `<footer class="site-footer"><div class="wrap footer-grid">` +
     `<div class="footer-brand"><a class="brand" href="${prefix}index.html" lang="en" dir="ltr"><img src="${prefix}media/icon-64.png" width="28" height="28" alt=""><span>WuWa VR</span></a><p>${escape(t.tagline)}</p></div>` +
     `<nav aria-label="${escape(t.explore)}"><p class="footer-title">${escape(t.explore)}</p>${link(prefix + 'guide.html', t.guide)}${link(prefix + 'record.html', t.capture)}${link(prefix + 'feedback.html', t.feedback)}${link(prefix + 'languages.html', t.languages)}</nav>` +
-    `<nav aria-label="${escape(t.project)}"><p class="footer-title">${escape(t.project)}</p>${link(prefix + 'developers.html', t.code)}<a data-project-link="code" hidden rel="noopener noreferrer">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer">${escape(t.releases)}</a>${link(prefix + 'risk.html', t.risk)}${link(prefix + 'license.html', t.license)}${link(prefix + 'support.html', t.support)}${link(prefix + 'credits.html', t.credits)}</nav>` +
+    `<nav aria-label="${escape(t.project)}"><p class="footer-title">${escape(t.project)}</p>${link(prefix + 'developers.html', t.code)}<a data-project-link="code" hidden rel="noopener noreferrer">GitHub</a><a data-project-link="releases" hidden rel="noopener noreferrer">${escape(t.releases)}</a>${link(prefix + 'risk.html', t.risk)}${link(prefix + 'license.html', t.license)}${link(prefix + 'support.html', t.support)}${link(prefix + 'credits.html', t.credits)}${link(privacy, t.privacy)}</nav>` +
     `</div><div class="wrap footer-note"><p>${escape(t.mit)}</p></div></footer>`;
 }
 // Abby in a VR headset (fan art, see LICENSE.md): the visor crop at 32 px, the head at 64.

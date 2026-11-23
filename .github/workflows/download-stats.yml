@@ -1,0 +1,45 @@
+# Once a day, records GitHub's public release download counters on the `metrics`
+# branch (created on the first run). No visitor data: see docs/METRICS.md.
+# A separate branch keeps daily bot commits out of main, so release pushes never
+# need a pull first and the site is not redeployed.
+name: Download counts
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: download-stats
+  cancel-in-progress: false
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check the snapshot script
+        run: node dev/test-download-stats.cjs
+      - name: Open the metrics branch
+        run: |
+          if git fetch --depth=1 origin metrics; then
+            git worktree add metrics-data FETCH_HEAD
+            git -C metrics-data switch -c metrics
+          else
+            git worktree add --detach metrics-data
+            git -C metrics-data switch --orphan metrics
+          fi
+      - name: Snapshot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node dev/download-stats.cjs metrics-data/downloads
+      - name: Commit
+        working-directory: metrics-data
+        run: |
+          git add downloads
+          if git diff --cached --quiet; then echo "No change."; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898799+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Download counts $(date -u +%F)"
+          git push origin metrics

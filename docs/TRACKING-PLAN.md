@@ -121,10 +121,13 @@ collector drops any event whose properties are not exactly its listed ones.
 ## Registering with the collector
 
 The collector accepts an app only once it is listed in `APPS` in
-`workers/usage-counter/src/schema.ts` (the-finals-outfit). WuWa VR's entry, as
-proposed; every payload the site produces was run through the collector's own
-`readEnvelope` and `checkEvent` with it, against collector commit ec9c128 (39 events from three pages, phone,
-tablet and desktop: all accepted; a foreign origin rejected):
+`workers/usage-counter/src/schema.ts` (the-finals-outfit). WuWa VR is
+registered there as of ChronoHaxx/the-finals-outfit@f6540a2 (PR #90), with the
+entry below. Every payload the site produces was run through that commit's own
+`readEnvelope` and `checkEvent`, unmodified: 39 events from three pages
+(phone, tablet and desktop) all accepted, and a foreign origin rejected.
+Both apps post from `https://chronohaxx.github.io`, so `app` is self-declared;
+only Hazimi's sites live on that origin.
 
 ```ts
 // WuWa VR guide site (github.com/ChronoHaxx/wuwa-vr, docs/TRACKING-PLAN.md). A multi-page site: one app_loaded per

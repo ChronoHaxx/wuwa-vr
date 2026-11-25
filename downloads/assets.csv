@@ -240,3 +240,6 @@ date,tag,published,asset,category,download_count
 2026-11-24,beta-1-2-8,2026-11-17,ChronoHaxx.WuWaVR-1.2.8-win-beta-full.nupkg,app_update,18
 2026-11-24,beta-1-2-8,2026-11-17,WuWa-VR-Launcher.zip,mod_package,20
 2026-11-24,beta-1-2-8,2026-11-17,WuWa-VR-Setup.exe,installer,10
+2026-11-25,beta-1-2-8,2026-11-17,WuWa-VR-Launcher.zip,mod_package,21
+2026-11-25,beta-1-2-8,2026-11-17,WuWa-VR-Setup.exe,installer,11
+2026-11-25,beta-1-2-7,2026-11-12,WuWa-VR-Setup.exe,installer,24

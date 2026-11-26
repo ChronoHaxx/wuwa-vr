@@ -26,6 +26,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
+      - name: Stamp the build id for usage counts
+        run: |
+          sed -i "s/\"siteBuild\": \"dev\"/\"siteBuild\": \"${GITHUB_SHA::7}\"/" site/config.js
+          grep -q "\"siteBuild\": \"${GITHUB_SHA::7}\"" site/config.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

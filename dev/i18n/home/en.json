@@ -26,7 +26,8 @@
     "support": "Optional support",
     "credits": "Credits",
     "mit": "Original independent website and guide work: MIT. Upstream components keep their own terms.",
-    "suggest": "View this page in English"
+    "suggest": "View this page in English",
+    "privacy": "Privacy"
   },
   "english": "",
   "hero": {
@@ -190,5 +191,34 @@
     "title": "Languages",
     "intro": "The home page, the player guide, everyday controls and the feedback form in ten languages. The detailed reference and UEVR's own menu are in English.",
     "request": "Request a language or correct a translation"
+  },
+  "privacy": {
+    "title": "Privacy",
+    "intro": "This site counts how it is used, so we can see which guides help and where people get stuck. It uses no cookies and stores nothing that identifies you.",
+    "countedTitle": "What is counted",
+    "counted": "Which pages are opened, and in which language; clicks on Download and on links to GitHub, YouTube and Ko-fi; how far down the guide people read; which questions are opened; whether the shortcut finder found something (never what you typed); and the feedback form's buttons.",
+    "howTitle": "How",
+    "how": "Cloudflare Web Analytics counts page views, and a small counter of our own, also on Cloudflare, counts the rest. To count daily visitors, your IP address and browser are mixed with a random key that is thrown away every day; your IP address is never stored. The data stays on Cloudflare for 3 months, then is deleted. Only daily totals are looked at.",
+    "notDoneTitle": "Never done",
+    "notDone": "No advertising, no cross-site tracking, no screen recording, and no selling or sharing of data.",
+    "choiceTitle": "Your choice",
+    "choice": "If your browser sends Global Privacy Control or Do Not Track, nothing is counted. You can also turn counting off for this browser with the button below. It saves one setting in your browser and nothing else.",
+    "switchOff": "Don't count my visits",
+    "switchOn": "Count my visits again",
+    "stateOn": "Counting is on for this browser.",
+    "stateOff": "Counting is off for this browser.",
+    "stateSignal": "Your browser's privacy signal already turns counting off.",
+    "noScript": "With JavaScript off, nothing is counted.",
+    "downloadsTitle": "Downloads",
+    "downloads": "GitHub counts how often each release file is downloaded. We copy those totals once a day.",
+    "appTitle": "The WuWa VR app",
+    "app": "The app sends no usage data. It contacts GitHub to check for updates and to download the VR mod.",
+    "storedTitle": "Saved in your browser",
+    "stored": "Your language and controller-label choice, if you pick one, so the next page matches. It never leaves your browser.",
+    "otherTitle": "Other sites",
+    "other": "Videos play from youtube-nocookie.com only after you choose one. GitHub, YouTube and Ko-fi have their own privacy policies.",
+    "questions": "Questions?",
+    "issueLink": "Open an issue on GitHub",
+    "description": "What the WuWa VR website counts, how, and how to turn it off."
   }
 }

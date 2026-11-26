@@ -26,7 +26,8 @@
     "support": "Freiwillige Unterstützung",
     "credits": "Mitwirkende",
     "mit": "Die eigene Website und die Anleitungen stehen unter MIT. Fremdkomponenten behalten ihre eigenen Bedingungen.",
-    "suggest": "Diese Seite auf Deutsch ansehen"
+    "suggest": "Diese Seite auf Deutsch ansehen",
+    "privacy": "Datenschutz"
   },
   "english": " (Englisch)",
   "hero": {
@@ -190,5 +191,34 @@
     "title": "Sprachen",
     "intro": "Startseite, Spielerleitfaden, Alltagssteuerung und Feedback-Formular in zehn Sprachen. Die ausführliche Referenz und UEVRs eigenes Menü sind auf Englisch.",
     "request": "Eine Sprache anfragen oder eine Übersetzung korrigieren"
+  },
+  "privacy": {
+    "title": "Datenschutz",
+    "intro": "Diese Seite zählt, wie sie genutzt wird, damit wir sehen, welche Anleitungen helfen und wo Leute hängen bleiben. Sie verwendet keine Cookies und speichert nichts, was dich erkennbar macht.",
+    "countedTitle": "Was gezählt wird",
+    "counted": "Welche Seiten in welcher Sprache geöffnet werden; Klicks auf Download und auf Links zu GitHub, YouTube und Ko-fi; wie weit die Anleitung gelesen wird; welche Fragen geöffnet werden; ob die Tastenkürzel-Suche etwas gefunden hat (nie, was du eingegeben hast); und die Schaltflächen des Feedback-Formulars.",
+    "howTitle": "Wie",
+    "how": "Cloudflare Web Analytics zählt Seitenaufrufe, und ein kleiner eigener Zähler, ebenfalls bei Cloudflare, zählt den Rest. Um tägliche Besucher zu zählen, werden deine IP-Adresse und dein Browser mit einem zufälligen Schlüssel vermischt, der jeden Tag verworfen wird; deine IP-Adresse wird nie gespeichert. Die Daten bleiben 3 Monate bei Cloudflare und werden dann gelöscht. Angesehen werden nur Tagessummen.",
+    "notDoneTitle": "Niemals",
+    "notDone": "Keine Werbung, kein seitenübergreifendes Tracking, keine Bildschirmaufzeichnung und kein Verkauf oder Weitergeben von Daten.",
+    "choiceTitle": "Deine Wahl",
+    "choice": "Wenn dein Browser Global Privacy Control oder Do Not Track sendet, wird nichts gezählt. Du kannst das Zählen für diesen Browser auch mit der Schaltfläche unten ausschalten. Sie speichert eine einzige Einstellung in deinem Browser, sonst nichts.",
+    "switchOff": "Meine Besuche nicht zählen",
+    "switchOn": "Meine Besuche wieder zählen",
+    "stateOn": "Das Zählen ist in diesem Browser an.",
+    "stateOff": "Das Zählen ist in diesem Browser aus.",
+    "stateSignal": "Das Datenschutzsignal deines Browsers schaltet das Zählen bereits aus.",
+    "noScript": "Ohne JavaScript wird nichts gezählt.",
+    "downloadsTitle": "Downloads",
+    "downloads": "GitHub zählt, wie oft jede Release-Datei heruntergeladen wird. Wir kopieren diese Summen einmal am Tag.",
+    "appTitle": "Die WuWa VR App",
+    "app": "Die App sendet keine Nutzungsdaten. Sie verbindet sich nur mit GitHub, um nach Updates zu suchen und die VR-Mod herunterzuladen.",
+    "storedTitle": "In deinem Browser gespeichert",
+    "stored": "Deine Sprache und die Controller-Tastennamen, falls du sie auswählst, damit die nächste Seite passt. Das verlässt deinen Browser nie.",
+    "otherTitle": "Andere Seiten",
+    "other": "Videos werden erst von youtube-nocookie.com abgespielt, wenn du eins auswählst. GitHub, YouTube und Ko-fi haben eigene Datenschutzerklärungen.",
+    "questions": "Fragen?",
+    "issueLink": "Eröffne ein Issue auf GitHub",
+    "description": "Was die WuWa VR Website zählt, wie, und wie du es ausschaltest."
   }
 }

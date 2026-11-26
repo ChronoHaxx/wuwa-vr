@@ -92,7 +92,7 @@ ${pad.block({code, dir, copy: home.pad, prefix})}
   const head = L.head({lang: code, title: `${plain('title')} — WuWa VR`, description: plain('intro'), prefix});
   return `<!doctype html><html lang="${code}" dir="${dir}">${head}<body><a class="skip" href="#main">${esc(chrome.skip)}</a>` +
     `${L.header({lang: code, prefix, labels: chrome, links, languageHref})}<main class="wrap page doc-page" id="main" data-guide="${code}">${body}</main>` +
-    `${L.footer({prefix, labels: chrome})}</body></html>\n`;
+    `${L.footer({prefix, labels: chrome, lang: code})}</body></html>\n`;
 }
 
 // English reference: Markdown rendered with GitHub-style heading ids (first use wins).

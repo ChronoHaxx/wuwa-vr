@@ -17,7 +17,7 @@ function generate(...args) {
     {cwd: fixture, env: process.env, encoding: 'utf8', timeout: 30000, windowsHide: true});
 }
 function verify() {
-  assert.equal(metadata.pages.length, 41);  // 32 + the feedback form in nine more languages (5 Nov 2026)
+  assert.equal(metadata.pages.length, 51);  // 32 + the feedback form in nine more languages (5 Nov 2026) + privacy in ten (23 Nov 2026)
   for (const file of metadata.pages) {
     const html = fs.readFileSync(path.join(site, file), 'utf8');
     assert.deepEqual(managedValues(html, /<link rel="canonical" href="([^"]+)">/g),
@@ -33,7 +33,7 @@ function verify() {
   const sitemap = fs.readFileSync(path.join(site, 'sitemap.xml'), 'utf8');
   const urls = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
   assert.deepEqual(urls, metadata.pages.map(metadata.canonicalUrl));
-  assert.equal(new Set(urls).size, 41);
+  assert.equal(new Set(urls).size, 51);
   assert(urls.includes(metadata.baseUrl));
   assert(!urls.some(url => /index\.html|google3ebe|launcher-updates/.test(url)));
   for (const file of ['index.html', 'guide.html', 'l/en.html', 'l/zh-Hans.html']) {
@@ -114,7 +114,7 @@ try {
   const first = snapshot();
   for (const file of metadata.pages) assert.equal(outsideHead(first[file]), outsideHead(before[file]), 'Body/shell changed: ' + file);
   for (const file of protectedFiles) assert.equal(first[file], before[file], 'Protected bytes changed: ' + file);
-  checks.push('41 self canonicals and share tags; EN/zh entry text; root sitemap; body/shell/verification/feed preserved');
+  checks.push('51 self canonicals and share tags; EN/zh entry text; root sitemap; body/shell/verification/feed preserved');
   generate('--metadata-only');
   assert.deepEqual(snapshot(), first);
   checks.push('metadata-only regeneration is byte-identical');

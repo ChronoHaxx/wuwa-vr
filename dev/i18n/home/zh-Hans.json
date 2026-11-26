@@ -26,7 +26,8 @@
     "support": "自愿支持",
     "credits": "致谢",
     "mit": "原创独立网站与指南内容采用 MIT 许可。上游组件保留各自条款。",
-    "suggest": "查看简体中文版"
+    "suggest": "查看简体中文版",
+    "privacy": "隐私"
   },
   "english": "（英文）",
   "hero": {
@@ -190,5 +191,34 @@
     "title": "语言",
     "intro": "首页、玩家指南、常用操作和反馈表单提供十种语言。详细参考和 UEVR 自带菜单为英文。",
     "request": "申请新语言或纠正翻译"
+  },
+  "privacy": {
+    "title": "隐私",
+    "intro": "本网站会统计使用情况，以便了解哪些指南有帮助、大家在哪里遇到困难。本网站不使用 Cookie，也不保存任何能识别你身份的信息。",
+    "countedTitle": "统计哪些内容",
+    "counted": "打开了哪些页面、使用哪种语言；对“下载”以及 GitHub、YouTube 和 Ko-fi 链接的点击；指南读到了哪里；打开了哪些问题；快捷键搜索是否找到结果（绝不记录你输入的内容）；以及反馈表单的按钮。",
+    "howTitle": "如何统计",
+    "how": "Cloudflare Web Analytics 统计页面浏览量，我们自己的小型计数器（同样运行在 Cloudflare 上）统计其余内容。为了统计每日访客数，你的 IP 地址和浏览器信息会与一个每天丢弃的随机密钥混合计算；你的 IP 地址从不保存。数据在 Cloudflare 上保留 3 个月后删除。我们只查看每日汇总。",
+    "notDoneTitle": "绝不做的事",
+    "notDone": "不投放广告，不跨网站跟踪，不录制屏幕，也不出售或分享数据。",
+    "choiceTitle": "你的选择",
+    "choice": "如果你的浏览器发送 Global Privacy Control 或 Do Not Track 信号，则不会统计任何内容。你也可以用下面的按钮在此浏览器上关闭统计。它只会在你的浏览器中保存一项设置，别无其他。",
+    "switchOff": "不要统计我的访问",
+    "switchOn": "重新统计我的访问",
+    "stateOn": "此浏览器的统计已开启。",
+    "stateOff": "此浏览器的统计已关闭。",
+    "stateSignal": "你的浏览器隐私信号已关闭统计。",
+    "noScript": "关闭 JavaScript 时不会统计任何内容。",
+    "downloadsTitle": "下载",
+    "downloads": "GitHub 会统计每个发布文件的下载次数。我们每天复制一次这些总数。",
+    "appTitle": "WuWa VR 应用",
+    "app": "该应用不发送任何使用数据。它只会连接 GitHub 检查更新并下载 VR 模组。",
+    "storedTitle": "保存在你浏览器中的内容",
+    "stored": "如果你选择了语言和手柄按键名称，会保存你的选择，让下一个页面保持一致。这些信息从不离开你的浏览器。",
+    "otherTitle": "其他网站",
+    "other": "只有在你选择视频后，视频才会从 youtube-nocookie.com 播放。GitHub、YouTube 和 Ko-fi 有各自的隐私政策。",
+    "questions": "有疑问？",
+    "issueLink": "在 GitHub 上提交 issue",
+    "description": "WuWa VR 网站统计哪些内容、如何统计，以及如何关闭统计。"
   }
 }

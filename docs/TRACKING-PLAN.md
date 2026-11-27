@@ -155,9 +155,10 @@ const wuwaVr: AppSpec = {
 // ...and in APPS:  "wuwa-vr": wuwaVr,
 ```
 
-Columns in `usage_events`: index1 `wuwa-vr`, blob1 event, blob2 form factor,
-blob3 build, blob4 visitor hash (`app_loaded` only), blob5 `page`, blob6
-`lang`, blob7–8 the event's own properties in the order above.
+Columns in `usage_events`: index1 `wuwa-vr` (`wuwa-vr:app_loaded` on
+app_loaded rows), blob1 event, blob2 form factor, blob3 build, blob4 visitor
+hash (`app_loaded` only), blob5 `page`, blob6 `lang`, blob7–8 the event's own
+properties in the order above.
 
 ## Retention and reports
 

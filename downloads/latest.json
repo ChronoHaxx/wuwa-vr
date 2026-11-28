@@ -1,13 +1,13 @@
 {
   "schema": 1,
   "repository": "ChronoHaxx/wuwa-vr",
-  "date": "2026-11-27",
+  "date": "2026-11-28",
   "note": "Cumulative GitHub release asset download counts. See docs/METRICS.md on main for what each category means.",
   "totals": {
-    "all": 978,
+    "all": 979,
     "installer": 197,
     "app_update": 121,
-    "mod_package": 470,
+    "mod_package": 471,
     "source": 40,
     "docs": 142,
     "other": 8
@@ -16,10 +16,10 @@
     {
       "tag": "beta-1-2-8",
       "published": "2026-11-17",
-      "all": 66,
+      "all": 67,
       "installer": 14,
       "app_update": 19,
-      "mod_package": 25,
+      "mod_package": 26,
       "source": 1,
       "docs": 7,
       "other": 0,
@@ -47,7 +47,7 @@
         {
           "name": "WuWa-VR-Launcher.zip",
           "category": "mod_package",
-          "downloads": 25
+          "downloads": 26
         },
         {
           "name": "WuWa-VR-Setup.exe",
